@@ -22,6 +22,47 @@ The sample may already have completed: **do not rerun it just to obtain proof**;
 inspect that existing job instead. Receipts are local acceptance evidence, not
 signed deployment authorization or proof that the whole catalogue is correct.
 
+### Opt-in durable receipt archive
+
+`archive_smoke_receipts.py` archives **existing receipts only** to the existing
+approved AWS S3 facility. It never imports the smoke runner, creates a scrape,
+changes bucket settings, or deletes remote objects. Nothing is enabled or
+scheduled automatically. Production enablement requires separate approval.
+
+After approval, run from `backend-py` using the existing storage AWS identity:
+
+```bash
+python -B deploy/archive_smoke_receipts.py \
+  --bucket APPROVED_EXISTING_BUCKET \
+  --expected-owner APPROVED_12_DIGIT_ACCOUNT \
+  --region APPROVED_REGION --keep-local 50
+```
+
+The bucket, owner and region must be explicitly supplied; credentials come from
+the existing AWS credential chain, not command-line arguments. The bucket must
+already have versioning and all four public-access blocks enabled. The command
+refuses expiration rules covering `release-smoke-receipts/v1/`, including
+noncurrent-version expiry. Existing snapshot-type tag rules do not apply to
+these untagged receipts. It does not modify those policies. Grant only the
+required bucket configuration reads plus PutObject/GetObject/GetObjectVersion
+on this prefix; no delete or bucket-policy mutation permissions are needed.
+
+Receipts are redacted again and stored under a job-ID/content-SHA256 key using
+conditional writes, server-side encryption and private bucket access. Each
+upload is read back and compared byte-for-byte and against SHA256 metadata.
+Retrying after a failure reuses the same object, including an upload whose
+response was lost. No new sample is needed.
+
+The newest 50 local receipts are retained by default. Older files are removed
+only after their exact remote version is freshly read and verified and the
+local file is confirmed unchanged. Unarchived, malformed, changed or
+unverifiable receipts remain local even above that limit: preserving the only
+copy takes priority over a hard disk cap. A local lock serializes archive runs.
+The JSON summary reports failures and the command exits nonzero if any receipt
+could not be safely handled. Rerun **the archive command**, never the sample.
+Arrange any periodic invocation through the approved production operations
+process; no timer or service is installed by this change.
+
 Use `inspect_restart_smoke.py`, **not** `safe_restart_smoke.py`, when the sample
 already exists. Obtain the explicit job and Celery task IDs from the original
 run. Obtain the complete expected worker nodenames from the deployment inventory,
