@@ -65,12 +65,14 @@ if [ "$release_test_mode" != 1 ]; then
   # Use the reviewed target's sample lifecycle rules before checkout, without
   # modifying installed code. Keep the helper beside its pinned proof assets.
   smoke_helper="$(mktemp "$backend_root/deploy/.release-smoke.XXXXXX.py")"
-  trap 'rm -f "$smoke_helper"' EXIT
+  trap 'rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py"' EXIT
   run_release_user git -C "$repo_root" show \
     "$target:backend-py/deploy/safe_restart_smoke.py" > "$smoke_helper"
+  run_release_user git -C "$repo_root" show \
+    "$target:backend-py/deploy/smoke_receipt.py" > "${smoke_helper%.py}.receipt.py"
   "$python_bin" -B "$smoke_helper" \
     --expected-rehearsal-account-id "$expected_disposable_account"
-  rm -f "$smoke_helper"
+  rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py"
   trap - EXIT
 fi
 

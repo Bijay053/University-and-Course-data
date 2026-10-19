@@ -603,6 +603,7 @@ def _worker_snapshot(celery: Any, timeout_seconds: float) -> dict[str, Any]:
         ):
             raise SmokeFailure("cannot inspect workers: no ping replies")
         states = {}
+        complete_replies = {"ping": workers}
         for state in ("reserved", "scheduled", "active"):
             replies = getattr(inspect, state)()
             if not isinstance(replies, Mapping) or set(replies) != set(workers):
@@ -617,7 +618,9 @@ def _worker_snapshot(celery: Any, timeout_seconds: float) -> dict[str, Any]:
                         raise SmokeFailure(f"cannot inspect workers: malformed {state} task")
                     tasks.append(task)
             states[state] = tasks
+            complete_replies[state] = replies
         states["_workers"] = sorted(workers)
+        states["_complete_replies"] = complete_replies
         return states
     except SmokeFailure:
         raise
@@ -631,7 +634,7 @@ async def _wait_for_worker_idle(
     sample_task_id: str | None = None,
     sample_job_id: str | None = None,
     wait_for_startup: bool = False,
-) -> None:
+) -> dict[str, Any]:
     """Observe return; never revoke, purge queues, or stop a worker."""
     if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
         raise SmokeFailure("worker return timeout must be finite and positive")
@@ -706,7 +709,13 @@ async def _wait_for_worker_idle(
                 raise SmokeFailure(f"sample Celery task ended as {state}")
             returned = state == "SUCCESS"
         if returned and not tasks and time.monotonic() < deadline:
-            return
+            return {
+                "observed_at": datetime.now(UTC).isoformat(),
+                "complete_worker_replies": states.get("_complete_replies"),
+                "task_id": sample_task_id,
+                "job_id": sample_job_id,
+                "result": result,
+            }
         await asyncio.sleep(min(1.0, max(0.0, deadline - time.monotonic())))
 
 
@@ -744,7 +753,7 @@ print(json.dumps({"states": states, "result": result}))
         if observation == {"not_ready": True}:
             raise WorkerNotReady("cannot inspect workers: no ping replies")
         states = observation["states"]
-        if not isinstance(states, dict) or set(states) != {"reserved", "scheduled", "active", "_workers"}:
+        if not isinstance(states, dict) or set(states) != {"reserved", "scheduled", "active", "_workers", "_complete_replies"}:
             raise ValueError("invalid worker states")
         return states, observation["result"]
     except WorkerNotReady:
@@ -832,6 +841,7 @@ async def _wait_for_done(
 
 
 async def _main(args: argparse.Namespace) -> None:
+    started_at = datetime.now(UTC).isoformat()
     recent_limit = getattr(args, "recent_deployment_evidence", None)
     evidence_path = getattr(
         args, "deployment_evidence_path", DEFAULT_DEPLOYMENT_EVIDENCE_PATH
@@ -912,10 +922,32 @@ async def _main(args: argparse.Namespace) -> None:
     job_id, task_id = await _create_and_dispatch(university_id, args.course_url)
     payload, staged_rows = await _wait_for_done(job_id, args.timeout_seconds)
     validate_done_payload(payload, staged_rows=staged_rows)
-    await _wait_for_worker_idle(
+    worker_evidence = await _wait_for_worker_idle(
         worker_timeout, sample_task_id=task_id, sample_job_id=job_id
     )
-    validate_idle_counts(await _active_counts())
+    final_counts = await _active_counts()
+    validate_idle_counts(final_counts)
+    try:
+        import importlib.util
+        receipt_module_path = Path(__file__).with_suffix(".receipt.py")
+        if not receipt_module_path.exists():
+            receipt_module_path = Path(__file__).with_name("smoke_receipt.py")
+        spec = importlib.util.spec_from_file_location("smoke_receipt", receipt_module_path)
+        receipt_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(receipt_module)
+        receipt = receipt_module.save_receipt(
+            Path(getattr(args, "receipt_directory", "/var/lib/university-portal/smoke-receipts")),
+            release=release, job_id=job_id, task_id=task_id,
+            payload=payload, staged_rows=staged_rows,
+            worker_evidence=worker_evidence, counts=final_counts,
+            started_at=started_at,
+        )
+    except Exception as exc:
+        raise SmokeFailure(
+            f"successful sample receipt could not be retained: job_id={job_id} "
+            f"task_id={task_id}; inspect this existing sample, do not rerun it"
+        ) from exc
+    print(json.dumps(receipt, sort_keys=True, separators=(",", ":")))
     print(f"safe restart smoke passed: release={release} job_id={job_id}")
 
 
@@ -927,6 +959,11 @@ def main() -> int:
         "--api-health-url", default="http://127.0.0.1:8000/api/health"
     )
     parser.add_argument("--timeout-seconds", type=int, default=300)
+    parser.add_argument(
+        "--receipt-directory", type=Path,
+        default=Path("/var/lib/university-portal/smoke-receipts"),
+        help="private directory for atomic successful sample JSON receipts",
+    )
     parser.add_argument(
         "--worker-return-timeout-seconds",
         type=float,

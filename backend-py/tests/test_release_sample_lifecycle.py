@@ -2,6 +2,7 @@
 from argparse import Namespace
 from pathlib import Path
 import subprocess
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -19,6 +20,12 @@ def snapshot(*active, reserved=(), scheduled=()):
     return {
         "active": list(active), "reserved": list(reserved),
         "scheduled": list(scheduled), "_workers": ["worker"],
+        "_complete_replies": {
+            "ping": {"worker": {"ok": "pong"}},
+            "active": {"worker": list(active)},
+            "reserved": {"worker": list(reserved)},
+            "scheduled": {"worker": list(scheduled)},
+        },
     }
 
 
@@ -235,7 +242,7 @@ def test_observer_loads_its_own_reviewed_helper(monkeypatch):
     def run(command, **_):
         assert command[-1] == str(Path(smoke.__file__).resolve())
         compile(command[3], "<worker-observer>", "exec")
-        return '{"states":{"active":[],"reserved":[],"scheduled":[],"_workers":["worker"]},"result":null}'
+        return json.dumps({"states": snapshot(), "result": None})
 
     monkeypatch.setattr(smoke, "_run", run)
     assert smoke._worker_observation(5, None)[0] == snapshot()
@@ -272,7 +279,9 @@ def test_precheckout_smoke_uses_target_without_modifying_installed_helper():
     cleanup = source.index('rm -f "$smoke_helper"', run)
     pause = source.index("# Pause consumption")
     assert fence < extract < run < cleanup < pause
-    assert 'trap \'rm -f "$smoke_helper"\' EXIT' in source
+    assert 'trap \'rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py"\' EXIT' in source
+    receipt_extract = source.index('"$target:backend-py/deploy/smoke_receipt.py"')
+    assert extract < receipt_extract < run
 
 
 @pytest.mark.asyncio
@@ -346,7 +355,9 @@ def test_snapshot_preserves_scheduled_task_identity():
     view = smoke._worker_snapshot(SimpleNamespace(
         control=SimpleNamespace(inspect=lambda **_: inspect)
     ), 1)
-    assert view == snapshot(scheduled=[task()])
+    expected = snapshot(scheduled=[task()])
+    expected["_complete_replies"]["scheduled"]["worker"] = [{"eta": "later", "request": task()}]
+    assert view == expected
 
 
 def test_observer_timeout_cannot_touch_worker_or_queues(monkeypatch):

@@ -2,6 +2,26 @@
 
 ## Read-only inspection of an existing restart smoke sample
 
+Successful ordinary `safe_restart_smoke.py` runs now automatically retain a
+private JSON receipt in `/var/lib/university-portal/smoke-receipts/<job-id>.json`
+(override with `--receipt-directory`). The same sanitized JSON is printed before
+the existing success line. Receipts use the actual persisted DONE payload and
+the exact task result and complete per-worker replies accepted by the guards;
+they do not dispatch a second sample or inspect workers again.
+
+The receipt follows the `database`, `celery`, `complete_worker_replies`, and
+`active_database_counts` structure in
+`docs/production/release-sample-lifecycle-evidence-2026-10-08.json`. Invocation
+and final worker observation timestamps distinguish it from later inspections.
+It does not invent SSM command IDs, journal evidence, or infrastructure identity.
+Credential-bearing keys, URL credentials/query strings, and common credential
+text are redacted recursively; other DONE fields are retained in full.
+Files are created atomically with mode 0600 and never replace earlier evidence.
+If receipt persistence fails, the command fails rather than reporting success.
+The sample may already have completed: **do not rerun it just to obtain proof**;
+inspect that existing job instead. Receipts are local acceptance evidence, not
+signed deployment authorization or proof that the whole catalogue is correct.
+
 Use `inspect_restart_smoke.py`, **not** `safe_restart_smoke.py`, when the sample
 already exists. Obtain the explicit job and Celery task IDs from the original
 run. Obtain the complete expected worker nodenames from the deployment inventory,
