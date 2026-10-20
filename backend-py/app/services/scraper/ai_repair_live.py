@@ -261,7 +261,10 @@ def _course_links_in_region(region, url: str, extra_hosts=()) -> list[dict]:
         path = urlsplit(candidate).path
         if (
             len(text) < 5 or not official_url(candidate, url, extra_hosts)
-            or not re.fullmatch(r"/study/(?:undergraduate|postgraduate)/[^/]+/?", path, re.I)
+            or not re.fullmatch(
+                r"(?:/study/(?:undergraduate|postgraduate)/[^/]+|/courses/[^/]+)/?",
+                path, re.I,
+            )
         ):
             continue
         if (
@@ -658,6 +661,19 @@ def inspect_page(url: str, html: str, config=None) -> dict:
         if re.search(r"\b(?:campus|location)\b\s*:\s*[A-Z][a-z]{2,}", text):
             facts.add("location")
     owned_award = "award" in facts
+    # Some degree templates present the award in H1 and the UCAS identifier,
+    # duration and delivery together in a compact header, without repeating
+    # "Qualification:" or "Study mode:". This is course-owned identity, not
+    # page-wide keyword evidence. Related cards/navigation were removed above.
+    ucas_header = next((
+        field["text"] for field in fields
+        if re.search(r"\bUCAS\s+(?:course\s+)?code\s*:\s*[A-Z0-9]{4}\b", field["text"], re.I)
+        and re.search(r"\b(?:duration|course length)\s*:\s*\d", field["text"], re.I)
+        and re.search(r"\b(?:full|part)[ -]time\b", field["text"], re.I)
+    ), None)
+    if ucas_header and _AWARD.search(title) and not is_generic_course_category_name(title):
+        owned_award = True
+        facts.update(("award", "mode"))
     if candidate == OBVIOUS_NON_DEGREE and not (owned_award and reason == "non_degree_url"):
         return {**result, "classification": "non_degree", "reason": reason}
     # A title alone (including a degree title on a partner/legal page) is never
@@ -896,6 +912,15 @@ class LiveRepairEvidence:
                 if (candidate not in self.initial and candidate not in pending
                         and not is_intentionally_excluded_course_url(candidate)):
                     linked.append(candidate)
+            # Broken discovery filters are exactly what this probe diagnoses.
+            # Rank conventional detail routes before navigation without applying
+            # those filters; every candidate still needs fresh owned evidence.
+            linked.sort(key=lambda candidate: (
+                not bool(re.fullmatch(
+                    r"(?:/courses/[^/]+|/study/(?:undergraduate|postgraduate)/[^/]+)/?",
+                    urlsplit(candidate).path, re.I,
+                )),
+            ))
             # Neither root navigation nor links from the first course may
             # consume the budget before the remaining priority targets are
             # checked. After those targets, fresh catalogue links beat stale

@@ -54,6 +54,77 @@ def context(**overrides):
     }
 
 
+def compact_course_header(title="Accounting & Finance BA (Hons)", extra=""):
+    # Reduced from Liverpool Hope's observed course-owned header.
+    return f"""<section id="pageContent"><h1>{title}</h1>
+    <div class="course_header"><p>UCAS Code: N400 | Duration: 3 years |
+    Full Time | Hope Park</p><p>UCAS Campus Code: L46</p></div>
+    <div>Overview Entry Requirements Finance</div>{extra}</section>"""
+
+
+def test_compact_ucas_course_identity_is_positive_live_evidence():
+    page = live.inspect_page(ONE, compact_course_header(), config())
+    assert page["classification"] == "course"
+
+
+@pytest.mark.parametrize("html", [
+    compact_course_header(title="Our courses"),
+    compact_course_header().replace("UCAS Code: N400", "UCAS Campus Code: L46"),
+    '<main><h1>Our courses</h1><div class="related-courses">'
+    + compact_course_header() + '</div></main>',
+    compact_course_header().replace("Duration: 3 years", "Visit our open day"),
+])
+def test_compact_ucas_evidence_requires_current_course_identity(html):
+    assert live.inspect_page(ONE, html, config())["classification"] != "course"
+
+
+@pytest.mark.parametrize("negative", [
+    "<p>This course is not available to international students.</p>",
+    "<p>Delivery: Online only</p>",
+    "<p>Study mode: Part-time only</p>",
+])
+def test_compact_ucas_header_does_not_bypass_eligibility(negative):
+    assert live.inspect_page(ONE, compact_course_header(extra=negative), config())["classification"] == "ineligible"
+
+
+@pytest.mark.asyncio
+async def test_repair_finds_subject_named_courses_and_validates_filter_rescue():
+    first = "https://university.example/courses/accounting-and-finance/"
+    second = "https://university.example/courses/artificial-intelligence/"
+    navigation = "https://university.example/undergraduate/getaprospectus/"
+    listing = f"""<main><h1>Our courses</h1>
+    <a href="{navigation}">Undergraduate degree prospectus</a>
+    <a href="{first}">Accounting and Finance</a>
+    <a href="{second}">Artificial Intelligence</a>
+    <a href="https://other.example/courses/science/">Other institution</a>
+    </main>"""
+    evidence = live.LiveRepairEvidence(context(
+        repair_course_url_sample=[], repair_url_sample=[], dropped_sample=[navigation],
+    ))
+    visited = []
+    async def fetch(url):
+        visited.append(url)
+        evidence.pages_checked += 1
+        html = listing if url == SEED else (
+            compact_course_header() if url in (first, second) else "<main><h1>Prospectus</h1></main>"
+        )
+        record = live.inspect_page(url, html, evidence.config)
+        evidence.records.append(record)
+        return record
+    evidence.fetch = fetch
+    result = await evidence.probe()
+    assert visited[:3] == [SEED, first, second]
+    assert result["course_pages"] == 2
+    assert not any("other.example" in url for url in visited)
+    validation = evidence.discovery_validation(
+        {"allow_url_patterns": ["/broken/"]},
+        {"allow_url_patterns": [r"/courses/[^/]+/$"],
+         "course_detail_url_patterns": [r"/courses/[^/]+/$"]},
+    )
+    assert validation["accepted"], validation
+    assert set(validation["courses"]) == {first, second}
+
+
 @pytest.mark.asyncio
 async def test_live_probe_checks_known_course_before_listing_links():
     ctx = context(repair_course_url_sample=[ONE], passed_sample=[TWO],
@@ -960,6 +1031,34 @@ async def test_live_proven_opaque_courses_finish_discovery_without_field_repair(
     assert accepted_live_probe(result)
     if already_fixed:
         chat.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_subject_named_compact_courses_repair_yaml_without_manual_url(monkeypatch, tmp_path):
+    from app.services.ai_repair_workflow import accepted_live_probe
+    urls = [SEED + "/accounting-and-finance/", SEED + "/artificial-intelligence/"]
+    ctx = context(
+        repair_course_url_sample=[], repair_url_sample=[], dropped_sample=[],
+        yaml_file=tmp_path / "university.yaml", unis_dir=tmp_path,
+    )
+    chat = mock_loop(monkeypatch, ctx, {
+        "confidence": 95, "diagnosis": "Wrong allowlist",
+        "patches": [{"section": "discovery", "field": "allow_url_patterns", "value": ["/courses/"]}],
+    })
+    async def fetch(url, *_args):
+        listing = '<main><h1>Our courses</h1>' + "".join(
+            f'<a href="{u}">{name}</a>'
+            for u, name in zip(urls, ["Accounting and Finance", "Artificial Intelligence"])
+        ) + "</main>"
+        return (listing if url == SEED else compact_course_header()), "", ""
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    monkeypatch.setattr(agent, "_assert_effective_discovery_patch", AsyncMock())
+    result = await agent.run_ai_repair_loop("job-live", FakeDb())
+    assert result["status"] == "completed", result
+    assert accepted_live_probe(result)
+    assert result["attempts"][0]["after_pass_count"] == 2
+    assert result["attempts"][0]["patch_applied_ok"]
+    assert "allow_url_patterns" in ctx["yaml_file"].read_text()
 
 
 def test_unverified_opaque_urls_do_not_count_as_proven_courses():
