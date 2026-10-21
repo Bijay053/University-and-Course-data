@@ -283,6 +283,8 @@ async def test_old_zero_result_job_uses_current_validated_recipe_without_openai(
     monkeypatch.setattr(agent, "read_session", lambda _job: {})
     monkeypatch.setattr(agent, "_write_session", lambda *_args: None)
     monkeypatch.setattr(agent, "_gather_context", lambda *_args: _async_value(ctx))
+    monkeypatch.setattr(agent, "_quality_snapshot", lambda *_args: _async_value({}))
+    monkeypatch.setattr(agent, "persist_repair_audit", lambda *_args: _async_value(None))
 
     session = await run_ai_repair_loop("old-job", object())
 

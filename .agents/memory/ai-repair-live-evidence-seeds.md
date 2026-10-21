@@ -26,3 +26,14 @@ When no staged or previously passing course URLs exist, a configured official co
 **Why:** A Portsmouth repair used its entire six-page probe on the homepage, dead media URLs, and broad study pages while the configured sitemap still contained hundreds of current course pages. Discovery count alone prevented the older sitemap seed path.
 
 **How to apply:** Spend a slot within the existing page budget on the configured official sitemap, filter its locations through the effective course URL gates, and independently fetch and classify a small spread of course details. A course-picker option whose name contains “International” is not an international-audience selector.
+
+Do not let missing-field rows consume every live-probe slot. Reserve some slots
+for better-populated staged candidates, while still classifying them afresh.
+
+**Why:** Contaminated historical reviews can contain prospectus and outreach
+pages with every field missing. Prioritizing gaps alone repeatedly probes those
+pages and produces zero positive course evidence despite valid courses nearby.
+
+**How to apply:** Mix gap-focused candidates with a small spread of populated
+records within the same page budget. Stored completeness is only a sampling
+hint, never proof of course identity or international eligibility.

@@ -100,3 +100,20 @@ async def test_live_validation_proves_both_course_links_before_enabling(monkeypa
     assert len(result["linked_fee_outputs"]) == 2
     assert engine.pages_checked == 3
     assert "_source_html" not in str(engine.audit())
+
+
+def test_explicit_home_quote_cannot_be_promoted_by_ai_or_a_foreign_exchange_mention():
+    from app.services.scraper.linked_fee_repair import explicit_uk_home_fee
+    html = """<main><p>Teaching with our international partners in France.</p>
+    <h2>Tuition fees</h2><p>The tuition fees for 2026/27 are £9,790.</p>
+    <p>If you are a student from the Isle of Man or the Channel Islands,
+    your tuition fees will also be £9,790.</p></main>"""
+    url = "https://www.hope.ac.uk/courses/teaching/"
+    assert explicit_uk_home_fee(html, url, 9790)
+    assert explicit_uk_home_fee(html, url, 16000) is None
+    same_international = html.replace("</main>", "<p>International tuition fees are £9,790.</p></main>")
+    assert explicit_uk_home_fee(same_international, url, 9790) is None
+    heading_international = html.replace("</main>", "<h2>International tuition fees</h2><p>£9,790 per year.</p></main>")
+    assert explicit_uk_home_fee(heading_international, url, 9790) is None
+    assert explicit_uk_home_fee(html, "https://example.ac.nz/course", 9790) is None
+    assert explicit_uk_home_fee(html, url, "not a numeric fee") is None

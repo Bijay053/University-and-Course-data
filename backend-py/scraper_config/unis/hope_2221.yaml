@@ -8,16 +8,25 @@
 # Review and expand it to improve discovery and extraction quality.
 # See scraper_config/defaults.yaml for all available options.
 
-discovery: {}
+discovery:
+  # These are catalogue/support hubs, not awards. Keep actual /courses/
+  # and /postgraduate/postgraduatecourses/ details eligible.
+  block_url_patterns:
+    - '^https?://(?:www\.)?hope\.ac\.uk/undergraduate/(?:degreewithfoundationyear|parentsandsupporters|outreach|networkofhope)/?(?:[?#].*)?$'
+    - '^https?://(?:www\.)?hope\.ac\.uk/undergraduate/getaprospectus(?:/orderaprospectus)?/?(?:[?#].*)?$'
+    - '^https?://(?:www\.)?hope\.ac\.uk/postgraduateresearch/?(?:[?#].*)?$'
 
 extraction:
+  english:
+    central_page: https://www.hope.ac.uk/englishlanguagerequirements/
   fees:
     default_currency: GBP
+    require_explicit_international_context: true
   filters:
     online_only:
       enabled: true
   staging:
     reject_if_missing:
       - course_name
-    skip_degree_qualifier_check: true
+    skip_degree_qualifier_check: false
     require_international_fee: false

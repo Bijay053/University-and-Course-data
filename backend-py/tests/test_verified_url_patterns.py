@@ -59,7 +59,20 @@ def test_partial_progress_is_measured_without_certifying_missing_fields():
         "course_name_pct", "intakes_pct", "mode_pct", "degree_level_pct",
     ], 100)
     after.update(ielts_pct=98, mode_pct=80, total_staged=50)
-    result = compare_quality({"fee_pct": 0, "ielts_pct": 70}, after, child)
+    # Improvements require the same course identities, not two percentages
+    # calculated over potentially different verification samples.
+    before = {
+        "fee_pct": 0, "ielts_pct": 70, "total_staged": 50,
+        "course_presence": {
+            str(i): [0, int(i < 35), 1, 1, 1, 1, int(i < 40), 1]
+            for i in range(50)
+        },
+    }
+    after["course_presence"] = {
+        str(i): [1, int(i < 49), 1, 1, 1, 1, int(i < 40), 1]
+        for i in range(50)
+    }
+    result = compare_quality(before, after, child)
     assert result["improved_fields"] == ["fee_pct", "ielts_pct"]
     assert result["unresolved_fields"] == ["ielts_pct", "mode_pct"]
     assert result["sample_verified"] is False

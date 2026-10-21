@@ -26,3 +26,14 @@ Preserve numeric continuity across inline markup before parsing tuition and acad
 **Why:** ULaw splits visible amounts and years across adjacent spans. Inserting spaces made £16,500 look like £1 and broke year matching, even though the visible page was correct.
 
 **How to apply:** Include split-number markup in financial extraction tests and verify the final persisted amount against the complete published token, not just the first regex match.
+
+International partnerships or exchanges are not evidence of an international
+tuition price. A populated baseline fee is not proof that the value is correct.
+
+**Why:** Liverpool Hope's text about international teaching partners made a UK
+tuition amount look complete in repair metrics. Checking the published page
+revealed the wrong audience despite the apparently healthy field-fill score.
+
+**How to apply:** Test selected amounts against owned audience evidence, retain
+equal home/international prices when explicitly published, and prevent later
+AI fallback from restoring a price already proven to be domestic.

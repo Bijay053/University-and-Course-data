@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import urldefrag, urljoin
+from urllib.parse import urldefrag, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -121,6 +121,39 @@ async def published_fee(html: str, url: str) -> dict | None:
         return None
     return {key: value for key, value in {**candidates[0], "source_url": url}.items()
             if key not in {"domestic_amount", "unpublished"}}
+
+
+def explicit_uk_home_fee(html: str, url: str, amount) -> str | None:
+    """Prove a quoted UK home amount without guessing an international price."""
+    if not (urlsplit(url).hostname or "").endswith(".ac.uk") or not amount:
+        return None
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    domestic = None
+    for node in soup.select("p, li"):
+        if node.find(["p", "li"]):
+            continue
+        text = " ".join(node.get_text(" ", strip=True).split())
+        amounts = {float(v.replace(",", "")) for v in re.findall(r"£\s*(\d[\d,]*(?:\.\d+)?)", text)}
+        if amount not in amounts:
+            continue
+        home_label = re.search(
+            r"\b(?:Isle of Man|Channel Islands|UK students?|Home students?)\b", text, re.I,
+        )
+        if home_label and re.search(r"\b(?:tuition|fees?)\b", text, re.I):
+            domestic = text[:500]
+        else:
+            heading = node.find_previous(["h2", "h3", "h4", "h5"])
+            audience_text = text + " " + (heading.get_text(" ", strip=True) if heading else "")
+            # Equal home/international prices are possible and are not borrowing.
+            if re.search(r"\b(?:international|overseas)\s+(?:tuition\s+)?fees?\b", audience_text, re.I):
+                return None
+    if domestic and any(row["international_fee"] == amount for row in tuition_records(html)):
+        return None
+    return domestic
 
 
 def borrowed_domestic_fee(html: str, amount) -> dict | None:

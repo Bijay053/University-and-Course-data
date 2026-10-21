@@ -73,6 +73,12 @@ _PER_BAND_FLOOR_RE_EACH = re.compile(
     re.IGNORECASE,
 )
 
+_PER_BAND_FLOOR_POSTFIX = re.compile(
+    r"\b([0-9]+(?:\.[0-9]+)?)\s+minimum\s+in\s+each\s+"
+    r"(?:sub[\s-]*)?(?:skill|component|band|section)s?\b",
+    re.IGNORECASE,
+)
+
 # A named component is not a uniform floor.  Keep unpublished components empty:
 # "IELTS 6.0 (including 5.5 in academic writing)" sets writing only.
 _IELTS_NAMED_COMPONENT_RE = re.compile(
@@ -103,6 +109,11 @@ def _try_floor(text: str, match_end: int, lo: float, hi: float) -> float | None:
         v = float(m2.group(1))
         if lo <= v <= hi:
             return v
+    postfix = _PER_BAND_FLOOR_POSTFIX.search(window)
+    if postfix:
+        value = float(postfix.group(1))
+        if lo <= value <= hi:
+            return value
     return None
 
 
