@@ -2512,27 +2512,28 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             if not _emit_buf:
                 return
             rows = _emit_buf[:]
-            _emit_buf.clear()
-        if not rows:
-            return
-        from sqlalchemy import text as _sql_t
-        from datetime import datetime as _dte, timezone as _tze
-        import json as _jsone
-        now = _dte.now(_tze.utc)
-        try:
-            async with AsyncSessionLocal() as _edb:
-                await _edb.execute(
-                    _sql_t(
-                        "INSERT INTO scrape_runtime_logs "
-                        "(runtime_job_id, sequence, event, payload, created_at) "
-                        "VALUES (:rid, :seq, :ev, CAST(:pl AS jsonb), :ts)"
-                    ),
-                    [{"rid": r["rid"], "seq": r["seq"], "ev": r["ev"],
-                      "pl": r["pl"], "ts": now} for r in rows],
-                )
-                await _edb.commit()
-        except Exception as _efx:  # noqa: BLE001
-            log.warning("emit buffer flush failed (%d rows): %s", len(rows), _efx)
+            from sqlalchemy import text as _sql_t
+            from datetime import datetime as _dte, timezone as _tze
+            now = _dte.now(_tze.utc)
+            try:
+                async with AsyncSessionLocal() as _edb:
+                    await _edb.execute(
+                        _sql_t(
+                            "INSERT INTO scrape_runtime_logs "
+                            "(runtime_job_id, sequence, event, payload, created_at) "
+                            "VALUES (:rid, :seq, :ev, CAST(:pl AS jsonb), :ts)"
+                        ),
+                        [{"rid": r["rid"], "seq": r["seq"], "ev": r["ev"],
+                          "pl": r["pl"], "ts": now} for r in rows],
+                    )
+                    await _edb.commit()
+                    # Do not discard evidence until the transaction commits.
+                    # Cancellation rolls back the transaction and leaves these
+                    # rows available for the final drain. Keep concurrent
+                    # flushes serialized, but preserve newly appended rows.
+                    del _emit_buf[:len(rows)]
+            except Exception as _efx:  # noqa: BLE001
+                log.warning("emit buffer flush failed (%d rows): %s", len(rows), _efx)
 
     async def _emit_flush_loop() -> None:
         """Background task: drain emit buffer every _EMIT_FLUSH_INTERVAL seconds."""
@@ -2561,7 +2562,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         })
         # Flush immediately on terminal events or when the buffer is full.
         # Background loop handles routine flushing for in-progress messages.
-        if event in ("complete", "error", "stopped") or len(_emit_buf) >= _EMIT_FLUSH_BATCH:
+        if event in ("done", "complete", "error", "stopped") or len(_emit_buf) >= _EMIT_FLUSH_BATCH:
             await _flush_emit_buf()
 
     from app.release_info import get_release_revision
