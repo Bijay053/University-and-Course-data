@@ -126,6 +126,84 @@ async def test_repair_finds_subject_named_courses_and_validates_filter_rescue():
 
 
 @pytest.mark.asyncio
+async def test_contaminated_missing_fields_do_not_exhaust_course_evidence_slots():
+    navigation = SEED + "/prospectus"
+    evidence = live.LiveRepairEvidence(context(
+        field_complete_course_urls=[ONE, TWO],
+        missing_fee_urls=[navigation, PARTNER],
+        critical_quality={"affected_rows": [
+            {"url": navigation}, {"url": PARTNER},
+        ]},
+    ))
+    visited = []
+    async def fetch(url):
+        visited.append(url)
+        evidence.pages_checked += 1
+        record = live.inspect_page(
+            url, course() if url in (ONE, TWO) else "<main><h1>Prospectus</h1></main>",
+            evidence.config,
+        )
+        evidence.records.append(record)
+        return record
+    evidence.fetch = fetch
+    result = await evidence.probe()
+    assert visited[:3] == [SEED, ONE, TWO]
+    assert result["course_pages"] == 2
+    assert evidence.pages_checked <= 6
+
+
+@pytest.mark.asyncio
+async def test_recent_review_urls_replace_stale_complete_anchors():
+    stale = SEED + "/old-course"
+    evidence = live.LiveRepairEvidence(context(
+        recent_course_urls=[ONE, TWO],
+        field_complete_course_urls=[stale],
+    ))
+    visited = []
+    async def fetch(url):
+        visited.append(url)
+        evidence.pages_checked += 1
+        record = live.inspect_page(
+            url, course() if url in (ONE, TWO) else "<main><h1>Not found</h1></main>",
+            evidence.config,
+        )
+        evidence.records.append(record)
+        return record
+    evidence.fetch = fetch
+    result = await evidence.probe()
+    assert visited[:3] == [SEED, ONE, TWO]
+    assert stale not in visited
+    assert result["course_pages"] == 2
+    assert evidence.pages_checked <= 6
+
+
+@pytest.mark.asyncio
+async def test_dead_anchor_is_replaced_before_prospectus_pages():
+    navigation = SEED + "/prospectus"
+    third = SEED.rstrip("/") + "/courses/chemistry"
+    evidence = live.LiveRepairEvidence(context(
+        field_complete_course_urls=[ONE, TWO],
+        missing_location_urls=[navigation],
+        repair_course_url_sample=[third],
+    ))
+    visited = []
+    async def fetch(url):
+        visited.append(url)
+        evidence.pages_checked += 1
+        record = live.inspect_page(
+            url, course() if url in (TWO, third) else "<main><h1>Not found</h1></main>",
+            evidence.config,
+        )
+        evidence.records.append(record)
+        return record
+    evidence.fetch = fetch
+    result = await evidence.probe()
+    assert visited[:4] == [SEED, ONE, TWO, third]
+    assert result["course_pages"] == 2
+    assert evidence.pages_checked <= 6
+
+
+@pytest.mark.asyncio
 async def test_live_probe_checks_known_course_before_listing_links():
     ctx = context(repair_course_url_sample=[ONE], passed_sample=[TWO],
                   repair_url_sample=[PARTNER])

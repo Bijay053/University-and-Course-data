@@ -283,6 +283,8 @@ async def test_old_zero_result_job_uses_current_validated_recipe_without_openai(
     monkeypatch.setattr(agent, "read_session", lambda _job: {})
     monkeypatch.setattr(agent, "_write_session", lambda *_args: None)
     monkeypatch.setattr(agent, "_gather_context", lambda *_args: _async_value(ctx))
+    monkeypatch.setattr(agent, "_quality_snapshot", lambda *_args: _async_value({}))
+    monkeypatch.setattr(agent, "persist_repair_audit", lambda *_args: _async_value(None))
 
     session = await run_ai_repair_loop("old-job", object())
 
@@ -568,6 +570,22 @@ async def test_atomic_extraction_rule_apply_targets_runtime_auto_config() -> Non
     assert db.commits == 1
     assert db.saved["admin_config"] == before["admin_config"]
     assert db.saved["auto_config"]["extraction_rules"]["duration"]["css"] == ".duration"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("empty", [None, {}])
+async def test_empty_config_apply_uses_same_normalization_as_read(empty) -> None:
+    class EmptyConfigDb(_FakeConfigDb):
+        async def execute(self, statement, params):
+            if "UPDATE universities" in str(statement):
+                assert "COALESCE(NULLIF(scrape_config, 'null'::jsonb), '{}'::jsonb)" in str(statement)
+                assert json.loads(params["before"]) == {}
+            return await super().execute(statement, params)
+    db = EmptyConfigDb(empty)
+    result = await _apply_recipe_to_db(7, {"linked_fee_repair": True}, db)
+    assert result["before"] == {}
+    assert result["applied"]["recipe"]["linked_fee_repair"] is True
+    assert db.commits == 1
 
 
 @pytest.mark.asyncio

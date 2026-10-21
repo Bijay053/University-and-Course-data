@@ -1715,6 +1715,14 @@ def _select_central_english_program(
         if not isinstance(profile, dict):
             continue
         values = profile.get("values")
+        # An explicit official "PGCE Programmes" row applies to that award
+        # family, not undergraduate teaching degrees that also confer QTS.
+        if (
+            profile.get("program_family") == "PGCE"
+            and _re.search(r"\bpgce\b", target)
+            and isinstance(values, dict)
+        ):
+            return values
         raw_codes = profile.get("course_codes")
         if isinstance(raw_codes, list):
             codes = {str(code or "").strip().upper() for code in raw_codes}
@@ -11348,6 +11356,19 @@ async def extract_course(
             payload["duration_term"] = _sqe_total["duration_term"]
             evidence.append(_sqe_total["evidence"])
         payload["extraction_method"] = _sqe_methods
+
+    _final_fee_cfg = getattr(getattr(get_uni_config(), "extraction", None), "fees", None)
+    if html and getattr(_final_fee_cfg, "require_explicit_international_context", False):
+        from app.services.scraper.linked_fee_repair import explicit_uk_home_fee
+        _home_fee_proof = explicit_uk_home_fee(html, url, payload.get("international_fee"))
+        if _home_fee_proof:
+            for _fee_key in ("international_fee", "fee_year", "fee_term"):
+                payload[_fee_key] = None
+            evidence.append({
+                "field_key": "international_fee", "value": None, "confidence": 1.0,
+                "method": "verified_home_fee_rejected", "source_url": url,
+                "snippet": _home_fee_proof,
+            })
 
     if (central_data or {}).get("linked_fee_repair") is True and html:
         from app.services.scraper.linked_fee_repair import tuition_records

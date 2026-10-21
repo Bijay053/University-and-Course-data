@@ -2011,7 +2011,17 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
                    )                                                  AS staged_course_urls,
                    array_agg(course_website ORDER BY id)
                      FILTER (WHERE international_fee IS NULL
-                             AND course_website IS NOT NULL)          AS missing_fee_urls
+                             AND course_website IS NOT NULL)          AS missing_fee_urls,
+                   array_agg(course_website ORDER BY id)
+                     FILTER (WHERE international_fee > 0 AND ielts_overall > 0
+                             AND course_website IS NOT NULL)          AS field_complete_course_urls,
+                   ARRAY(
+                     SELECT recent.course_website FROM scraped_courses recent
+                     WHERE recent.university_id = :uid
+                       AND recent.status IN ('pending', 'review', 'approved')
+                       AND recent.course_website IS NOT NULL
+                     ORDER BY recent.id DESC LIMIT 12
+                   )                                                  AS recent_course_urls
             FROM   scraped_courses
             WHERE  university_id = :uid
               AND  scrape_job_id = :jid
@@ -2090,6 +2100,8 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
         "intentional_excluded_sample": intentional_excluded_sample,
         "repair_course_url_sample": repair_course_url_sample,
         "missing_fee_urls": list(q.get("missing_fee_urls") or []) if q else [],
+        "field_complete_course_urls": list(q.get("field_complete_course_urls") or []) if q else [],
+        "recent_course_urls": list(q.get("recent_course_urls") or []) if q else [],
         "repair_url_sample": list(dict.fromkeys(repair_course_url_sample + dropped_sample)),
         "passed_sample":   passed_sample,
         "gate_skip_counts": gate_skip_counts,
@@ -2329,7 +2341,8 @@ async def _apply_to_db(
     result = await db.execute(
         text(
             "UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) "
-            "WHERE id = :id AND scrape_config = CAST(:expected AS jsonb)"
+            "WHERE id = :id AND "
+            "COALESCE(NULLIF(scrape_config, 'null'::jsonb), '{}'::jsonb) = CAST(:expected AS jsonb)"
         ),
         {
             "cfg": _json.dumps(sc),
@@ -2450,7 +2463,8 @@ async def _apply_recipe_to_db(
     result = await db.execute(
         text(
             "UPDATE universities SET scrape_config = CAST(:after AS jsonb) "
-            "WHERE id = :id AND scrape_config = CAST(:before AS jsonb)"
+            "WHERE id = :id AND "
+            "COALESCE(NULLIF(scrape_config, 'null'::jsonb), '{}'::jsonb) = CAST(:before AS jsonb)"
         ),
         {
             "after": _json.dumps(updated_sc),

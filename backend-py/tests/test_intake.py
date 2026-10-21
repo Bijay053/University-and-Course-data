@@ -25,6 +25,28 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def test_modal_may_is_not_an_intake_without_a_published_start_date():
+    html = "<main><h1>Primary Education BA (Hons)</h1><p>You may apply for this course. Placements may be required.</p></main>"
+    assert _run(intake.extract(html, "https://www.hope.ac.uk/courses/primary-education/")) == []
+
+
+def test_modal_may_near_start_keyword_is_not_an_intake():
+    html = "<main><p>Course start information may be updated. Applicants may need an interview.</p></main>"
+    assert _run(intake.extract(html, "https://example.edu/courses/education")) == []
+
+
+def test_genuine_labelled_may_start_is_preserved():
+    html = "<main><dl><dt>Start date</dt><dd>May 2027</dd></dl></main>"
+    result = _run(intake.extract(html, "https://example.edu/courses/education"))
+    assert result[0].normalized["intake_months"] == ["May"]
+
+
+def test_lowercase_may_with_day_is_preserved():
+    html = "<main><p>Course starts 15 may 2027.</p></main>"
+    result = _run(intake.extract(html, "https://example.edu/courses/education"))
+    assert result[0].normalized["intake_months"] == ["May"]
+
+
 def test_strong_intake_sibling_div_classifies_via_structural_pass():
     """ASA-style adjacent-div idiom: `<div><strong>Intake</strong></div>
     <div>February, July</div>`. Pre-fix, the keyword window walked the

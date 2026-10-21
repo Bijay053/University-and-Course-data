@@ -284,7 +284,9 @@ _SALARY_CTX = re.compile(
     re.IGNORECASE,
 )
 _INTL_CTX = re.compile(
-    r"\b(international|overseas|non[-\s]?resident|out[-\s]?of[-\s]?(?:state|country)|foreign)\b",
+    r"\b(international(?!\s+(?:partners?|partnerships?|placements?|exchanges?|"
+    r"collaborations?|relations|business|travel|experiences?|opportunities)\b)"
+    r"|overseas|non[-\s]?resident|out[-\s]?of[-\s]?(?:state|country)|foreign)\b",
     re.IGNORECASE,
 )
 _TUITION_CTX = re.compile(r"\b(tuition|fee|fees|cost\s+of\s+study)\b", re.IGNORECASE)

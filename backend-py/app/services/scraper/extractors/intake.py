@@ -1087,7 +1087,21 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
 
     # Pass 2: month names anywhere in scoped chunks.
     if not months:
-        for raw in _MONTH_RE.findall(search):
+        for match in _MONTH_RE.finditer(search):
+            raw = match.group(1)
+            # The modal verb "may" is not a published intake. A day/month
+            # date was handled above, and labelled cells were handled by
+            # the structural pass. Do not manufacture May from prose.
+            if raw.casefold() == "may" and (
+                (not chunks and raw == "may")
+                or re.match(
+                    r"\s+(?:be|have|include|require|need|apply|vary|change|"
+                    r"also|not|wish|choose|take|offer|lead|result|qualify|"
+                    r"find|receive|request|contact|ask|use)\b",
+                    search[match.end():], re.I,
+                )
+            ):
+                continue
             month = _normalise_month(raw)
             if month and month not in months:
                 months.append(month)

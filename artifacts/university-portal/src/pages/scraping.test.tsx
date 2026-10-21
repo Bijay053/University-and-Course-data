@@ -350,7 +350,9 @@ function initialReview(): ScrapingInitialReviewState {
   };
 }
 
-describe("unfinished course recovery report navigation", () => {
+// These full-page tests perform multiple editor/report transitions. Keep a
+// bounded allowance for JSDOM layout work while backend tests share the CPU.
+describe("unfinished course recovery report navigation", { timeout: 15_000 }, () => {
   it("guards history paging and filtering before removing a changed report", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -438,7 +440,7 @@ describe("unfinished course recovery report navigation", () => {
   });
 });
 
-describe("discarding a course edit", () => {
+describe("discarding a course edit", { timeout: 15_000 }, () => {
   function openCourseEditor({ routing = false, save = false } = {}) {
     const review = initialReview();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

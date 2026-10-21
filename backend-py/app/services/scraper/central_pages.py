@@ -822,6 +822,23 @@ async def _parse_english_by_level_async(
         if londonmet_ug:
             return {"undergraduate": londonmet_ug}
 
+        from .central_english_tables import level_ielts_cells, other_level_scores
+        from html import escape
+        level_cells = level_ielts_cells(html)
+        if level_cells is not None:
+            # A row/column table must not be flattened into heading windows:
+            # both level headings precede the IELTS row in plain text.
+            table_profiles = {}
+            other_scores = other_level_scores(html)
+            for level, value in level_cells.items():
+                profile = await _parse_english_page_html_async(
+                    f"<p>IELTS {escape(value)}</p>", page_url,
+                )
+                if profile.get("ielts_overall"):
+                    profile.update(other_scores.get(level, {}))
+                    table_profiles[level] = profile
+            return table_profiles
+
         text = html_to_text(html)
         matches = list(_LEVEL_HEADING_RE.finditer(text))
         if not matches:
@@ -1347,6 +1364,8 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
         # "no subscore less than 6.5", or "7.0 all other subtests".  Seed all
         # skills with that floor; explicit skill groups below then override it.
         shared_patterns = (
+            r"\b([4-9](?:\.\d+)?)\s+(?:minimum\s+)?in\s+each\s+"
+            r"(?:sub[\s-]*)?(?:skills?|components?|bands?|sections?)\b",
             r"(?:minimum(?:\s+score)?(?:\s+of)?|no\s+(?:subscore|band)\s+(?:is\s+)?less\s+than)"
             r"\s*([4-9](?:\.\d+)?)\s+(?:in\s+)?(?:each|all)\s+"
             r"(?:subtests?|skills?|components?|bands?)",
@@ -1409,6 +1428,27 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
         return values
 
     profiles: list[dict[str, Any]] = []
+    from .central_english_tables import named_ielts_cells
+    for program_name, cell in named_ielts_cells(html):
+        overall = _score(cell, 0.0, 9.0)
+        if overall is None:
+            continue
+        values = {"ielts_overall": overall, **_ielts_subscores(cell)}
+        profile = {
+            "program_names": program_name,
+            "program_aliases": [program_name],
+            "values": values,
+        }
+        award = _re.fullmatch(r"(BA|BSc|MA|MSc)\s+(.+)", program_name, _re.I)
+        if award:
+            code, subject = award.groups()
+            profile["program_aliases"].extend([
+                f"{subject} {code}", f"{subject} {code} (Hons)",
+                f"{subject} {code} (Honours)",
+            ])
+        if _re.fullmatch(r"PGCE\s+Programmes?", program_name, _re.I):
+            profile["program_family"] = "PGCE"
+        profiles.append(profile)
     if section is not None:
         for heading in section.find_all("h6", recursive=False):
             table = heading.find_next_sibling("table")
@@ -1792,7 +1832,7 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 #                             english_by_level + english_by_program
 
 _CACHE_TTL_DAYS = 30
-_ENGLISH_CACHE_SCHEMA_VERSION = 10
+_ENGLISH_CACHE_SCHEMA_VERSION = 12
 _FEE_CACHE_SCHEMA_VERSION = 2
 
 

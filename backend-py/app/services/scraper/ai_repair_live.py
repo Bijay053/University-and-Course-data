@@ -841,10 +841,37 @@ class LiveRepairEvidence:
             + fee_targets
             + list(self.ctx.get("repair_course_url_sample") or [])
         ))
+        # Rank likely detail routes ahead of contaminated historical gap
+        # rows. These are probe priorities, not exceptions to live validation.
+        if missing_location or affected or missing_fees:
+            targets.sort(key=lambda candidate: not bool(re.search(
+                r"/(?:courses?|programmes?|programs?)/[^/]+", urlsplit(candidate).path,
+                re.I,
+            )))
         course_candidates = [
             url for url in targets
             if not is_intentionally_excluded_course_url(url)
-        ][:3]
+        ][:4]
+        # Badly contaminated review sets have navigation pages with every
+        # field missing. Do not let those consume the whole evidence sample.
+        # Reserve two slots for rows with populated fee + English evidence,
+        # then revalidate their identity on the live page (never trust storage
+        # as proof). Keep affected targets and a replacement in case a
+        # historical anchor is now unpublished or ineligible.
+        recent = self.ctx.get("recent_course_urls") or []
+        anchor_candidates = recent if len(recent) >= 2 else (
+            recent + list(self.ctx.get("field_complete_course_urls") or [])
+        )
+        anchors = list(dict.fromkeys(
+            url for url in anchor_candidates
+            if official_url(url, self.ctx["scrape_url"], self.extra_hosts)
+            and not is_intentionally_excluded_course_url(url)
+        ))
+        if anchors:
+            selected = [anchors[0]]
+            if len(anchors) > 1:
+                selected.append(anchors[len(anchors) // 2])
+            course_candidates = list(dict.fromkeys(selected + course_candidates))[:4]
         passed = [
             url for url in self.ctx.get("passed_sample") or []
             if not is_intentionally_excluded_course_url(url)
