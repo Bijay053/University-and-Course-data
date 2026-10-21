@@ -317,11 +317,18 @@ def child(status="completed", **overrides):
 
 
 def quality(**overrides):
-    return {
+    result = {
         "total_staged": 3, "fee_pct": 100, "ielts_pct": 100, "location_pct": 100,
         "duration_pct": 100, "course_name_pct": 100, "intakes_pct": 100,
         "mode_pct": 100, "degree_level_pct": 100, **overrides,
     }
+    from app.services.scraper.repair_quality_cohort import FIELDS
+    result["course_presence"] = {
+        f"course-{i}": [i < round(result[field] * result["total_staged"] / 100)
+                       for field in FIELDS]
+        for i in range(result["total_staged"])
+    }
+    return result
 
 
 @pytest.mark.asyncio

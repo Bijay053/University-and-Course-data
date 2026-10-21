@@ -5206,6 +5206,10 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             )
             central_data = None
 
+        if ((uni_scrape_config or {}).get("recipe") or {}).get("linked_fee_repair") is True:
+            central_data = dict(central_data or {})
+            central_data["linked_fee_repair"] = True
+
         # Phase A.5 — pre-extraction gate.  Drop candidates whose URL or
         # link text matches the central blocklist BEFORE we spend any
         # network/extraction budget on them.  Discovery already filters,

@@ -797,6 +797,8 @@ class LiveRepairEvidence:
                 )
                 record = ({"url": url, "classification": failure, "reason": reason}
                           if failure else inspect_page(url, html, self.config))
+                if not failure:
+                    record["_source_html"] = html
             except Exception as exc:
                 record.update(classification="network_failure", reason=type(exc).__name__)
             finally:
@@ -825,10 +827,18 @@ class LiveRepairEvidence:
             row.get("url") for row in affected
             if not row.get("course_location") and row.get("url")
         ][:1]
+        missing_fees = list(dict.fromkeys(self.ctx.get("missing_fee_urls") or []))
+        # Sample across actual missing-fee rows instead of repeatedly probing
+        # the first department in a catalogue (often domestic-only health courses).
+        fee_targets = [
+            missing_fees[min(len(missing_fees) - 1, len(missing_fees) * n // 3)]
+            for n in (1, 2)
+        ] if missing_fees else []
         targets = list(dict.fromkeys(
             missing_location
             + [row.get("url") for row in affected if row.get("url")]
             + list(quality.get("critical_urls") or [])
+            + fee_targets
             + list(self.ctx.get("repair_course_url_sample") or [])
         ))
         course_candidates = [
@@ -1072,6 +1082,27 @@ class LiveRepairEvidence:
                     self.validation_pages[url] = checked[url]
                 if checked[url]["classification"] != "course":
                     reasons.append(f"Live verification failed for {url}: {checked[url]['classification']}")
+        if extraction.get("linked_fee_repair") is not None:
+            from .linked_fee_repair import recover_fee
+            fee_pages = {}
+            async def fetch_fee(target):
+                if target not in fee_pages:
+                    fee_pages[target] = await self.fetch(target)
+                return fee_pages[target].get("_source_html", "")
+            outputs = []
+            if extraction["linked_fee_repair"] is not True:
+                reasons.append("Linked fee repair must be a validated boolean capability")
+            else:
+                for course_url, page in checked.items():
+                    if page.get("classification") != "course":
+                        continue
+                    fee = await recover_fee(page.get("owned_html", ""), course_url,
+                                            self.config, fetch_fee)
+                    if fee:
+                        outputs.append({"course_url": course_url, **fee})
+                if len(outputs) < 2:
+                    reasons.append("Linked fees require two course-owned links with published tuition")
+            report["linked_fee_outputs"] = outputs
         # Audience-aware recipes are eligible only when live evidence contains
         # both audiences and each selector keeps its own panel ownership.
         audience_pages = [

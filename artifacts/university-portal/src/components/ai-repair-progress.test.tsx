@@ -41,6 +41,20 @@ it("shows every verification field and replaces stale pending probe text after c
 
 afterEach(cleanup);
 
+it("explains that changes use matching courses rather than different coverage totals", () => {
+  render(<AiRepairProgress
+    autonomous={{ ...base, phase: "needs_review", comparison: {
+      baseline: { fee_pct: 2 }, verification: { fee_pct: 6 },
+      matched_courses: 31, unmatched_verification_courses: 0,
+      comparison_verified: true, improved_fields: [], regressions: [],
+    } }}
+    currentAttempt={1}
+  />);
+  expect(screen.getByText(/Changes below compare 31 matching courses/)).toBeTruthy();
+  expect(screen.queryByText("Improved fields:")).toBeNull();
+  expect(screen.queryByText("Regressions:")).toBeNull();
+});
+
 describe("AiRepairProgress", () => {
   it("shows actual discovery-repair counts without claiming candidates are eligible courses", () => {
     render(
