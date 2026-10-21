@@ -538,17 +538,17 @@ it("keeps a newly returned retry selected when older hydration finishes later", 
   });
 });
 
-async function renderFailedFilterCollapseCard(): Promise<void> {
+async function renderFailedFilterCollapseCard(kept = 0): Promise<void> {
   sessionStorage.setItem("scrape_slot_1_jobId", "job-filter-collapse");
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.startsWith("/api/scrape/status/job-filter-collapse")) {
       return jsonResponse({
-        status: "failed",
+        status: kept ? "completed" : "failed",
         universityId: 75,
         universityName: "Canterbury Christ Church University (CCCU)",
-        totalFound: 55,
-        imported: 0,
+        totalFound: kept || 55,
+        imported: kept ? 88 : 0,
         skipped: 0,
         errors: 0,
         current: 0,
@@ -557,9 +557,9 @@ async function renderFailedFilterCollapseCard(): Promise<void> {
           event: "warning",
           kind: "extract_allow_url_filter",
           message: "URL filter dropped 55 / 55 URLs (100%)",
-          drop_pct: 100,
-          dropped: 55,
-          kept: 0,
+          drop_pct: kept ? 92 : 100,
+          dropped: kept ? 1009 : 55,
+          kept,
           dropped_sample: ["/study-here/courses/accounting-and-finance"],
         }],
       });
@@ -578,7 +578,11 @@ async function renderFailedFilterCollapseCard(): Promise<void> {
   }));
 
   await waitFor(() => {
-    expect(screen.getByRole("button", { name: "Run automatic repair" })).toBeTruthy();
+    if (kept) {
+      expect(screen.getByText(/URL filter excluded/)).toBeTruthy();
+    } else {
+      expect(screen.getByRole("button", { name: "Run automatic repair" })).toBeTruthy();
+    }
   });
 }
 
@@ -601,6 +605,13 @@ describe("runtimeProgressFromStatus", () => {
       totalFound: 409,
     })).toEqual({ current: 409, total: 409 });
   });
+});
+
+it("does not label unverified filtered links as lost valid courses", async () => {
+  await renderFailedFilterCollapseCard(94);
+  expect(screen.getByText("URL filter excluded 92% of discovered links")).toBeTruthy();
+  expect(screen.getByText(/this count does not establish missing courses/)).toBeTruthy();
+  expect(screen.queryByText(/valid course pages may have been dropped/)).toBeNull();
 });
 
 describe("isCategoryPageWarningStale", () => {

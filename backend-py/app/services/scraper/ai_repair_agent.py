@@ -3195,16 +3195,21 @@ async def run_ai_repair_loop(
             if "official_catalogue_fallback" in disc_patch and not (live and ctx.get("provider_failure")):
                 disc_patch = {}
                 validation_errors.append("Provider strategy changes require bounded official-source validation.")
-            # A model may diagnose an audience-scoped intake/English defect
-            # without proposing a recipe (the recipe is live-derived). Force
-            # the bounded live validator onto this path even when AI emitted
-            # no applicable patch.
+            # A model's mention of IELTS/international fees does not establish
+            # an audience-selector defect. Only opt into this specialized path
+            # when the live probe actually found typed selector evidence.
+            # Explicit audience_recipe proposals still require full validation.
             _audience_diagnosis = " ".join(
                 str(ai_data.get(key) or "") for key in
                 ("diagnosis", "root_cause", "explanation")
             ).casefold()
             if (
                 live
+                and any(
+                    (sample.get("audience_evidence") or {}).get("evidence")
+                    for sample in (ctx.get("live_probe") or {}).get("samples", [])
+                    if sample.get("classification") == "course"
+                )
                 and any(token in _audience_diagnosis for token in
                         ("audience", "international intake", "linked english",
                          "english source", "ielts"))

@@ -2589,7 +2589,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                   {urlFilterWarning.kind === "category_pages" ? (
                     <span className="text-red-800">Wrong pages — category pages only ({urlFilterWarning.categoryCount}/{urlFilterWarning.totalKept} URLs have no degree qualifier)</span>
                   ) : (
-                    <span className="text-amber-800">URL filter removed {urlFilterWarning.dropPct?.toFixed(0)}% of discovered course pages</span>
+                    <span className="text-amber-800">URL filter excluded {urlFilterWarning.dropPct?.toFixed(0)}% of discovered links</span>
                   )}
                 </div>
                 {urlFilterWarning.kind === "category_pages" ? (
@@ -2607,7 +2607,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                         ? <><code className="font-mono bg-amber-100 px-0.5 rounded">course_detail_url_patterns</code> removed {urlFilterWarning.dropped} URLs — only {urlFilterWarning.kept} remain for extraction.</>
                         : urlFilterWarning.ruleType === "unknown"
                         ? <>A URL filter removed {urlFilterWarning.dropped} discovered URLs before extraction; no URLs remained.</>
-                        : <><code className="font-mono bg-amber-100 px-0.5 rounded">allow_url_patterns</code> only matched {urlFilterWarning.kept} URLs — {urlFilterWarning.dropped} were not matched and dropped.</>
+                        : <><code className="font-mono bg-amber-100 px-0.5 rounded">allow_url_patterns</code> matched {urlFilterWarning.kept} links and excluded {urlFilterWarning.dropped}. Excluded links may include navigation, forms, and archived pages; this count does not establish missing courses.</>
                       }
                     </p>
                     {urlFilterWarning.patternBreakdown && Object.keys(urlFilterWarning.patternBreakdown).length > 0 && (
@@ -2848,7 +2848,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                   {urlFilterWarning.kind === "category_pages" ? (
                     <span className="text-red-800">Discovery issue: category pages were selected instead of course pages</span>
                   ) : (
-                    <span className="text-amber-800">URL filter removed {urlFilterWarning.dropPct?.toFixed(0)}% of discovered course pages</span>
+                    <span className="text-amber-800">URL filter excluded {urlFilterWarning.dropPct?.toFixed(0)}% of discovered links</span>
                   )}
                 </div>
                 {urlFilterWarning.kind === "category_pages" ? (
@@ -2857,14 +2857,14 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                   <>
                     <p className="text-amber-700 leading-relaxed">
                       {urlFilterWarning.ruleType === "block"
-                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">block_url_patterns</code> removed {urlFilterWarning.dropped} course URLs. Only {urlFilterWarning.kept} were extracted.</>
+                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">block_url_patterns</code> excluded {urlFilterWarning.dropped} links; {urlFilterWarning.kept} passed the URL filters.</>
                         : urlFilterWarning.ruleType === "must_contain"
-                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">must_contain</code> removed {urlFilterWarning.dropped} course URLs. Only {urlFilterWarning.kept} were extracted.</>
+                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">must_contain</code> excluded {urlFilterWarning.dropped} links; {urlFilterWarning.kept} passed the URL filters.</>
                         : urlFilterWarning.ruleType === "course_detail"
-                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">course_detail_url_patterns</code> removed {urlFilterWarning.dropped} course URLs. Only {urlFilterWarning.kept} were extracted.</>
+                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">course_detail_url_patterns</code> excluded {urlFilterWarning.dropped} links; {urlFilterWarning.kept} passed the URL filters.</>
                         : urlFilterWarning.ruleType === "unknown"
                         ? <>A URL filter removed {urlFilterWarning.dropped} discovered URLs before extraction; no courses were staged.</>
-                        : <><code className="font-mono bg-amber-100 px-0.5 rounded">allow_url_patterns</code> only matched {urlFilterWarning.kept} URLs — {urlFilterWarning.dropped} valid course pages may have been dropped.</>
+                        : <><code className="font-mono bg-amber-100 px-0.5 rounded">allow_url_patterns</code> matched {urlFilterWarning.kept} links and excluded {urlFilterWarning.dropped}. Excluded links may include navigation, forms, and archived pages; this count does not establish missing courses.</>
                       }
                     </p>
                     {urlFilterWarning.patternBreakdown && Object.keys(urlFilterWarning.patternBreakdown).length > 0 && (

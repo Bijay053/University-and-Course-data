@@ -684,6 +684,20 @@ async def test_audience_repair_rejects_when_every_course_lacks_typed_evidence(
 
 
 @pytest.mark.asyncio
+async def test_missing_fee_or_ielts_diagnosis_does_not_invent_audience_recipe(monkeypatch):
+    ctx = context(effective_discovery={}, after_filter=94, imported=88)
+    mock_loop(monkeypatch, ctx, {
+        "confidence": 95, "patches": [],
+        "diagnosis": "International fees and IELTS are missing; linked English and fee sources need review.",
+    })
+    monkeypatch.setattr(live, "_fetch_official", AsyncMock(return_value=(course(), "", "")))
+    result = await agent.run_ai_repair_loop("job-live", FakeDb())
+    assert result["live_probe"]["accepted"], result.get("error")
+    assert "Audience evidence missing" not in str(result)
+    assert not result["autonomous"].get("verified")
+
+
+@pytest.mark.asyncio
 async def test_invalid_filter_attempt_does_not_spend_validation_page_budget(monkeypatch):
     fetch = AsyncMock(return_value=(course(), "", ""))
     monkeypatch.setattr(live, "_fetch_official", fetch)
