@@ -119,3 +119,45 @@ mtime_ms = 1792541115431
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/1553f05a-2b8f-48e6-ad5d-2aa2ddbfb6d3/72c92cda-617f-4b25-933e-067b5fa565fa"
 storage_version_token = "1792541194035401"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "4CcwATHI0vlJgAA0h6Iuq"
+uri = "file://generated-artifacts/archive-storage-live-20261021T003218Z.zip"
+type = "unspecified"
+title = "Archive validation — two cleanup cases passed"
+description = "All three attempts, cleanup evidence, independent signer pins and confirmed removal of temporary permissions. The normal success case failed and is being investigated; this is not a success certificate."
+logical_id = "aebcb3cb-a342-4b6f-b074-ab795b524901"
+content_hash = "sha256:9067db29b72d2806fb5ee569519cb760adf23fc0a3c67285420ab9cc5179ae12"
+size = 7097
+mtime_ms = 1792544941140
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/aebcb3cb-a342-4b6f-b074-ab795b524901/af3a32dc-ea26-4506-a76c-da9b9e5b26a9"
+storage_version_token = "1792544951722266"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "H4wq7LSIl7CSXdNYJwdXM"
+uri = "file://generated-artifacts/archive-storage-live-20261021T012735Z.zip"
+type = "unspecified"
+title = "Interrupted archive run — cleanup confirmed"
+description = "Saved run identity, partial test output, independent bucket/stack absence checks, public signer pins, and verified temporary-permission removal. This interrupted run is not a passing test or success proof."
+logical_id = "9f99719c-6159-4010-ba5e-b6520e93e710"
+content_hash = "sha256:69badc1cec8862d99d1cc5570deebcdf9b39fab274e5e646d319f5e9bdf6ca01"
+size = 2315
+mtime_ms = 1792546694471
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/9f99719c-6159-4010-ba5e-b6520e93e710/bd115d00-53e2-4ce7-b35e-3f6c254e0a34"
+storage_version_token = "1792546742262066"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "Vac94o9zA4qdWlwZ0fkLF"
+uri = "file://generated-artifacts/archive-storage-live-20261021T013834Z.zip"
+type = "unspecified"
+title = "AWS archive check — failed, cleanup verified"
+description = "The normal archive scenario failed after the retention-body check. Independent checks confirmed resource cleanup, and the temporary permissions were removed. This is failure evidence, not a passing release proof."
+logical_id = "32148324-e77e-469d-80c1-fdb47f31d8a0"
+content_hash = "sha256:aa9640a6b396d221a90b03e3ccc3068a883c4e0d5e514947b3f423e8a7156ca8"
+size = 5771
+mtime_ms = 1792547693771
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/32148324-e77e-469d-80c1-fdb47f31d8a0/4349ea85-23cc-45da-89ae-670b2cb48a69"
+storage_version_token = "1792548463768377"
+content_type = "application/octet-stream"

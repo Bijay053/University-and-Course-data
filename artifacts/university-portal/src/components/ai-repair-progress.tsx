@@ -73,6 +73,11 @@ export type AutonomousRepair = {
     verification_quality?: VerificationQuality;
     unresolved_fields?: string[] | Record<string, unknown>;
     improved_fields?: string[];
+    matched_courses?: number;
+    unmatched_verification_courses?: number;
+    comparison_verified?: boolean;
+    comparison_basis?: string;
+    recovered_field_counts?: Record<string, number>;
     regressions?: string[] | Record<string, unknown>;
     capped?: boolean;
     stop_reason?: string | null;
@@ -431,6 +436,14 @@ export function AiRepairProgress({
           <div className="grid grid-cols-[1fr_52px_64px] gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1 font-semibold text-gray-600">
             <span>Quality</span><span>Baseline</span><span>Verification</span>
           </div>
+          {comparison?.matched_courses != null && (
+            <p className="border-b border-gray-200 px-2 py-1 text-gray-600">
+              Coverage totals may describe different course samples. Changes below compare
+              {" "}{comparison.matched_courses} matching courses.
+              {(comparison.unmatched_verification_courses ?? 0) > 0 &&
+                ` ${comparison.unmatched_verification_courses} checked courses have no matching baseline.`}
+            </p>
+          )}
           {QUALITY_FIELDS.map(({ key, label }) => (
             <div key={key} className="grid grid-cols-[1fr_52px_64px] gap-1 border-b border-gray-100 px-2 py-1 last:border-0">
               <span>{label}</span>

@@ -18,7 +18,7 @@ from botocore.exceptions import ClientError
 from .archive_storage_proof import (
     PRODUCTION_ACCOUNT_IDS, atomic_json, pinned_key, write_proof,
 )
-from .archive_storage_scenarios import exercise, require, versions
+from .archive_storage_scenarios import ScenarioFailure, exercise, require, versions
 
 TAG = "university-portal:disposable-archive"
 FAILURES = ("after-stack-creation", "after-upload")
@@ -212,6 +212,18 @@ def rehearse(*, account, production, region, run_id, proof_output, state_output,
             with tempfile.TemporaryDirectory(prefix="archive-synthetic-") as directory:
                 checks = exercise(resources.s3, bucket=resources.state["bucket"], owner=account,
                                   directory=directory, owned=resources.owned, checkpoint=checkpoint)
+        except Exception as exc:
+            # Persist a safe diagnostic before teardown. Never save raw provider
+            # messages: they may contain signed URLs or credentials.
+            failure = {"type": type(exc).__name__}
+            if isinstance(exc, ScenarioFailure):
+                failure["assertion"] = str(exc)
+            elif isinstance(exc, ClientError):
+                code = str(exc.response.get("Error", {}).get("Code", ""))
+                if re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", code):
+                    failure["aws_code"] = code
+            resources.state["failure"] = failure
+            raise
         finally:
             try:
                 resources.cleanup()

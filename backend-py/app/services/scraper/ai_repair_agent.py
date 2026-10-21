@@ -1307,6 +1307,16 @@ async def _quality_snapshot(job_id: str, uni_id: int, db) -> dict:
     q = (await db.execute(
         text("""
             SELECT COUNT(*)                                      AS total,
+                   jsonb_agg(jsonb_build_object(
+                     'url', course_website, 'name', course_name,
+                     'location', course_location,
+                     'fields', jsonb_build_array(
+                       international_fee IS NOT NULL, ielts_overall IS NOT NULL,
+                       course_location IS NOT NULL, duration IS NOT NULL,
+                       course_name IS NOT NULL, intake_months IS NOT NULL,
+                       study_mode IS NOT NULL, degree_level IS NOT NULL
+                     )
+                   ))                                            AS comparison_rows,
                    COUNT(international_fee)                      AS has_fee,
                    COUNT(ielts_overall)                          AS has_ielts,
                    COUNT(intake_months)                          AS has_intakes,
@@ -1378,8 +1388,10 @@ async def _quality_snapshot(job_id: str, uni_id: int, db) -> dict:
             "sample_bad_course_names": [], "sample_bad_locations": [],
         }
 
+    from .repair_quality_cohort import course_presence
     pct = lambda n: round(100 * (n or 0) / total)
     return {
+        "course_presence": course_presence(q.get("comparison_rows") or []),
         "total_staged":       total,
         "fee_pct":            pct(q["has_fee"]),
         "ielts_pct":          pct(q["has_ielts"]),
@@ -1996,7 +2008,10 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
                            LIMIT 1
                          )
                      )
-                   )                                                  AS staged_course_urls
+                   )                                                  AS staged_course_urls,
+                   array_agg(course_website ORDER BY id)
+                     FILTER (WHERE international_fee IS NULL
+                             AND course_website IS NOT NULL)          AS missing_fee_urls
             FROM   scraped_courses
             WHERE  university_id = :uid
               AND  scrape_job_id = :jid
@@ -2074,6 +2089,7 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
         "dropped_sample":  dropped_sample,
         "intentional_excluded_sample": intentional_excluded_sample,
         "repair_course_url_sample": repair_course_url_sample,
+        "missing_fee_urls": list(q.get("missing_fee_urls") or []) if q else [],
         "repair_url_sample": list(dict.fromkeys(repair_course_url_sample + dropped_sample)),
         "passed_sample":   passed_sample,
         "gate_skip_counts": gate_skip_counts,
@@ -2428,6 +2444,8 @@ async def _apply_recipe_to_db(
         runtime_recipe["audience_recipe"] = recipe_patch["audience_recipe"]
     if recipe_patch.get("audience_evidence"):
         runtime_recipe["audience_evidence"] = recipe_patch["audience_evidence"]
+    if recipe_patch.get("linked_fee_repair") is True:
+        runtime_recipe["linked_fee_repair"] = True
     updated_sc["recipe"] = runtime_recipe
     result = await db.execute(
         text(
@@ -2899,6 +2917,10 @@ async def run_ai_repair_loop(
         session["uni_name"]       = ctx["uni_name"]
         session["university_id"] = ctx["university_id"]
         quality_baseline          = ctx.get("quality") or {}
+        cohort_snapshot = await _quality_snapshot(job_id, ctx["university_id"], db)
+        if cohort_snapshot.get("course_presence"):
+            quality_baseline = {**quality_baseline,
+                                "course_presence": cohort_snapshot["course_presence"]}
         session["quality_before"] = quality_baseline
         _write_session(job_id, session)
         if live_enabled:
@@ -3220,6 +3242,18 @@ async def run_ai_repair_loop(
                     "section": "recipe", "field": "audience_repair",
                     "value": True,
                 })
+            if live and int((ctx.get("quality") or {}).get("fee_pct", 100)) < 100:
+                from .linked_fee_repair import course_fee_links
+                linked_courses = [
+                    page for course_url, page in live.initial.items()
+                    if page.get("classification") == "course"
+                    and course_fee_links(page.get("owned_html", ""), course_url, live.config)
+                ]
+                if len(linked_courses) >= 2:
+                    extr_patch["linked_fee_repair"] = True
+                    patches_raw.append({
+                        "section": "recipe", "field": "linked_fee_repair", "value": True,
+                    })
             if dup_skipped:
                 validation_errors.append(f"Duplicate patches skipped: {', '.join(dup_skipped)}")
             if disc_only_blocked:
@@ -3231,14 +3265,19 @@ async def run_ai_repair_loop(
             candidate_audience_recipe = (extr_patch.get("audience_recipe")
                                          if isinstance(extr_patch, dict) else None)
             if extr_patch:
-                unsupported = set(extr_patch) - {"extraction_rules", "audience_recipe", "audience_repair"}
+                unsupported = set(extr_patch) - {
+                    "extraction_rules", "audience_recipe", "audience_repair", "linked_fee_repair",
+                }
                 if unsupported:
                     validation_errors.append(
                         "Extraction patch rejected: automatic repair supports only tested "
                         f"Stage-0 extraction_rules, not {', '.join(sorted(unsupported))}."
                     )
                     extr_patch = {}
-                elif candidate_audience_recipe is None and "audience_repair" not in extr_patch and int(ai_data.get("confidence") or 0) < 85:
+                elif (candidate_audience_recipe is None and "audience_repair" not in extr_patch
+                      and not (set(extr_patch) == {"linked_fee_repair"}
+                               and extr_patch["linked_fee_repair"] is True)
+                      and int(ai_data.get("confidence") or 0) < 85):
                     validation_errors.append(
                         "Extraction patch rejected: OpenAI confidence was below 85%."
                     )

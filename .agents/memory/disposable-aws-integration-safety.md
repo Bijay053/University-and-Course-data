@@ -7,6 +7,12 @@ Destructive AWS integration tests must validate the account identity of every pr
 
 Infrastructure rehearsals must exercise the real queue/worker semantics and validate runner-to-template resource identifiers; a parked message or source-string assertion is not operational proof.
 
+Storage refusal tests must observe the intended bucket configuration before exercising the refusal, and observe restoration before proceeding.
+
+**Why:** Immediate reads after S3 bucket-setting changes can still see the prior safe configuration, making a live negative test report acceptance without testing the intended condition.
+
+**How to apply:** Use bounded read-back convergence for public-access and lifecycle settings. Fail closed on timeout; never weaken archive preflight checks to accommodate propagation.
+
 Offline SDK doubles must preserve the real client's resource-lifecycle contract.
 
 **Why:** Wrapping fake AWS clients in context managers concealed that real

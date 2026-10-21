@@ -15,3 +15,11 @@ description: Pointers to site-specific discovery and extraction lessons for UK u
 - [UC Leeds qualifier](ucleeds-degree-qualifier-false-positive.md): degree word absence does not prove a category page.
 - [Huddersfield intake authority](huddersfield-intake-authority.md): placeholder metadata needs exact labelled course dates, not range facets or deadlines.
 - [Northumbria catalogue scope](northumbria-catalogue-scope.md): current cards include nested UG/PG routes and London redirects; sitemap counts are not current-course counts.
+- [UEL award routes](uel-static-catalogue-transport.md): each award owns its options and IELTS panel.
+- [Richmond delivery](richmond-online-navigation-noise.md): ordinary online activities are not online-only delivery.
+- [LSBU transport](lsbu-render-delivery.md), [annual tuition](lsbu-fee-authority.md): rendered course-owned facts and international fee authority.
+- [Middlesex English](mdx-english-authority.md), [London Met intakes](londonmet-audience-intakes.md): category-specific requirements and overseas cohort ownership.
+- [ARU catalogue](aru-catalogue-repair.md): accepted detail pages do not prove complete discovery.
+- [BCU production identity](bcu-production-recipe-identity.md), [UWL coverage](uwl-rendered-listing-coverage.md): production recipe parity and page-by-page catalogue proof.
+- [Plymouth sitemap](plymouth-sitemap-delivery.md), [Plymouth campuses](plymouth-course-locations.md): misrouted award URLs and course-owned location authority.
+- [Portsmouth facts](portsmouth-course-authority.md): exact course-instance delivery and international tuition.

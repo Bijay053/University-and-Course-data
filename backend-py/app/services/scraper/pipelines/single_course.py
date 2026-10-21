@@ -6919,6 +6919,37 @@ async def extract_course(
                         keyword=_kw_hit,
                     )
 
+        if (central_data or {}).get("linked_fee_repair") is True and html:
+            from app.services.scraper.linked_fee_repair import borrowed_domestic_fee
+            from app.services.scraper.ai_repair_live import inspect_page
+            owned_fee_html = inspect_page(url, html, get_uni_config()).get("owned_html", "")
+            unpublished = borrowed_domestic_fee(owned_fee_html, payload.get("international_fee"))
+            if unpublished:
+                payload["international_fee"] = None
+                evidence.append({
+                    "field_key": "international_fee", "value": None, "confidence": 1.0,
+                    "method": "validated_international_fee_unpublished", "source_url": url,
+                    "snippet": unpublished["snippet"],
+                })
+        if (payload.get("international_fee") is None
+                and (central_data or {}).get("linked_fee_repair") is True and html):
+            from app.services.scraper.linked_fee_repair import recover_fee
+            from app.services.scraper.ai_repair_live import _fetch_official
+            linked_config = get_uni_config()
+            async def fetch_linked_fee(target):
+                content, failure, _ = await _fetch_official(target, linked_config, 15)
+                return "" if failure else content
+            linked_fee = await recover_fee(html, url, linked_config, fetch_linked_fee)
+            if linked_fee:
+                for key in ("international_fee", "currency", "fee_term", "fee_year"):
+                    payload[key] = linked_fee[key]
+                    evidence.append({
+                        "field_key": key, "value": linked_fee[key], "confidence": .92,
+                        "method": "validated_course_fee_link",
+                        "source_url": linked_fee["source_url"],
+                        "snippet": linked_fee["snippet"],
+                    })
+
         # ── YAML: Fee link-following (fees.follow_links) ──────────────────────
         # When international_fee is still blank after all extractors and after
         # fee rejection, scan the course HTML for <a> elements whose text
@@ -11317,6 +11348,26 @@ async def extract_course(
             payload["duration_term"] = _sqe_total["duration_term"]
             evidence.append(_sqe_total["evidence"])
         payload["extraction_method"] = _sqe_methods
+
+    if (central_data or {}).get("linked_fee_repair") is True and html:
+        from app.services.scraper.linked_fee_repair import tuition_records
+        from app.services.scraper.ai_repair_live import inspect_page
+        fee_records = tuition_records(
+            inspect_page(url, html, get_uni_config()).get("owned_html", "")
+        )
+        if fee_records:
+            latest_fee_year = max(row["fee_year"] for row in fee_records)
+            unpublished_record = next((
+                row for row in fee_records
+                if row["fee_year"] == latest_fee_year and row["unpublished"]
+            ), None)
+            if unpublished_record:
+                payload["international_fee"] = None
+                evidence.append({
+                    "field_key": "international_fee", "value": None, "confidence": 1.0,
+                    "method": "validated_international_fee_unpublished", "source_url": url,
+                    "snippet": unpublished_record["snippet"],
+                })
 
     footer = build_course_page_provenance_footer(payload)
 

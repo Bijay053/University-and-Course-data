@@ -685,7 +685,9 @@ def compare_quality(
         "fee_pct", "ielts_pct", "location_pct", "duration_pct", "course_name_pct",
         "intakes_pct", "mode_pct", "degree_level_pct",
     )
-    regressions = [key for key in fields if after.get(key, 0) < before.get(key, 0)]
+    from .scraper.repair_quality_cohort import matched_comparison
+    matched = matched_comparison(before, after)
+    regressions = matched["regressions"]
     unresolved = [key for key in fields if after.get(key, 0) < 100]
     stats = (child.discovered_config or {}).get("pipeline_stats") or {}
     gates = child.gate_skip_counts or {}
@@ -720,12 +722,11 @@ def compare_quality(
         and critical_quality_count == 0
         and not guard and not contamination
         and safety.get("safe") is True
+        and (matched["comparison_verified"] or int(before.get("total_staged") or 0) == 0)
     )
-    improved_fields = [
-        key for key in fields
-        if key in before and key in after and after[key] > before[key]
-    ]
+    improved_fields = matched["improved_fields"]
     return {
+        **matched,
         "baseline": before, "verification": after, "regressions": regressions,
         "improved_fields": improved_fields,
         "unresolved_fields": unresolved, "sample_verified": clean,
@@ -802,6 +803,10 @@ async def _combined_quality(child_ids: list[str], university_id: int, db) -> dic
     if not total:
         return snapshots[-1] if snapshots else {}
     result = dict(snapshots[-1])
+    result["course_presence"] = {
+        key: value for snapshot in snapshots
+        for key, value in (snapshot.get("course_presence") or {}).items()
+    }
     result["total_staged"] = total
     for key in (
         "fee_pct", "ielts_pct", "location_pct", "duration_pct", "course_name_pct",

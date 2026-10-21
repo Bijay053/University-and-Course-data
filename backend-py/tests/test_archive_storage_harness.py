@@ -121,12 +121,50 @@ def resources(s3=None):
     )
 
 
+def test_scenarios_wait_for_bucket_configuration_visibility(tmp_path, monkeypatch):
+    s3 = S3()
+    delayed = {}
+    for getter, setters in (
+        ("get_public_access_block", ("put_public_access_block",)),
+        ("get_bucket_lifecycle_configuration",
+         ("put_bucket_lifecycle_configuration", "delete_bucket_lifecycle")),
+    ):
+        original_get = getattr(s3, getter)
+        def read(_getter=getter, _read=original_get, **args):
+            if _getter in delayed:
+                return delayed.pop(_getter)
+            return _read(**args)
+        monkeypatch.setattr(s3, getter, read)
+        for setter in setters:
+            original_set = getattr(s3, setter)
+            def write(_getter=getter, _read=original_get, _write=original_set, **args):
+                delayed[_getter] = _read()
+                return _write(**args)
+            monkeypatch.setattr(s3, setter, write)
+    sleeps = []
+    monkeypatch.setattr(scenarios.time, "sleep", sleeps.append)
+    assert scenarios.exercise(s3, bucket="fixture", owner=ACCOUNT, directory=tmp_path,
+                              owned=lambda: None, checkpoint=lambda _: None) == proof.CHECKS
+    assert sleeps == [1] * 6
+    assert not delayed
+
+
+def test_bucket_configuration_timeout_fails_closed(monkeypatch):
+    monkeypatch.setattr(scenarios.time, "monotonic", lambda: 10)
+    with pytest.raises(scenarios.ScenarioFailure, match="did not converge"):
+        scenarios.wait_for_setting(lambda: "old", "new", timeout=0)
+
+
 def test_all_scenarios_execute_without_application_or_sample(tmp_path):
     s3 = S3()
     checkpoints = []
     assert scenarios.exercise(s3, bucket="fixture", owner=ACCOUNT, directory=tmp_path,
                               owned=lambda: None, checkpoint=checkpoints.append) == proof.CHECKS
-    assert checkpoints == ["after-upload"]
+    assert checkpoints == [
+        "after-upload", "after-lost-response", "after-unsafe-config",
+        "after-retention-body", "after-retention-metadata",
+        "after-retention-vanished", "after-retention-unreadable", "after-retention-changed",
+    ]
     assert all(s3.block.values()) and s3.rules == []
     assert s3.items
 
@@ -263,7 +301,7 @@ def test_no_proof_without_all_checks_and_cleanup(tmp_path):
 
 
 @pytest.mark.parametrize("failure", [None, "after-stack-creation", "after-upload",
-                                   "lost-create-response", "cleanup-failure"])
+                                   "lost-create-response", "cleanup-failure", "provider-error"])
 def test_whole_runner_proves_cleanup_before_signing(tmp_path, monkeypatch, failure):
     s3 = S3()
     cf = CF(s3)
@@ -277,6 +315,8 @@ def test_whole_runner_proves_cleanup_before_signing(tmp_path, monkeypatch, failu
         cf.exists = s3.exists = True
         if failure == "lost-create-response":
             raise TimeoutError("created before connection loss")
+        if failure == "provider-error":
+            raise error("AccessDenied", "credential-bearing-provider-details")
     cf.create_stack = create
     if failure == "cleanup-failure":
         def refuse(**args):
@@ -302,7 +342,7 @@ def test_whole_runner_proves_cleanup_before_signing(tmp_path, monkeypatch, failu
                   signers=pins, opt_in=True,
                   fail_at=failure if failure in harness.FAILURES else None)
     if failure:
-        with pytest.raises((RuntimeError, TimeoutError)):
+        with pytest.raises((RuntimeError, TimeoutError, ClientError)):
             harness.rehearse(**kwargs)
         assert not output.exists()
     else:
@@ -310,6 +350,9 @@ def test_whole_runner_proves_cleanup_before_signing(tmp_path, monkeypatch, failu
         proof.validate_proof(output, account=ACCOUNT, run_id=RUN, signers=pins)
     state = json.loads(state_path.read_text())
     assert sorted(closed) == sorted(services)
+    if failure == "provider-error":
+        assert state["failure"] == {"type": "ClientError", "aws_code": "AccessDenied"}
+        assert "credential-bearing-provider-details" not in state_path.read_text()
     if failure == "cleanup-failure":
         assert not state["cleanup_verified"] and cf.exists and s3.exists
         s3.delete_object = S3.delete_object.__get__(s3)

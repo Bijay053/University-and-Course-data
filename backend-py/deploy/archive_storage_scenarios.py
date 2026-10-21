@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 from pathlib import Path
 import uuid
 
@@ -13,10 +14,22 @@ from . import archive_smoke_receipts as archive
 from .archive_storage_proof import CHECKS
 
 
+class ScenarioFailure(RuntimeError):
+    """A static harness assertion, never a provider response or credential."""
+
+
 def require(condition, message):
     # Do not use assert: the harness must remain safe under python -O.
     if not condition:
-        raise RuntimeError(message)
+        raise ScenarioFailure(message)
+
+
+def wait_for_setting(read, expected, *, timeout=60):
+    """S3 bucket configuration updates are not immediately visible to readers."""
+    deadline = time.monotonic() + timeout
+    while read() != expected:
+        require(time.monotonic() < deadline, "bucket configuration did not converge")
+        time.sleep(1)
 
 
 def receipt(directory, order):
@@ -133,6 +146,7 @@ def exercise(client, *, bucket, owner, directory, owned, checkpoint):
     require(fault.puts == 2 and versions(client, args) == before_versions,
             "retry uploaded duplicate versions")
     require(not old.exists() and new.exists(), "newest receipt not retained")
+    checkpoint("after-lost-response")
 
     path = folder("unsafe-config")
     receipt(path, 1)
@@ -157,21 +171,46 @@ def exercise(client, *, bucket, owner, directory, owned, checkpoint):
                            "Filter": {"Prefix": archive.PREFIX}, **expiry}],
             })
         try:
+            # Do not test refusal against the old, still-safe configuration.
+            # In particular, lifecycle updates can remain invisible briefly.
+            if bad == "public":
+                wait_for_setting(
+                    lambda: client.get_public_access_block(**args)[
+                        "PublicAccessBlockConfiguration"], {**block, "IgnorePublicAcls": False},
+                )
+            else:
+                def lifecycle_rules():
+                    try:
+                        return client.get_bucket_lifecycle_configuration(**args).get("Rules", [])
+                    except ClientError as exc:
+                        if archive._code(exc) != "NoSuchLifecycleConfiguration":
+                            raise
+                        return []
+                wait_for_setting(lifecycle_rules, [{
+                    "ID": "archive-refusal-fixture", "Status": "Enabled",
+                    "Filter": {"Prefix": archive.PREFIX}, **expiry,
+                }])
             try:
                 run(path)
             except ValueError as exc:
                 require(("public-access" if bad == "public" else "lifecycle") in str(exc),
                         "unexpected preflight refusal")
             else:
-                raise RuntimeError("unsafe bucket was accepted")
+                raise ScenarioFailure("unsafe bucket was accepted")
             same_local(path, before)
             require(versions(client, args) == before_versions, "preflight refusal wrote objects")
         finally:
             owned()
             if bad == "public":
                 client.put_public_access_block(**args, PublicAccessBlockConfiguration=block)
+                wait_for_setting(
+                    lambda: client.get_public_access_block(**args)["PublicAccessBlockConfiguration"],
+                    block,
+                )
             else:
                 client.delete_bucket_lifecycle(**args)
+                wait_for_setting(lifecycle_rules, [])
+    checkpoint("after-unsafe-config")
 
     for failure in ("body", "metadata", "vanished", "unreadable", "changed"):
         path = folder(f"retention-{failure}")
@@ -189,4 +228,5 @@ def exercise(client, *, bucket, owner, directory, owned, checkpoint):
                 and old.exists() and new.exists(), "unverified receipt was pruned")
         if failure in {"vanished", "unreadable", "changed"}:
             require(adapter.injected == 1, "retention fault not exercised")
+        checkpoint("after-retention-" + failure)
     return CHECKS
