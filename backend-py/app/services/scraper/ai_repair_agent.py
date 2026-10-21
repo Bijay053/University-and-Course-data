@@ -2956,9 +2956,9 @@ async def run_ai_repair_loop(
         quality_baseline          = ctx.get("quality") or {}
         quality_job_id = ctx.get("quality_source_job_id") or job_id
         cohort_snapshot = await _quality_snapshot(quality_job_id, ctx["university_id"], db)
-        if cohort_snapshot.get("course_presence"):
-            quality_baseline = {**quality_baseline,
-                                "course_presence": cohort_snapshot["course_presence"]}
+        if cohort_snapshot:
+            quality_baseline = {**quality_baseline, **cohort_snapshot}
+        ctx["quality"] = quality_baseline
         session["quality_before"] = quality_baseline
         _write_session(job_id, session)
         if live_enabled:
@@ -3332,7 +3332,7 @@ async def run_ai_repair_loop(
                         ctx["university_id"], db
                     )
                     extraction_validation = (
-                        await _validate_extraction_patch_on_snapshots(job_id, extr_patch, db)
+                        await _validate_extraction_patch_on_snapshots(quality_job_id, extr_patch, db)
                         if extr_patch.get("extraction_rules")
                         else {"accepted": True, "reports": [], "rules": {}}
                     )

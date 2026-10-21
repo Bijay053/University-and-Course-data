@@ -1089,6 +1089,38 @@ def mock_loop(monkeypatch, ctx, ai):
 
 
 @pytest.mark.asyncio
+async def test_old_empty_job_repairs_current_cohort_and_replays_its_snapshots(monkeypatch):
+    quality = dict.fromkeys([
+        "fee_pct", "ielts_pct", "intakes_pct", "duration_pct",
+        "location_pct", "degree_level_pct", "mode_pct",
+    ], 100)
+    quality["total_staged"] = 31
+    ctx = context(imported=0, raw_discovered=31, after_filter=31, drop_rate=0,
+                  quality=quality, quality_source_job_id="current-review")
+    chat = mock_loop(monkeypatch, ctx, {
+        "confidence": 95, "patches": [{
+            "section": "recipe", "field": "extraction_rules.duration",
+            "value": {"css": ".duration", "confidence": .95},
+        }],
+    })
+    snapshot = AsyncMock(return_value={**quality, "duration_pct": 0})
+    replay = AsyncMock(return_value={
+        "accepted": False, "reports": [{
+            "field": "duration", "rejection_reasons": ["No demonstrated fill"], "samples": [],
+        }],
+    })
+    monkeypatch.setattr(agent, "_quality_snapshot", snapshot)
+    monkeypatch.setattr(agent, "_validate_extraction_patch_on_snapshots", replay)
+    async def fetch(url, *_args):
+        return (LISTING if url == SEED else course()), "", ""
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    await agent.run_ai_repair_loop("job-live", FakeDb())
+    assert chat.await_count == 1
+    assert snapshot.await_args_list[0].args[0] == "current-review"
+    assert replay.await_args.args[0] == "current-review"
+
+
+@pytest.mark.asyncio
 async def test_shared_url_heuristic_repaired_by_exact_yaml_exception(monkeypatch, tmp_path):
     urls = [f"https://university.example/study-at-example/awards/{slug}" for slug in ("law", "science")]
     ctx = context(dropped_sample=urls, repair_url_sample=urls,
