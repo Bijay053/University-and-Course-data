@@ -19,6 +19,25 @@ TWO = SEED + "/bachelor-of-science"
 PARTNER = SEED + "/partners"
 
 
+@pytest.mark.parametrize("field", [
+    "fee_pct", "ielts_pct", "intakes_pct", "duration_pct",
+    "location_pct", "degree_level_pct", "mode_pct",
+])
+def test_passing_urls_do_not_bypass_current_field_gaps(field):
+    quality = dict.fromkeys([
+        "fee_pct", "ielts_pct", "intakes_pct", "duration_pct",
+        "location_pct", "degree_level_pct", "mode_pct",
+    ], 100)
+    quality["total_staged"] = 31
+    assert not agent._field_repair_needed(quality)
+    quality[field] = 6
+    assert agent._field_repair_needed(quality)
+    quality[field] = 100
+    quality["critical_quality_count"] = 1
+    assert agent._field_repair_needed(quality)
+    assert not agent._field_repair_needed({})
+
+
 def course(title="Bachelor of Laws", extra=""):
     return f"""<html><main><h1>{title}</h1>
     <dl><dt>Award</dt><dd>Bachelor of Laws</dd>

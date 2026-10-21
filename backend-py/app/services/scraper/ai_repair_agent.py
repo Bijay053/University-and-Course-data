@@ -1300,6 +1300,19 @@ def _quality_summary(quality: dict) -> str:
 
 # ── Quality snapshot ───────────────────────────────────────────────────────────
 
+def _field_repair_needed(quality: dict) -> bool:
+    """Passing URL filters cannot certify populated review fields."""
+    if not quality.get("total_staged"):
+        return False
+    return bool(quality.get("critical_quality_count")) or any(
+        (quality.get(field) or 0) < 100
+        for field in (
+            "fee_pct", "ielts_pct", "intakes_pct", "duration_pct",
+            "location_pct", "degree_level_pct", "mode_pct",
+        )
+    )
+
+
 async def _quality_snapshot(job_id: str, uni_id: int, db) -> dict:
     """Query staged-course fill rates for this job. Returns quality dict."""
     from sqlalchemy import text
@@ -1955,6 +1968,7 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
     q = (await db.execute(
         text("""
             SELECT COUNT(*)                                          AS total,
+                   MIN(scrape_job_id)                                AS quality_source_job_id,
                    COUNT(international_fee)                          AS has_fee,
                    COUNT(ielts_overall)                              AS has_ielts,
                    COUNT(intake_months)                              AS has_intakes,
@@ -2024,7 +2038,15 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
                    )                                                  AS recent_course_urls
             FROM   scraped_courses
             WHERE  university_id = :uid
-              AND  scrape_job_id = :jid
+              AND  scrape_job_id = COALESCE(
+                (SELECT exact.scrape_job_id FROM scraped_courses exact
+                 WHERE exact.university_id = :uid AND exact.scrape_job_id = :jid
+                   AND exact.status IN ('pending', 'review', 'approved') LIMIT 1),
+                (SELECT recent.scrape_job_id FROM scraped_courses recent
+                 WHERE recent.university_id = :uid
+                   AND recent.status IN ('pending', 'review', 'approved')
+                 ORDER BY recent.id DESC LIMIT 1)
+              )
               AND  status IN ('pending', 'review', 'approved')
         """),
         {"uid": uni_id, "jid": job_id},
@@ -2088,6 +2110,7 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
 
     return {
         "job_id":          job_id,
+        "quality_source_job_id": (q.get("quality_source_job_id") or job_id) if q else job_id,
         "university_id":   uni_id,
         "uni_name":        row["uni_name"] or "Unknown",
         "scrape_url":      row["scrape_url"] or "",
@@ -2931,7 +2954,8 @@ async def run_ai_repair_loop(
         session["uni_name"]       = ctx["uni_name"]
         session["university_id"] = ctx["university_id"]
         quality_baseline          = ctx.get("quality") or {}
-        cohort_snapshot = await _quality_snapshot(job_id, ctx["university_id"], db)
+        quality_job_id = ctx.get("quality_source_job_id") or job_id
+        cohort_snapshot = await _quality_snapshot(quality_job_id, ctx["university_id"], db)
         if cohort_snapshot.get("course_presence"):
             quality_baseline = {**quality_baseline,
                                 "course_presence": cohort_snapshot["course_presence"]}
@@ -2993,6 +3017,7 @@ async def run_ai_repair_loop(
         if (
             session["current_attempt"] == 0
             and ctx.get("imported", 0) == 0
+            and not _field_repair_needed(ctx.get("quality") or {})
             and current_sim["total"] > 0
             and current_sim["after"] >= current_minimum
             and (live is None or not live.discovery_needed(current_disc))
@@ -3048,7 +3073,7 @@ async def run_ai_repair_loop(
                      job_id, attempt_num, MAX_ATTEMPTS, _discovery_phase_done, ctx["drop_rate"])
 
             # ① Snapshot quality BEFORE this attempt
-            quality_before = await _quality_snapshot(job_id, ctx["university_id"], db)
+            quality_before = await _quality_snapshot(quality_job_id, ctx["university_id"], db)
             quality_before["drop_rate"] = ctx["drop_rate"]
 
             # ② Determine current repair phase (locked once discovery is done)
