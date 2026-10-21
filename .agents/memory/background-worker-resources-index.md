@@ -10,3 +10,4 @@ description: Ownership, event-loop cleanup, isolation, and test-reload safety fo
 - [Pre-claim failure ownership](preclaim-failure-ownership.md) — direct emergency writes remain outside shared pools and transition only queued jobs.
 - [Repair pre-claim schema readiness](repair-preclaim-schema.md) — service health alone does not prove delivered tasks can claim work.
 - [Isolated worker acceptance](isolated-worker-acceptance.md) — retain migration-defined defaults and separate database checks from synchronous browser loops.
+- [Terminal log durability](worker-log-durability.md) — cancelled writes must retain buffered rows; worker success alone does not prove durable completion evidence.

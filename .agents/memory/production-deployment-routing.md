@@ -21,6 +21,16 @@ Never replace unavailable push credentials by copying secrets.
 Pace GitHub connector object transfers and retry transient rate-limit/server
 failures before treating them as corrupt Git objects.
 
+Keep resumable transfer inputs in the ignored workspace `.local` directory,
+not solely in `/tmp`. After an interrupted transfer, verify the remote branch
+before repeating any branch update.
+
+**Why:** A workspace recycle interrupted a chunked transfer and removed its
+temporary input while the notebook still retained the partially assembled data.
+
+**How to apply:** Verify the complete encoded length and object hashes again
+after reconnecting; partial notebook state is not evidence that a push finished.
+
 **Why:** Parallel object uploads exceeded the connector's 10 requests/second
 limit, and a valid tree creation returned a transient server error. A subsequent
 read can confirm an object exists even if its creation response was lost.
