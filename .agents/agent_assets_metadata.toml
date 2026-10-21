@@ -77,3 +77,31 @@ mtime_ms = 1790415269319
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/a6039bf7-9bbf-484b-8a23-5cb94e5c0018/60701f01-f30f-482a-b26a-4c3843976768"
 storage_version_token = "1790415317849313"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "K7AX3E3I3TEFMc6ZpzQf9"
+uri = "file://generated-artifacts/archive-permissions/verified-proof.json"
+type = "unspecified"
+title = "Signed archive permission test proof"
+description = "Nine live AWS permission and archive checks passed; disposable resource teardown verified. Signature validated against the pinned public key and current code digest."
+logical_id = "336fcd6c-70dd-457a-8ded-9e72eeab88b2"
+content_hash = "sha256:8878d40f1722881f85c9f439ea894864ffde62998481ea2b0feefe7863b8ecad"
+size = 1262
+mtime_ms = 1792539440757
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/336fcd6c-70dd-457a-8ded-9e72eeab88b2/c14fb5de-cf15-4cb6-9b8d-6066c131c56a"
+storage_version_token = "1792539471749380"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "GoRcx2kt_YRaUap888F2e"
+uri = "file://generated-artifacts/archive-permissions/verified-state.json"
+type = "unspecified"
+title = "Disposable archive cleanup record"
+description = "Saved non-secret resource identities with verified cleanup for the completed permission test."
+logical_id = "620c34a2-f2fc-4c2a-bbc6-fc52685678af"
+content_hash = "sha256:b08b75398580d8e9ca9816835df73769a8f1d45ce20227a67af430a76f136d19"
+size = 270
+mtime_ms = 1792539438914
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/620c34a2-f2fc-4c2a-bbc6-fc52685678af/5afc79e5-a6bf-42f1-99bd-f84ec3b2d5f3"
+storage_version_token = "1792539473042414"
+content_type = "application/octet-stream"

@@ -173,6 +173,66 @@ cd /root/University-and-Course-data && cd backend-py && PYTHONPATH=. python -m p
   --noconftest -p no:cacheprovider
 ```
 
+### Separate least-privilege archive permission rehearsal
+
+`deploy.archive_permission_contract.archive_policy` grants only three bucket
+safety reads (`GetBucketPublicAccessBlock`, `GetBucketVersioning`,
+`GetLifecycleConfiguration`) and prefix-scoped `PutObject`, `GetObject`,
+`GetObjectVersion`. Both statements constrain the resource account. There is
+no ListBucket, remote deletion, tagging, ACL, policy or lifecycle mutation grant.
+Missing objects may therefore return 403 instead of 404: the archive attempts
+conditional creation, never overwrites an existing object, and still requires
+verified readback before local pruning.
+
+`deploy.rehearse_archive_permissions` is a **separate approval-gated** test.
+It creates a new role as well as the disposable private versioned bucket, never
+updates a production role or bucket, and uses the restricted assumed-role
+client for every actual archive call. Its trust policy names only the disposable
+provisioning IAM principal; its inline and STS session policies use the narrow
+contract above. The harness currently requires an IAM user/role ARN as its
+provisioning caller, and rejects STS session ARNs rather than broadening trust.
+
+In addition to the storage harness permissions above, the provisioning identity
+needs CloudFormation `CAPABILITY_NAMED_IAM`, IAM create/get/tag/delete role and
+inline-policy management restricted to `uni-archive-reader-*`, and AssumeRole
+on that namespace. Those permissions must **not** be granted to the archive
+role. Only the harness identity lists versions, checks ownership tags, and
+deletes exact versions and the stack. Cleanup refuses mismatched role tags and
+independently confirms the role, stack, and bucket are absent.
+
+The scenarios cover conditional conflicts, lost-response retries without extra
+versions, local retention, failed-read retention, and real AWS AccessDenied/403
+responses for versioned/unversioned deletion, put/delete bucket policy,
+put/delete lifecycle, and out-of-prefix access. A separate signed
+`disposable_archive_permissions` proof is issued only after checks and cleanup;
+ordinary storage proofs cannot substitute for it. Use
+`archive_storage_proof.validate_proof(..., permissions=True)` to validate.
+
+Offline checks (no network or credentials):
+
+```bash
+cd /root/University-and-Course-data && cd backend-py && PYTHONPATH=. python -m pytest \
+  tests/test_archive_permission_contract.py tests/test_archive_permission_harness.py \
+  --import-mode=importlib -q -c /dev/null --noconftest -p no:cacheprovider
+```
+
+After **separate approval**, with the same explicit disposable settings and
+independently pinned signing key described above:
+
+```bash
+cd /root/University-and-Course-data && cd backend-py && \
+  RUN_DISPOSABLE_AWS_ARCHIVE_PERMISSIONS=1 PYTHONPATH=. python -m pytest \
+  tests/test_archive_permissions_aws_integration.py \
+  --import-mode=importlib -q -c /dev/null --noconftest -p no:cacheprovider
+```
+
+The runner waits 15 minutes for initial S3 versioning propagation. It saves
+non-secret resource identities before creation; after interruption use
+`python -m deploy.rehearse_archive_permissions` with the original arguments and
+`--cleanup-only`. The test driver does this automatically on timeout and checks
+absence independently. Collect signed proof and state as CI artifacts in the
+same execution; do not treat an ignored workspace file as durable handoff.
+
 ### Restore an archived receipt onto a replacement host
 
 `restore_smoke_receipts.py` retrieves **existing evidence only**. Obtain separate

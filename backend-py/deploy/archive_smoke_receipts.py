@@ -96,7 +96,10 @@ def archive_one(client, bucket, owner, path):
     try:
         version = _verify(client, args, data)
     except ClientError as exc:
-        if _code(exc) not in ("NoSuchKey", "404"):
+        # Without ListBucket S3 conceals missing keys as AccessDenied. A
+        # conditional write is safe for either case: it cannot replace evidence.
+        # A genuinely denied read still fails closed at the verified readback.
+        if _code(exc) not in ("NoSuchKey", "404", "AccessDenied", "403"):
             raise
         try:
             response = client.put_object(

@@ -42,7 +42,9 @@ def code_digest():
     directory = Path(__file__).parent
     digest = hashlib.sha256()
     for name in ("archive_smoke_receipts.py", "archive_storage_scenarios.py",
-                 "archive_storage_proof.py", "rehearse_archive_storage.py"):
+                 "archive_storage_proof.py", "rehearse_archive_storage.py",
+                 "archive_permission_contract.py", "archive_permission_scenarios.py",
+                 "rehearse_archive_permissions.py"):
         digest.update(name.encode())
         digest.update((directory / name).read_bytes())
     return digest.hexdigest()
@@ -64,12 +66,15 @@ def pinned_key(kms, key_id, account, region, signers):
     return arn, serialization.load_pem_public_key(pem.encode())
 
 
-def write_proof(path, *, kms, key_id, account, region, signers, state, checks):
-    if tuple(checks) != CHECKS or state.get("cleanup_verified") is not True:
+def write_proof(path, *, kms, key_id, account, region, signers, state, checks, permissions=False):
+    from .archive_permission_scenarios import CHECKS as PERMISSION_CHECKS
+    expected = PERMISSION_CHECKS if permissions else CHECKS
+    if tuple(checks) != expected or state.get("cleanup_verified") is not True:
         raise ValueError("archive checks and cleanup must pass before signing")
     arn, public = pinned_key(kms, key_id, account, region, signers)
     payload = {
-        "kind": KIND, "schema_version": 1, "result": "passed",
+        "kind": "disposable_archive_permissions" if permissions else KIND,
+        "schema_version": 1, "result": "passed",
         "account_id": account, "region": region, "run_id": state["run_id"],
         "bucket": state["bucket"], "stack_name": state["stack_name"],
         "teardown_verified": True, "checks": list(checks),
@@ -89,13 +94,15 @@ def write_proof(path, *, kms, key_id, account, region, signers, state, checks):
     return payload
 
 
-def validate_proof(path, *, account, run_id, signers):
+def validate_proof(path, *, account, run_id, signers, permissions=False):
     """Offline verification against independently pinned keys, never receipt-supplied keys."""
     payload = json.loads(Path(path).read_text())
+    from .archive_permission_scenarios import CHECKS as PERMISSION_CHECKS
     required = {
-        "kind": KIND, "schema_version": 1, "result": "passed",
+        "kind": "disposable_archive_permissions" if permissions else KIND,
+        "schema_version": 1, "result": "passed",
         "account_id": account, "run_id": run_id, "teardown_verified": True,
-        "checks": list(CHECKS), "code_sha256": code_digest(),
+        "checks": list(PERMISSION_CHECKS if permissions else CHECKS), "code_sha256": code_digest(),
         "signing_algorithm": SIGNING_ALGORITHM,
     }
     if account in PRODUCTION_ACCOUNT_IDS or any(payload.get(k) != v for k, v in required.items()):

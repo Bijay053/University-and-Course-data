@@ -22,6 +22,29 @@ Hand off a signed rehearsal receipt to its destination within the same operation
 Disposable bucket ownership should be established by the provisioning service,
 not by treating a successful client response as the sole evidence of ownership.
 
+Least-privilege archive checks must omit ListBucket as well as remote deletion
+and bucket mutation permissions.
+
+**Why:** S3 returns AccessDenied rather than NoSuchKey for absent objects when
+the caller lacks ListBucket. A broad harness identity hides this distinction,
+so successful archival under that identity does not prove the narrow contract.
+
+**How to apply:** Exercise the real archive with a separate scoped role. Use
+conditional creation after a concealed missing-key response and require
+verified readback before pruning local evidence. Offline SDK stubs establish
+request behavior, not actual IAM enforcement.
+
+New temporary harness permissions need time to propagate before CloudFormation
+starts provisioning.
+
+**Why:** An approved exact-bucket grant was readable from IAM immediately, but
+CloudFormation still failed CreateBucket with no matching identity permission.
+That failed run required full teardown despite the correct policy document.
+
+**How to apply:** After an approved temporary grant, wait for propagation and
+check effective permissions before provisioning. Preserve exact policy identity
+for removal and independently confirm removal after resource cleanup.
+
 **Why:** S3 bucket creation and tagging are separate calls. A lost create response
 or a failure before tagging can leave a bucket that a tag-fenced cleanup routine
 must refuse to delete. Provider-managed tagged provisioning and a saved run
