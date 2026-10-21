@@ -20,3 +20,12 @@ The durable repair schema is a startup prerequisite, not an optional audit enhan
 **Why:** A release once included the model and migration but the target database had not applied the migration. Repair tasks stayed “queued” while the periodic reconciler failed on the missing table.
 
 **How to apply:** Keep the numbered migration as the deployment source of truth, plus a safe `CREATE IF NOT EXISTS` rollout guard on API startup and worker repair/recovery entry points.
+
+An empty configuration must have the same normalization in its read snapshot
+and compare-and-swap predicate, including SQL NULL and JSON null.
+
+**Why:** Reading an absent document as an empty mapping but comparing it against
+raw NULL made a validated repair look like a concurrent operator edit.
+
+**How to apply:** Normalize only empty representations, and retain exact JSON
+equality for populated documents so genuine concurrent edits still block apply.

@@ -858,8 +858,12 @@ class LiveRepairEvidence:
         # then revalidate their identity on the live page (never trust storage
         # as proof). Keep affected targets and a replacement in case a
         # historical anchor is now unpublished or ineligible.
+        recent = self.ctx.get("recent_course_urls") or []
+        anchor_candidates = recent if len(recent) >= 2 else (
+            recent + list(self.ctx.get("field_complete_course_urls") or [])
+        )
         anchors = list(dict.fromkeys(
-            url for url in self.ctx.get("field_complete_course_urls") or []
+            url for url in anchor_candidates
             if official_url(url, self.ctx["scrape_url"], self.extra_hosts)
             and not is_intentionally_excluded_course_url(url)
         ))

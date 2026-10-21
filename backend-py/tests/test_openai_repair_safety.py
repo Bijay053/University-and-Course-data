@@ -573,6 +573,22 @@ async def test_atomic_extraction_rule_apply_targets_runtime_auto_config() -> Non
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("empty", [None, {}])
+async def test_empty_config_apply_uses_same_normalization_as_read(empty) -> None:
+    class EmptyConfigDb(_FakeConfigDb):
+        async def execute(self, statement, params):
+            if "UPDATE universities" in str(statement):
+                assert "COALESCE(NULLIF(scrape_config, 'null'::jsonb), '{}'::jsonb)" in str(statement)
+                assert json.loads(params["before"]) == {}
+            return await super().execute(statement, params)
+    db = EmptyConfigDb(empty)
+    result = await _apply_recipe_to_db(7, {"linked_fee_repair": True}, db)
+    assert result["before"] == {}
+    assert result["applied"]["recipe"]["linked_fee_repair"] is True
+    assert db.commits == 1
+
+
+@pytest.mark.asyncio
 async def test_atomic_extraction_rule_apply_rolls_back_on_compare_and_swap_conflict() -> None:
     db = _FakeConfigDb({"auto_config": {}}, update_rowcount=0)
     with pytest.raises(RuntimeError, match="changed during validation"):

@@ -19,6 +19,25 @@ TWO = SEED + "/bachelor-of-science"
 PARTNER = SEED + "/partners"
 
 
+@pytest.mark.parametrize("field", [
+    "fee_pct", "ielts_pct", "intakes_pct", "duration_pct",
+    "location_pct", "degree_level_pct", "mode_pct",
+])
+def test_passing_urls_do_not_bypass_current_field_gaps(field):
+    quality = dict.fromkeys([
+        "fee_pct", "ielts_pct", "intakes_pct", "duration_pct",
+        "location_pct", "degree_level_pct", "mode_pct",
+    ], 100)
+    quality["total_staged"] = 31
+    assert not agent._field_repair_needed(quality)
+    quality[field] = 6
+    assert agent._field_repair_needed(quality)
+    quality[field] = 100
+    quality["critical_quality_count"] = 1
+    assert agent._field_repair_needed(quality)
+    assert not agent._field_repair_needed({})
+
+
 def course(title="Bachelor of Laws", extra=""):
     return f"""<html><main><h1>{title}</h1>
     <dl><dt>Award</dt><dd>Bachelor of Laws</dd>
@@ -148,6 +167,31 @@ async def test_contaminated_missing_fields_do_not_exhaust_course_evidence_slots(
     evidence.fetch = fetch
     result = await evidence.probe()
     assert visited[:3] == [SEED, ONE, TWO]
+    assert result["course_pages"] == 2
+    assert evidence.pages_checked <= 6
+
+
+@pytest.mark.asyncio
+async def test_recent_review_urls_replace_stale_complete_anchors():
+    stale = SEED + "/old-course"
+    evidence = live.LiveRepairEvidence(context(
+        recent_course_urls=[ONE, TWO],
+        field_complete_course_urls=[stale],
+    ))
+    visited = []
+    async def fetch(url):
+        visited.append(url)
+        evidence.pages_checked += 1
+        record = live.inspect_page(
+            url, course() if url in (ONE, TWO) else "<main><h1>Not found</h1></main>",
+            evidence.config,
+        )
+        evidence.records.append(record)
+        return record
+    evidence.fetch = fetch
+    result = await evidence.probe()
+    assert visited[:3] == [SEED, ONE, TWO]
+    assert stale not in visited
     assert result["course_pages"] == 2
     assert evidence.pages_checked <= 6
 
@@ -1042,6 +1086,38 @@ def mock_loop(monkeypatch, ctx, ai):
     monkeypatch.setattr(agent, "_predict_quality", AsyncMock(return_value=({}, {})))
     monkeypatch.setattr(openai_client, "chat_json", AsyncMock(return_value=ai))
     return openai_client.chat_json
+
+
+@pytest.mark.asyncio
+async def test_old_empty_job_repairs_current_cohort_and_replays_its_snapshots(monkeypatch):
+    quality = dict.fromkeys([
+        "fee_pct", "ielts_pct", "intakes_pct", "duration_pct",
+        "location_pct", "degree_level_pct", "mode_pct",
+    ], 100)
+    quality["total_staged"] = 31
+    ctx = context(imported=0, raw_discovered=31, after_filter=31, drop_rate=0,
+                  quality=quality, quality_source_job_id="current-review")
+    chat = mock_loop(monkeypatch, ctx, {
+        "confidence": 95, "patches": [{
+            "section": "recipe", "field": "extraction_rules.duration",
+            "value": {"css": ".duration", "confidence": .95},
+        }],
+    })
+    snapshot = AsyncMock(return_value={**quality, "duration_pct": 0})
+    replay = AsyncMock(return_value={
+        "accepted": False, "reports": [{
+            "field": "duration", "rejection_reasons": ["No demonstrated fill"], "samples": [],
+        }],
+    })
+    monkeypatch.setattr(agent, "_quality_snapshot", snapshot)
+    monkeypatch.setattr(agent, "_validate_extraction_patch_on_snapshots", replay)
+    async def fetch(url, *_args):
+        return (LISTING if url == SEED else course()), "", ""
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    await agent.run_ai_repair_loop("job-live", FakeDb())
+    assert chat.await_count == 1
+    assert snapshot.await_args_list[0].args[0] == "current-review"
+    assert replay.await_args.args[0] == "current-review"
 
 
 @pytest.mark.asyncio

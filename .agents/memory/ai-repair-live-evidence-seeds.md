@@ -37,3 +37,26 @@ pages and produces zero positive course evidence despite valid courses nearby.
 **How to apply:** Mix gap-focused candidates with a small spread of populated
 records within the same page budget. Stored completeness is only a sampling
 hint, never proof of course identity or international eligibility.
+
+Prefer recent same-university review URLs for probe anchors even when the
+original failed job still has rows; keep the original job as the comparison
+baseline.
+
+**Why:** Older Hope rows retained retired course URLs after a fresh verification
+had already stored usable replacements. Checking only whether old rows existed
+made retries repeatedly fetch the retired URLs.
+
+**How to apply:** Use recency only to choose bounded probe candidates. Re-fetch
+and classify every candidate; never promote stored rows into live authority.
+
+When a historical job no longer owns review rows, use one current review
+cohort consistently for field diagnosis, baseline presence, and snapshot
+replay—not just for live URL sampling. Preserve the original repair's ownership.
+
+**Why:** Production retries passed the URL checks and exited before field
+repair because the original job had no rows, even though the current review
+contained widespread missing fees.
+
+**How to apply:** Passing URL filters is not a field-quality verdict. Use actual
+field-presence metrics rather than non-null SQL counts (empty arrays are not
+populated intakes), and replay rules against the diagnosed cohort's snapshots.
