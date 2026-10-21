@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import ExitStack
+from contextlib import ExitStack, closing
 import json
 import os
 from pathlib import Path
@@ -170,7 +170,7 @@ def rehearse(*, account, production, region, run_id, proof_output, state_output,
         config = Config(connect_timeout=5, read_timeout=20, retries={"max_attempts": 2},
                         ignore_configured_endpoint_urls=True)
         def client(name):
-            return clients.enter_context(sdk.client(name, region_name=region, config=config))
+            return clients.enter_context(closing(sdk.client(name, region_name=region, config=config)))
         resources = Resources(sts=client("sts"), s3=client("s3"), cf=client("cloudformation"),
                               account=account, production=production, region=region, run_id=run_id)
         resources.account_guard()

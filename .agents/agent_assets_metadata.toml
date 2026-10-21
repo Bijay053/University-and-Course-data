@@ -105,3 +105,17 @@ mtime_ms = 1792539438914
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/620c34a2-f2fc-4c2a-bbc6-fc52685678af/5afc79e5-a6bf-42f1-99bd-f84ec3b2d5f3"
 storage_version_token = "1792539473042414"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "qMG8QS3II2WaAyTK2M7rv"
+uri = "file://generated-artifacts/archive-storage-live-20261021T000413Z.zip"
+type = "unspecified"
+title = "Archive test evidence — blocked by AWS permissions"
+description = "Test results, independent signer pins, and cleanup states for all three attempts. No success proof was issued; all temporary stacks and buckets were verified absent."
+logical_id = "1553f05a-2b8f-48e6-ad5d-2aa2ddbfb6d3"
+content_hash = "sha256:4397040b935525b78365c79a32054d19cb6ef4e1afbd6a6862243e7c4c602ead"
+size = 7030
+mtime_ms = 1792541115431
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/1553f05a-2b8f-48e6-ad5d-2aa2ddbfb6d3/72c92cda-617f-4b25-933e-067b5fa565fa"
+storage_version_token = "1792541194035401"
+content_type = "application/octet-stream"

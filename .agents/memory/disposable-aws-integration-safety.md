@@ -7,6 +7,15 @@ Destructive AWS integration tests must validate the account identity of every pr
 
 Infrastructure rehearsals must exercise the real queue/worker semantics and validate runner-to-template resource identifiers; a parked message or source-string assertion is not operational proof.
 
+Offline SDK doubles must preserve the real client's resource-lifecycle contract.
+
+**Why:** Wrapping fake AWS clients in context managers concealed that real
+clients only provide `close()`, causing live storage checks to fail before
+provisioning despite passing offline tests.
+
+**How to apply:** Use close-capable, non-context-manager doubles and assert
+cleanup on both success and failure paths.
+
 Never persist a SigV4 presigned attestation made with temporary credentials: its URL embeds the session token. Use a dedicated asymmetric KMS signing key and pin only its public key/ARN in production.
 
 SSM documents must wait for an explicit bootstrap-complete marker, use the application virtual environment for Python dependencies, and keep readiness/control checks bounded but retryable. Create event schedules disabled and enable them only after the mutation under test and an ownership-tag check. Keep exact proof output free of setup-command noise.

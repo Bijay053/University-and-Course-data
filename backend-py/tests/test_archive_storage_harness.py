@@ -1,7 +1,6 @@
 """Offline execution of the storage harness; no AWS credentials or application imports."""
 import io
 import json
-from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -284,8 +283,11 @@ def test_whole_runner_proves_cleanup_before_signing(tmp_path, monkeypatch, failu
             raise error("AccessDenied")
         s3.delete_object = refuse
     services = {"s3": s3, "cloudformation": cf, "kms": kms, "sts": sts}
+    closed = []
+    for name, service in services.items():
+        service.close = lambda name=name: closed.append(name)
     monkeypatch.setattr(harness, "session", lambda: SimpleNamespace(
-        client=lambda name, **kwargs: nullcontext(services[name]),
+        client=lambda name, **kwargs: services[name],
     ))
     monkeypatch.setattr(harness.time, "sleep", lambda seconds: None)
     original_sign = kms.sign
@@ -307,6 +309,7 @@ def test_whole_runner_proves_cleanup_before_signing(tmp_path, monkeypatch, failu
         harness.rehearse(**kwargs)
         proof.validate_proof(output, account=ACCOUNT, run_id=RUN, signers=pins)
     state = json.loads(state_path.read_text())
+    assert sorted(closed) == sorted(services)
     if failure == "cleanup-failure":
         assert not state["cleanup_verified"] and cf.exists and s3.exists
         s3.delete_object = S3.delete_object.__get__(s3)
@@ -359,8 +362,11 @@ def test_live_test_driver_recovers_killed_child_offline(tmp_path, monkeypatch):
     owned = resources()
     owned.cf.exists = owned.s3.exists = False
     services = {"sts": owned.sts, "s3": owned.s3, "cloudformation": owned.cf}
+    closed = []
+    for name, service in services.items():
+        service.close = lambda name=name: closed.append(name)
     monkeypatch.setattr(driver, "session", lambda: SimpleNamespace(
-        client=lambda name, **kwargs: nullcontext(services[name]),
+        client=lambda name, **kwargs: services[name],
     ))
     calls = []
     def run(command, **kwargs):
@@ -375,3 +381,4 @@ def test_live_test_driver_recovers_killed_child_offline(tmp_path, monkeypatch):
     with pytest.raises(AssertionError, match="timed out; ownership-checked cleanup verified"):
         driver.test_archive_storage_and_independent_cleanup(None)
     assert len(calls) == 2 and "--cleanup-only" in calls[-1]
+    assert sorted(closed) == sorted(services)

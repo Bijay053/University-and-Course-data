@@ -1,5 +1,6 @@
 """Opt-in, billable STORAGE ONLY test. Never create a release smoke sample."""
 import json
+from contextlib import closing
 import os
 from pathlib import Path
 import subprocess
@@ -59,14 +60,18 @@ def test_archive_storage_and_independent_cleanup(failure):
         assert state.is_file(), "timed out before provisioning state was written"
         result = subprocess.run(command + ["--cleanup-only"], timeout=900, **process_args)
     # A nonzero process status is not cleanup evidence.
+    assert state.is_file(), (
+        f"archive harness exited before writing resource state (exit={result.returncode}); "
+        f"safe harness output: {result.stdout.strip()}"
+    )
     saved = json.loads(state.read_text())
     assert saved["cleanup_verified"] is True
     sdk = session()
     config = Config(connect_timeout=5, read_timeout=20, retries={"max_attempts": 2},
                     ignore_configured_endpoint_urls=True)
-    with (sdk.client("sts", region_name=region, config=config) as sts,
-          sdk.client("s3", region_name=region, config=config) as s3,
-          sdk.client("cloudformation", region_name=region, config=config) as cf):
+    with (closing(sdk.client("sts", region_name=region, config=config)) as sts,
+          closing(sdk.client("s3", region_name=region, config=config)) as s3,
+          closing(sdk.client("cloudformation", region_name=region, config=config)) as cf):
         Resources(sts=sts, s3=s3, cf=cf, account=account, production=production,
                   region=region, run_id=run_id).assert_absent()
     assert not timed_out, "archive rehearsal timed out; ownership-checked cleanup verified"
