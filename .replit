@@ -299,7 +299,7 @@ externalPort = 4200
 
 [nix]
 channel = "stable-25_05"
-packages = ["libxcrypt", "postgresql", "rapidfuzz-cpp", "taskflow", "xcodebuild", "zlib"]
+packages = ["cacert", "cargo", "libffi", "libiconv", "libxcrypt", "openssl", "pkg-config", "postgresql", "rapidfuzz-cpp", "rustc", "taskflow", "xcodebuild", "zlib"]
 
 [userenv]
 
@@ -308,3 +308,6 @@ GITHUB_PUSH_URL = "https://github.com/Studyinfocentre/University-and-course-mana
 WLV_SEARCHSTAX_TOKEN = "d94d88f1dfd335e6bb4ef870b2c1ff29faf95bb6"
 DURHAM_SEARCHSTAX_TOKEN = "75c41a510e054668f69fae93cf05b755ba027b7c"
 LEEDSTRINITY_SEARCHSTAX_TOKEN = "877b10aff7b0b0d2d452d592169782516d929bad"
+
+[userenv.development]
+PLAYWRIGHT_NODEJS_PATH = "/home/runner/workspace/scripts/secure-browser-node.sh"

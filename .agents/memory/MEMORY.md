@@ -146,3 +146,4 @@
 - [Dispatch test failure sentinels](dispatch-test-failure-sentinels.md) — verify mock outcomes outside broad delivery exception handlers so ordering assertions cannot be swallowed.
 - [Discovery alert scope](discovery-alert-scope.md) — selected-course recoveries need outcome-based alerts, not catalogue-size thresholds.
 - [Repair comparison and linked tuition](repair-matched-cohort-and-linked-fees.md) — match course identities; follow owned fee links without borrowing domestic or thesis-pending prices.
+- [Hidden Node runtimes](node-runtime-security.md) — shell, Nix pnpm, and Python browser drivers may use different Node releases; check certifi separately from OS trust.

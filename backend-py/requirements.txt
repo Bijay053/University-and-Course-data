@@ -7,6 +7,8 @@ alembic>=1.13.0
 pydantic>=2.7.0
 pydantic-settings>=2.3.0
 httpx>=0.27.0
+# eMudhra compromised intermediate mitigation; retains unaffected roots.
+certifi>=2026.10.19
 beautifulsoup4>=4.12.0
 lxml>=5.2.0
 selectolax>=0.3.21

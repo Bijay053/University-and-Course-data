@@ -15,10 +15,10 @@ paths = [ "/" ]
 localPort = 20675
 
 [services.development]
-run = "pnpm --filter @workspace/university-portal run dev"
+run = "bash ../../scripts/pnpm-secure.sh --filter @workspace/university-portal run dev"
 
 [services.production]
-build = [ "pnpm", "--filter", "@workspace/university-portal", "run", "build" ]
+build = [ "bash", "../../scripts/pnpm-secure.sh", "--filter", "@workspace/university-portal", "run", "build" ]
 publicDir = "artifacts/university-portal/dist/public"
 serve = "static"
 

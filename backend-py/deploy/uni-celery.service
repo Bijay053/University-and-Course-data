@@ -6,6 +6,8 @@ After=network.target redis-server.service postgresql.service
 Type=simple
 User=root
 WorkingDirectory=/opt/university-portal/backend-py
+Environment=PLAYWRIGHT_NODEJS_PATH=/usr/bin/node
+ExecStartPre=/usr/bin/node /opt/university-portal/scripts/check-node-security.cjs
 EnvironmentFile=/opt/university-portal/backend-py/.env
 EnvironmentFile=-/etc/university-portal/openai.env
 EnvironmentFile=/opt/university-portal/backend-py/.release.env

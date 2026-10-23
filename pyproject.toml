@@ -8,6 +8,7 @@ dependencies = [
     "asyncpg>=0.29.0",
     "beautifulsoup4>=4.12.0",
     "celery[redis]>=5.4.0",
+    "certifi>=2026.10.19",
     "email-validator>=2.0",
     "fastapi>=0.115.0",
     "google-generativeai>=0.7.0",
