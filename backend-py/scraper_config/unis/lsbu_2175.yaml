@@ -4,6 +4,13 @@
 # Discovery: Seeded search results to BFS discovery
 # Notes: Heavily blocked marketing/stories to prevent scraping alumni profiles.
 
+locked_config_paths:
+  - extraction.scrape_do_skip_fallbacks
+  - extraction.scrape_do_request_timeout_seconds
+  - extraction.scrape_do_wayback_after_first_failure
+  - extraction.skip_browser_rescue
+  - extraction.skip_per_course_browser
+
 discovery:
   # LSBU is fully Cloudflare-blocked: httpx, cffi, Scrape.do static all fail.
   # The sitemap probe (4 URLs × ~75s each = ~300s) exhausts the discovery
@@ -40,6 +47,12 @@ extraction:
   # skip_browser_rescue: Playwright is also a datacenter IP — no point running it.
   scrape_do_render: true
   scrape_do_skip_fallbacks: true
+  # Do not spend the entire 90s course deadline retrying the same blocked
+  # proxy route. Try live once, then the already-discovered archive snapshot.
+  # An archive miss permits one final bounded live attempt, not the generic
+  # rendered/static retry ladder. Unresolved pages remain explicit failures.
+  scrape_do_request_timeout_seconds: 20
+  scrape_do_wayback_after_first_failure: true
   skip_browser_rescue: true
   # The separate missing-English browser pass ran on 77 courses in the logged
   # scrape and filled zero fields. Do not spend the extraction deadline on it.
