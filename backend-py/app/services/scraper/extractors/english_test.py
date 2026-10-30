@@ -854,6 +854,18 @@ def _duolingo(text: str) -> float | None:
 def _emit(test: str, scores: dict[str, float] | float | None, snippet: str) -> list[ExtractionResult]:
     if scores is None:
         return []
+    if test == "ielts":
+        # Other tests share labels such as "overall" and "reading". Never
+        # serialize their 100–200 point scales as IELTS, even after a regex hit.
+        def valid_band(value: Any) -> bool:
+            return isinstance(value, (int, float)) and 0 <= value <= 9 and value * 2 == int(value * 2)
+
+        if isinstance(scores, dict):
+            if not valid_band(scores.get("overall")):
+                return []
+            scores = {key: value for key, value in scores.items() if valid_band(value)}
+        elif not valid_band(scores):
+            return []
     out: list[ExtractionResult] = []
     if isinstance(scores, dict):
         normalized: dict[str, Any] = {}
@@ -1391,9 +1403,24 @@ _SEGI_PROGRAMME_IELTS: dict[str, float] = {
 }
 
 
+def is_reference_only_english_page(url: str) -> bool:
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    return (
+        (parsed.hostname or "").lower() in {"surrey.ac.uk", "www.surrey.ac.uk"}
+        and parsed.path.rstrip("/") == "/apply/international/english-language-requirements"
+    )
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     from urllib.parse import urlparse as _up
     _host = (_up(url).netloc or "").lower()
+    if is_reference_only_english_page(url):
+        # This is a conversion reference for several possible IELTS offers,
+        # not an institutional admission requirement. Use the course's offer;
+        # flattening these tables mixes Cambridge, TOEFL and PTE components.
+        return []
 
     from app.services.scraper.cccu_embedded_facts import (
         extract_cccu_embedded_facts,

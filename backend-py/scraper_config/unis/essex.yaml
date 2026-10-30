@@ -1,0 +1,105 @@
+# University of Essex
+# Hostname: www.essex.ac.uk
+# Verified subject-directory seeds; the content sitemap does not contain degrees.
+# JSON is valid YAML. These subject pages contain official Funnelback redirect links.
+{
+  "hostname_guard": "www.essex.ac.uk",
+  "locked_config_paths": [
+    "discovery.seed_urls",
+    "discovery.allow_url_patterns",
+    "discovery.course_detail_url_patterns",
+    "discovery.force_candidate_url_patterns"
+  ],
+  "discovery": {
+    "seed_urls": [
+      "https://www.essex.ac.uk/subjects",
+      "https://www.essex.ac.uk/subjects/accounting",
+      "https://www.essex.ac.uk/subjects/acting-producing-stage-management",
+      "https://www.essex.ac.uk/subjects/actuarial-science",
+      "https://www.essex.ac.uk/subjects/art-history",
+      "https://www.essex.ac.uk/subjects/biochemistry",
+      "https://www.essex.ac.uk/subjects/biological-sciences",
+      "https://www.essex.ac.uk/subjects/biomedical-science",
+      "https://www.essex.ac.uk/subjects/business-and-management",
+      "https://www.essex.ac.uk/subjects/childhood-studies",
+      "https://www.essex.ac.uk/subjects/computational-finance",
+      "https://www.essex.ac.uk/subjects/computer-science",
+      "https://www.essex.ac.uk/subjects/creative-writing",
+      "https://www.essex.ac.uk/subjects/criminology",
+      "https://www.essex.ac.uk/subjects/data-analytics",
+      "https://www.essex.ac.uk/subjects/dental-hygiene",
+      "https://www.essex.ac.uk/subjects/drama",
+      "https://www.essex.ac.uk/subjects/economics",
+      "https://www.essex.ac.uk/subjects/engineering",
+      "https://www.essex.ac.uk/subjects/english-language",
+      "https://www.essex.ac.uk/subjects/english-language-teaching",
+      "https://www.essex.ac.uk/subjects/entrepreneurship",
+      "https://www.essex.ac.uk/subjects/environment",
+      "https://www.essex.ac.uk/subjects/european-studies",
+      "https://www.essex.ac.uk/subjects/events-hospitality-and-tourism-management",
+      "https://www.essex.ac.uk/subjects/film-studies",
+      "https://www.essex.ac.uk/subjects/finance-and-banking",
+      "https://www.essex.ac.uk/subjects/genetics",
+      "https://www.essex.ac.uk/subjects/global-studies",
+      "https://www.essex.ac.uk/subjects/health-and-social-care",
+      "https://www.essex.ac.uk/subjects/history",
+      "https://www.essex.ac.uk/subjects/human-resource-management",
+      "https://www.essex.ac.uk/subjects/human-rights",
+      "https://www.essex.ac.uk/subjects/international-relations",
+      "https://www.essex.ac.uk/subjects/journalism",
+      "https://www.essex.ac.uk/subjects/latin-american-studies",
+      "https://www.essex.ac.uk/subjects/law",
+      "https://www.essex.ac.uk/subjects/liberal-arts",
+      "https://www.essex.ac.uk/subjects/linguistics",
+      "https://www.essex.ac.uk/subjects/literature",
+      "https://www.essex.ac.uk/subjects/marine-biology",
+      "https://www.essex.ac.uk/subjects/marketing",
+      "https://www.essex.ac.uk/subjects/mathematics",
+      "https://www.essex.ac.uk/subjects/mba",
+      "https://www.essex.ac.uk/subjects/modern-languages",
+      "https://www.essex.ac.uk/subjects/nursing",
+      "https://www.essex.ac.uk/subjects/occupational-therapy",
+      "https://www.essex.ac.uk/subjects/philosophy",
+      "https://www.essex.ac.uk/subjects/physiotherapy",
+      "https://www.essex.ac.uk/subjects/politics",
+      "https://www.essex.ac.uk/subjects/psychology",
+      "https://www.essex.ac.uk/subjects/psychology-applied-and-clinical",
+      "https://www.essex.ac.uk/subjects/psychosocial-and-psychoanalytic-studies",
+      "https://www.essex.ac.uk/subjects/robotics",
+      "https://www.essex.ac.uk/subjects/social-work",
+      "https://www.essex.ac.uk/subjects/sociology",
+      "https://www.essex.ac.uk/subjects/speech-and-language-therapy",
+      "https://www.essex.ac.uk/subjects/sport-and-exercise",
+      "https://www.essex.ac.uk/subjects/sports-therapy",
+      "https://www.essex.ac.uk/subjects/translation-and-interpreting"
+    ],
+    "bfs_page_budget": 65,
+    "allow_url_patterns": [
+      "(?i)^https://www\\.essex\\.ac\\.uk/courses/[a-z]{2}\\d+/\\d+/[^/?#]+/?(?:\\?[^#]*)?$"
+    ],
+    "course_detail_url_patterns": [
+      "(?i)^https://www\\.essex\\.ac\\.uk/courses/[a-z]{2}\\d+/\\d+/[^/?#]+/?(?:\\?[^#]*)?$"
+    ],
+    "force_candidate_url_patterns": [
+      "(?i)^https://www\\.essex\\.ac\\.uk/courses/[a-z]{2}\\d+/\\d+/[^/?#]+/?(?:\\?[^#]*)?$"
+    ],
+    "listing_only_patterns": [
+      "/subjects(?:/|$)"
+    ],
+    "allow_blocked_listing_patterns": [
+      "/subjects(?:/|$)"
+    ],
+    "block_url_patterns": [
+      "/study-abroad(?:/|$)",
+      "/short-courses(?:/|$)",
+      "/blog(?:/|$)",
+      "/news(?:/|$)"
+    ],
+    "expected_min_courses": 100
+  },
+  "extraction": {
+    "fees": {
+      "default_currency": "GBP"
+    }
+  }
+}

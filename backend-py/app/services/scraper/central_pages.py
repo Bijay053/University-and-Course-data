@@ -1009,6 +1009,8 @@ async def _parse_english_page_html_async(html: str, page_url: str) -> dict[str, 
     try:
         from app.services.scraper.extractors import english_test
 
+        if english_test.is_reference_only_english_page(page_url):
+            return {}
         results = await english_test.extract(html, page_url)
         out: dict[str, Any] = {}
         requirement_evidence: dict[str, str] | None = None
@@ -1832,7 +1834,7 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 #                             english_by_level + english_by_program
 
 _CACHE_TTL_DAYS = 30
-_ENGLISH_CACHE_SCHEMA_VERSION = 12
+_ENGLISH_CACHE_SCHEMA_VERSION = 13
 _FEE_CACHE_SCHEMA_VERSION = 2
 
 

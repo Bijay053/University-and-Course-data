@@ -272,7 +272,10 @@ def _get_shared_client() -> httpx.AsyncClient:
         if client is not None and not client.is_closed:
             return client
 
+    from app.services.scraper.tls_context import scraper_ssl_context
+
     client = httpx.AsyncClient(
+        verify=scraper_ssl_context(),
         timeout=httpx.Timeout(15.0, connect=10.0),
         follow_redirects=True,
         limits=httpx.Limits(

@@ -3648,6 +3648,9 @@ async def extract_course(
             "discovery or select a uel_variant URL"
         )
 
+    from app.services.scraper.extractors.hsu_facts import is_hsu_course as _is_hsu_course
+    _hsu_source_html = html if _is_hsu_course(url) else None
+
     # Preserve Federation's original response before generic HTML compaction
     # and audience-oriented transformations run.  Its authoritative Duration,
     # Locations, Start dates, and canonical-name blocks live in embedded JSON;
@@ -11736,6 +11739,12 @@ async def extract_course(
     # browser/default and broad reject-keyword passes, including omissions.
     from app.services.scraper.extractors.lsbu_fees import apply_course_fee_authority as _apply_lsbu_fee
     _apply_lsbu_fee(html or "", url, payload, evidence)
+
+    # Preserve HSU's course-owned campus and international year/price tuple
+    # after generic extraction, browser/AI fallback and institutional defaults.
+    if _hsu_source_html is not None:
+        from app.services.scraper.extractors.hsu_facts import apply_course_authority as _apply_hsu
+        _apply_hsu(_hsu_source_html, url, payload, evidence)
 
     # ── Evidence selection finalisation ────────────────────────────────────
     # Mark the winning evidence row for each field as decision_status="selected"

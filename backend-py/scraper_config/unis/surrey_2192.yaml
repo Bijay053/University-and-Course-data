@@ -2,7 +2,15 @@
 # Hostname: www.surrey.ac.uk
 # Country: United Kingdom | Currency: GBP
 # Discovery: BFS from main study levels (undergraduate, postgraduate, research) following course links. Pages are primarily server-rendered HTML.
-# Notes: Extracts fees and English requirements directly from individual course pages. Allows online-only international courses.
+# Notes: Course pages own English requirements; the central page is only a conversion reference.
+locked_config_paths:
+  - discovery.seed_urls
+  - discovery.allow_url_patterns
+  - discovery.expected_min_courses
+  - extraction.english.central_page
+  - extraction.english.default_ielts
+  - extraction.english.default_pte
+  - extraction.english.default_toefl
 discovery:
   always_sitemap_supplement: true
   seed_urls:
@@ -11,7 +19,7 @@ discovery:
   - https://www.surrey.ac.uk/postgraduate/research
   allow_url_patterns:
   - /postgraduate/[^/]+/?$
-  - /undergraduate/[^/]+/\d{4}/?$
+  - /undergraduate/[^/]+(?:/\d{4})?/?$
   block_url_patterns:
   - /apply
   - /contact
@@ -29,7 +37,9 @@ discovery:
   - /life-on-campus
   - /fees-and-funding$
   - /international/living
-  expected_min_courses: 400
+  # Current UG, taught PG and research A–Z lists contain roughly 245 distinct
+  # course URLs, not 400 (variants share course pages). Keep a collapse alarm.
+  expected_min_courses: 200
 extraction:
   fees:
     default_currency: GBP
@@ -43,12 +53,12 @@ extraction:
     - UK fee
     - Domestic
   english:
-    central_page: https://www.surrey.ac.uk/apply/international/english-language-requirements
+    central_page: null
     course_english_priority: true
     trust_vision_ocr: false
-    default_ielts: 6.0
-    default_pte: 60
-    default_toefl: 80
+    default_ielts: null
+    default_pte: null
+    default_toefl: null
   intake:
     start_dates_only: true
   course_name:
