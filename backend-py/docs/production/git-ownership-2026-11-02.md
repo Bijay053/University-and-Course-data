@@ -30,5 +30,9 @@ SSM repair and verification: `da9e6b40-3063-4b31-a7d0-ac3d94e3cca5`.
 A read-only Git metadata permission check is added to the guarded release before
 fetch, executed as the repository owner. It checks writable metadata directories
 and refs/reflogs while excluding operational backups and normal read-only object
-files. This code is not deployed by the ownership repair. Legacy installations
-without the helper retain their existing release behavior until upgraded.
+files. This code is not deployed by the ownership repair.
+
+The subsequent bootstrap enhancement reads the checker from the locally
+available reviewed target, not the installed predecessor. Missing target objects
+or checker cause refusal before fetch; the approved target's guarded entrypoint
+must still be used when bootstrapping an older installation.

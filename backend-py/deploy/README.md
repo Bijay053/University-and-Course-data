@@ -355,6 +355,16 @@ in `../README.md`.
 
 ## Guarded application release
 
+The production entrypoint first verifies the full predecessor and target IDs,
+local commit availability, current HEAD and ancestry without network access or
+Git replacement objects. It reads the Git metadata checker from that exact
+target into memory, then executes it as the repository owner before any fetch,
+environment loading, sample or checkout. An older installed checkout need not
+contain the checker. Missing target objects or a missing target checker refuse
+the release: provision the reviewed objects separately and rerun; the bootstrap
+does not fetch executable policy on demand. The ordinary remote-tip revision
+fence still runs after this local check and again before checkout.
+
 Optional real Linux permission/ACL tests for the Git metadata preflight:
 
 ```bash

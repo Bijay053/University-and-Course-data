@@ -83,6 +83,34 @@ verify_target_runtime() {
   fi
 }
 
+verify_target_git_metadata() {
+  local checker="backend-py/deploy/git_metadata_preflight.py" source
+  if [[ ! "$predecessor" =~ ^[0-9a-f]{40}$ || ! "$target" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Release refused: Git preflight requires exact full revision IDs." >&2
+    return 1
+  fi
+  # Never lazily fetch a missing object, execute replacement objects, or inspect
+  # a moving ref. The caller must provision reviewed target objects beforehand.
+  local_git() {
+    run_release_user env GIT_NO_REPLACE_OBJECTS=1 GIT_NO_LAZY_FETCH=1 \
+      GIT_ALLOW_PROTOCOL= git -C "$repo_root" "$@"
+  }
+  if ! local_git cat-file -e "$predecessor^{commit}" ||
+     ! local_git cat-file -e "$target^{commit}" ||
+     [ "$(local_git rev-parse HEAD)" != "$predecessor" ] ||
+     ! local_git merge-base --is-ancestor "$predecessor" "$target"; then
+    echo "Release refused: locally available target/predecessor could not be verified; provision reviewed objects before release." >&2
+    return 1
+  fi
+  # Materialize in memory only, and require git show to finish successfully
+  # before executing any byte. A missing target checker is a refusal.
+  if ! source="$(local_git show "$target:$checker")"; then
+    echo "Release refused: reviewed target lacks the Git metadata checker." >&2
+    return 1
+  fi
+  (cd "$repo_root" && printf '%s\n' "$source" | run_release_user "$python_bin" -B -)
+}
+
 resume_consumers() {
   if [ "$release_test_mode" = 1 ]; then
     printf 'resume-attempted\n' >> "$resume_marker"
@@ -92,6 +120,7 @@ resume_consumers() {
 }
 
 if [ "$release_test_mode" != 1 ]; then
+  verify_target_git_metadata
   cd "$backend_root"
   set -a
   source .env
@@ -99,11 +128,6 @@ if [ "$release_test_mode" != 1 ]; then
   source /etc/university-portal/database.env
   set +a
   export PYTHONPATH=.
-  # Execute the installed read-only checker as the repository owner before
-  # fetch can start automatic housekeeping. Older predecessors lack this file.
-  if [ -f "$backend_root/deploy/git_metadata_preflight.py" ]; then
-    run_release_user "$python_bin" -B "$backend_root/deploy/git_metadata_preflight.py"
-  fi
   run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
   verify_target_runtime
   verify_target_worker_schema

@@ -42,7 +42,7 @@ def test_symlink_is_not_followed(tmp_path):
 def test_preflight_runs_as_owner_before_fetch():
     script = (FILE.parent / "guarded_release.sh").read_text()
     production = script[script.index('if [ "$release_test_mode" != 1 ]; then'):]
-    assert production.index('run_release_user "$python_bin"') < production.index('run_release_user "$revision_fence" verify')
+    assert production.index("verify_target_git_metadata") < production.index('run_release_user "$revision_fence" verify')
 
 
 @pytest.fixture
