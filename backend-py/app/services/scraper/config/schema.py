@@ -3561,6 +3561,10 @@ class ExtractionConfig(BaseModel):
             "failures within the shared per-course deadline."
         ),
     )
+    scrape_do_wayback_timeout_seconds: Optional[float] = Field(
+        default=None, gt=0, le=90,
+        description="Total early archive fallback budget, including queue wait and retries. None preserves existing behavior.",
+    )
     scrape_do_wayback_after_first_failure: bool = Field(
         default=False,
         description=(

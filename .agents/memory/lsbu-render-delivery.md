@@ -14,3 +14,15 @@ Disabling browser rescue alone does not bound the proxy retry ladder. A failed r
 **Why:** A later LSBU log still took 94 minutes with browser passes disabled, and then started a separate large retry. One live current-page fetch succeeded within 20 seconds while a legacy archived URL remained unavailable.
 
 **How to apply:** Budget the first live attempt independently and reach archive fallback before generic static/render retries exhaust the course deadline. Verify both current and unavailable URLs; a successful fetch is not proof of extraction quality or full catalogue recovery.
+
+An early archive fallback also needs an end-to-end budget including its
+semaphore wait, not only an HTTP timeout.
+
+**Why:** Cached archive replay serializes through a single slot and may perform
+three 25-second attempts plus retry sleeps. A failing replay can therefore
+consume other courses' deadlines while they wait without making a request.
+
+**How to apply:** Bound the queue and replay together, cancel timed-out work
+cleanly, and retain the bounded final live attempt. Keep unresolved URLs as
+explicit recoverable failures; do not present this transport bound as proof
+that the full archived catalogue is current or that AI extraction is fast.
