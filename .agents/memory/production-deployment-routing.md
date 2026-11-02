@@ -400,6 +400,17 @@ even though both process environments already contained the exact revision.
 unit journal for the exact full revision for a short bounded interval before
 classifying the restart as failed.
 
+Check production ancestry before advancing the deployment branch. A previous
+release-only reconciliation commit may not be an ancestor of workspace main.
+
+**Why:** The workspace retained the tested source tree but not the previous
+production merge commit, so a non-forced GitHub branch update correctly refused.
+
+**How to apply:** Compare both trees and ancestry first. If the only divergence
+is the prior release ancestry, create a reconciliation commit with both parents
+and the exact tested target tree, verify its tree hash, and fast-forward without
+force. Do not use this to discard production-only source changes.
+
 Frontend source changes are not deployed by pulling Git or restarting the API
 and Celery services. Nginx serves the built Vite output directly.
 
