@@ -21,7 +21,7 @@ def _apply_english(soup, url, payload, evidence):
                  if re.search(r"international students|english language", h.get_text(), re.I)]
     for section in sections:
         summary = section.find("summary")
-        if summary and not re.search(r"international|english", summary.get_text(), re.I):
+        if summary and not re.search(r"international|english|required|grades|entry", summary.get_text(), re.I):
             continue
         for paragraph in section.find_all(["p", "li"]):
             text = paragraph.get_text(" ", strip=True)
@@ -110,6 +110,11 @@ def apply_course_authority(html: str, url: str, payload: dict, evidence: list) -
                                node.get_text("\n", strip=True).replace("\n£", " £"), re.I)
             if inline:
                 text = inline[1]
+            elif re.search(r"course is only open to international applicants",
+                           soup.get_text(" ", strip=True), re.I) and re.match(r"^£", text):
+                # International-only programme: use its headline tuition,
+                # not the bursary or the discounted payable amount.
+                text = re.split(r"\.\s+(?=[A-Z])", text, maxsplit=1)[0]
             elif not international:
                 continue
             if re.search(
@@ -138,8 +143,10 @@ def apply_course_authority(html: str, url: str, payload: dict, evidence: list) -
         if section is None:
             continue
         text = section.get_text(" ", strip=True)
-        if re.search(r"Tuition Fees", text, re.I):
-            continue  # Already handled by the year-heading authority above.
+        # WordPress wraps the whole course in one section; discard everything
+        # before the labelled fee block. A later "tuition fees policy" link
+        # must not suppress the actual price.
+        text = re.split(r"\bCourse Fees\b", text, maxsplit=1, flags=re.I)[-1]
         phd = re.search(
             r"course (20\d{2})/\d{2} entry.*?per annum.*?"
             r"International\s+£[\d,\s.]+\s+Part-time\s+£([\d,\s.]+)\s+Full-time",
