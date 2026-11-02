@@ -40,3 +40,15 @@ selected marker, and the legacy currency alias could still hold the AI value.
 **How to apply:** Reset superseded tuple evidence and reconcile aliases before
 final selection. Assert selected metadata as well as amounts after real
 staging; a correct snapshot of column values alone does not prove citation parity.
+
+HSU's central English guidance distinguishes undergraduate requirements from
+two postgraduate alternatives and explicitly excepts Global Healthcare
+Management. Master of Osteopathy is classified as undergraduate despite its
+award name.
+
+**Why:** Choosing a level from the word “Master”, or choosing the central page's
+first postgraduate score, can assign the wrong requirement.
+
+**How to apply:** Verify the exact course/award and admissions referral; use an
+explicit course-owned overall to disambiguate postgraduate alternatives. Fetch
+the applicable guidance rather than treating previously observed scores as defaults.

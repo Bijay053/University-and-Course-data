@@ -13,3 +13,13 @@ Round-trip tests must preserve the university configuration context at both extr
 **Why:** Resetting the context after extraction made an HSU persistence test reject an unpublished fee under generic staging policy, rather than exercise the intended university-specific review behavior.
 
 **How to apply:** Re-enter the same recipe context for staging without bypassing its gate. Exercise replacement under a new scrape job; same-job duplicate rejection is a different contract.
+
+Reusing identical evidence is safer than superseding a candidate and appending
+an identical selected copy.
+
+**Why:** Duplicate suppression at the database boundary can retain the earlier
+superseded copy and discard the selected copy, losing the citation despite a
+correct in-memory winner.
+
+**How to apply:** Reuse the original proof when reaffirming course authority;
+assert selected citations after persistence, including overall-only requirements.

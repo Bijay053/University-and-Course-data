@@ -33,19 +33,25 @@ def _apply_english(soup, url, payload, evidence):
                 r"|(?:score of|level)\s*(\d(?:\.\d)?)", text, re.I)
             floor = re.search(
                 r"(?:no less than|no (?:component|element|band|section) below)\s*(\d(?:\.\d)?)", text, re.I)
-            if not overall or not floor:
+            if not overall:
                 continue
             value = float(next(g for g in overall.groups() if g))
-            band = float(floor[1])
-            if 0 < band <= value <= 9:
+            band = float(floor[1]) if floor else None
+            if 0 < value <= 9 and (band is None or 0 < band <= value):
                 scores.add((value, band))
                 snippets.append(text)
-    if len(scores) != 1:
+    overalls = {value for value, _ in scores}
+    bands = {band for _, band in scores if band is not None}
+    if len(overalls) != 1 or len(bands) > 1:
         return
-    overall, band = next(iter(scores))
-    for field, value in {"ielts_overall": overall, **{
+    overall = next(iter(overalls))
+    band = next(iter(bands)) if bands else None
+    values = {"ielts_overall": overall}
+    if band is not None:
+        values.update({
         f"ielts_{part}": band for part in ("reading", "writing", "listening", "speaking")
-    }}.items():
+        })
+    for field, value in values.items():
         payload[field] = value
         for row in evidence:
             if row.get("field_key") == field:
