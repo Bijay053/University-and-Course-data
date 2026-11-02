@@ -21,6 +21,18 @@ Never replace unavailable push credentials by copying secrets.
 Pace GitHub connector object transfers and retry transient rate-limit/server
 failures before treating them as corrupt Git objects.
 
+A ready GitHub REST connection does not necessarily provide Git transport
+credentials. Transfer large object sets in bounded, dependency-ordered batches,
+verifying returned object hashes before a non-force branch update.
+
+**Why:** The Git proxy rejected a legacy REST connection, and retaining a whole
+compressed object transfer plus its decoded payload exceeded the notebook memory
+limit. Per-batch uploads avoided retaining both representations.
+
+**How to apply:** Use the connected API when Git transport explicitly rejects
+its credential type. Keep each batch below the file-read limit and release its
+payload after upload; verify remote ancestry and branch identity before advancing.
+
 Keep resumable transfer inputs in the ignored workspace `.local` directory,
 not solely in `/tmp`. After an interrupted transfer, verify the remote branch
 before repeating any branch update.
