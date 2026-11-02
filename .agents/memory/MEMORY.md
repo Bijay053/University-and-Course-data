@@ -147,3 +147,4 @@
 - [Discovery alert scope](discovery-alert-scope.md) — selected-course recoveries need outcome-based alerts, not catalogue-size thresholds.
 - [Repair comparison and linked tuition](repair-matched-cohort-and-linked-fees.md) — match course identities; follow owned fee links without borrowing domestic or thesis-pending prices.
 - [Hidden Node runtimes](node-runtime-security.md) — shell, Nix pnpm, and Python browser drivers may use different Node releases; check certifi separately from OS trust.
+- [Production runtime prerequisites](production-runtime-prerequisites.md) — approved security maintenance precedes code-only guarded releases; preserve service overlays and private directories.
