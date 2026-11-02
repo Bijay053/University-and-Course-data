@@ -355,6 +355,19 @@ in `../README.md`.
 
 ## Guarded application release
 
+Optional real Linux permission/ACL tests for the Git metadata preflight:
+
+```bash
+cd backend-py
+RUN_GIT_OWNER_TESTS=1 python -m pytest tests/test_git_metadata_preflight.py -q
+```
+
+Run as a non-root user. Fixtures create disposable repositories only, require
+no sudo and never connect to production. The extended ACL test uses Linux's
+POSIX ACL xattr interface directly; unsupported filesystems explicitly skip it.
+Without the opt-in variable, the real permission cases skip while unit tests
+still run. Fixture teardown restores test-owned permissions for removal.
+
 The release now performs a read-only runtime prerequisite check immediately
 after its immutable revision fence, before samples, consumer changes or checkout.
 It reads Node policy and the certifi minimum from the exact target Git objects,
