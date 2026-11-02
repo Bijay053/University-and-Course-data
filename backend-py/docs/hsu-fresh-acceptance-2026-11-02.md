@@ -63,6 +63,12 @@ Full HTML and JSON evidence live in the ignored
 The initial receipt is `receipt.json`; the continuation is
 `60d8c485-857f-4d29-a561-a11998e2b19b/receipt.json`.
 
+These files are **workspace-local, not yet certified as remotely retained**.
+The opt-in [acceptance archive procedure](acceptance-evidence-archive.md) uses
+`hsu-fresh-acceptance-2026-11-02.inventory.json` to archive exactly the ten files
+listed below. Record its verified manifest key, version ID and SHA-256 here
+after a successful upload; the inventory alone is not retention proof.
+
 Receipt SHA-256:
 - Initial: `80eb1b434d4563c16386842bc2e6dd1d1ea2645a38092c44dca7f7db5261500e`
 - Continuation: `0c98f30b8dbf41facb78b02cbe4290ae0169781bfa3a1f7cd24d2eb9e63e7299`

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "acceptance_id": "hsu-fresh-acceptance-2026-11-02",
+  "files": [
+    {"path": "receipt.json", "sha256": "80eb1b434d4563c16386842bc2e6dd1d1ea2645a38092c44dca7f7db5261500e"},
+    {"path": "master-of-chiropractic.html", "sha256": "393a291c8370a8aedaecd19d797b3071335a9c475da23416c0835f2cd12004ea"},
+    {"path": "msc-dietetics-pre-registration.html", "sha256": "c180b7606fb132ce4984bb01df43ec6b5e7b4a6cca6d6a890ab15c4453ea9297"},
+    {"path": "research-degree-phd.html", "sha256": "042fcb543b6186d64c338eeaee6a113f3c19a3cb708e58002a0ac58fea9cdb11"},
+    {"path": "msc-sport-and-exercise-rehabilitation.html", "sha256": "9ff8de2ffc13f405908c5b11b603409aa7e67f102de11d3943eb337296a1955f"},
+    {"path": "mba-management-with-health-data-analytics-and-ai.html", "sha256": "0fe265a937f704b2d03c274e3fbeef747ba9283ad3214439dfbf489da6ce32f6"},
+    {"path": "60d8c485-857f-4d29-a561-a11998e2b19b/receipt.json", "sha256": "0c98f30b8dbf41facb78b02cbe4290ae0169781bfa3a1f7cd24d2eb9e63e7299"},
+    {"path": "60d8c485-857f-4d29-a561-a11998e2b19b/msc-global-healthcare-management.html", "sha256": "b760a903f3fb4e34d7368435b910bd9ec23da65733dc720be4d9b398bbb9108c"},
+    {"path": "60d8c485-857f-4d29-a561-a11998e2b19b/bsc-occupational-therapy.html", "sha256": "cd476c2a5114e712e44d991ad89407914f15f20dc83366ff93b1795b56f52ef4"},
+    {"path": "60d8c485-857f-4d29-a561-a11998e2b19b/msc-dietetics-integrated-degree-apprenticeship.html", "sha256": "981b6b95992f408d69e7a31e2794bb76b0f263fcbc2448a3b402408828f4adba"}
+  ]
+}
