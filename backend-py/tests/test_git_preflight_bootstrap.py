@@ -2,6 +2,7 @@
 import hashlib
 import os
 from pathlib import Path
+import shlex
 import shutil
 import stat
 import subprocess
@@ -10,6 +11,154 @@ import sys
 import pytest
 
 DEPLOY = Path(__file__).resolve().parents[1] / "deploy"
+
+
+@pytest.fixture(params=["workspace", "production-2.43.0"])
+def bootstrap_git(request):
+    """Exercise real binaries, not a shim pretending to implement old Git."""
+    binary = (shutil.which("git") if request.param == "workspace" else
+              os.environ.get("BOOTSTRAP_PRODUCTION_GIT", "/usr/bin/git"))
+    assert binary and Path(binary).is_file(), f"Required Git binary unavailable: {binary}"
+    version = subprocess.check_output([binary, "--version"], text=True).strip()
+    if request.param == "production-2.43.0":
+        assert version == "git version 2.43.0", version
+    return binary, tuple(map(int, version.split()[2].split(".")[:3]))
+
+
+@pytest.fixture
+def missing_promisor_checker(tmp_path, bootstrap_git):
+    """A disposable promisor clone with exactly one required loose blob removed.
+
+    --no-hardlinks gives the clone its own objects. Configuring partial-clone
+    metadata before removing the blob models an object promised by origin, not
+    ordinary repository corruption. No real repository's objects are touched.
+    """
+    binary, version = bootstrap_git
+    # Do not pass application credentials to disposable subprocesses (or expose
+    # them in pytest's fixture repr on failure).
+    env = {k: os.environ[k] for k in ("PATH", "HOME", "TMPDIR", "SYSTEMROOT")
+           if k in os.environ}
+    env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
+
+    def run(repo, *args, extra_env=None):
+        return subprocess.run(
+            [binary, "-C", str(repo), *args], env=env | (extra_env or {}),
+            capture_output=True, text=True, timeout=15,
+        )
+
+    def checked(repo, *args):
+        result = run(repo, *args)
+        assert result.returncode == 0, result.stderr
+        return result.stdout.strip()
+
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    checked(origin, "init", "-q")
+    checked(origin, "config", "user.name", "Fixture")
+    checked(origin, "config", "user.email", "fixture@example.invalid")
+    (origin / "baseline").write_text("predecessor")
+    checked(origin, "add", ".")
+    checked(origin, "commit", "-qm", "predecessor")
+    predecessor = checked(origin, "rev-parse", "HEAD")
+    checker_path = "backend-py/deploy/git_metadata_preflight.py"
+    checker = origin / checker_path
+    checker.parent.mkdir(parents=True)
+    checker.write_bytes((DEPLOY / "git_metadata_preflight.py").read_bytes())
+    checked(origin, "add", ".")
+    checked(origin, "commit", "-qm", "target")
+    target = checked(origin, "rev-parse", "HEAD")
+    blob = checked(origin, "rev-parse", f"{target}:{checker_path}")
+    repo = tmp_path / "promisor"
+    checked(origin, "clone", "--no-hardlinks", "--no-checkout", str(origin), str(repo))
+    checked(repo, "checkout", "-q", predecessor)
+    checked(repo, "config", "core.repositoryformatversion", "1")
+    checked(repo, "config", "extensions.partialClone", "origin")
+    checked(repo, "config", "remote.origin.promisor", "true")
+    checked(repo, "config", "remote.origin.partialclonefilter", "blob:none")
+    # This helper is entirely local and always exits before any actual I/O.
+    checked(repo, "remote", "set-url", "origin", "bootstrap-sentinel::promised")
+    checked(repo, "config", "protocol.bootstrap-sentinel.allow", "always")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    transport_log = tmp_path / "transport-calls"
+    helper = bin_dir / "git-remote-bootstrap-sentinel"
+    helper.write_text(
+        f"#!/bin/sh\nprintf '%s\\n' \"$*\" >> {shlex.quote(str(transport_log))}\nexit 97\n"
+    )
+    helper.chmod(0o755)
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    obj = repo / ".git/objects" / blob[:2] / blob[2:]
+    original_obj = origin / ".git/objects" / blob[:2] / blob[2:]
+    assert obj.is_file() and original_obj.is_file()
+    assert obj.stat().st_ino != original_obj.stat().st_ino
+    obj.unlink()  # Only the tmp_path clone's independently owned loose blob.
+    assert original_obj.is_file()
+    assert not list((repo / ".git/objects/pack").glob("*.pack"))
+    (repo / "backend-py").mkdir(exist_ok=True)
+    reached = tmp_path / "after-gate"
+    (repo / "backend-py/.env").write_text(
+        f"printf passed > {shlex.quote(str(reached))}\nexit 73\n"
+    )
+    sudo = bin_dir / "sudo"
+    sudo.write_text('#!/bin/sh\n[ "$1" = -u ] && [ "$2" = ubuntu ] || exit 90\nshift 2\nexec "$@"\n')
+    sudo.chmod(0o755)
+    # Select the tested Git for the entrypoint, including Git's own child fetch.
+    (bin_dir / "git").symlink_to(binary)
+    return {
+        "repo": repo, "env": env, "run": run, "version": version,
+        "predecessor": predecessor, "target": target,
+        "spec": f"{target}:{checker_path}", "transport_log": transport_log,
+        "reached": reached,
+    }
+
+
+@pytest.mark.parametrize("protection", ["none", "lazy-only", "protocol-only", "both"])
+def test_promisor_transport_sentinel_controls(missing_promisor_checker, protection):
+    fixture = missing_promisor_checker
+    extra_env = {}
+    if protection in {"lazy-only", "both"}:
+        extra_env["GIT_NO_LAZY_FETCH"] = "1"
+    if protection in {"protocol-only", "both"}:
+        extra_env["GIT_ALLOW_PROTOCOL"] = ""
+    before = snapshot(fixture["repo"])
+    result = fixture["run"](fixture["repo"], "show", fixture["spec"], extra_env=extra_env)
+    assert result.returncode != 0
+    assert snapshot(fixture["repo"]) == before
+    # Distribution builds may backport GIT_NO_LAZY_FETCH (including the local
+    # 2.43.0 binary). Its explicit warning distinguishes that behavior from
+    # upstream older Git, which ignores the variable and invokes the sentinel.
+    # The protocol-only case proves safety even without lazy-fetch suppression.
+    # A child `git fetch` is not itself a transport attempt.
+    lazy_disabled = "lazy fetching disabled" in result.stderr
+    expects_transport = protection == "none" or (
+        protection == "lazy-only" and fixture["version"] < (2, 48, 0)
+        and not lazy_disabled
+    )
+    assert fixture["transport_log"].exists() == expects_transport, result.stderr
+    if expects_transport:
+        assert "origin promised" in fixture["transport_log"].read_text()
+
+
+def test_bootstrap_missing_promisor_checker_never_invokes_transport(missing_promisor_checker):
+    fixture = missing_promisor_checker
+    before = snapshot(fixture["repo"])
+    env = fixture["env"] | {
+        "GUARDED_RELEASE_REPO_ROOT": str(fixture["repo"]),
+        "GUARDED_RELEASE_PYTHON": sys.executable,
+        "GUARDED_RELEASE_TEST_MODE": "0",
+    }
+    result = subprocess.run(
+        ["bash", str(DEPLOY / "guarded_release.sh"), fixture["predecessor"],
+         fixture["target"], "123456789012"],
+        env=env, capture_output=True, text=True, timeout=15,
+    )
+    assert result.returncode != 0
+    assert "Release refused: reviewed target lacks the Git metadata checker." in result.stderr
+    assert not fixture["transport_log"].exists(), "Bootstrap attempted a transport"
+    assert not fixture["reached"].exists(), "Bootstrap sourced runtime configuration"
+    assert snapshot(fixture["repo"]) == before
+    assert "RELEASE_MANIFEST=" not in result.stdout
+    assert "safe restart smoke" not in result.stdout
 
 
 def git(repo, *args):

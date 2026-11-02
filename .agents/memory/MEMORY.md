@@ -149,3 +149,4 @@
 - [Hidden Node runtimes](node-runtime-security.md) — shell, Nix pnpm, and Python browser drivers may use different Node releases; check certifi separately from OS trust.
 - [Production runtime prerequisites](production-runtime-prerequisites.md) — approved security maintenance precedes code-only guarded releases; preserve service overlays and private directories.
 - [HSU recovery source authority](hsu-recovery-source-authority.md) — null extraction is not proof of unpublished tuition; inspect inline/nested fees and preserve unknown campus facts for review.
+- [Git lazy-fetch backports](git-lazy-fetch-backports.md) — older distribution builds can honor lazy-fetch suppression; test transport denial independently of version numbers.
