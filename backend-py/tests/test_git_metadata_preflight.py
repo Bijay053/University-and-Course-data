@@ -162,3 +162,77 @@ def test_real_posix_acl_denial_is_preserved(owner_repo):
     result = owner_inspect(repo, checker)
     assert "logs/entry" in result["problems"]
     assert fingerprint(path) == before
+
+
+@pytest.fixture
+def linked_repo(tmp_path):
+    """Disposable real linked layout; no privileged operations or live repos."""
+    repo = tmp_path / "main"
+    linked = tmp_path / "linked"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.name=Test", "-c",
+         "user.email=test@example.invalid", "commit", "-qm", "fixture", "--allow-empty"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-qb",
+                    "linked", str(linked)], check=True)
+    return repo / ".git", linked
+
+
+@pytest.mark.parametrize("case", [
+    "normal", "blocked-common-refs", "readonly-objects", "private-backup",
+    "common-refs-symlink", "dangling-common-refs", "common-directory-symlink",
+])
+def test_linked_layout_refused_without_traversal_or_mutation(linked_repo, monkeypatch, case):
+    common, linked = linked_repo
+    private = common / "private-backup"
+    private.mkdir()
+    (private / "secret").write_text("private evidence must stay untouched")
+    blocked = common / "refs/blocked"
+    blocked.mkdir()
+    (blocked / "entry").write_text("ref evidence")
+    obj = common / "objects/readonly-fixture"
+    obj.write_text("object evidence")
+    obj.chmod(0o444)
+    metadata = Path(subprocess.check_output(
+        ["git", "-C", str(linked), "rev-parse", "--absolute-git-dir"], text=True).strip())
+    if case in {"common-refs-symlink", "dangling-common-refs"}:
+        (common / "refs/link").symlink_to(
+            private if case == "common-refs-symlink" else common / "absent")
+    if case == "common-directory-symlink":
+        alias = common.parent.parent / "common-alias"
+        alias.symlink_to(common, target_is_directory=True)
+        (metadata / "commondir").write_text(str(alias) + "\n")
+    paths = [common, *common.rglob("*"), linked / ".git"]
+    before = {p: fingerprint(p) for p in paths}
+    restricted = blocked if case == "blocked-common-refs" else private
+    mode = stat.S_IMODE(restricted.stat().st_mode)
+    if case in {"blocked-common-refs", "private-backup"}:
+        restricted.chmod(0o000)
+    restricted_mode = stat.S_IMODE(restricted.stat().st_mode)
+    try:
+        monkeypatch.chdir(linked)
+        def no_scan(_):
+            pytest.fail("unsupported linked metadata must not be traversed")
+        monkeypatch.setattr(gate, "problems", no_scan)
+        assert gate.main() == 1
+        result = subprocess.run([sys.executable, "-B", str(FILE)], cwd=linked,
+                                text=True, capture_output=True, timeout=10)
+        assert result.returncode == 1
+        assert "linked-worktree/shared Git metadata layouts are unsupported" in result.stdout
+        assert "GIT_METADATA_PREFLIGHT_OK" not in result.stdout
+        assert "private evidence" not in result.stdout + result.stderr
+        assert stat.S_IMODE(restricted.stat().st_mode) == restricted_mode
+    finally:
+        # Test-owned fixture cleanup only, not preflight behavior.
+        restricted.chmod(mode)
+    assert {p: fingerprint(p) for p in paths} == before
+
+
+def test_unavailable_common_directory_fails_closed(monkeypatch, capsys):
+    outputs = iter(["/repo/.git\n", ""])
+    monkeypatch.setattr(gate.subprocess, "check_output", lambda *a, **kw: next(outputs))
+    monkeypatch.setattr(gate, "problems", lambda _: pytest.fail("must not scan"))
+    assert gate.main() == 1
+    assert "unable to inspect" in capsys.readouterr().out

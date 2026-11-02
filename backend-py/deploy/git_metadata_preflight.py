@@ -39,6 +39,18 @@ def main():
         root = Path(subprocess.check_output(
             ["git", "rev-parse", "--absolute-git-dir"], text=True,
             stderr=subprocess.DEVNULL, timeout=10).strip())
+        common_output = subprocess.check_output(
+            ["git", "rev-parse", "--git-common-dir"], text=True,
+            stderr=subprocess.DEVNULL, timeout=10).strip()
+        if not root.is_absolute() or not common_output:
+            raise OSError("Unable to identify Git metadata directories")
+        # --git-common-dir may be relative to cwd. Compare lexical absolute
+        # paths, not resolve(): do not follow symlinks to approve an alias.
+        common = Path(os.path.abspath(common_output))
+        if common != root or os.path.lexists(root / "commondir"):
+            print("Release refused: linked-worktree/shared Git metadata layouts are unsupported.")
+            print("Run the release from a standalone checkout; no metadata was changed.")
+            return 1
         errors = problems(root)
         if errors:
             print("Release refused: Git metadata is not writable by the repository owner.")
