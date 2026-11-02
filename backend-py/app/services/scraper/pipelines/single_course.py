@@ -11745,6 +11745,8 @@ async def extract_course(
     if _hsu_source_html is not None:
         from app.services.scraper.extractors.hsu_facts import apply_course_authority as _apply_hsu
         _apply_hsu(_hsu_source_html, url, payload, evidence)
+        from app.services.scraper.extractors.hsu_linked_english import recover_linked_english
+        await recover_linked_english(_hsu_source_html, url, payload, evidence, fetch_html)
 
     # ── Evidence selection finalisation ────────────────────────────────────
     # Mark the winning evidence row for each field as decision_status="selected"

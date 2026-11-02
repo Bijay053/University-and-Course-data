@@ -33,19 +33,25 @@ def _apply_english(soup, url, payload, evidence):
                 r"|(?:score of|level)\s*(\d(?:\.\d)?)", text, re.I)
             floor = re.search(
                 r"(?:no less than|no (?:component|element|band|section) below)\s*(\d(?:\.\d)?)", text, re.I)
-            if not overall or not floor:
+            if not overall:
                 continue
             value = float(next(g for g in overall.groups() if g))
-            band = float(floor[1])
-            if 0 < band <= value <= 9:
+            band = float(floor[1]) if floor else None
+            if 0 < value <= 9 and (band is None or 0 < band <= value):
                 scores.add((value, band))
                 snippets.append(text)
-    if len(scores) != 1:
+    overalls = {value for value, _ in scores}
+    bands = {band for _, band in scores if band is not None}
+    if len(overalls) != 1 or len(bands) > 1:
         return
-    overall, band = next(iter(scores))
-    for field, value in {"ielts_overall": overall, **{
+    overall = next(iter(overalls))
+    band = next(iter(bands)) if bands else None
+    values = {"ielts_overall": overall}
+    if band is not None:
+        values.update({
         f"ielts_{part}": band for part in ("reading", "writing", "listening", "speaking")
-    }}.items():
+        })
+    for field, value in values.items():
         payload[field] = value
         for row in evidence:
             if row.get("field_key") == field:
@@ -165,9 +171,16 @@ def apply_course_authority(html: str, url: str, payload: dict, evidence: list) -
     newest = max((year for year, _, _ in sections), default=0)
     prices = set().union(*(p for y, p, _ in sections if y == newest))
     for row in evidence:
-        if row.get("field_key") == "international_fee":
+        if row.get("field_key") in {
+            "international_fee", "currency", "fee_currency", "fee_term", "fee_year",
+        }:
             row["decision_status"] = "needs_review"
     payload.update(international_fee=None, currency="GBP", fee_term=None, fee_year=None)
+    # AI may return the legacy currency alias as well as the canonical column.
+    # Evidence finalisation reads payload keys directly: leaving AUD in this
+    # alias would select contradictory evidence beside a correctly saved GBP fee.
+    if "fee_currency" in payload:
+        payload["fee_currency"] = "GBP"
     if len(prices) == 1:
         amount, term = next(iter(prices))
         payload.update(international_fee=amount, fee_term=term, fee_year=newest or None)
