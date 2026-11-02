@@ -99,6 +99,11 @@ if [ "$release_test_mode" != 1 ]; then
   source /etc/university-portal/database.env
   set +a
   export PYTHONPATH=.
+  # Execute the installed read-only checker as the repository owner before
+  # fetch can start automatic housekeeping. Older predecessors lack this file.
+  if [ -f "$backend_root/deploy/git_metadata_preflight.py" ]; then
+    run_release_user "$python_bin" -B "$backend_root/deploy/git_metadata_preflight.py"
+  fi
   run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
   verify_target_runtime
   verify_target_worker_schema

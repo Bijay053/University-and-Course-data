@@ -14,3 +14,9 @@ Keep private production configuration directories private during build-user chec
 **Why:** A root-readable checker beneath the protected configuration directory cannot be opened by the Ubuntu build user, even when the checker file itself is world-readable.
 
 **How to apply:** Verify that user's actual Node binary/version using an inline assertion or a public temporary checker; do not widen directory permissions merely to test it. Verify the effective service browser-runtime environment again after guarded restart.
+
+Never recursively change ownership of the production Git directory to fix housekeeping.
+
+**Why:** This host also retains private operational backups within Git metadata, while read-only object files can legitimately have a different owner. The observed failure needed only ref-directory and reflog ownership repairs.
+
+**How to apply:** Inventory active Git processes and locks, fence exact paths and owners, preserve file hashes and ref inventories, and repair only proven writable-metadata blockers.
