@@ -29,3 +29,14 @@ were lost; the course pages actually supplied both.
 **How to apply:** Preserve each course's own overall/component pair and selected
 citations. Do not copy a universal band floor to pages that only link to central
 English guidance or publish an overall score alone.
+
+Treat fee currency aliases and selected evidence as part of the authoritative
+fee tuple, not only the persisted amount and canonical currency.
+
+**Why:** Adversarial AI testing found a correct GBP database value beside
+selected AUD evidence. Updating the payload alone did not clear the earlier
+selected marker, and the legacy currency alias could still hold the AI value.
+
+**How to apply:** Reset superseded tuple evidence and reconcile aliases before
+final selection. Assert selected metadata as well as amounts after real
+staging; a correct snapshot of column values alone does not prove citation parity.

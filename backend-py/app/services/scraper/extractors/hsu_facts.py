@@ -165,9 +165,16 @@ def apply_course_authority(html: str, url: str, payload: dict, evidence: list) -
     newest = max((year for year, _, _ in sections), default=0)
     prices = set().union(*(p for y, p, _ in sections if y == newest))
     for row in evidence:
-        if row.get("field_key") == "international_fee":
+        if row.get("field_key") in {
+            "international_fee", "currency", "fee_currency", "fee_term", "fee_year",
+        }:
             row["decision_status"] = "needs_review"
     payload.update(international_fee=None, currency="GBP", fee_term=None, fee_year=None)
+    # AI may return the legacy currency alias as well as the canonical column.
+    # Evidence finalisation reads payload keys directly: leaving AUD in this
+    # alias would select contradictory evidence beside a correctly saved GBP fee.
+    if "fee_currency" in payload:
+        payload["fee_currency"] = "GBP"
     if len(prices) == 1:
         amount, term = next(iter(prices))
         payload.update(international_fee=amount, fee_term=term, fee_year=newest or None)
