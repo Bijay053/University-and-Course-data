@@ -3,6 +3,14 @@ name: Production deployment routing
 description: Non-obvious routing constraints for deploying this project to its external AWS host.
 ---
 
+Release requests target the existing AWS production deployment only, not a new
+Replit deployment.
+
+**Why:** The user explicitly requested production only.
+
+**How to apply:** Prepare and verify the existing AWS release path; do not
+redirect the user to Replit publishing for this application.
+
 An authenticated GitHub connection can transfer exact Git objects when saved
 push tokens are rejected. Bound each payload and verify every object's original
 SHA before updating the branch without force.
