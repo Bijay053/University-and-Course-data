@@ -355,6 +355,23 @@ in `../README.md`.
 
 ## Guarded application release
 
+The release now performs a read-only runtime prerequisite check immediately
+after its immutable revision fence, before samples, consumer changes or checkout.
+It reads Node policy and the certifi minimum from the exact target Git objects,
+checks Node as the Ubuntu build user, and checks each service's configured
+browser Node after ordered EnvironmentFile overrides and UnsetEnvironment.
+Unloaded systemd changes, missing required files, ambiguous environment syntax,
+unknown versions and unsupported requirement syntax fail closed.
+
+The gate does not install packages, modify units, reload systemd or waive the
+existing rehearsal/idle gates. Follow the approved runtime-maintenance procedure
+when it refuses a release. It intentionally does not print environment values
+or captured command errors. For a predecessor without this gate, materialize
+and run the reviewed target's guarded entrypoint using the existing bootstrap
+procedure; simply invoking an older installed entrypoint cannot add new checks.
+Legacy targets without a declared Node policy or certifi floor do not acquire
+new inferred requirements.
+
 Invoke the production release entrypoint with the exact currently deployed
 revision, the exact intended `origin/main` revision, and the 12-digit disposable
 AWS account used by the mandatory rehearsal proof:

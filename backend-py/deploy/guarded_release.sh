@@ -70,6 +70,19 @@ verify_target_worker_schema() {
   fi
 }
 
+verify_target_runtime() {
+  # Bootstrap from immutable target bytes, without changing installed source.
+  # Legacy targets have no helper; this entrypoint's checker can still read
+  # their declared policies. No samples or consumer changes precede this gate.
+  local checker="backend-py/deploy/release_runtime_prerequisites.py"
+  if run_release_user git -C "$repo_root" cat-file -e "$target:$checker" 2>/dev/null; then
+    run_release_user git -C "$repo_root" show "$target:$checker" |
+      "$python_bin" -B - --repo "$repo_root" --target "$target"
+  else
+    "$python_bin" -B "$repo_root/$checker" --repo "$repo_root" --target "$target"
+  fi
+}
+
 resume_consumers() {
   if [ "$release_test_mode" = 1 ]; then
     printf 'resume-attempted\n' >> "$resume_marker"
@@ -87,6 +100,7 @@ if [ "$release_test_mode" != 1 ]; then
   set +a
   export PYTHONPATH=.
   run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
+  verify_target_runtime
   verify_target_worker_schema
   # Use the reviewed target's sample lifecycle rules before checkout, without
   # modifying installed code. Keep the helper beside its pinned proof assets.
