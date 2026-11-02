@@ -23,6 +23,7 @@ def test_lsbu_uses_bounded_static_extraction_without_noisy_browser(university_id
     assert config.extraction.max_parallel_fetch == 6
     assert config.extraction.scrape_do_request_timeout_seconds == 20
     assert config.extraction.scrape_do_wayback_after_first_failure is True
+    assert config.extraction.scrape_do_wayback_timeout_seconds == 15
     assert config.extraction.study_mode.suppress_nav_rule is True
     assert config.extraction.study_mode.online_only_requires_strong_evidence is True
 
@@ -104,5 +105,36 @@ async def test_lsbu_course_owned_online_label_remains_authoritative():
         assert len(evidence) == 1
         assert evidence[0].value == "Online"
         assert evidence[0].method == "study_mode:strong_label"
+    finally:
+        set_uni_config(None)
+
+
+@pytest.mark.asyncio
+async def test_lsbu_archive_queue_budget_cancels_wait_and_retains_live_retry(monkeypatch):
+    import asyncio
+    from unittest.mock import AsyncMock
+    from app.services.scraper import http_fetcher as fetcher
+    config = _config(84)
+    config.extraction.scrape_do_wayback_timeout_seconds = .02
+    cancelled = asyncio.Event()
+    html = "<html><h1>Accounting and Finance BA</h1></html>"
+    live = AsyncMock(side_effect=[None, html])
+    async def blocked_archive(*args):
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+    monkeypatch.setenv("SCRAPE_DO_TOKEN", "test-only")
+    monkeypatch.setattr(fetcher, "fetch_html_scrape_do", live)
+    monkeypatch.setattr(fetcher, "fetch_html_wayback", blocked_archive)
+    set_uni_config(config)
+    try:
+        with fetcher.scrape_do_render_scope():
+            result = await asyncio.wait_for(fetcher.fetch_html(
+                "https://www.lsbu.ac.uk/study/course-finder/accounting-finance-ba-hons"
+            ), timeout=1)
+        assert result == html
+        assert cancelled.is_set()
+        assert live.await_count == 2
     finally:
         set_uni_config(None)

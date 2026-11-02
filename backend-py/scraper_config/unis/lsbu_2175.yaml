@@ -8,6 +8,7 @@ locked_config_paths:
   - extraction.scrape_do_skip_fallbacks
   - extraction.scrape_do_request_timeout_seconds
   - extraction.scrape_do_wayback_after_first_failure
+  - extraction.scrape_do_wayback_timeout_seconds
   - extraction.skip_browser_rescue
   - extraction.skip_per_course_browser
 
@@ -53,6 +54,9 @@ extraction:
   # rendered/static retry ladder. Unresolved pages remain explicit failures.
   scrape_do_request_timeout_seconds: 20
   scrape_do_wayback_after_first_failure: true
+  # Archive replay has a shared single-slot queue and 25s x 3 retries.
+  # Bound queue + request time so it cannot consume the whole course deadline.
+  scrape_do_wayback_timeout_seconds: 15
   skip_browser_rescue: true
   # The separate missing-English browser pass ran on 77 courses in the logged
   # scrape and filled zero fields. Do not spend the extraction deadline on it.

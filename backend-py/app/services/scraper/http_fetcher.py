@@ -1639,7 +1639,28 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                     "immediately before provider retries",
                     url,
                 )
-                _early_wayback = await fetch_html_wayback(url)
+                _archive_budget = getattr(
+                    _active_config.extraction, "scrape_do_wayback_timeout_seconds", None
+                )
+                try:
+                    if _archive_budget is None:
+                        _early_wayback = await fetch_html_wayback(url)
+                    else:
+                        _early_wayback = await asyncio.wait_for(
+                            fetch_html_wayback(url), timeout=_archive_budget
+                        )
+                except asyncio.TimeoutError:
+                    log.warning(
+                        "fetch %s: early archive budget exhausted after %.1fs "
+                        "(including queue wait); continuing bounded live fallback",
+                        url, _archive_budget,
+                    )
+                    _early_wayback = None
+                    _record_fetch_failure(
+                        kind="wayback_transient",
+                        reason="Early archive queue/request budget exhausted",
+                        retryable=True, transport="wayback_snapshot",
+                    )
                 if _early_wayback is not None:
                     from app.services.scraper.snapshot_context import stage_snapshot as _stage
                     _stage(url, _early_wayback, "wayback")
