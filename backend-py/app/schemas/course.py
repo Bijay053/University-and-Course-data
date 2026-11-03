@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.study_modes import validate_study_mode_input
 
 
 class CourseLocationOffering(BaseModel):
@@ -40,10 +42,18 @@ class CourseBase(BaseModel):
 
 
 class CourseCreate(CourseBase):
-    pass
+    @field_validator("study_mode", mode="before")
+    @classmethod
+    def valid_study_mode(cls, value):
+        return validate_study_mode_input(value)
 
 
 class CourseUpdate(BaseModel):
+    @field_validator("study_mode", mode="before")
+    @classmethod
+    def valid_study_mode(cls, value):
+        return validate_study_mode_input(value)
+
     @model_validator(mode="before")
     @classmethod
     def offerings_are_read_only(cls, value):

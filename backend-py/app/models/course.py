@@ -6,6 +6,7 @@ from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, T
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.study_modes import StudyModeText
 
 
 class Course(Base):
@@ -22,7 +23,7 @@ class Course(Base):
     course_website: Mapped[str | None] = mapped_column(Text)
     duration: Mapped[float | None] = mapped_column(Numeric(6, 2))
     duration_term: Mapped[str | None] = mapped_column(Text)
-    study_mode: Mapped[str | None] = mapped_column(Text)
+    study_mode: Mapped[str | None] = mapped_column(StudyModeText())
     degree_level: Mapped[str | None] = mapped_column(Text)
     study_load: Mapped[str | None] = mapped_column(Text)
     language: Mapped[str | None] = mapped_column(Text)

@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.study_modes import StudyModeText
 
 REVIEW_URL_IDENTITY_CONSTRAINT = "uq_scraped_courses_job_review_url_identity"
 
@@ -59,7 +60,7 @@ class ScrapedCourse(Base):
     fee_scope_key: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     duration: Mapped[float | None] = mapped_column(Numeric(6, 2))
     duration_term: Mapped[str | None] = mapped_column(Text)
-    study_mode: Mapped[str | None] = mapped_column(Text)
+    study_mode: Mapped[str | None] = mapped_column(StudyModeText())
     degree_level: Mapped[str | None] = mapped_column(Text)
     study_load: Mapped[str | None] = mapped_column(Text)
     language: Mapped[str | None] = mapped_column(Text)

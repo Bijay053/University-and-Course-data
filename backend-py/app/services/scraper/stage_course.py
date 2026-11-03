@@ -46,6 +46,7 @@ from app.services.scraper.guards import (
     should_stage_course,
 )
 from app.services.scraper.field_normalizers import sanitize_intake_months_payload
+from app.study_modes import sanitize_study_mode_payload
 from app.services.scraper.payload_contract import (
     GUARD_ONLY_PIPELINE_PAYLOAD_FIELDS,
     PERSISTABLE_STAGING_PAYLOAD_FIELDS,
@@ -1118,6 +1119,11 @@ async def stage_course(
     # after the initial guard.  Re-run the guard immediately before model
     # construction so the actual JSONB write is always month-only.
     payload = sanitize_intake_months_payload(payload)
+    # Eligibility gates above must see the original delivery/load evidence.
+    # Reject prose only at the final write boundary, not before those gates.
+    mode_guard = sanitize_study_mode_payload({**payload, "evidence": evidence})
+    evidence = mode_guard.pop("evidence")
+    payload = mode_guard
     validate_payload_keys("stage_course final payload", payload.keys())
 
     sc = ScrapedCourse(

@@ -3067,6 +3067,13 @@ async def re_extract_staged(
         # targeted request.  This is the last boundary before values are
         # assigned to the existing JSONB row.
         payload = sanitize_intake_months_payload(payload)
+        from app.study_modes import sanitize_study_mode_payload
+
+        payload = sanitize_study_mode_payload(payload)
+        if payload.get("study_mode") is None and "invalid_study_mode" in (payload.get("scrape_warnings") or []):
+            # A rejected candidate may remain in review evidence, but must not
+            # be promoted as selected proof for a populated field.
+            selected_evidence_by_field.pop("study_mode", None)
         if (
             intake_clear_requested
             and (targeted_fields is None or "intake_months" in targeted_fields)
