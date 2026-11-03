@@ -20,11 +20,15 @@
 }
 .sic-degrees :focus-visible { outline: 2px solid hsl(var(--sic-teal)); outline-offset: 2px; }
 /* Highlight the rounded search container, not the rectangular inner input. */
+.sic-degrees form[role="search"]:has(input:focus-visible) {
+  outline: 2px solid hsl(var(--sic-muted) / 0.55);
+  outline-offset: 3px;
+}
 .sic-degrees .sic-hero form[role="search"]:has(input:focus-visible) {
   outline: 2px solid hsl(0 0% 100% / 0.75);
   outline-offset: 4px;
 }
-.sic-degrees .sic-hero form[role="search"] input:focus-visible {
+.sic-degrees form[role="search"] input:focus-visible {
   outline: none;
 }
 /* Cover the browser's autofill paint without affecting selection or the caret. */
