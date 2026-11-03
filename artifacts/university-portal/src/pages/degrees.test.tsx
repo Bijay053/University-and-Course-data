@@ -31,6 +31,19 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("public degrees page", () => {
+  it("combines course-name and location filters above results and clears both", async () => {
+    render(<DegreesPage />);
+    await screen.findByTestId("card-course-1");
+    fireEvent.change(screen.getByTestId("input-course-name"), { target: { value: "nursing" } });
+    fireEvent.change(screen.getByTestId("input-course-location"), { target: { value: "Sydney" } });
+    await waitFor(() => expect(calls.some((url) => url.includes("q=nursing") && url.includes("location=Sydney"))).toBe(true));
+    expect(window.location.search).toContain("location=Sydney");
+    expect((screen.getByTestId("input-search") as HTMLInputElement).value).toBe("nursing");
+    fireEvent.click(screen.getByTestId("button-clear-filters"));
+    expect((screen.getByTestId("input-course-name") as HTMLInputElement).value).toBe("");
+    expect((screen.getByTestId("input-course-location") as HTMLInputElement).value).toBe("");
+  });
+
   it("picks a university from one searchable dropdown", async () => {
     render(<DegreesPage />);
     await screen.findByTestId("card-course-1");

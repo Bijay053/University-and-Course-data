@@ -19,7 +19,7 @@ describe("degrees lib", () => {
     expect(p.get("intakes")).toBe("July,March");
   });
   it("round-trips URL state and rejects junk", () => {
-    const f = { ...EMPTY_FILTERS, q: "law", country: "UK", sort: "fee_asc" as const, page: 3, budgetCurrency: "GBP", budgetMax: "9000" };
+    const f = { ...EMPTY_FILTERS, q: "law", location: "London", country: "UK", sort: "fee_asc" as const, page: 3, budgetCurrency: "GBP", budgetMax: "9000" };
     expect(filtersFromQuery(filtersToQuery(f))).toEqual(f);
     expect(filtersFromQuery("sort=evil&page=-2&university=x").sort).toBe("relevance");
   });

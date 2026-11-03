@@ -24,7 +24,7 @@ function readUniState(search: string) {
 }
 
 function countActive(f: DegreeFilters) {
-  return [f.q.trim(), f.country, f.universityId, f.degreeLevel, f.budgetCurrency || f.budgetMax].filter(Boolean).length + (f.intakes.length ? 1 : 0);
+  return [f.q.trim(), f.location.trim(), f.country, f.universityId, f.degreeLevel, f.budgetCurrency || f.budgetMax].filter(Boolean).length + (f.intakes.length ? 1 : 0);
 }
 
 export default function DegreesPage() {
@@ -34,6 +34,7 @@ export default function DegreesPage() {
   );
   const [filters, setFilters] = useState<DegreeFilters>(() => filtersFromQuery(window.location.search));
   const [qDraft, setQDraft] = useState(filters.q);
+  const [locationDraft, setLocationDraft] = useState(filters.location);
   const [initialUni] = useState(() => readUniState(window.location.search));
   const [mode, setMode] = useState<Mode>(initialUni.mode);
   const [uniQ, setUniQ] = useState(initialUni.uq);
@@ -59,9 +60,9 @@ export default function DegreesPage() {
 
   // Debounce keyword typing into filters.
   useEffect(() => {
-    const t = setTimeout(() => setFilters((f) => f.q === qDraft ? f : { ...f, q: qDraft, page: 1 }), 350);
+    const t = setTimeout(() => setFilters((f) => f.q === qDraft && f.location === locationDraft ? f : { ...f, q: qDraft, location: locationDraft, page: 1 }), 350);
     return () => clearTimeout(t);
-  }, [qDraft]);
+  }, [qDraft, locationDraft]);
 
   // Reflect state in URL for reloads and sharing.
   useEffect(() => {
@@ -109,7 +110,7 @@ export default function DegreesPage() {
 
   useEffect(() => { if (!loading) resultsTop.current?.scrollIntoView({ block: "start", behavior: "smooth" }); }, [filters.page]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const clearAll = () => { setQDraft(""); setFilters(EMPTY_FILTERS); };
+  const clearAll = () => { setQDraft(""); setLocationDraft(""); setFilters(EMPTY_FILTERS); };
   const openCourseById = (id: number) => {
     const found = data?.results.find((c) => c.id === id);
     if (found) { setSelected(found); setShortlistOpen(false); }
@@ -196,6 +197,24 @@ export default function DegreesPage() {
               </div>
             </div>
           </div>
+
+          <form role="search" aria-label="Filter course results"
+            onSubmit={(event) => { event.preventDefault(); patch({ q: qDraft, location: locationDraft }); }}
+            className="mb-4 grid gap-3 rounded-xl border border-[hsl(var(--sic-line))] bg-white p-3 sm:grid-cols-2">
+            <label className="text-xs font-semibold text-[hsl(var(--sic-muted))]">
+              Course name
+              <input type="search" value={qDraft} onChange={(event) => setQDraft(event.target.value)}
+                placeholder="Search course name" data-testid="input-course-name"
+                className="mt-1.5 h-10 w-full rounded-lg border border-[hsl(var(--sic-line))] px-3 text-sm font-normal text-[hsl(var(--sic-ink))]" />
+            </label>
+            <label className="text-xs font-semibold text-[hsl(var(--sic-muted))]">
+              Location
+              <input type="search" value={locationDraft} onChange={(event) => setLocationDraft(event.target.value)}
+                placeholder="City, campus or region" data-testid="input-course-location"
+                className="mt-1.5 h-10 w-full rounded-lg border border-[hsl(var(--sic-line))] px-3 text-sm font-normal text-[hsl(var(--sic-ink))]" />
+            </label>
+            <button type="submit" className="sr-only">Apply course name and location</button>
+          </form>
 
           {error ? (
             <div role="alert" className="rounded-2xl border border-[hsl(var(--sic-line))] bg-white p-8 text-center">

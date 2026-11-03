@@ -60,11 +60,11 @@ export const SORTS: { value: SortKey; label: string }[] = [
 export const isFeeSort = (s: SortKey) => s === "fee_asc" || s === "fee_desc";
 
 export type DegreeFilters = {
-  q: string; country: string; universityId: string; degreeLevel: string; intakes: string[];
+  q: string; location: string; country: string; universityId: string; degreeLevel: string; intakes: string[];
   budgetCurrency: string; budgetMax: string; sort: SortKey; page: number;
 };
 export const EMPTY_FILTERS: DegreeFilters = {
-  q: "", country: "", universityId: "", degreeLevel: "", intakes: [],
+  q: "", location: "", country: "", universityId: "", degreeLevel: "", intakes: [],
   budgetCurrency: "", budgetMax: "", sort: "relevance", page: 1,
 };
 
@@ -78,6 +78,7 @@ export function activeBudget(f: DegreeFilters): { currency: string; max: number 
 export function buildSearchParams(f: DegreeFilters): URLSearchParams {
   const p = new URLSearchParams();
   if (f.q.trim()) p.set("q", f.q.trim());
+  if (f.location.trim()) p.set("location", f.location.trim());
   if (f.country) p.set("country", f.country);
   if (f.universityId) p.set("university_id", f.universityId);
   if (f.degreeLevel) p.set("degree_level", f.degreeLevel);
@@ -94,6 +95,7 @@ export function buildSearchParams(f: DegreeFilters): URLSearchParams {
 export function filtersToQuery(f: DegreeFilters): string {
   const p = new URLSearchParams();
   if (f.q.trim()) p.set("q", f.q.trim());
+  if (f.location.trim()) p.set("location", f.location.trim());
   if (f.country) p.set("country", f.country);
   if (f.universityId) p.set("university", f.universityId);
   if (f.degreeLevel) p.set("level", f.degreeLevel);
@@ -112,6 +114,7 @@ export function filtersFromQuery(search: string): DegreeFilters {
   const uni = p.get("university") ?? "";
   return {
     q: p.get("q") ?? "",
+    location: p.get("location") ?? "",
     country: p.get("country") ?? "",
     universityId: /^\d+$/.test(uni) ? uni : "",
     degreeLevel: p.get("level") ?? "",

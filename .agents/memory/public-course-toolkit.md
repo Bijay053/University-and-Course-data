@@ -25,7 +25,9 @@ Place course keyword search inside the left filter sidebar, not the hero.
 
 **Why:** The user requested moving the header search box into the filters.
 
-**How to apply:** Keep it in the Filters panel on mobile as well.
+**How to apply:** Keep it in the Filters panel on mobile as well. The user later
+also requested Course name and Location fields directly above the course cards;
+do not move these back into the hero.
 
 Toolkit filter dropdowns must support typing within a single control.
 
