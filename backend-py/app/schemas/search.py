@@ -1,6 +1,18 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pydantic import BaseModel, Field
+
+
+class PublicUniversityInsight(BaseModel):
+    id: int
+    country: str
+    text: str
+    updated_at: datetime | None = None
+
+
+class PublicUniversityInsightsResponse(BaseModel):
+    insights: list[PublicUniversityInsight] = Field(default_factory=list)
 
 
 class SearchOffering(BaseModel):

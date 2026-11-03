@@ -1,4 +1,5 @@
 import { ExternalLink, X, Bookmark, BookmarkCheck } from "lucide-react";
+import { UniversityInsights } from "./university-insights";
 import { type CourseResult, NOT_PUBLISHED, englishList, feeLines, formatDuration, formatFeeLine, locationText, safeHttpUrl } from "./lib";
 
 type Props = { course: CourseResult | null; shortlisted: boolean; onToggleShortlist: () => void; onClose: () => void };
@@ -53,6 +54,7 @@ export function DetailPanel({ course, shortlisted, onToggleShortlist, onClose }:
           </Row>
           <Row k="Field">{[course.category, course.sub_category].filter(Boolean).join(" / ") || NOT_PUBLISHED}</Row>
         </dl>
+        <UniversityInsights key={course.university.id} universityId={course.university.id} universityName={course.university.name} />
         <div className="mt-5 flex flex-col gap-2">
           {url ? (
             <a href={url} target="_blank" rel="noopener noreferrer" data-testid="link-official-course"

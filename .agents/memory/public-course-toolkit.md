@@ -28,3 +28,20 @@ not the staff sign-in page.
 
 **How to apply:** Keep anonymous home navigation public while preserving staff
 sign-in and protected administration.
+
+University Key Insights are intended to be readable by public toolkit visitors.
+
+**Why:** The user explicitly requested each university's saved Key Insights in
+the toolkit so visitors can see them.
+
+**How to apply:** Preserve country-specific context and original guidance,
+keep editing staff-only, and do not trigger AI parsing or writes on public reads.
+
+University search must be a separate, prominent mode alongside course search,
+not only a university filter in the course sidebar.
+
+**Why:** The user clarified that the sidebar search did not satisfy the requested
+separate university search option.
+
+**How to apply:** Preserve distinct Courses and Universities browsing, with
+university results leading to Key Insights and that university's courses.

@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { useState } from "react";
 import { type DegreeFilters, type OptionsResponse } from "./lib";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -24,6 +25,10 @@ function Section({ title, id, children }: { title: string; id: string; children:
 }
 
 export function FilterPanel({ filters, options, optionsError, onRetryOptions, onChange, onClear, activeCount }: Props) {
+  const [universityQuery, setUniversityQuery] = useState("");
+  const matchingUniversities = (options?.universities ?? []).filter((u) =>
+    u.name.toLocaleLowerCase().includes(universityQuery.trim().toLocaleLowerCase()),
+  );
   const months = options?.intake_months?.length ? options.intake_months : MONTHS;
   const currencies = options?.currencies ?? [];
   const budgetIncomplete = !!filters.budgetMax.trim() && !filters.budgetCurrency;
@@ -31,7 +36,7 @@ export function FilterPanel({ filters, options, optionsError, onRetryOptions, on
     <div className="space-y-4" data-testid="panel-filters">
       <div className="flex items-center justify-between">
         <h2 className="sic-display text-lg">Refine</h2>
-        <button type="button" onClick={onClear} disabled={activeCount === 0} data-testid="button-clear-filters"
+        <button type="button" onClick={() => { setUniversityQuery(""); onClear(); }} disabled={activeCount === 0 && !universityQuery} data-testid="button-clear-filters"
           className="text-sm font-medium text-[hsl(var(--sic-teal))] disabled:text-[hsl(var(--sic-muted))]/60 hover:underline">
           Clear all{activeCount ? ` (${activeCount})` : ""}
         </button>
@@ -50,6 +55,25 @@ export function FilterPanel({ filters, options, optionsError, onRetryOptions, on
         </select>
       </Section>
       <Section title="University" id="f-uni">
+        <input type="search" aria-label="Search universities" placeholder="Search universities…"
+          className={selectCls} value={universityQuery} data-testid="input-university-search"
+          onChange={(e) => setUniversityQuery(e.target.value)} />
+        {universityQuery.trim() && (
+          <div className="max-h-48 overflow-y-auto rounded-lg border border-[hsl(var(--sic-line))] bg-white">
+            {matchingUniversities.map((u) => (
+              <button key={u.id} type="button"
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-[hsl(var(--sic-teal-soft))]"
+                onClick={() => { onChange({ universityId: String(u.id) }); setUniversityQuery(""); }}>
+                {u.name}
+              </button>
+            ))}
+            {!matchingUniversities.length && (
+              <p role="status" className="px-3 py-2 text-sm text-[hsl(var(--sic-muted))]">
+                {options ? "No universities found." : "University list is not available yet."}
+              </p>
+            )}
+          </div>
+        )}
         <select aria-labelledby="f-uni" className={selectCls} value={filters.universityId} data-testid="select-university"
           onChange={(e) => onChange({ universityId: e.target.value })}>
           <option value="">Any university</option>

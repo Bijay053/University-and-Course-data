@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.schemas.search import (
+    PublicUniversityInsightsResponse,
     SearchCourseResponse,
     SearchCourseRow,
     SearchOptionsResponse,
@@ -34,6 +35,33 @@ from app.services.course_id_aliases import COURSE_ALIAS_EXCLUSION_SQL
 log = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.get("/universities/{university_id}/insights", response_model=PublicUniversityInsightsResponse)
+async def public_university_insights(
+    university_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Read-only saved guidance for universities visible in the public catalogue.
+
+    Deliberately does not call the staff notes route: its lazy AI backfill writes
+    to the database. Expose only source text, country and update date here.
+    """
+    visible = await db.scalar(text(f"""
+        WITH {_COURSE_SEARCH_CTE}
+        SELECT EXISTS (
+            SELECT 1 FROM course_search_view WHERE university_id = :university_id
+        )
+    """), {"university_id": university_id})
+    if not visible:
+        raise HTTPException(status_code=404, detail="University not found")
+    rows = (await db.execute(text("""
+        SELECT id, country, raw_text AS text, updated_at
+        FROM assessment_notes
+        WHERE university_id = :university_id AND btrim(raw_text) <> ''
+        ORDER BY country, id
+    """), {"university_id": university_id})).mappings().all()
+    return {"insights": [dict(row) for row in rows]}
 
 _SEARCH_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS ix_fees_course_id ON fees (course_id)",
