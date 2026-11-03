@@ -65,12 +65,12 @@ export default function PublicCoursePage() {
           <nav className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[13px]" aria-label="Breadcrumb">
             <Link href="/toolkit" className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 -ml-2 text-white/75 hover:bg-white/10 hover:text-white" data-testid="link-back-toolkit"><ArrowLeft className="h-3.5 w-3.5" aria-hidden /> All courses</Link>
             {course && <><span className="text-white/35" aria-hidden>/</span>
-              <Link href={`/toolkit/universities/${course.university.id}`} className="inline-flex min-w-0 items-center gap-1.5 rounded-full px-2 py-1 text-white/75 hover:bg-white/10 hover:text-white" data-testid="link-university-page"><Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden /><span className="truncate max-w-[60vw] sm:max-w-none">{course.university.name}</span></Link></>}
+              <Link href={`/toolkit/universities/${course.university.id}`} className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-white/75 hover:bg-white/10 hover:text-white" data-testid="link-university-page"><Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden /><span className="min-w-0 break-words">{course.university.name}</span></Link></>}
           </nav>
           {course ? (
             <div className="mt-5 max-w-3xl sic-rise">
               {has(course.degree_level) && <p className="mb-2 inline-flex rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-foreground">{course.degree_level}</p>}
-              <h1 className="sic-display text-[1.375rem] leading-[1.2] sm:text-[1.75rem] lg:text-[2rem] font-semibold [text-wrap:balance] break-words" data-testid="text-course-name">{course.course_name}</h1>
+              <h1 className="sic-display text-[1.3rem] min-[400px]:text-[1.375rem] leading-[1.2] sm:text-[1.75rem] lg:text-[2rem] font-semibold [text-wrap:balance] break-words [overflow-wrap:anywhere]" data-testid="text-course-name">{course.course_name}</h1>
               <p className="mt-1.5 text-sm text-white/75" data-testid="text-course-university">{course.university.name}{place ? `, ${place}` : ""}</p>
             </div>
           ) : state.status === "loading" ? (
@@ -78,7 +78,7 @@ export default function PublicCoursePage() {
           ) : null}
           {course && facts.length > 0 && (
             <dl className="mt-5 grid w-full gap-px overflow-hidden rounded-xl bg-white/10"
-              style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 12rem), 1fr))" }}
+              style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr))" }}
               data-testid="list-course-facts">
               {facts.map(([k, v]) => (
                 <div key={k} className="min-w-0 bg-[hsl(var(--sic-navy))]/40 px-4 py-2.5">
@@ -110,7 +110,7 @@ export default function PublicCoursePage() {
         ) : course && (
           <div className="space-y-6">
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-              <aside className="self-start lg:order-2 lg:sticky lg:top-6 space-y-3" aria-label="Course summary">
+              <aside className="order-2 self-start lg:order-2 lg:sticky lg:top-6 space-y-3" aria-label="Course summary">
                 <div className="overflow-hidden rounded-2xl border border-[hsl(var(--sic-line))] bg-white">
                   <div className="space-y-3 p-4">
                     {fees.length > 0 && <div><p className={label}>{fees.length > 1 ? "Fees from" : "Tuition fee"}</p>
@@ -134,7 +134,7 @@ export default function PublicCoursePage() {
                 </div>
               </aside>
 
-              <article className="min-w-0 space-y-5 rounded-2xl border border-[hsl(var(--sic-line))] bg-white p-4 sm:p-6 lg:order-1">
+              <article className="min-w-0 space-y-5 rounded-2xl border border-[hsl(var(--sic-line))] bg-white p-4 sm:p-6 order-1 lg:order-1">
                 {fees.length > 0 && (
                   <CourseSection id="fees" index={++n} title="Tuition fees">
                     <ul className="divide-y divide-[hsl(var(--sic-line))] rounded-xl border border-[hsl(var(--sic-line))]" data-testid="list-course-fees">

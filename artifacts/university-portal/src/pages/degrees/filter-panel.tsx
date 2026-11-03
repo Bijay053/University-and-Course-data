@@ -18,7 +18,7 @@ const BLANK_BANDS = { eOverall: "", eReading: "", eWriting: "", eListening: "", 
 type Props = {
   filters: DegreeFilters; options: OptionsResponse | null; optionsError: boolean;
   onRetryOptions: () => void; onChange: (patch: Partial<DegreeFilters>) => void; onClear: () => void; activeCount: number;
-  onSearch: () => void;
+  onSearch: () => void; onClose?: () => void;
 };
 
 function Item({ value, title, children }: { value: string; title: ReactNode; children: ReactNode }) {
@@ -30,7 +30,7 @@ function Item({ value, title, children }: { value: string; title: ReactNode; chi
   );
 }
 
-export function FilterPanel({ filters: f, options, optionsError, onRetryOptions, onChange, onClear, activeCount, onSearch }: Props) {
+export function FilterPanel({ filters: f, options, optionsError, onRetryOptions, onChange, onClear, activeCount, onSearch, onClose }: Props) {
   const strOpts = (xs: string[] | undefined) => (xs ?? []).map((x) => ({ value: x, label: x }));
   const resetFeeSort = f.sort === "fee_asc" || f.sort === "fee_desc" ? "relevance" : f.sort;
   const months = options?.intakes?.length ? options.intakes : options?.intake_months?.length ? options.intake_months : MONTHS;
@@ -45,12 +45,18 @@ export function FilterPanel({ filters: f, options, optionsError, onRetryOptions,
 
   return (
     <div className="space-y-3" data-testid="panel-filters">
-      <div className="flex items-center justify-between">
+      <div className={`flex items-center justify-between ${onClose ? "sticky top-0 z-20 -mx-5 bg-[hsl(var(--sic-paper))] px-5 py-3" : ""}`}>
         <h2 className="sic-display text-lg">Refine</h2>
+        <div className="flex items-center gap-2">
         <button type="button" onClick={onClear} disabled={activeCount === 0} data-testid="button-clear-filters"
           className="text-sm font-medium text-primary disabled:text-[hsl(var(--sic-muted))]/60 hover:underline">
           Reset{activeCount ? ` (${activeCount})` : ""}
         </button>
+          {onClose && <button type="button" onClick={onClose} aria-label="Close filters" title="Close filters" data-testid="button-close-filters"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-[hsl(var(--sic-line))] bg-white text-[hsl(var(--sic-navy))] hover:bg-[hsl(var(--sic-mist))]">
+            <X className="h-5 w-5" aria-hidden />
+          </button>}
+        </div>
       </div>
       {optionsError && (
         <div role="alert" className="rounded-lg bg-[hsl(var(--sic-amber))]/10 p-3 text-sm">

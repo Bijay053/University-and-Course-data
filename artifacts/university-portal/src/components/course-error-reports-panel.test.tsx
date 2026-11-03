@@ -22,10 +22,10 @@ describe("CourseErrorReportsPanel", () => {
     expect(screen.getByText("Harbour Uni")).toBeTruthy();
     expect(screen.queryByText("Deleted course")).toBeNull();
     const link = screen.getByTestId("link-report-page-5");
-    expect(link.getAttribute("href")).toBe("/toolkit/universities/4?tab=insights");
+    expect(link.getAttribute("href")).toBe("/universities/4?tab=assessment");
     fireEvent.click(link);
-    expect(window.location.pathname).toBe("/toolkit/universities/4");
-    expect(window.location.search).toBe("?tab=insights");
+    expect(window.location.pathname).toBe("/universities/4");
+    expect(window.location.search).toBe("?tab=assessment");
   });
 
   it("opens the reported course and university from their names", async () => {
@@ -35,13 +35,25 @@ describe("CourseErrorReportsPanel", () => {
     }), { status: 200 })));
     wrap();
     const course = await screen.findByTestId("link-report-page-5");
-    expect(course.getAttribute("href")).toBe("/toolkit/courses/3");
+    expect(course.getAttribute("href")).toBe("/courses/3");
     fireEvent.click(course);
-    expect(window.location.pathname).toBe("/toolkit/courses/3");
+    expect(window.location.pathname).toBe("/courses/3");
     const university = screen.getByTestId("link-report-university-5");
-    expect(university.getAttribute("href")).toBe("/toolkit/universities/4");
+    expect(university.getAttribute("href")).toBe("/universities/4");
     fireEvent.click(university);
-    expect(window.location.pathname).toBe("/toolkit/universities/4");
+    expect(window.location.pathname).toBe("/universities/4");
+  });
+
+  it("falls back to the dashboard university when a reported course was deleted", async () => {
+    perms.set = new Set(["courses.view"]);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      reports: [{ ...report, course_id: null, university_id: 4 }], total: 1,
+    }), { status: 200 })));
+    wrap();
+    const link = await screen.findByTestId("link-report-page-5");
+    expect(link.getAttribute("href")).toBe("/universities/4");
+    fireEvent.click(link);
+    expect(window.location.pathname).toBe("/universities/4");
   });
 
   it("keeps deleted target snapshots without broken navigation links", async () => {

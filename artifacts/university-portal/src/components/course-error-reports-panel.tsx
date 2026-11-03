@@ -72,10 +72,10 @@ export function CourseErrorReportsPanel() {
             <ul className="divide-y rounded-md border">
               {q.data.reports.map((r) => {
                 const busy = update.isPending && update.variables?.id === r.id;
-                const universityHref = r.university_id ? `/toolkit/universities/${r.university_id}` : null;
+                const universityHref = r.university_id ? `/universities/${r.university_id}` : null;
                 const reportHref = r.field === "key_insights"
-                  ? universityHref && `${universityHref}?tab=insights`
-                  : r.course_id ? `/toolkit/courses/${r.course_id}` : null;
+                  ? universityHref && `${universityHref}?tab=assessment`
+                  : r.course_id ? `/courses/${r.course_id}` : universityHref;
                 const title = r.field === "key_insights"
                   ? `Key Insights — ${r.insight_country || "General guidance"}`
                   : r.course_name ?? "Deleted course";

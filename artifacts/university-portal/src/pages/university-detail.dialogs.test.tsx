@@ -51,6 +51,7 @@ vi.mock("@/hooks/use-toast", () => ({
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  window.history.replaceState(null, "", "/");
 });
 
 type ApprovalResult = {
@@ -172,6 +173,15 @@ async function expectDialogAndClose(
 }
 
 describe("University Detail dialogs", () => {
+  it("opens the editable Key Insights tab from a dashboard report link", async () => {
+    window.history.replaceState(null, "", "/universities/7?tab=assessment");
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Add Key Insight" }));
+    await screen.findByRole("dialog", { name: "Add Key Insight" });
+    expectAccessibleDialog();
+  });
+
   it("disables normal and force approval for PT-only raw rows while publishing mixed/eligible selections", async () => {
     const user = userEvent.setup();
     const { fetchMock } = renderPage(sourceId => ({

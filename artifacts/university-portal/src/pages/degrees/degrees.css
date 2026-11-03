@@ -38,6 +38,18 @@
 .sic-degrees .sic-select-search input:focus-visible {
   outline: none;
 }
+/* Editable controls below 16px cause Safari to zoom the whole page on focus. */
+@media (max-width: 639px) {
+  .sic-degrees input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .sic-degrees textarea,
+  .sic-degrees select {
+    font-size: 16px;
+  }
+  .sic-degrees #sort,
+  .sic-degrees #sort-currency {
+    font-size: 12px;
+  }
+}
 /* Cover the browser's autofill paint without affecting selection or the caret. */
 .sic-degrees form[role="search"] input {
   background-color: #fff;

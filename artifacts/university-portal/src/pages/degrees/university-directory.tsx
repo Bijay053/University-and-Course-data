@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, ChevronRight, MapPin, RotateCcw, Search, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, MapPin, RotateCcw, Search, X } from "lucide-react";
 import type { OptionsResponse } from "./lib";
 import { SearchableSelect } from "./searchable-select";
 
@@ -66,29 +66,36 @@ export function UniversityDirectory({ options, optionsError, onRetry, q, country
     .filter(Boolean) as { k: string; label: string; clear: () => void }[];
   const reset = () => { onQ(""); onCountry(""); onCity(""); };
   const loading = !options && !optionsError;
+  const [placeOpen, setPlaceOpen] = useState(() => !!(country || city));
+  const placeCount = (country ? 1 : 0) + (city ? 1 : 0);
 
   return (
-    <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-8 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+    <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-5 sm:py-8 grid gap-5 sm:gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="self-start lg:sticky lg:top-6" aria-label="University filters">
-        <div className="rounded-2xl border border-[hsl(var(--sic-line))] bg-white p-5">
+        <div className="rounded-2xl border border-[hsl(var(--sic-line))] bg-white p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <h2 className="sic-display text-lg">Where to study</h2>
             {active.length > 0 && (
-              <button type="button" onClick={reset} className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline" data-testid="button-reset-university-filters">
+              <button type="button" onClick={reset} className="inline-flex min-h-10 items-center gap-1 px-1 text-xs font-semibold text-primary hover:underline" data-testid="button-reset-university-filters">
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reset
               </button>
             )}
           </div>
-          <form role="search" aria-label="University search" autoComplete="off" className="sic-university-search mt-4" onSubmit={(e) => e.preventDefault()}>
+          <form role="search" aria-label="University search" autoComplete="off" className="sic-university-search mt-3 sm:mt-4" onSubmit={(e) => e.preventDefault()}>
             <label htmlFor="uni-q" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-[hsl(var(--sic-muted))]">University name</label>
             <div className="flex items-center gap-2 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-3 focus-within:border-[hsl(var(--sic-navy))] focus-within:ring-1 focus-within:ring-[hsl(var(--sic-navy))]">
               <Search className="h-4 w-4 shrink-0 text-[hsl(var(--sic-muted))]" aria-hidden />
               <input id="uni-q" type="search" autoComplete="off" value={q} onChange={(e) => onQ(e.target.value)} placeholder="University name"
-                className="h-10 w-full min-w-0 bg-transparent text-sm text-[hsl(var(--sic-ink))] outline-none placeholder:text-[hsl(var(--sic-muted))] [&::-webkit-search-cancel-button]:appearance-none" data-testid="input-university-search" />
-              {q && <button type="button" aria-label="Clear university search" onClick={() => onQ("")} className="shrink-0 p-1 text-[hsl(var(--sic-muted))] hover:text-primary" data-testid="button-clear-university-search"><X className="h-4 w-4" aria-hidden /></button>}
+                className="h-11 sm:h-10 w-full min-w-0 bg-transparent text-base sm:text-sm text-[hsl(var(--sic-ink))] outline-none placeholder:text-[hsl(var(--sic-muted))] [&::-webkit-search-cancel-button]:appearance-none" data-testid="input-university-search" />
+              {q && <button type="button" aria-label="Clear university search" onClick={() => onQ("")} className="-mr-1.5 grid h-9 w-9 shrink-0 place-items-center text-[hsl(var(--sic-muted))] hover:text-primary" data-testid="button-clear-university-search"><X className="h-4 w-4" aria-hidden /></button>}
             </div>
           </form>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+          <button type="button" onClick={() => setPlaceOpen((o) => !o)} aria-expanded={placeOpen} aria-controls="uni-place-filters" data-testid="button-toggle-university-place"
+            className="lg:hidden mt-3 flex h-11 w-full items-center justify-between rounded-lg border border-[hsl(var(--sic-line))] bg-[hsl(var(--sic-mist))] px-3 text-sm font-semibold text-[hsl(var(--sic-navy))]">
+            <span>Country and city{placeCount ? ` (${placeCount})` : ""}</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${placeOpen ? "rotate-180" : ""}`} aria-hidden />
+          </button>
+          <div id="uni-place-filters" className={`mt-3 lg:mt-4 gap-4 sm:grid-cols-2 lg:grid lg:grid-cols-1 ${placeOpen ? "grid" : "hidden"}`}>
             <div>
               <p className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-[hsl(var(--sic-muted))]">Country</p>
 <SearchableSelect label="Country" testId="select-university-country" anyLabel="All countries" value={country} disabled={!options}
@@ -108,7 +115,7 @@ export function UniversityDirectory({ options, optionsError, onRetry, q, country
 
       <section aria-labelledby="uni-heading" className="min-w-0" ref={resultsTop}>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <h2 id="uni-heading" className="sic-display text-2xl">Universities</h2>
             <p className="text-sm text-[hsl(var(--sic-muted))]" aria-live="polite" data-testid="text-university-count">
               {loading ? "Loading universities" : options ? `${matches.length.toLocaleString()} ${matches.length === all.length ? "" : `of ${all.length.toLocaleString()} `}universit${(active.length ? all.length : matches.length) === 1 ? "y" : "ies"}` : ""}
@@ -169,7 +176,7 @@ export function UniversityDirectory({ options, optionsError, onRetry, q, country
               Showing {start + 1}–{Math.min(start + PAGE_SIZE, matches.length)} of {matches.length.toLocaleString()} {matches.length === 1 ? "university" : "universities"}
             </p>
             {totalPages > 1 && (
-              <nav aria-label="University pagination" className="flex items-center gap-3">
+              <nav aria-label="University pagination" className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
                 <button type="button" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}
                   data-testid="button-prev-university-page" className="inline-flex h-10 items-center gap-1 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-3 text-sm font-semibold hover:border-[hsl(var(--sic-navy))] disabled:cursor-not-allowed disabled:opacity-40">
                   <ChevronLeft className="h-4 w-4" aria-hidden /> Previous

@@ -148,6 +148,7 @@ async def test_search_stays_fast_and_uses_child_indexes_at_catalogue_scale():
                     id integer, name text, category text, sub_category text,
                     degree_level text, duration numeric, duration_term text,
                     study_mode text, course_website text, course_location text,
+                    other_test text,
                     university_id integer, status text, approval_status text
                 ) ON COMMIT DROP""",
                 """CREATE TEMP TABLE course_id_aliases (
@@ -209,6 +210,7 @@ async def test_search_stays_fast_and_uses_child_indexes_at_catalogue_scale():
                               'https://course.test/' || id,
                               CASE WHEN id % 2 = 0
                                    THEN 'Sydney Campus' ELSE 'Melbourne Campus' END,
+                              NULL,
                               1 + ((id - 1) % 50),
                               'active',
                               'approved'
@@ -392,6 +394,7 @@ async def test_search_cte_executes_against_production_base_table_shape():
                     id integer, name text, category text, sub_category text,
                     degree_level text, duration numeric, duration_term text,
                     study_mode text, course_website text, course_location text,
+                    other_test text,
                     university_id integer, status text, approval_status text
                 ) ON COMMIT DROP""",
                 """CREATE TEMP TABLE course_id_aliases (
@@ -432,7 +435,7 @@ async def test_search_cte_executes_against_production_base_table_shape():
                 """INSERT INTO courses
                    VALUES (10, 'Master of Testing', 'Computing', 'Software',
                            'Master', 2, 'Years', 'On Campus',
-                           'https://uni.test/testing', 'Sydney Campus', 1,
+                           'https://uni.test/testing', 'Sydney Campus', NULL, 1,
                            'active', 'approved')"""
             ))
             await db.execute(text(

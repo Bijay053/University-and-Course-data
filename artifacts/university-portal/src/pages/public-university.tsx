@@ -90,26 +90,26 @@ export default function PublicUniversityPage() {
   return (
     <div className="sic-degrees min-h-[100dvh] max-w-full overflow-x-hidden">
       <header className="sic-hero sic-contour text-white">
-        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 pt-5 pb-0">
-          <nav className="flex items-center justify-between" aria-label="Site">
-            <Link href="/toolkit?mode=universities" className="inline-flex items-center gap-2 text-sm text-white/80 hover:text-white" data-testid="link-back-universities">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 pt-4 sm:pt-5 pb-0">
+          <nav className="flex items-center justify-between gap-3" aria-label="Site">
+            <Link href="/toolkit?mode=universities" className="inline-flex h-11 sm:h-auto items-center gap-2 text-sm text-white/80 hover:text-white" data-testid="link-back-universities">
               <ArrowLeft className="h-4 w-4" aria-hidden /> All universities
             </Link>
             <button type="button" onClick={() => setShortlistOpen(true)} data-testid="button-open-shortlist"
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-white/10 px-4 text-sm font-medium hover:bg-white/20">
-              <Bookmark className="h-4 w-4" aria-hidden /> Shortlist <span className="rounded-full bg-white px-2 text-xs text-[hsl(var(--sic-navy))]">{shortlist.items.length}</span>
+              className="inline-flex h-11 sm:h-10 shrink-0 items-center gap-2 rounded-full bg-white/10 px-3 sm:px-4 text-sm font-medium hover:bg-white/20">
+              <Bookmark className="h-4 w-4" aria-hidden /> <span className="sr-only min-[400px]:not-sr-only">Shortlist</span> <span className="rounded-full bg-white px-2 text-xs text-[hsl(var(--sic-navy))]">{shortlist.items.length}</span>
             </button>
           </nav>
-          <div className="mt-8 pb-6">
+          <div className="mt-4 sm:mt-8 pb-5 sm:pb-6">
             <p className="text-[11px] uppercase tracking-[0.16em] text-white/70">University</p>
-            {name ? <h1 className="sic-display text-3xl sm:text-5xl leading-[1.05] break-words" data-testid="text-university-name">{name}</h1>
+            {name ? <h1 className="sic-display text-[1.75rem] min-[400px]:text-3xl sm:text-5xl leading-[1.1] sm:leading-[1.05] break-words [overflow-wrap:anywhere]" data-testid="text-university-name">{name}</h1>
               : <div className="mt-2 h-12 w-80 max-w-full animate-pulse rounded-lg bg-white/15" aria-label="Loading university" />}
           </div>
           {!notFound && (
-            <div role="tablist" aria-label="University sections" className="flex gap-1">
+            <div role="tablist" aria-label="University sections" className="flex gap-1 overflow-x-auto">
               {([["courses", "Courses", GraduationCap], ["insights", "Key Insights", Lightbulb]] as const).filter(([t]) => t !== "insights" || !hasNoInsights).map(([t, label, Icon]) => (
                 <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} data-testid={`tab-uni-${t}`}
-                  className={`inline-flex h-11 items-center gap-2 rounded-t-xl px-5 text-sm font-semibold transition-colors ${tab === t ? "bg-[hsl(var(--sic-paper))] text-[hsl(var(--sic-navy))]" : "text-white/80 hover:bg-white/10"}`}>
+                  className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-t-xl px-4 sm:px-5 text-sm font-semibold transition-colors ${tab === t ? "bg-[hsl(var(--sic-paper))] text-[hsl(var(--sic-navy))]" : "text-white/80 hover:bg-white/10"}`}>
                   <Icon className="h-4 w-4" aria-hidden /> {label}
                 </button>
               ))}
@@ -118,7 +118,7 @@ export default function PublicUniversityPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-8">
+      <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-5 sm:py-8">
         {optionsError && !options ? (
           <div role="alert" className="rounded-2xl border border-[hsl(var(--sic-line))] bg-white p-8 text-center">
             <p className="sic-display text-xl">This university could not be loaded</p>
@@ -136,7 +136,7 @@ export default function PublicUniversityPage() {
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <section className="min-w-0" aria-labelledby="uni-courses-heading">
               <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <h2 id="uni-courses-heading" className="sic-display text-2xl">Courses</h2>
                   <p className="text-sm text-[hsl(var(--sic-muted))]" aria-live="polite" data-testid="text-uni-course-count">
                     {loading && !data ? "Loading courses" : data ? `${data.total.toLocaleString()} approved course${data.total === 1 ? "" : "s"}` : ""}
@@ -171,7 +171,7 @@ export default function PublicUniversityPage() {
                 </div>
               )}
               {data && data.total > data.limit && !error && (
-                <nav className="mt-8 flex items-center justify-center gap-3" aria-label="Pagination">
+                <nav className="mt-8 flex flex-wrap items-center justify-center gap-2 sm:gap-3" aria-label="Pagination">
                   <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)} data-testid="button-prev-page"
                     className="inline-flex h-10 items-center gap-1 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-3 text-sm disabled:opacity-40"><ChevronLeft className="h-4 w-4" aria-hidden /> Previous</button>
                   <span className="text-sm tabular-nums" data-testid="text-page">Page {page} of {totalPages}</span>

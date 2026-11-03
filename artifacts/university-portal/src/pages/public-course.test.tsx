@@ -47,7 +47,7 @@ describe("public course page", () => {
     }] }) });
     renderAt("/toolkit/courses/7");
     const facts = await screen.findByTestId("list-course-facts");
-    expect(facts.style.gridTemplateColumns).toBe("repeat(auto-fit, minmax(min(100%, 12rem), 1fr))");
+    expect(facts.style.gridTemplateColumns).toBe("repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr))");
     expect(facts.className).not.toContain("sm:flex");
     expect(facts.children[0].textContent).toBe("LevelBachelor");
     expect(facts.children[1].textContent).toBe(`Study mode${longMode}`);

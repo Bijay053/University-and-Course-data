@@ -566,10 +566,14 @@ async def search_courses(
 
     where_sql = " AND ".join(where) if where else "TRUE"
 
-    # B5: sort param. Default behaviour (no sort) preserves the
-    # legacy "relevance when q present, alphabetical otherwise" order.
+    # Promote featured institutions before pagination for both search clients.
+    # An old priority on an institution that is no longer featured must not
+    # influence ordinary results. Explicit user-selected sorts still win below.
     sort_clause = (
-        ("rank DESC NULLS LAST, " if q or (course_name and course_name.strip()) else "") + "c.course_name, c.id"
+        "c.featured DESC, "
+        "CASE WHEN c.featured THEN c.featured_priority ELSE 0 END DESC, "
+        + ("rank DESC NULLS LAST, " if q or (course_name and course_name.strip()) else "")
+        + "c.course_name, c.id"
     )
     if sort:
         s = sort.strip().lower()

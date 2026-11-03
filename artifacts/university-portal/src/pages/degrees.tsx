@@ -131,34 +131,34 @@ export default function DegreesPage() {
   return (
     <div className="sic-degrees min-h-[100dvh] max-w-full overflow-x-hidden">
       <header className="sic-hero sic-contour text-white">
-        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 pt-5 pb-10">
-          <nav className="flex items-center justify-between" aria-label="Site">
-            <Link href="/toolkit" className="flex items-center gap-2.5" data-testid="link-home">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground sic-display font-semibold">SI</span>
-              <span className="leading-tight">
-                <span className="block font-semibold">Study Info Centre</span>
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 pt-4 sm:pt-5 pb-6 sm:pb-10">
+          <nav className="flex items-center justify-between gap-3" aria-label="Site">
+            <Link href="/toolkit" className="flex min-w-0 items-center gap-2.5" data-testid="link-home">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground sic-display font-semibold">SI</span>
+              <span className="min-w-0 leading-tight">
+                <span className="block truncate text-[15px] sm:text-base font-semibold">Study Info Centre</span>
                 <span className="flex items-center gap-2">
-                  <span className="text-[11px] uppercase tracking-[0.16em] text-white/80">Course toolkit</span>
+                  <span className="whitespace-nowrap text-[10px] sm:text-[11px] uppercase tracking-[0.14em] sm:tracking-[0.16em] text-white/80">Course toolkit</span>
                   <span data-testid="badge-toolkit-beta" className="sic-beta shrink-0 rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white">Beta</span>
                 </span>
               </span>
             </Link>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <button type="button" onClick={() => setShortlistOpen(true)} data-testid="button-open-shortlist"
-                className="inline-flex h-10 items-center gap-2 rounded-full bg-white/10 px-4 text-sm font-medium hover:bg-white/20">
-                <Bookmark className="h-4 w-4" aria-hidden /> Shortlist <span className="rounded-full bg-white px-2 text-xs text-[hsl(var(--sic-navy))]" data-testid="text-shortlist-count">{shortlist.items.length}</span>
+                className="inline-flex h-11 sm:h-10 items-center gap-2 rounded-full bg-white/10 px-3 sm:px-4 text-sm font-medium hover:bg-white/20">
+                <Bookmark className="h-4 w-4" aria-hidden /> <span className="sr-only min-[400px]:not-sr-only">Shortlist</span> <span className="rounded-full bg-white px-2 text-xs text-[hsl(var(--sic-navy))]" data-testid="text-shortlist-count">{shortlist.items.length}</span>
               </button>
               <Link href="/login" className="hidden sm:inline-flex h-10 items-center rounded-full px-4 text-sm text-white/80 hover:text-white" data-testid="link-staff-login">Staff sign in</Link>
             </div>
           </nav>
-          <div className="mt-10 max-w-3xl">
-            <h1 className="sic-display text-4xl sm:text-5xl leading-[1.05]">Find your course.<br /><span className="text-red-400">Explore your options.</span></h1>
+          <div className="mt-6 sm:mt-10 max-w-3xl">
+            <h1 className="sic-display text-[1.875rem] min-[400px]:text-4xl sm:text-5xl leading-[1.08] sm:leading-[1.05]">Find your course.<br /><span className="text-red-400">Explore your options.</span></h1>
           </div>
-<div className="mt-7 max-w-3xl">
-            <div role="tablist" aria-label="Search mode" className="mb-3 inline-flex rounded-full bg-white/10 p-1 ring-1 ring-white/15">
+<div className="mt-5 sm:mt-7 max-w-3xl">
+            <div role="tablist" aria-label="Search mode" className="inline-flex max-w-full rounded-full bg-white/10 p-1 ring-1 ring-white/15">
               {([["courses", "Courses", GraduationCap], ["universities", "Universities", Building2]] as const).map(([m, label, Icon]) => (
                 <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} data-testid={`tab-${m}`}
-                  className={`inline-flex h-10 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-colors ${mode === m ? "bg-white text-[hsl(var(--sic-navy))] shadow" : "text-white/80 hover:text-white"}`}>
+                  className={`inline-flex h-11 sm:h-10 items-center gap-2 rounded-full px-4 sm:px-5 text-sm font-semibold transition-colors ${mode === m ? "bg-white text-[hsl(var(--sic-navy))] shadow" : "text-white/80 hover:text-white"}`}>
                   <Icon className="h-4 w-4" aria-hidden /> {label}
                 </button>
               ))}
@@ -172,7 +172,7 @@ export default function DegreesPage() {
         page={uniPage} onPage={setUniPage}
         q={uniQ} country={uniCountry} city={uniCity} onQ={setUniQ} onCountry={setUniCountry} onCity={setUniCity} />
       ) : (
-      <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-8 grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_380px]">
+      <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-5 sm:py-8 grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_380px]">
         <aside className="hidden lg:block self-start lg:sticky lg:top-6" aria-label="Filters">
           <FilterPanel filters={filters} options={options} optionsError={optionsError} onRetryOptions={loadOptions} onChange={patch} onClear={clearAll} activeCount={activeCount} onSearch={searchFilters} />
         </aside>
@@ -190,34 +190,34 @@ export default function DegreesPage() {
               </p>
             </div>
             <div className="flex min-w-0 flex-col gap-1 sm:items-end" data-testid="course-results-toolbar">
-              <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2 min-w-0 max-w-full">
-              <button type="button" onClick={() => setFiltersOpen(true)} className="lg:hidden inline-flex h-10 items-center gap-2 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-3 text-sm" data-testid="button-open-filters">
+              <div className="flex flex-wrap sm:flex-nowrap items-center sm:justify-end gap-2 min-w-0 max-w-full">
+              <button type="button" onClick={() => setFiltersOpen(true)} className="lg:hidden inline-flex h-11 sm:h-10 basis-full min-[400px]:basis-auto justify-center items-center gap-2 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-3 text-sm" data-testid="button-open-filters">
                 <SlidersHorizontal className="h-4 w-4" aria-hidden /> Filters{activeCount ? ` (${activeCount})` : ""}
               </button>
               <label htmlFor="sort" className="sr-only">Sort by</label>
               <select id="sort" value={filters.sort} onChange={(e) => patch({ sort: e.target.value as SortKey })} data-testid="select-sort"
                 aria-describedby={!filters.budgetCurrency ? "fee-sort-help" : undefined}
-                className="h-9 w-44 min-w-0 max-w-full rounded-lg border border-[hsl(var(--sic-line))] bg-white px-2 text-xs">
+                className="h-11 sm:h-9 flex-1 sm:flex-none sm:w-44 min-w-0 max-w-full rounded-lg border border-[hsl(var(--sic-line))] bg-white px-2 text-xs">
                 {SORTS.map((s) => <option key={s.value} value={s.value} disabled={isFeeSort(s.value) && !filters.budgetCurrency}>{s.label}</option>)}
               </select>
               <label htmlFor="sort-currency" className="sr-only">Sorting currency</label>
               <select id="sort-currency" value={filters.budgetCurrency} data-testid="select-sort-currency"
                 disabled={!options?.currencies?.length}
                 onChange={(e) => patch({ budgetCurrency: e.target.value, ...(!e.target.value && isFeeSort(filters.sort) ? { sort: "relevance" as SortKey } : {}) })}
-                className="h-9 w-24 min-w-0 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-2 text-xs">
+                className="h-11 sm:h-9 w-24 shrink-0 min-w-0 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-2 text-xs">
                 <option value="">Currency</option>
                 {options?.currencies?.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
               </select>
-              <div className="flex rounded-lg border border-[hsl(var(--sic-line))] bg-white p-0.5" role="group" aria-label="Layout">
+              <div className="flex shrink-0 rounded-lg border border-[hsl(var(--sic-line))] bg-white p-0.5" role="group" aria-label="Layout">
                 {(["grid", "list"] as const).map((v) => (
                   <button key={v} type="button" aria-pressed={view === v} aria-label={`${v} view`} onClick={() => setView(v)} data-testid={`button-view-${v}`}
-                    className={`grid h-9 w-9 place-items-center rounded-md ${view === v ? "bg-[hsl(var(--sic-navy))] text-white" : "text-[hsl(var(--sic-muted))]"}`}>
+                    className={`grid h-10 w-10 sm:h-9 sm:w-9 place-items-center rounded-md ${view === v ? "bg-[hsl(var(--sic-navy))] text-white" : "text-[hsl(var(--sic-muted))]"}`}>
                     {v === "grid" ? <LayoutGrid className="h-4 w-4" aria-hidden /> : <List className="h-4 w-4" aria-hidden />}
                   </button>
                 ))}
               </div>
               </div>
-              {!filters.budgetCurrency && <p id="fee-sort-help" className="text-right text-xs text-[hsl(var(--sic-muted))]">Choose a currency to sort by fee.</p>}
+              {!filters.budgetCurrency && <p id="fee-sort-help" className="text-left sm:text-right text-xs text-[hsl(var(--sic-muted))]">Choose a currency to sort by fee.</p>}
             </div>
           </div>
 
@@ -265,7 +265,7 @@ export default function DegreesPage() {
           )}
 
           {data && data.total > data.limit && !error && (
-            <nav className="mt-8 flex items-center justify-center gap-3" aria-label="Pagination">
+            <nav className="mt-8 flex flex-wrap items-center justify-center gap-2 sm:gap-3" aria-label="Pagination">
               <button type="button" disabled={filters.page <= 1 || loading} onClick={() => patch({ page: filters.page - 1 })} data-testid="button-prev-page"
                 className="inline-flex h-10 items-center gap-1 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-3 text-sm disabled:opacity-40"><ChevronLeft className="h-4 w-4" aria-hidden /> Previous</button>
               <span className="text-sm tabular-nums" data-testid="text-page">Page {filters.page} of {totalPages}</span>
@@ -292,9 +292,9 @@ export default function DegreesPage() {
 
       {filtersOpen && mode === "courses" && (
         <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Filters" aria-description="Narrow courses by country, university, level, intake and currency" onKeyDown={(e) => e.key === "Escape" && setFiltersOpen(false)}>
-          <button type="button" aria-label="Close filters" className="absolute inset-0 bg-[hsl(213_60%_12%/0.45)]" onClick={() => setFiltersOpen(false)} />
-          <div className="sic-rise relative w-[88%] max-w-sm h-full overflow-y-auto bg-[hsl(var(--sic-paper))] p-5">
-            <FilterPanel filters={filters} options={options} optionsError={optionsError} onRetryOptions={loadOptions} onChange={patch} onClear={clearAll} activeCount={activeCount} onSearch={searchFilters} />
+          <button type="button" aria-label="Dismiss filters" className="absolute inset-0 bg-[hsl(213_60%_12%/0.45)]" onClick={() => setFiltersOpen(false)} />
+          <div className="sic-rise relative w-[88%] max-w-sm h-full overflow-y-auto bg-[hsl(var(--sic-paper))] px-5 pb-5">
+            <FilterPanel filters={filters} options={options} optionsError={optionsError} onRetryOptions={loadOptions} onChange={patch} onClear={clearAll} activeCount={activeCount} onSearch={searchFilters} onClose={() => setFiltersOpen(false)} />
           </div>
         </div>
       )}

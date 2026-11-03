@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRoute, Link, useLocation } from "wouter";
+import { useRoute, Link, useLocation, useSearch } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses, getListCoursesQueryKey } from "@workspace/api-client-react";
 import { CourseCampusFees, courseFeeExportColumns } from "@/components/course-campus-fees";
 import { Button } from "@/components/ui/button";
@@ -370,6 +370,7 @@ function CmpRow({ label, raw, bak }: { label: string; raw: unknown; bak: unknown
 export default function UniversityDetail() {
   const [, params] = useRoute("/universities/:id");
   const [, navigate] = useLocation();
+  const reportTab = new URLSearchParams(useSearch()).get("tab");
   const id = params?.id ? parseInt(params.id) : 0;
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -448,7 +449,10 @@ export default function UniversityDetail() {
     }
   }, [id, toast]);
 
-  const [tab, setTab] = useState<Tab>("courses");
+  const [tab, setTab] = useState<Tab>(() => reportTab === "assessment" ? "assessment" : "courses");
+  useEffect(() => {
+    setTab(reportTab === "assessment" ? "assessment" : "courses");
+  }, [id, reportTab]);
 
   // ── Auto-Configure / probe state ─────────────────────────────────────────
   type ProbeStatus = "none" | "probing" | "configured" | "failed";

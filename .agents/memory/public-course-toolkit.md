@@ -28,9 +28,12 @@ university Key Insights using a short form, and staff must see the submissions
 inside the dashboard. Key Insights reports must identify the university and
 the relevant insight country, not an unrelated course.
 Staff need direct navigation from dashboard reports to the affected course and
-university so they can investigate the reported information.
+university inside the staff dashboard, never the public toolkit or landing page,
+so they can investigate and fix the reported information. Key Insights reports
+must open the university's editable Key Insights tab.
 
-**Why:** The user explicitly requested public error reports and dashboard review.
+**Why:** The user explicitly requested public error reports and dashboard review,
+then corrected report links that opened public pages instead of dashboard management.
 
 **How to apply:** Keep reports private and review-only. Never treat anonymous
 reports as scraper learning, source authority, or instructions to change course
@@ -186,3 +189,29 @@ A form-level focus style surrounds the label too after search moves into the sid
 
 **How to apply:** Preserve visible mouse and keyboard focus on the field itself
 when moving or restyling search controls; do not outline their enclosing form.
+
+## Mobile content priority
+
+On phones, prioritize course information before repeated summary/actions, and
+keep university location filters collapsible without hiding the name search.
+
+**Why:** The user requested mobile-friendly versions of course search, university
+search and both detail pages after showing cramped headers and results pushed
+down by controls. The same information and filtering must remain available.
+
+**How to apply:** Preserve desktop layouts and navigation while reducing mobile
+header height and control congestion. Keep keyboard labels, readable long names
+and full-size editable fields; never remove data simply to make a screen fit.
+
+## Featured institution search priority
+
+Use the existing university/college Featured setting to place its matching
+approved courses first in default/relevance results in both staff and public search.
+
+**Why:** The user pointed to the existing Featured ON/OFF setting and requested
+those institutions' courses at the top of both search lists.
+
+**How to apply:** Apply promotion after eligibility filters and before pagination.
+Use configured featured priority within that group, then relevance or name.
+Preserve explicit fee, name and duration sorting instead of overriding the
+visitor's chosen order.

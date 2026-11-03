@@ -8,7 +8,7 @@ type Props = {
 
 export function CourseCard({ course, view, selected, shortlisted, onSelect, onToggleShortlist, index }: Props) {
   const meta = (
-    <ul className={`text-[13px] text-[hsl(var(--sic-muted))] ${view === "list" ? "flex flex-wrap gap-x-5 gap-y-1" : "space-y-1"}`}>
+    <ul className={`min-w-0 break-words text-[13px] text-[hsl(var(--sic-muted))] ${view === "list" ? "flex flex-wrap gap-x-5 gap-y-1" : "space-y-1"}`}>
       {locationText(course) !== NOT_PUBLISHED && <li className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />{locationText(course)}</li>}
       {course.duration != null && <li className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />{formatDuration(course.duration, course.duration_term)}</li>}
       {course.intakes.some((intake) => intake.trim()) && <li className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />{course.intakes.filter((intake) => intake.trim()).join(", ")}</li>}
@@ -16,12 +16,12 @@ export function CourseCard({ course, view, selected, shortlisted, onSelect, onTo
   );
   return (
     <article style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }} data-testid={`card-course-${course.id}`}
-      className={`sic-rise group relative rounded-2xl border bg-white/95 transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-18px_hsl(213_60%_22%/0.5)] ${selected ? "border-[hsl(var(--sic-teal))] ring-2 ring-[hsl(var(--sic-teal))]/25" : "border-[hsl(var(--sic-line))]"} ${view === "list" ? "p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4" : "p-5 flex flex-col gap-3"}`}>
+      className={`sic-rise group relative rounded-2xl border bg-white/95 transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-18px_hsl(213_60%_22%/0.5)] ${selected ? "border-[hsl(var(--sic-teal))] ring-2 ring-[hsl(var(--sic-teal))]/25" : "border-[hsl(var(--sic-line))]"} ${view === "list" ? "p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4" : "p-4 sm:p-5 flex flex-col gap-3"}`}>
       <div className="flex-1 min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2 pr-10">
           {course.degree_level?.trim() && <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[hsl(var(--sic-teal))]">{course.degree_level}</span>}
         </div>
-        <h3 className="sic-display text-[19px] leading-snug">
+        <h3 className="sic-display pr-8 text-[17px] sm:text-[19px] leading-snug break-words [overflow-wrap:anywhere]">
           <button type="button" onClick={onSelect} aria-pressed={selected} data-testid={`button-select-course-${course.id}`}
             className="text-left after:absolute after:inset-0 after:content-[''] hover:text-[hsl(var(--sic-teal))]">
             {course.course_name}
@@ -36,7 +36,7 @@ export function CourseCard({ course, view, selected, shortlisted, onSelect, onTo
       </div>}
       <button type="button" onClick={onToggleShortlist} aria-pressed={shortlisted} data-testid={`button-shortlist-${course.id}`}
         aria-label={shortlisted ? `Remove ${course.course_name} from shortlist` : `Add ${course.course_name} to shortlist`}
-        className={`absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full border transition-colors ${shortlisted ? "bg-[hsl(var(--sic-teal))] border-transparent text-white" : "bg-white border-[hsl(var(--sic-line))] text-[hsl(var(--sic-navy))] hover:border-[hsl(var(--sic-teal))]"}`}>
+        className={`absolute right-2.5 top-2.5 sm:right-3 sm:top-3 z-10 grid h-10 w-10 sm:h-9 sm:w-9 place-items-center rounded-full border transition-colors ${shortlisted ? "bg-[hsl(var(--sic-teal))] border-transparent text-white" : "bg-white border-[hsl(var(--sic-line))] text-[hsl(var(--sic-navy))] hover:border-[hsl(var(--sic-teal))]"}`}>
         {shortlisted ? <BookmarkCheck className="h-4 w-4" aria-hidden /> : <Bookmark className="h-4 w-4" aria-hidden />}
       </button>
     </article>

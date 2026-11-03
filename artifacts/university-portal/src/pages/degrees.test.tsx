@@ -189,10 +189,33 @@ describe("public degrees page", () => {
     expect(calls.some((u) => u.includes("/api/search/compare?ids=1,2"))).toBe(true);
   });
 
+  it("closes mobile filters with a labelled icon without clearing the search", async () => {
+    render(<DegreesPage />);
+    await screen.findByTestId("card-course-1");
+    fireEvent.change(screen.getByTestId("input-course-name"), { target: { value: "Science" } });
+    fireEvent.click(screen.getByTestId("button-open-filters"));
+    const dialog = screen.getByRole("dialog", { name: "Filters" });
+    const close = within(dialog).getByRole("button", { name: "Close filters" });
+    expect(close.querySelector("svg")).not.toBeNull();
+    fireEvent.click(close);
+    expect(screen.queryByRole("dialog", { name: "Filters" })).toBeNull();
+    expect((screen.getByTestId("input-course-name") as HTMLInputElement).value).toBe("Science");
+    fireEvent.click(screen.getByTestId("button-open-filters"));
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Filters" }), { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Filters" })).toBeNull();
+  });
+
   it("switches to university mode, searches and links each card to its own page", async () => {
     render(<DegreesPage />);
     await screen.findByTestId("card-course-1");
     fireEvent.click(screen.getByTestId("tab-universities"));
+    const placeToggle = screen.getByTestId("button-toggle-university-place");
+    expect(placeToggle.getAttribute("aria-expanded")).toBe("false");
+    expect(placeToggle.getAttribute("aria-controls")).toBe("uni-place-filters");
+    fireEvent.click(placeToggle);
+    expect(placeToggle.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(placeToggle);
+    expect(placeToggle.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByTestId("select-university")).toBeNull();
     expect(screen.queryByTestId("input-search")).toBeNull();
     const card = await screen.findByTestId("card-university-9");
