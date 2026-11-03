@@ -1,32 +1,22 @@
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=DM+Sans:wght@400;500;600;700&display=swap");
-
 .sic-degrees {
-  --sic-ink: 214 52% 17%;
-  --sic-navy: 213 60% 22%;
-  --sic-teal: 182 48% 34%;
-  --sic-teal-soft: 180 38% 92%;
-  --sic-mist: 186 30% 96%;
-  --sic-paper: 40 33% 98%;
-  --sic-line: 190 18% 85%;
-  --sic-muted: 210 14% 42%;
+  --sic-ink: var(--foreground);
+  --sic-navy: var(--sidebar);
+  --sic-teal: var(--primary);
+  --sic-teal-soft: 0 72% 96%;
+  --sic-mist: var(--muted);
+  --sic-paper: var(--background);
+  --sic-line: var(--border);
+  --sic-muted: var(--muted-foreground);
   --sic-amber: 34 78% 52%;
-  font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--app-font-sans);
   color: hsl(var(--sic-ink));
   background: hsl(var(--sic-paper));
   overflow-x: clip;
 }
-.sic-degrees .sic-display { font-family: "Fraunces", Georgia, serif; letter-spacing: -0.015em; }
-.sic-degrees .sic-hero {
-  background:
-    radial-gradient(1200px 400px at 85% -10%, hsl(182 48% 34% / 0.35), transparent 60%),
-    linear-gradient(135deg, hsl(213 60% 18%), hsl(205 55% 24%));
-}
+.sic-degrees .sic-display { font-family: var(--app-font-sans); font-weight: 600; letter-spacing: -0.025em; }
+.sic-degrees .sic-hero,
 .sic-degrees .sic-hero.sic-contour {
-  background:
-    repeating-radial-gradient(circle at 90% 120%, transparent 0 22px, hsl(180 40% 80% / 0.08) 22px 23px),
-    radial-gradient(1200px 400px at 85% -10%, hsl(182 48% 34% / 0.35), transparent 60%),
-    linear-gradient(135deg, hsl(213 60% 18%), hsl(205 55% 24%));
-  background-color: hsl(213 60% 18%);
+  background: hsl(var(--sidebar));
 }
 .sic-degrees :focus-visible { outline: 2px solid hsl(var(--sic-teal)); outline-offset: 2px; }
 @keyframes sic-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }

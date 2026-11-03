@@ -99,8 +99,8 @@ export default function DegreesPage() {
         <div className="mx-auto max-w-[1400px] px-4 sm:px-6 pt-5 pb-10">
           <nav className="flex items-center justify-between" aria-label="Site">
             <Link href="/degrees" className="flex items-center gap-2.5" data-testid="link-home">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-white text-[hsl(var(--sic-navy))] sic-display font-semibold">SI</span>
-              <span className="leading-tight"><span className="block font-semibold">Study Info Centre</span><span className="block text-[11px] uppercase tracking-[0.16em] text-teal-100/80">Course toolkit</span></span>
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground sic-display font-semibold">SI</span>
+              <span className="leading-tight"><span className="block font-semibold">Study Info Centre</span><span className="block text-[11px] uppercase tracking-[0.16em] text-white/80">Course toolkit</span></span>
             </Link>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setShortlistOpen(true)} data-testid="button-open-shortlist"
@@ -111,7 +111,7 @@ export default function DegreesPage() {
             </div>
           </nav>
           <div className="mt-10 max-w-3xl">
-            <h1 className="sic-display text-4xl sm:text-5xl leading-[1.05]">Find the course,<br /><span className="italic text-teal-200">then read the fine print.</span></h1>
+            <h1 className="sic-display text-4xl sm:text-5xl leading-[1.05]">Find the course,<br /><span className="text-red-400">then read the fine print.</span></h1>
             <p className="mt-3 text-white/75 max-w-xl">Every listing comes from published university data. Where a detail has not been published, we say so.</p>
           </div>
           <form role="search" className="mt-7 flex max-w-3xl items-center gap-2 rounded-2xl bg-white p-2 shadow-xl" onSubmit={(e) => { e.preventDefault(); setFilters((f) => ({ ...f, q: qDraft, page: 1 })); }}>

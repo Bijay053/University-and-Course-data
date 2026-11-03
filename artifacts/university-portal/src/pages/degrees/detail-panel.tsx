@@ -28,7 +28,7 @@ export function DetailPanel({ course, shortlisted, onToggleShortlist, onClose }:
       <div className="sic-hero sic-contour px-5 pt-5 pb-6 text-white relative">
         <button type="button" onClick={onClose} aria-label="Close course details" data-testid="button-close-detail"
           className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-white/10 hover:bg-white/20"><X className="h-4 w-4" aria-hidden /></button>
-        <p className="text-[11px] uppercase tracking-[0.14em] text-teal-100/90">{course.degree_level || "Level not published"}</p>
+        <p className="text-[11px] uppercase tracking-[0.14em] text-white/90">{course.degree_level || "Level not published"}</p>
         <h2 id="detail-title" className="sic-display text-2xl leading-tight mt-1 pr-8">{course.course_name}</h2>
         <p className="text-sm text-white/80 mt-1">{course.university.name}</p>
       </div>
