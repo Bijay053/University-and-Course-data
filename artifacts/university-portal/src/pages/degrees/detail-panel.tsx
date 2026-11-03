@@ -1,6 +1,6 @@
-import { ExternalLink, X, Bookmark, BookmarkCheck } from "lucide-react";
-import { UniversityInsights } from "./university-insights";
-import { type CourseResult, NOT_PUBLISHED, englishList, feeLines, formatDuration, formatFeeLine, locationText, safeHttpUrl } from "./lib";
+import { Link } from "wouter";
+import { ArrowRight, X, Bookmark, BookmarkCheck } from "lucide-react";
+import { type CourseResult, NOT_PUBLISHED, englishList, feeLines, formatDuration, formatFeeLine, locationText } from "./lib";
 
 type Props = { course: CourseResult | null; shortlisted: boolean; onToggleShortlist: () => void; onClose: () => void };
 
@@ -21,7 +21,6 @@ export function DetailPanel({ course, shortlisted, onToggleShortlist, onClose }:
       </div>
     );
   }
-  const url = safeHttpUrl(course.course_url);
   const english = englishList(course.english_requirements);
   const fees = feeLines(course).filter((fee) => fee.amount != null);
   const field = [course.category, course.sub_category].filter((value) => value?.trim()).join(" / ");
@@ -55,21 +54,18 @@ export function DetailPanel({ course, shortlisted, onToggleShortlist, onClose }:
           </Row>}
           {field && <Row k="Field">{field}</Row>}
         </dl>
-        <UniversityInsights key={course.university.id} universityId={course.university.id} universityName={course.university.name} />
         <div className="mt-5 flex flex-col gap-2">
-          {url ? (
-            <a href={url} target="_blank" rel="noopener noreferrer" data-testid="link-official-course"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[hsl(var(--sic-navy))] text-sm font-semibold text-white hover:bg-[hsl(var(--sic-teal))]">
-              Official course page <ExternalLink className="h-4 w-4" aria-hidden />
-            </a>
-          ) : null}
+<Link href={`/toolkit/courses/${course.id}`} data-testid="link-view-details"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[hsl(var(--sic-navy))] text-sm font-semibold text-white hover:bg-[hsl(var(--sic-teal))]">
+            View details <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
           <button type="button" onClick={onToggleShortlist} aria-pressed={shortlisted} data-testid="button-detail-shortlist"
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[hsl(var(--sic-line))] text-sm font-semibold hover:border-[hsl(var(--sic-teal))]">
             {shortlisted ? <BookmarkCheck className="h-4 w-4" aria-hidden /> : <Bookmark className="h-4 w-4" aria-hidden />}
             {shortlisted ? "On your shortlist" : "Add to shortlist"}
           </button>
         </div>
-        <p className="mt-4 text-xs text-[hsl(var(--sic-muted))]">Fees are shown exactly as published by the institution, in their original currency and period. Always confirm on the official page.</p>
+        <p className="mt-4 text-xs text-[hsl(var(--sic-muted))]">Fees are shown exactly as published by the institution, in their original currency and period. Always confirm with the university.</p>
       </div>
     </section>
   );

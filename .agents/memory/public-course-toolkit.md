@@ -21,6 +21,20 @@ rather than use a separate visual identity.
 **How to apply:** Reuse the portal's shared typography and brand colours when
 styling public course browsing.
 
+Place course keyword search inside the left filter sidebar, not the hero.
+
+**Why:** The user requested moving the header search box into the filters.
+
+**How to apply:** Keep it in the Filters panel on mobile as well.
+
+Toolkit filter dropdowns must support typing within a single control.
+
+**Why:** The user requested searchable dropdowns and questioned the duplicated
+university search box plus select.
+
+**How to apply:** Use one searchable selection control per filter, not a separate
+search input above a native dropdown.
+
 Visitors opening the website's main link should land on the public toolkit,
 not the staff sign-in page.
 
@@ -58,6 +72,14 @@ university results opening a full public university page with Courses and
 Key Insights tabs, rather than a side panel.
 
 Public Key Insights must match the existing admin card design.
+
+For course browsing, keep Key Insights on the full course page, not in the
+compact course preview/card panel. The full university Insights tab remains.
+
+**Why:** The user explicitly requested removing insights from the preview panel
+and showing them on the full course page.
+
+**How to apply:** Keep preview details compact; retain guidance on full pages.
 
 **Why:** The user explicitly requested full university pages and the same
 Key Insights design shown when staff add insights.

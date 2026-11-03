@@ -32,7 +32,7 @@ export type CourseResult = {
 export type SearchResponse = { total: number; page: number; limit: number; results: CourseResult[] };
 export type OptionsResponse = {
   countries: string[];
-  universities: { id: number; name: string }[];
+  universities: { id: number; name: string; country?: string | null; city?: string | null }[];
   degree_levels?: string[];
   intake_months?: string[];
   currencies?: string[];

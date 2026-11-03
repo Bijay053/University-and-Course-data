@@ -31,21 +31,23 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("public degrees page", () => {
-  it("finds universities by name and applies the selected university", async () => {
+  it("picks a university from one searchable dropdown", async () => {
     render(<DegreesPage />);
-    await screen.findByRole("option", { name: "Harbour University" });
-    const search = screen.getByRole("searchbox", { name: "Search universities" });
-    fireEvent.change(search, { target: { value: "HARBOUR" } });
-    fireEvent.click(screen.getByRole("button", { name: "Harbour University" }));
+    await screen.findByTestId("card-course-1");
+    expect(screen.queryByTestId("input-university-search")).toBeNull();
+    await waitFor(() => expect((screen.getByTestId("select-university") as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId("select-university"));
+    const filter = screen.getByTestId("select-university-filter");
+    fireEvent.change(filter, { target: { value: "missing university" } });
+    expect(screen.getByText("No universities found")).toBeTruthy();
+    fireEvent.change(filter, { target: { value: "HARBOUR" } });
+    fireEvent.click(screen.getByRole("option", { name: "Harbour University" }));
     await waitFor(() => expect(calls.some((url) => url.includes("university_id=9"))).toBe(true));
-    expect((screen.getByTestId("select-university") as HTMLSelectElement).value).toBe("9");
-    expect((search as HTMLInputElement).value).toBe("");
+    expect(screen.getByTestId("select-university").getAttribute("data-value")).toBe("9");
+    expect(screen.getByTestId("select-university").textContent).toBe("Harbour University");
     expect(await screen.findByText("Scholarship: 20% for eligible applicants")).toBeTruthy();
-    fireEvent.change(search, { target: { value: "missing university" } });
-    expect(screen.getByText("No universities found.")).toBeTruthy();
     fireEvent.click(screen.getByTestId("button-clear-filters"));
-    expect((search as HTMLInputElement).value).toBe("");
-    expect((screen.getByTestId("select-university") as HTMLSelectElement).value).toBe("");
+    expect(screen.getByTestId("select-university").getAttribute("data-value")).toBe("");
   });
 
   it("renders results, sets metadata and shows honest detail", async () => {
@@ -55,10 +57,13 @@ describe("public degrees page", () => {
     expect(screen.queryByTestId("text-fee-2")).toBeNull();
     fireEvent.click(screen.getByTestId("button-select-course-2"));
     const panels = screen.getAllByTestId("panel-detail");
+    expect(within(panels[0]).getByTestId("link-view-details").getAttribute("href")).toBe("/toolkit/courses/2");
     expect(within(panels[0]).queryByTestId("link-official-course")).toBeNull();
     fireEvent.click(screen.getByTestId("button-select-course-1"));
-    expect(screen.getAllByTestId("link-official-course")[0].getAttribute("href")).toBe("https://harbour.example.edu/msc");
-    await waitFor(() => expect(screen.getAllByText("Scholarship: 20% for eligible applicants").length).toBeGreaterThan(0));
+    expect(screen.getAllByTestId("link-view-details")[0].getAttribute("href")).toBe("/toolkit/courses/1");
+    expect(screen.queryByTestId("link-official-course")).toBeNull();
+    expect(within(panels[0]).queryByTestId("section-insights")).toBeNull();
+    expect(calls.some((url) => url.endsWith("/insights"))).toBe(false);
   });
 
   it("sends currency independently and only enables fee sort with a currency", async () => {
@@ -66,8 +71,10 @@ describe("public degrees page", () => {
     await screen.findByTestId("card-course-1");
     const feeOpt = screen.getByRole("option", { name: /Fee amount, low to high/ }) as HTMLOptionElement;
     expect(feeOpt.disabled).toBe(true);
-    await waitFor(() => expect(screen.getAllByRole("option", { name: "GBP" }).length).toBeGreaterThan(0));
-    fireEvent.change(screen.getAllByTestId("select-budget-currency")[0], { target: { value: "GBP" } });
+    await waitFor(() => expect((screen.getByTestId("select-budget-currency") as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId("select-budget-currency"));
+    fireEvent.change(screen.getByTestId("select-budget-currency-filter"), { target: { value: "gb" } });
+    fireEvent.click(screen.getByRole("option", { name: "GBP" }));
     await waitFor(() => expect(calls.some((u) => u.includes("currency=GBP") && !u.includes("fee_max"))).toBe(true));
     expect((screen.getByRole("option", { name: /Fee amount, low to high/ }) as HTMLOptionElement).disabled).toBe(false);
     fireEvent.change(screen.getByTestId("select-sort"), { target: { value: "fee_asc" } });
@@ -115,5 +122,77 @@ describe("public degrees page", () => {
     expect((screen.getByTestId("input-university-search") as HTMLInputElement).value).toBe("harbour");
     expect(calls.some((u) => u.includes("/api/search/courses"))).toBe(false);
     expect(window.location.search).toBe("?mode=universities&uq=harbour");
+  });
+
+  describe("university directory location filters", () => {
+    const unis = [
+      { id: 9, name: "Harbour University", country: "Australia", city: "Sydney" },
+      { id: 10, name: "Harbour Institute", country: "Australia", city: "Melbourne" },
+      { id: 11, name: "Lakeside College", country: "Canada", city: "Toronto" },
+      { id: 12, name: "Coastal Academy", country: "Australia", city: "  " },
+      { id: 13, name: "Ridge University", country: "Unknown", city: null },
+    ];
+    beforeEach(() => {
+      vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+        const url = String(input); calls.push(url);
+        const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
+        if (url.includes("/api/search/options")) return json({ countries: [], universities: unis });
+        return json({ total: 0, page: 1, limit: 12, results: [] });
+      }));
+    });
+    const country = () => ({ value: screen.getByTestId("select-university-country").getAttribute("data-value") });
+    const city = () => ({ value: screen.getByTestId("select-university-city").getAttribute("data-value") });
+    const choices = (id: string) => {
+      fireEvent.click(screen.getByTestId(id));
+      const out = screen.getAllByRole("option").map((o) => o.textContent);
+      fireEvent.keyDown(screen.getByTestId(`${id}-filter`), { key: "Escape" });
+      return out;
+    };
+    const pick = (id: string, label: string) => {
+      fireEvent.click(screen.getByTestId(id));
+      fireEvent.click(screen.getByRole("option", { name: label }));
+    };
+    const ids = () => screen.queryAllByTestId(/^card-university-\d+$/).map((el) => el.getAttribute("data-testid"));
+
+    it("shows clean locations, derives choices and combines name, country and city", async () => {
+      window.history.replaceState(null, "", "/toolkit?mode=universities");
+      render(<DegreesPage />);
+      await screen.findByTestId("card-university-9");
+      expect(screen.getByTestId("text-university-location-9").textContent).toBe("Sydney, Australia");
+      expect(screen.getByTestId("text-university-location-12").textContent).toBe("Australia");
+      expect(screen.queryByTestId("text-university-location-13")).toBeNull();
+      expect(choices("select-university-country")).toEqual(["All countries", "Australia", "Canada"]);
+      pick("select-university-country", "Australia");
+      expect(choices("select-university-city")).toEqual(["All cities in Australia", "Melbourne", "Sydney"]);
+      expect(ids()).toEqual(["card-university-9", "card-university-10", "card-university-12"]);
+      fireEvent.change(screen.getByTestId("input-university-search"), { target: { value: "harbour" } });
+      pick("select-university-city", "Melbourne");
+      expect(ids()).toEqual(["card-university-10"]);
+      expect(screen.getByTestId("text-university-count").textContent).toBe("1 of 5 universities");
+      await waitFor(() => expect(window.location.search).toBe("?mode=universities&uq=harbour&ucountry=Australia&ucity=Melbourne"));
+      pick("select-university-country", "Canada");
+      expect(city().value).toBe("");
+      expect(screen.getByTestId("state-university-empty")).toBeTruthy();
+      fireEvent.click(screen.getByTestId("button-university-empty-clear"));
+      expect(ids()).toHaveLength(5);
+      expect(country().value).toBe("");
+      await waitFor(() => expect(window.location.search).toBe("?mode=universities"));
+    });
+
+    it("restores country and city from the URL and resets them", async () => {
+      window.history.replaceState(null, "", "/toolkit?mode=universities&ucountry=Australia&ucity=Sydney");
+      render(<DegreesPage />);
+      await screen.findByTestId("card-university-9");
+      expect(country().value).toBe("Australia");
+      expect(city().value).toBe("Sydney");
+      expect(ids()).toEqual(["card-university-9"]);
+      expect(screen.getByTestId("card-university-9").getAttribute("href")).toBe("/toolkit/universities/9");
+      fireEvent.click(screen.getByTestId("chip-university-city"));
+      expect(ids()).toHaveLength(3);
+      fireEvent.click(screen.getByTestId("button-reset-university-filters"));
+      expect(ids()).toHaveLength(5);
+      fireEvent.click(screen.getByTestId("tab-courses"));
+      await waitFor(() => expect(window.location.search).not.toContain("ucountry"));
+    });
   });
 });

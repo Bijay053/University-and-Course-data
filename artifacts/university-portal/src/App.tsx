@@ -24,6 +24,7 @@ import CourseDetail from "@/pages/course-detail";
 import Login from "@/pages/login";
 import DegreesPage from "@/pages/degrees";
 import PublicUniversityPage from "@/pages/public-university";
+import PublicCoursePage from "@/pages/public-course";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import UsersPage from "@/pages/users";
@@ -66,6 +67,7 @@ function Router() {
     <Switch>
       <Route path="/toolkit" component={DegreesPage} />
       <Route path="/toolkit/universities/:id" component={PublicUniversityPage} />
+      <Route path="/toolkit/courses/:id" component={PublicCoursePage} />
       <Route path="/login" component={Login} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />

@@ -94,6 +94,9 @@ async def test_public_search_currency_budget_visibility_and_comparison(hsu_datab
         assert [c["id"] for c in response.json()["results"]] == [ids[0], ids[5]]
         options = (await client.get("/api/search/options")).json()
         assert options["currencies"] == ["AUD", "GBP"]
+        university_option = next(u for u in options["universities"] if u["id"] == uni_id)
+        assert university_option["country"] == "United Kingdom"
+        assert university_option["city"] == "London"
         comparison = await client.get("/api/search/compare",
                                       params={"ids": ",".join(map(str, ids))[:100]})
         assert comparison.status_code == 400  # maximum five enforced

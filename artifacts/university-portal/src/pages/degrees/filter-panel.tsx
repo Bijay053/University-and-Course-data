@@ -1,11 +1,14 @@
 import { X } from "lucide-react";
-import { useState } from "react";
+import { SearchableSelect } from "./searchable-select";
 import { type DegreeFilters, type OptionsResponse } from "./lib";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const selectCls = "w-full h-10 rounded-lg border border-[hsl(var(--sic-line))] bg-white/90 px-3 text-sm text-[hsl(var(--sic-ink))]";
 
 type Props = {
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onSearchSubmit: () => void;
   filters: DegreeFilters;
   options: OptionsResponse | null;
   optionsError: boolean;
@@ -24,11 +27,9 @@ function Section({ title, id, children }: { title: string; id: string; children:
   );
 }
 
-export function FilterPanel({ filters, options, optionsError, onRetryOptions, onChange, onClear, activeCount }: Props) {
-  const [universityQuery, setUniversityQuery] = useState("");
-  const matchingUniversities = (options?.universities ?? []).filter((u) =>
-    u.name.toLocaleLowerCase().includes(universityQuery.trim().toLocaleLowerCase()),
-  );
+export function FilterPanel({ searchValue, onSearchChange, onSearchSubmit, filters, options, optionsError, onRetryOptions, onChange, onClear, activeCount }: Props) {
+  const strOpts = (xs: string[] | undefined) => (xs ?? []).map((x) => ({ value: x, label: x }));
+  const resetFeeSort = filters.sort === "fee_asc" || filters.sort === "fee_desc" ? "relevance" : filters.sort;
   const months = options?.intake_months?.length ? options.intake_months : MONTHS;
   const currencies = options?.currencies ?? [];
   const budgetIncomplete = !!filters.budgetMax.trim() && !filters.budgetCurrency;
@@ -36,11 +37,20 @@ export function FilterPanel({ filters, options, optionsError, onRetryOptions, on
     <div className="space-y-4" data-testid="panel-filters">
       <div className="flex items-center justify-between">
         <h2 className="sic-display text-lg">Refine</h2>
-        <button type="button" onClick={() => { setUniversityQuery(""); onClear(); }} disabled={activeCount === 0 && !universityQuery} data-testid="button-clear-filters"
+        <button type="button" onClick={onClear} disabled={activeCount === 0} data-testid="button-clear-filters"
           className="text-sm font-medium text-[hsl(var(--sic-teal))] disabled:text-[hsl(var(--sic-muted))]/60 hover:underline">
           Clear all{activeCount ? ` (${activeCount})` : ""}
         </button>
       </div>
+      <form role="search" aria-label="Course search" onSubmit={(event) => { event.preventDefault(); onSearchSubmit(); }} className="space-y-2">
+        <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-[hsl(var(--sic-muted))]">
+          Search courses
+          <input type="search" value={searchValue} onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Course name or subject" data-testid="input-search"
+            className={`${selectCls} mt-2 font-normal normal-case tracking-normal`} />
+        </label>
+        <button type="submit" data-testid="button-search" className="h-10 w-full rounded-lg bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90">Search</button>
+      </form>
       {optionsError && (
         <div role="alert" className="rounded-lg bg-[hsl(var(--sic-amber))]/10 p-3 text-sm">
           Filter lists could not be loaded.{" "}
@@ -48,44 +58,17 @@ export function FilterPanel({ filters, options, optionsError, onRetryOptions, on
         </div>
       )}
       <Section title="Destination country" id="f-country">
-        <select aria-labelledby="f-country" className={selectCls} value={filters.country} data-testid="select-country"
-          onChange={(e) => onChange({ country: e.target.value })}>
-          <option value="">Any country</option>
-          {(options?.countries ?? []).map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <SearchableSelect label="Destination country" testId="select-country" anyLabel="Any country" value={filters.country}
+          options={strOpts(options?.countries)} onChange={(v) => onChange({ country: v })} searchPlaceholder="Type a country" emptyText="No countries found" />
       </Section>
       <Section title="University" id="f-uni">
-        <input type="search" aria-label="Search universities" placeholder="Search universities…"
-          className={selectCls} value={universityQuery} data-testid="input-university-search"
-          onChange={(e) => setUniversityQuery(e.target.value)} />
-        {universityQuery.trim() && (
-          <div className="max-h-48 overflow-y-auto rounded-lg border border-[hsl(var(--sic-line))] bg-white">
-            {matchingUniversities.map((u) => (
-              <button key={u.id} type="button"
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-[hsl(var(--sic-teal-soft))]"
-                onClick={() => { onChange({ universityId: String(u.id) }); setUniversityQuery(""); }}>
-                {u.name}
-              </button>
-            ))}
-            {!matchingUniversities.length && (
-              <p role="status" className="px-3 py-2 text-sm text-[hsl(var(--sic-muted))]">
-                {options ? "No universities found." : "University list is not available yet."}
-              </p>
-            )}
-          </div>
-        )}
-        <select aria-labelledby="f-uni" className={selectCls} value={filters.universityId} data-testid="select-university"
-          onChange={(e) => onChange({ universityId: e.target.value })}>
-          <option value="">Any university</option>
-          {(options?.universities ?? []).map((u) => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
-        </select>
+        <SearchableSelect label="University" testId="select-university" anyLabel="Any university" value={filters.universityId}
+          options={(options?.universities ?? []).map((u) => ({ value: String(u.id), label: u.name }))}
+          onChange={(v) => onChange({ universityId: v })} searchPlaceholder="Type a university" emptyText={options ? "No universities found" : "University list is not available yet"} />
       </Section>
       <Section title="Degree level" id="f-level">
-        <select aria-labelledby="f-level" className={selectCls} value={filters.degreeLevel} data-testid="select-degree-level"
-          onChange={(e) => onChange({ degreeLevel: e.target.value })}>
-          <option value="">Any level</option>
-          {(options?.degree_levels ?? []).map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
+        <SearchableSelect label="Degree level" testId="select-degree-level" anyLabel="Any level" value={filters.degreeLevel}
+          options={strOpts(options?.degree_levels)} onChange={(v) => onChange({ degreeLevel: v })} searchPlaceholder="Type a level" emptyText="No levels found" />
       </Section>
       <Section title="Intake month" id="f-intake">
         <div className="grid grid-cols-3 gap-1.5" role="group" aria-labelledby="f-intake">
@@ -104,12 +87,9 @@ export function FilterPanel({ filters, options, optionsError, onRetryOptions, on
       <Section title="Fee currency and budget" id="f-budget">
         <p className="text-xs text-[hsl(var(--sic-muted))]">Pick a currency to see only fees published in it. Nothing is converted. Add an amount to cap the budget.</p>
         <div className="grid grid-cols-[96px_1fr] gap-2">
-          <label className="sr-only" htmlFor="budget-currency">Budget currency</label>
-          <select id="budget-currency" className={selectCls} value={filters.budgetCurrency} data-testid="select-budget-currency"
-            onChange={(e) => onChange(e.target.value ? { budgetCurrency: e.target.value } : { budgetCurrency: "", sort: filters.sort === "fee_asc" || filters.sort === "fee_desc" ? "relevance" : filters.sort })} disabled={!currencies.length}>
-            <option value="">{currencies.length ? "Any" : "None"}</option>
-            {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
+<SearchableSelect label="Budget currency" testId="select-budget-currency" anyLabel={currencies.length ? "Any" : "None"} value={filters.budgetCurrency}
+            options={strOpts(currencies)} disabled={!currencies.length} searchPlaceholder="Code" emptyText="None"
+            onChange={(v) => onChange(v ? { budgetCurrency: v } : { budgetCurrency: "", sort: resetFeeSort })} />
           <label className="sr-only" htmlFor="budget-max">Maximum fee amount</label>
           <input id="budget-max" type="number" inputMode="decimal" min={0} placeholder="Max fee amount"
             className={selectCls} value={filters.budgetMax} data-testid="input-budget-max"
@@ -118,7 +98,7 @@ export function FilterPanel({ filters, options, optionsError, onRetryOptions, on
         {budgetIncomplete && <p className="text-xs text-[hsl(var(--sic-amber))]" role="status">Choose a currency to apply this amount.</p>}
         {(filters.budgetMax || filters.budgetCurrency) && (
           <button type="button" className="inline-flex items-center gap-1 text-xs text-[hsl(var(--sic-muted))] hover:text-[hsl(var(--sic-ink))]"
-            onClick={() => onChange({ budgetMax: "", budgetCurrency: "", sort: filters.sort === "fee_asc" || filters.sort === "fee_desc" ? "relevance" : filters.sort })} data-testid="button-clear-budget">
+            onClick={() => onChange({ budgetMax: "", budgetCurrency: "", sort: resetFeeSort })} data-testid="button-clear-budget">
             <X className="h-3 w-3" aria-hidden /> Remove currency and budget
           </button>
         )}

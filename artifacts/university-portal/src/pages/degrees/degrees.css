@@ -31,6 +31,9 @@
 .sic-degrees form[role="search"] input:focus-visible {
   outline: none;
 }
+.sic-degrees .sic-select-search input:focus-visible {
+  outline: none;
+}
 /* Cover the browser's autofill paint without affecting selection or the caret. */
 .sic-degrees form[role="search"] input {
   background-color: #fff;

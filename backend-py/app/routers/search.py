@@ -906,7 +906,7 @@ async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> Search
             .all()
         )
         unis = (
-            await db.execute(text("SELECT id, name FROM universities ORDER BY name"))
+            await db.execute(text("SELECT id, name, country, city FROM universities ORDER BY name"))
         ).mappings().all()
         degree_levels = (
             (

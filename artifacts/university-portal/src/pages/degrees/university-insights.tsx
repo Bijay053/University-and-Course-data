@@ -6,8 +6,8 @@ import { InsightCardsGrid, type InsightCard } from "@/components/insights/insigh
 type Insight = { id: number; country: string; text: string; updated_at: string | null; parsed_data?: InsightCard[] | null };
 
 /** Public, read-only Key Insights: same card design as the admin view, without edit controls. */
-export function UniversityInsights({ universityId, universityName, compact = false }: {
-  universityId: number; universityName: string; compact?: boolean;
+export function UniversityInsights({ universityId, universityName, compact = false, hideEmpty = false }: {
+  universityId: number; universityName: string; compact?: boolean; hideEmpty?: boolean;
 }) {
   const [state, setState] = useState<{ id: number; notes: Insight[]; error: boolean } | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -36,6 +36,7 @@ export function UniversityInsights({ universityId, universityName, compact = fal
 
   if (current && !current.error && current.notes.length === 0) return null;
 
+  if (hideEmpty && current && !current.error && current.notes.length === 0) return null;
   return (
     <section aria-label={`Key Insights — ${universityName}`} className={compact ? "my-5 rounded-xl border border-[hsl(var(--sic-line))] bg-white p-4" : ""} data-testid="section-insights">
       {compact && <><h3 className="sic-display text-lg">Key Insights</h3><p className="mb-3 text-sm text-[hsl(var(--sic-muted))]">{universityName}</p></>}
