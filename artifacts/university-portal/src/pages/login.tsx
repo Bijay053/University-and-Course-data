@@ -1,28 +1,61 @@
-import { useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { Eye, EyeOff } from "lucide-react";
-import { useAuth } from "@/context/auth";
+import { useAuth, type LoginChallenge } from "@/context/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, verifyOtp } = useAuth();
   const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [challenge, setChallenge] = useState<LoginChallenge | null>(null);
+  const [code, setCode] = useState("");
+  const [resendWait, setResendWait] = useState(0);
+
+  useEffect(() => {
+    if (!challenge) return;
+    const timer = window.setInterval(() => setResendWait((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [challenge]);
+
+  async function sendCode() {
+    const next = await login(email, password);
+    setChallenge(next);
+    setResendWait(next.resend_after);
+    setCode("");
+  }
+
+  async function resendCode() {
+    setError(null);
+    setLoading(true);
+    try {
+      await sendCode();
+    } catch (err) {
+      setError((err as Error).message || "Could not resend your code.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await login(email, password);
-      navigate("/");
+      if (challenge) {
+        await verifyOtp(challenge.challenge_token, code);
+        setPassword("");
+        navigate("/");
+      } else {
+        await sendCode();
+      }
     } catch (err) {
       setError((err as Error).message || "Login failed. Check your credentials.");
     } finally {
@@ -44,11 +77,14 @@ export default function Login() {
           </div>
           <div>
             <CardTitle className="text-xl">Study Info Centre</CardTitle>
-            <CardDescription className="text-sm mt-1">Admin Portal — Sign in to continue</CardDescription>
+            <CardDescription className="text-sm mt-1">
+              {challenge ? `Enter the code sent to ${challenge.masked_email}` : "Admin Portal — Email verification required"}
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {!challenge && <>
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -93,14 +129,34 @@ export default function Login() {
                 </button>
               </div>
             </div>
+            </>}
+            {challenge && <div className="space-y-1.5">
+              <Label htmlFor="verification-code">Email verification code</Label>
+              <Input
+                id="verification-code" inputMode="numeric" autoComplete="one-time-code"
+                pattern="[0-9]{6}" maxLength={6} minLength={6} required autoFocus
+                value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
+                placeholder="6-digit code" className="text-center text-lg tracking-[0.25em]"
+              />
+              <p className="text-xs text-muted-foreground">Expires in 10 minutes. Check your spam folder too.</p>
+            </div>}
             {error && (
-              <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+              <p role="alert" className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
                 {error}
               </p>
             )}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in…" : "Sign in"}
+              {loading ? "Please wait…" : challenge ? "Verify and sign in" : "Send verification code"}
             </Button>
+            {challenge && <div className="space-y-2 text-center">
+              <Button type="button" variant="outline" className="w-full" disabled={loading || resendWait > 0} onClick={resendCode}>
+                {resendWait > 0 ? `Resend code in ${resendWait}s` : "Resend code"}
+              </Button>
+              <button type="button" disabled={loading} className="text-sm text-primary hover:underline"
+                onClick={() => { setChallenge(null); setCode(""); setPassword(""); setError(null); }}>
+                Use another account
+              </button>
+            </div>}
           </form>
           <p className="mt-5 border-t pt-4 text-center text-sm text-muted-foreground">
             Looking for a course?{" "}

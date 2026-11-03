@@ -183,7 +183,7 @@ def test_authenticated_status_and_reloaded_job_preserve_mode(client_with_uni, st
     client, db = client_with_uni
     app.dependency_overrides.pop(get_current_user)
     token = jwt.encode(
-        {"sub": "review-reader", "permissions": ["scraping.view"]},
+        {"sub": "review-reader", "permissions": ["scraping.view"], "otp_verified": True},
         settings.session_secret, algorithm="HS256",
     )
     headers = {"Authorization": f"Bearer {token}"}

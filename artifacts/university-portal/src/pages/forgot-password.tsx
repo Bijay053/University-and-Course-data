@@ -11,7 +11,6 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
-  const [debugUrl, setDebugUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
@@ -26,10 +25,14 @@ export default function ForgotPassword() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data?.detail || "Request failed");
+        const detail = data?.detail;
+        throw new Error(
+          typeof detail === "string"
+            ? detail
+            : "Unable to request a password reset. Please try again.",
+        );
       }
       setDone(true);
-      setDebugUrl(typeof data.debug_reset_url === "string" ? data.debug_reset_url : null);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -52,7 +55,7 @@ export default function ForgotPassword() {
           <div>
             <CardTitle className="text-xl">Forgot password</CardTitle>
             <CardDescription className="text-sm mt-1">
-              Enter your account email and we'll send a reset link.
+              Enter your account email to request password-reset instructions.
             </CardDescription>
           </div>
         </CardHeader>
@@ -60,15 +63,10 @@ export default function ForgotPassword() {
           {done ? (
             <div className="space-y-4 text-sm">
               <div className="rounded-md bg-emerald-50 text-emerald-900 px-3 py-3 border border-emerald-200">
-                If an account exists for that email, a reset link is on its way.
-                Check your inbox (and spam folder).
+                If an active account uses this email, check your inbox and spam
+                folder for reset instructions. If nothing arrives, contact your
+                portal administrator.
               </div>
-              {debugUrl && (
-                <div className="rounded-md bg-amber-50 text-amber-900 px-3 py-3 border border-amber-200 break-all">
-                  <p className="font-medium mb-1">Dev mode (SMTP not configured):</p>
-                  <a className="underline text-primary" href={debugUrl}>{debugUrl}</a>
-                </div>
-              )}
               <Link href="/login" className="text-primary hover:underline block text-center">
                 ← Back to sign in
               </Link>
@@ -87,7 +85,7 @@ export default function ForgotPassword() {
                 />
               </div>
               {error && (
-                <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+                <p role="alert" className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
                   {error}
                 </p>
               )}

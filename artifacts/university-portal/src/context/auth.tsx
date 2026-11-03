@@ -12,6 +12,13 @@ interface User {
   role: string;
 }
 
+export interface LoginChallenge {
+  challenge_token: string;
+  masked_email: string;
+  expires_in: number;
+  resend_after: number;
+}
+
 interface AuthState {
   user: User | null;
   loading: boolean;
@@ -19,7 +26,8 @@ interface AuthState {
   permissions: Set<string>;
   can: (key: string) => boolean;
   canAny: (keys: string[]) => boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginChallenge>;
+  verifyOtp: (challengeToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -31,7 +39,8 @@ const AuthContext = createContext<AuthState>({
   permissions: new Set(),
   can: () => false,
   canAny: () => false,
-  login: async () => {},
+  login: async () => { throw new Error("Authentication is unavailable"); },
+  verifyOtp: async () => {},
   logout: async () => {},
   refresh: async () => {},
 });
@@ -86,12 +95,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [forceLogout]);
 
-  async function login(email: string, password: string) {
-    const res = await fetch(`${BASE}/api/auth/login`, {
+  async function authRequest(path: string, body: Record<string, string>) {
+    const res = await fetch(`${BASE}/api/auth/${path}`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(body),
     });
     let data: Record<string, unknown> = {};
     try {
@@ -113,9 +122,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           : "Login failed";
       throw new Error(message);
     }
-    if (typeof data.token === "string") {
-      setAuthToken(data.token);
+    return data;
+  }
+
+  async function login(email: string, password: string): Promise<LoginChallenge> {
+    const data = await authRequest("login", { email, password });
+    if (data.otp_required !== true || typeof data.challenge_token !== "string") {
+      throw new Error("Email verification is required. Please reload and try again.");
     }
+    // A challenge is not an authenticated session and stays only in component memory.
+    setAuthToken(null);
+    setUser(null);
+    setPermissions(new Set());
+    setIsSuperAdmin(false);
+    return {
+      challenge_token: data.challenge_token,
+      masked_email: String(data.masked_email ?? "your account email"),
+      expires_in: Number(data.expires_in ?? 600),
+      resend_after: Number(data.resend_after ?? 60),
+    };
+  }
+
+  async function verifyOtp(challengeToken: string, code: string) {
+    const data = await authRequest("verify-otp", { challenge_token: challengeToken, code });
+    if (typeof data.token !== "string" || !data.user) {
+      throw new Error("Verification did not complete. Please try again.");
+    }
+    setAuthToken(data.token);
     setUser((data.user as User) ?? null);
     setPermissions(new Set<string>(Array.isArray(data.permissions) ? data.permissions : []));
     setIsSuperAdmin(Boolean(data.is_super_admin));
@@ -146,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, isSuperAdmin, permissions, can, canAny, login, logout, refresh }}
+      value={{ user, loading, isSuperAdmin, permissions, can, canAny, login, verifyOtp, logout, refresh }}
     >
       {children}
     </AuthContext.Provider>

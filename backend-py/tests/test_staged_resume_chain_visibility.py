@@ -190,7 +190,7 @@ async def test_continuation_status_keeps_parent_rows_visible():
             path = f"/api/scrape/status/{child_job_id}"
             unauthenticated = await client.get(path)
             token = jwt.encode(
-                {"sub": "review-reader", "permissions": ["scraping.view"]},
+                {"sub": "review-reader", "permissions": ["scraping.view"], "otp_verified": True},
                 settings.session_secret, algorithm="HS256",
             )
             response = await client.get(path, headers={"Authorization": f"Bearer {token}"})

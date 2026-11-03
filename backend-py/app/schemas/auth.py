@@ -26,6 +26,19 @@ class LoginResponse(BaseModel):
     token: str | None = None
 
 
+class LoginChallengeResponse(BaseModel):
+    otp_required: bool = True
+    challenge_token: str
+    masked_email: str
+    expires_in: int = 600
+    resend_after: int = 60
+
+
+class VerifyLoginBody(BaseModel):
+    challenge_token: str = Field(..., min_length=32, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    code: str = Field(..., min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
+
+
 class MeResponse(BaseModel):
     user: dict | None = None
     permissions: list[str] = []
@@ -46,7 +59,6 @@ class ResetPasswordBody(BaseModel):
 class GenericOk(BaseModel):
     ok: bool = True
     message: str | None = None
-    debug_reset_url: str | None = None
 
 
 # ---------------------------------------------------------------------------

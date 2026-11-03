@@ -37,6 +37,8 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session"
         ) from exc
     exp = payload.get("exp")
+    if payload.get("otp_verified") is not True:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email verification required")
     if exp and datetime.now(timezone.utc).timestamp() > exp:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     return payload
@@ -51,6 +53,7 @@ async def get_optional_user(
     if not token:
         return None
     try:
-        return jwt.decode(token, settings.session_secret, algorithms=["HS256"])
+        payload = jwt.decode(token, settings.session_secret, algorithms=["HS256"])
+        return payload if payload.get("otp_verified") is True else None
     except JWTError:
         return None

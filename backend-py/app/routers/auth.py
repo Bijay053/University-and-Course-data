@@ -2,15 +2,17 @@
 
 Endpoints:
 
-  POST /api/auth/login              { email, password }   -> sets `session` cookie
+   POST /api/auth/login              { email, password }   -> email OTP challenge, never a session
+   POST /api/auth/verify-otp         { challenge_token, code } -> verified session
   POST /api/auth/logout                                   -> clears cookie
   GET  /api/auth/me                                       -> { user, permissions, is_super_admin }
-  POST /api/auth/forgot-password    { email }             -> always 200 (no enumeration)
+  POST /api/auth/forgot-password    { email }             -> generic acknowledgement or global delivery-unavailable error
   POST /api/auth/reset-password     { token, new_password }
 """
 from __future__ import annotations
 
 import logging
+import hmac
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -29,12 +31,15 @@ from app.schemas.auth import (
     GenericOk,
     LoginBody,
     LoginResponse,
+    LoginChallengeResponse,
+    VerifyLoginBody,
     MeResponse,
     ResetPasswordBody,
 )
 from app.services.email import _is_configured as smtp_is_configured
 from app.services.email import send_email
 from app.services.passwords import hash_password, verify_password
+from app.services import login_otp
 
 log = logging.getLogger("uniportal.auth")
 router = APIRouter()
@@ -60,6 +65,7 @@ def _issue_token(payload: dict) -> str:
         **payload,
         "exp": datetime.now(timezone.utc) + timedelta(days=SESSION_DAYS),
         "iat": datetime.now(timezone.utc),
+        "otp_verified": True,
     }
     return jwt.encode(body, settings.session_secret, algorithm="HS256")
 
@@ -75,15 +81,48 @@ def _perm_keys(user: User) -> list[str]:
     return sorted(role_perms | user_perms)
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=LoginChallengeResponse)
 async def login(
-    body: LoginBody, response: Response, db: Annotated[AsyncSession, Depends(get_db)]
-) -> LoginResponse:
+    body: LoginBody, request: Request, response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> LoginChallengeResponse:
+    await login_otp.check_login_rate(request.client.host if request.client else "unknown")
     user = await _load_user_by_email(db, body.email)
     if not user or not user.is_active or not verify_password(body.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
+    if not smtp_is_configured():
+        raise HTTPException(503, "Sign-in email delivery is unavailable. Please contact the portal administrator.")
+    challenge, code = await login_otp.issue(user)
+    sent = await send_email(
+        user.email, "Your Study Info Centre sign-in code",
+        f"Your sign-in verification code is: {code}\n\n"
+        "This code expires in 10 minutes and can be used once. "
+        "If you did not request it, do not share the code and change your password.",
+    )
+    if not sent:
+        await login_otp.discard(challenge)
+        raise HTTPException(503, "Could not send your verification email. Please try again later.")
+    response.delete_cookie("session", path="/")
+    local, _, domain = user.email.partition("@")
+    return LoginChallengeResponse(
+        challenge_token=challenge, masked_email=f"{local[:1]}***@{domain}",
+    )
+
+
+@router.post("/verify-otp", response_model=LoginResponse)
+async def verify_login_otp(
+    body: VerifyLoginBody, request: Request, response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> LoginResponse:
+    proof = await login_otp.consume(body.challenge_token, body.code)
+    user = await _load_user_by_email(db, proof["email"])
+    if (
+        not user or not user.is_active or user.id != proof["user_id"]
+        or not hmac.compare_digest(login_otp.stamp(user.password_hash), proof["password_stamp"])
+    ):
+        raise HTTPException(401, "Your account changed. Please start sign-in again.")
     perms = _perm_keys(user)
     payload = _payload_for(user, perms)
     token = _issue_token(payload)
@@ -92,9 +131,7 @@ async def login(
         value=token,
         httponly=True,
         samesite="lax",
-        # HTTP-only server (plain IP, no TLS). Keep secure=False so browsers
-        # do not silently drop the cookie. Re-enable when HTTPS is configured.
-        secure=False,
+        secure=request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "").split(",")[0].strip() == "https",
         max_age=SESSION_DAYS * 24 * 3600,
         path="/",
     )
@@ -168,13 +205,20 @@ async def forgot_password(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> GenericOk:
-    """Always returns 200 to avoid leaking which emails exist."""
+    """Never expose reset credentials or whether an account exists."""
+    # Check before account lookup/token creation so this error is identical for
+    # existing, inactive and unknown addresses.
+    if not smtp_is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Password reset email is currently unavailable. Please contact the portal administrator.",
+        )
     user = await _load_user_by_email(db, body.email)
-    debug_url: str | None = None
     if user and user.is_active:
         token = secrets.token_urlsafe(32)
         expires = datetime.now(timezone.utc) + timedelta(hours=RESET_TOKEN_TTL_HOURS)
-        db.add(PasswordResetToken(token=token, user_id=user.id, expires_at=expires))
+        reset_row = PasswordResetToken(token=token, user_id=user.id, expires_at=expires)
+        db.add(reset_row)
         await db.commit()
 
         reset_url = _build_reset_url(request, token)
@@ -186,15 +230,18 @@ async def forgot_password(
             f"If you didn't request this, you can safely ignore this email.\n"
         )
         sent = await send_email(user.email, "Reset your password", body_text)
-        if not sent and not smtp_is_configured():
-            # Surface link in dev so the operator can still complete the flow.
-            debug_url = reset_url
-            log.warning("Reset link (SMTP not configured): %s", reset_url)
+        if not sent:
+            # Do not leave a usable reset credential for an undelivered email.
+            # Keep the public acknowledgement identical to unknown accounts:
+            # a transport failure must not become an account-existence oracle.
+            await db.delete(reset_row)
+            await db.commit()
+            log.warning("Password reset email was not delivered")
 
     return GenericOk(
         ok=True,
-        message="If an account exists for that address, a reset link has been sent.",
-        debug_reset_url=debug_url,
+        message="If an active account uses this address, check its inbox for reset instructions. "
+        "If no email arrives, contact the portal administrator.",
     )
 
 

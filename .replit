@@ -353,6 +353,12 @@ GITHUB_PUSH_URL = "https://github.com/Studyinfocentre/University-and-course-mana
 WLV_SEARCHSTAX_TOKEN = "d94d88f1dfd335e6bb4ef870b2c1ff29faf95bb6"
 DURHAM_SEARCHSTAX_TOKEN = "75c41a510e054668f69fae93cf05b755ba027b7c"
 LEEDSTRINITY_SEARCHSTAX_TOKEN = "877b10aff7b0b0d2d452d592169782516d929bad"
+DEFAULT_FROM_EMAIL = "noreply@studyinfocentre.com"
+SES_REGION = "ap-south-1"
+EMAIL_TRANSPORT = "smtp"
+SMTP_HOST = "email-smtp.ap-south-1.amazonaws.com"
+SMTP_PORT = "587"
+SMTP_USE_TLS = "true"
 
 [userenv.development]
 PLAYWRIGHT_NODEJS_PATH = "/home/runner/workspace/scripts/secure-browser-node.sh"
