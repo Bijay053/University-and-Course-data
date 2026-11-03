@@ -31,6 +31,10 @@
 .sic-degrees form[role="search"] input:focus-visible {
   outline: none;
 }
+/* This form also owns the label; focus belongs to its rounded field, not the form. */
+.sic-degrees form.sic-university-search:has(input:focus-visible) {
+  outline: none;
+}
 .sic-degrees .sic-select-search input:focus-visible {
   outline: none;
 }
@@ -54,4 +58,6 @@
 .sic-degrees .sic-rise { animation: sic-rise 420ms cubic-bezier(.2,.7,.2,1) both; }
 @keyframes sic-shimmer { 0% { opacity: .55 } 50% { opacity: 1 } 100% { opacity: .55 } }
 .sic-degrees .sic-skel { background: hsl(var(--sic-teal-soft)); animation: sic-shimmer 1.4s ease-in-out infinite; border-radius: 8px; }
-@media (prefers-reduced-motion: reduce) { .sic-degrees .sic-rise, .sic-degrees .sic-skel { animation: none; } }
+@keyframes sic-beta-blink { 0%, 100% { background-color: #dc2626; } 50% { background-color: #991b1b; } }
+.sic-degrees .sic-beta { animation: sic-beta-blink 1.8s ease-in-out infinite; color: #fff; }
+@media (prefers-reduced-motion: reduce) { .sic-degrees .sic-rise, .sic-degrees .sic-skel, .sic-degrees .sic-beta { animation: none; } }

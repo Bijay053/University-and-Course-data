@@ -2,6 +2,7 @@ import { useGetDashboardStats } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, GraduationCap, Award, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CourseErrorReportsPanel } from "@/components/course-error-reports-panel";
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useGetDashboardStats();
@@ -78,7 +79,7 @@ export default function Dashboard() {
         ))}
       </div>
       
-      {/* Missing charts/tables due to short effort level, but basic skeleton is here */}
+      <CourseErrorReportsPanel />
     </div>
   );
 }

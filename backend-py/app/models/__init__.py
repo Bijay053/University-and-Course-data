@@ -1,4 +1,5 @@
 from app.models.course_offering import CourseOffering
+from app.models.course_error_report import CourseErrorReport
 """Re-export every model so ``from app.models import University`` works
 everywhere (and so Alembic autogenerate sees them). Models are mapped
 column-for-column to the existing Postgres schema; we never own DDL — the

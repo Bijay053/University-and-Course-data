@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { ArrowRight, X, Bookmark, BookmarkCheck } from "lucide-react";
+import { ReportCourseErrorButton } from "@/components/report-course-error";
 import { type CourseResult, NOT_PUBLISHED, englishList, feeLines, formatDuration, formatFeeLine, locationText } from "./lib";
 
 type Props = { course: CourseResult | null; shortlisted: boolean; onToggleShortlist: () => void; onClose: () => void };
@@ -64,6 +65,7 @@ export function DetailPanel({ course, shortlisted, onToggleShortlist, onClose }:
             {shortlisted ? <BookmarkCheck className="h-4 w-4" aria-hidden /> : <Bookmark className="h-4 w-4" aria-hidden />}
             {shortlisted ? "On your shortlist" : "Add to shortlist"}
           </button>
+          <ReportCourseErrorButton key={course.id} courseId={course.id} courseName={course.course_name} universityName={course.university.name} />
         </div>
         <p className="mt-4 text-xs text-[hsl(var(--sic-muted))]">Fees are shown exactly as published by the institution, in their original currency and period. Always confirm with the university.</p>
       </div>

@@ -785,6 +785,7 @@ def test_search_options_success_response_is_unchanged():
         [{"id": 2, "name": "Alpha University"}],
         ["Bachelor", "Master"],
         ["Bachelor's degree", "Year 12"],
+        ["AUD", "GBP"],
     ])
 
     async def _db_override():
@@ -795,6 +796,7 @@ def test_search_options_success_response_is_unchanged():
 
     assert response.status_code == 200
     assert response.json() == {
+        "currencies": ["AUD", "GBP"],
         "countries": ["Australia", "United Kingdom"],
         "cities": ["London", "Sydney"],
         "universities": [{"id": 2, "name": "Alpha University"}],

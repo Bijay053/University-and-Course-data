@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.release_info import get_release_revision
+from app.routers import course_error_reports
 from app.routers import import_routes as _import_routes
 from app.routers import backup as _backup
 from app.routers import (
@@ -175,6 +176,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(universities.router, prefix="/api", tags=["universities"])
 app.include_router(courses.router, prefix="/api", tags=["courses"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(course_error_reports.router, prefix="/api/course-error-reports", tags=["course-error-reports"])
 app.include_router(reviews.router, prefix="/api", tags=["reviews"])
 app.include_router(scrape.router, prefix="/api/scrape", tags=["scrape"])
 app.include_router(api_discovery.router, prefix="/api/scrape", tags=["scrape"])

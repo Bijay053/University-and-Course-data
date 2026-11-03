@@ -73,7 +73,7 @@ export default function PublicUniversityPage() {
     if (id == null || tab !== "courses") return;
     const ac = new AbortController();
     const p = new URLSearchParams({ university_id: String(id), limit: String(PAGE_SIZE) });
-    if (q.trim()) p.set("q", q.trim());
+    if (q.trim()) p.set("course_name", q.trim());
     if (page > 1) p.set("page", String(page));
     setLoading(true); setError(false);
     fetch(`${BASE}/api/search/courses?${p}`, { signal: ac.signal })

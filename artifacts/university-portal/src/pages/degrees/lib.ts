@@ -1,3 +1,5 @@
+import { appendAcademicCredentialParams } from "../search-query";
+
 export const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 export const MAX_COMPARE = 5;
 export const PAGE_SIZE = 12;
@@ -8,6 +10,8 @@ export type Offering = {
   feeAmount: number | null; feeCurrency: string | null; feeTerm: string | null; feeYear: number | null;
 };
 export type CourseResult = {
+  matched_locations?: string[] | null;
+  matched_offerings?: Offering[] | null;
   id: number;
   course_name: string;
   university: { id: number; name: string; logo_url: string | null; city: string | null; country: string | null };
@@ -36,14 +40,23 @@ export type OptionsResponse = {
   degree_levels?: string[];
   intake_months?: string[];
   currencies?: string[];
+  qualifications?: string[];
+  grading_schemes?: { scheme: string; out_of: string[] }[];
+  english_exams?: string[];
+  intakes?: string[];
 };
 export type CompareEnglish = {
   test_type: string | null; test_name?: string | null; overall: number | null;
   listening: number | null; reading: number | null; writing: number | null; speaking: number | null;
 };
+export type Scholarship = {
+  id: number; name: string; details: string | null; eligibility_criteria: string | null;
+  amount: number | null; percentage: number | null; currency: string | null;
+};
 export type CompareCourse = Omit<CourseResult, "english_requirements"> & {
   study_mode?: string | null;
   english_requirements: CompareEnglish[];
+  scholarships?: Scholarship[] | null;
   academic_requirements: { academic_level: string | null; academic_score: number | null; score_type: string | null }[];
 };
 
@@ -51,41 +64,90 @@ export type SortKey = "relevance" | "name" | "fee_asc" | "fee_desc" | "duration_
 export const SORTS: { value: SortKey; label: string }[] = [
   { value: "relevance", label: "Best match" },
   { value: "name", label: "Course name A to Z" },
-  { value: "fee_asc", label: "Fee amount, low to high" },
-  { value: "fee_desc", label: "Fee amount, high to low" },
+  { value: "fee_asc", label: "Fee: low to high" },
+  { value: "fee_desc", label: "Fee: high to low" },
   { value: "duration_asc", label: "Shortest duration" },
   { value: "duration_desc", label: "Longest duration" },
 ];
 
 export const isFeeSort = (s: SortKey) => s === "fee_asc" || s === "fee_desc";
 
+export const DURATION_DEFAULT: [number, number] = [0, 6];
+export const DURATION_LIMIT = 10;
+export const FEE_SLIDER_MAX = 100000;
+export const FEE_INPUT_MAX = 200000;
+export const GRADING_SCHEMES = ["GPA", "Percentage"] as const;
+export const ENGLISH_EXAMS_FALLBACK = ["IELTS", "PTE", "TOEFL", "CAE", "DET"];
+export const ENGLISH_BANDS = [["eOverall", "Overall", "english_overall", "eo"], ["eReading", "Reading", "english_reading", "er"], ["eWriting", "Writing", "english_writing", "ew"], ["eListening", "Listening", "english_listening", "el"], ["eSpeaking", "Speaking", "english_speaking", "es"]] as const;
+export type EnglishBandKey = typeof ENGLISH_BANDS[number][0];
+
 export type DegreeFilters = {
   q: string; location: string; country: string; universityId: string; degreeLevel: string; intakes: string[];
-  budgetCurrency: string; budgetMax: string; sort: SortKey; page: number;
+  qualification: string; scheme: string; outOf: string; gradingScore: string;
+  englishExam: string; eOverall: string; eReading: string; eWriting: string; eListening: string; eSpeaking: string;
+  otherExam: string; durationMin: number; durationMax: number;
+  budgetCurrency: string; budgetMin: string; budgetMax: string; sort: SortKey; page: number;
 };
 export const EMPTY_FILTERS: DegreeFilters = {
   q: "", location: "", country: "", universityId: "", degreeLevel: "", intakes: [],
-  budgetCurrency: "", budgetMax: "", sort: "relevance", page: 1,
+  qualification: "", scheme: "", outOf: "", gradingScore: "",
+  englishExam: "", eOverall: "", eReading: "", eWriting: "", eListening: "", eSpeaking: "",
+  otherExam: "", durationMin: DURATION_DEFAULT[0], durationMax: DURATION_DEFAULT[1],
+  budgetCurrency: "", budgetMin: "", budgetMax: "", sort: "relevance", page: 1,
 };
 
-/** A budget applies only when both a currency and a positive amount are set. */
-export function activeBudget(f: DegreeFilters): { currency: string; max: number } | null {
-  const max = Number(f.budgetMax);
-  if (!f.budgetCurrency || !f.budgetMax.trim() || !Number.isFinite(max) || max <= 0) return null;
-  return { currency: f.budgetCurrency.toUpperCase(), max };
+const NUM = /^\d+(\.\d+)?$/;
+const posNum = (v: string) => { const t = v.trim(); return NUM.test(t) ? Number(t) : null; };
+
+/** Fee amounts apply only alongside a currency; nothing is converted across currencies. */
+export function activeBudget(f: DegreeFilters): { currency: string; min: number | null; max: number | null } | null {
+  if (!f.budgetCurrency) return null;
+  const min = posNum(f.budgetMin); const max = posNum(f.budgetMax);
+  const lo = min != null && min > 0 ? min : null;
+  const hi = max != null && max > 0 ? max : null;
+  if (lo == null && hi == null) return null;
+  return { currency: f.budgetCurrency.toUpperCase(), min: lo, max: hi != null && lo != null && hi < lo ? lo : hi };
+}
+
+/** Academic score is only meaningful once its scheme (and GPA scale) is chosen. */
+function academic(f: DegreeFilters) {
+  if (!f.qualification) return { qualification: "", scheme: "", outOf: "", gradingScore: "" };
+  const scheme = (GRADING_SCHEMES as readonly string[]).includes(f.scheme) ? f.scheme : "";
+  const outOf = scheme === "GPA" && posNum(f.outOf) ? f.outOf.trim() : "";
+  const score = posNum(f.gradingScore);
+  const cap = scheme === "Percentage" ? 100 : outOf ? Number(outOf) : null;
+  const gradingScore = cap != null && score != null && score <= cap ? f.gradingScore.trim() : "";
+  return { qualification: f.qualification, scheme, outOf, gradingScore };
+}
+
+export function countActiveFilters(f: DegreeFilters): number {
+  return [
+    f.q.trim(), f.location.trim(), f.country, f.universityId, f.degreeLevel, f.qualification, f.englishExam, f.otherExam.trim(),
+    f.intakes.length, f.durationMin !== DURATION_DEFAULT[0] || f.durationMax !== DURATION_DEFAULT[1],
+    f.budgetCurrency || f.budgetMin.trim() || f.budgetMax.trim(),
+  ].filter(Boolean).length;
 }
 
 export function buildSearchParams(f: DegreeFilters): URLSearchParams {
   const p = new URLSearchParams();
-  if (f.q.trim()) p.set("q", f.q.trim());
+  if (f.q.trim()) p.set("course_name", f.q.trim());
   if (f.location.trim()) p.set("location", f.location.trim());
   if (f.country) p.set("country", f.country);
   if (f.universityId) p.set("university_id", f.universityId);
   if (f.degreeLevel) p.set("degree_level", f.degreeLevel);
   if (f.intakes.length) p.set("intakes", f.intakes.join(","));
+  if (f.durationMin > DURATION_DEFAULT[0]) p.set("duration_years_min", String(f.durationMin));
+  if (f.durationMax < DURATION_DEFAULT[1]) p.set("duration_years_max", String(f.durationMax));
+  if (f.englishExam) {
+    p.set("english_exam", f.englishExam);
+    for (const [key, , param] of ENGLISH_BANDS) { const v = f[key].trim(); if (posNum(v) != null) p.set(param, v); }
+  }
+  appendAcademicCredentialParams(p, academic(f));
+  if (f.otherExam.trim()) p.set("other_exam", f.otherExam.trim());
   const budget = activeBudget(f);
   if (f.budgetCurrency) p.set("currency", f.budgetCurrency.toUpperCase());
-  if (budget) p.set("fee_max", String(budget.max));
+  if (budget?.min != null) p.set("fee_min", String(budget.min));
+  if (budget?.max != null) p.set("fee_max", String(budget.max));
   if (f.sort !== "relevance" && (!isFeeSort(f.sort) || f.budgetCurrency)) p.set("sort", f.sort);
   if (f.page > 1) p.set("page", String(f.page));
   p.set("limit", String(PAGE_SIZE));
@@ -100,7 +162,20 @@ export function filtersToQuery(f: DegreeFilters): string {
   if (f.universityId) p.set("university", f.universityId);
   if (f.degreeLevel) p.set("level", f.degreeLevel);
   if (f.intakes.length) p.set("intakes", f.intakes.join(","));
+  const a = academic(f);
+  if (a.qualification) p.set("qual", a.qualification);
+  if (a.scheme) p.set("scheme", a.scheme);
+  if (a.outOf) p.set("outof", a.outOf);
+  if (a.gradingScore) p.set("grade", a.gradingScore);
+  if (f.englishExam) {
+    p.set("exam", f.englishExam);
+    for (const [key, , , short] of ENGLISH_BANDS) if (posNum(f[key]) != null) p.set(short, f[key].trim());
+  }
+  if (f.otherExam.trim()) p.set("other", f.otherExam.trim());
+  if (f.durationMin !== DURATION_DEFAULT[0]) p.set("dmin", String(f.durationMin));
+  if (f.durationMax !== DURATION_DEFAULT[1]) p.set("dmax", String(f.durationMax));
   if (f.budgetCurrency) p.set("currency", f.budgetCurrency);
+  if (f.budgetMin.trim()) p.set("budgetmin", f.budgetMin.trim());
   if (f.budgetMax.trim()) p.set("budget", f.budgetMax.trim());
   if (f.sort !== "relevance") p.set("sort", f.sort);
   if (f.page > 1) p.set("page", String(f.page));
@@ -109,21 +184,38 @@ export function filtersToQuery(f: DegreeFilters): string {
 
 export function filtersFromQuery(search: string): DegreeFilters {
   const p = new URLSearchParams(search);
+  const get = (k: string) => (p.get(k) ?? "").trim();
   const sort = p.get("sort") as SortKey | null;
   const page = Number(p.get("page"));
-  const uni = p.get("university") ?? "";
-  return {
+  const uni = get("university");
+  const half = (k: string, fallback: number) => {
+    const n = posNum(get(k));
+    return n != null && n <= DURATION_LIMIT ? Math.round(n * 2) / 2 : fallback;
+  };
+  let dMin = half("dmin", DURATION_DEFAULT[0]); let dMax = half("dmax", DURATION_DEFAULT[1]);
+  if (dMin > dMax) { dMin = DURATION_DEFAULT[0]; dMax = DURATION_DEFAULT[1]; }
+  const numStr = (k: string) => (posNum(get(k)) != null ? get(k) : "");
+  const exam = get("exam").slice(0, 40);
+  const bands = Object.fromEntries(ENGLISH_BANDS.map(([key, , , short]) => [key, exam ? numStr(short) : ""])) as Record<EnglishBandKey, string>;
+  const base: DegreeFilters = {
+    ...EMPTY_FILTERS,
     q: p.get("q") ?? "",
     location: p.get("location") ?? "",
     country: p.get("country") ?? "",
     universityId: /^\d+$/.test(uni) ? uni : "",
     degreeLevel: p.get("level") ?? "",
-    intakes: (p.get("intakes") ?? "").split(",").map((s) => s.trim()).filter(Boolean),
-    budgetCurrency: (p.get("currency") ?? "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3),
-    budgetMax: /^\d+(\.\d+)?$/.test(p.get("budget") ?? "") ? (p.get("budget") as string) : "",
-    sort: sort && SORTS.some((s) => s.value === sort) && (!isFeeSort(sort) || /^[A-Z]{3}$/i.test(p.get("currency") ?? "")) ? sort : "relevance",
+    intakes: get("intakes").split(",").map((s) => s.trim()).filter(Boolean),
+    qualification: get("qual").slice(0, 120), scheme: get("scheme"), outOf: get("outof"), gradingScore: get("grade"),
+    englishExam: exam, ...bands,
+    otherExam: get("other").slice(0, 60),
+    durationMin: dMin, durationMax: dMax,
+    budgetCurrency: get("currency").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3),
+    budgetMin: numStr("budgetmin"),
+    budgetMax: numStr("budget"),
+    sort: sort && SORTS.some((s) => s.value === sort) && (!isFeeSort(sort) || /^[A-Z]{3}$/i.test(get("currency"))) ? sort : "relevance",
     page: Number.isInteger(page) && page > 1 ? page : 1,
   };
+  return { ...base, ...academic(base) };
 }
 
 export function safeHttpUrl(raw: string | null | undefined): string | null {
@@ -136,8 +228,8 @@ export function safeHttpUrl(raw: string | null | undefined): string | null {
 
 export type FeeLine = { label: string | null; amount: number | null; currency: string | null; term: string | null; year: number | null };
 
-export function feeLines(c: Pick<CourseResult, "offerings" | "international_fee" | "currency" | "fee_term" | "fee_year" | "course_location">): FeeLine[] {
-  const offs = c.offerings ?? [];
+export function feeLines(c: Pick<CourseResult, "offerings" | "matched_offerings" | "international_fee" | "currency" | "fee_term" | "fee_year" | "course_location">): FeeLine[] {
+  const offs = c.matched_offerings ?? c.offerings ?? [];
   if (offs.length) {
     return offs.map((o) => ({ label: o.location, amount: o.feeAmount, currency: o.feeCurrency, term: o.feeTerm, year: o.feeYear }));
   }
@@ -184,7 +276,7 @@ export function englishList(e: CourseResult["english_requirements"]): { exam: st
 }
 
 export function locationText(c: CourseResult): string {
-  return c.course_location || [c.university.city, c.university.country].filter(Boolean).join(", ") || NOT_PUBLISHED;
+  return c.matched_locations?.filter(Boolean).join(", ") || c.course_location || [c.university.city, c.university.country].filter(Boolean).join(", ") || NOT_PUBLISHED;
 }
 
 // ── Shortlist storage ──

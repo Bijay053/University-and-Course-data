@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import math
+from app.services.search_matching import literal_like, location_match, name_match
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -106,6 +107,7 @@ course_search_view AS MATERIALIZED (
         c.study_mode,
         c.course_website,
         c.course_location,
+        c.other_test,
         c.university_id,
         setweight(to_tsvector('simple', coalesce(c.name, '')), 'A') ||
             setweight(to_tsvector('simple', coalesce(u.name, '')), 'B')
@@ -227,6 +229,7 @@ course_search_view AS MATERIALIZED (
 async def search_courses(
     db: Annotated[AsyncSession, Depends(get_db)],
     q: str | None = None,
+    course_name: str | None = None,
     country: str | None = None,
     city: str | None = None,
     university_id: int | None = None,
@@ -234,15 +237,6 @@ async def search_courses(
     intake_month: str | None = None,
     max_fee: float | None = None,
     max_ielts: float | None = None,
-    # B5: the /search UI sends ~14 filter params that the previous
-    # implementation silently ignored. The search CTE has the columns
-    # we need for most of them (location,
-    # intakes, fee, duration_years, per-exam overall scores,
-    # category/sub_category) — they were just never wired. The ones
-    # that DO require a join (per-band English bands beyond overall,
-    # academic/grading filters, country_residence, other_exam) stay
-    # accepted-but-noop for now so the UI keeps building URLs without
-    # 422s and we can ship them in a follow-up. See bottom of handler.
     location: str | None = None,
     intakes: str | None = None,         # CSV: "Spring,Fall"
     fee_min: float | None = None,
@@ -255,17 +249,16 @@ async def search_courses(
     category: str | None = None,
     sub_category: str | None = None,
     sort: str | None = None,            # relevance|fee_asc|fee_desc|duration|name
-    # Accepted-but-noop (require english_requirements join):
-    english_reading: float | None = None,        # noqa: ARG001
-    english_writing: float | None = None,        # noqa: ARG001
-    english_listening: float | None = None,      # noqa: ARG001
-    english_speaking: float | None = None,       # noqa: ARG001
+    english_reading: Annotated[float | None, Query(ge=0)] = None,
+    english_writing: Annotated[float | None, Query(ge=0)] = None,
+    english_listening: Annotated[float | None, Query(ge=0)] = None,
+    english_speaking: Annotated[float | None, Query(ge=0)] = None,
     country_residence: str | None = None,        # noqa: ARG001
     highest_qualification: str | None = None,
     grading_scheme: str | None = None,
     grading_out_of: str | None = None,
     grading_score: str | None = None,
-    other_exam: str | None = None,               # noqa: ARG001
+    other_exam: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
 ) -> SearchCourseResponse:
@@ -276,14 +269,22 @@ async def search_courses(
         # 1. Full-text search (exact stems — fastest, highest precision)
         # 2. ILIKE substring (catches partial/prefix matches)
         # 3. pg_trgm word_similarity (typo-tolerant fuzzy matching)
+        fuzzy_clause, fuzzy_params = name_match("c.course_name", q, "qword")
         where.append(
             "(c.search_tsv @@ plainto_tsquery('english', :q) "
             "OR lower(c.course_name) ILIKE :ql "
-            "OR word_similarity(:q_trgm, lower(c.course_name)) > 0.25)"
+            f"OR {fuzzy_clause})"
         )
+        params.update(fuzzy_params)
         params["q"] = q
-        params["ql"] = f"%{q.lower()}%"
+        params["ql"] = literal_like(q.strip().lower())
         params["q_trgm"] = q.lower()
+    if course_name and course_name.strip():
+        clause, name_params = name_match("c.course_name", course_name, "nameword")
+        where.append(clause)
+        params.update(name_params)
+        params["name_query"] = course_name.strip().lower()
+        params["name_like"] = literal_like(course_name.strip().lower())
     legacy_offering_filters = []
     offering_filters = []
     if country:
@@ -314,15 +315,20 @@ async def search_courses(
     # university_city OR a course_location string ("Sydney Campus"),
     # so OR them with case-insensitive ILIKE on both columns.
     if location and location.strip():
-        legacy_offering_filters.append(
-            "(lower(c.university_city) ILIKE :loc "
-            "OR lower(c.course_location) ILIKE :loc "
-            "OR word_similarity(:loc_trgm, lower(c.university_city)) > 0.3 "
-            "OR word_similarity(:loc_trgm, lower(c.course_location)) > 0.3)"
+        # Course-owned location is authoritative. Only a genuinely absent
+        # location may fall back to the university city; a different campus
+        # must not match merely because its university is headquartered there.
+        legacy_location = (
+            "CASE WHEN lower(btrim(coalesce(c.course_location, ''))) "
+            "IN ('', 'unknown', 'not published', 'n/a', '-') "
+            "THEN c.university_city ELSE c.course_location END"
         )
-        params["loc"] = f"%{location.strip().lower()}%"
+        legacy_offering_filters.append(
+            location_match(legacy_location)
+        )
+        params["loc"] = literal_like(location.strip().lower())
         params["loc_trgm"] = location.strip().lower()
-        offering_filters.append("lower(o.location) ILIKE :loc")
+        offering_filters.append(location_match("o.location"))
 
     # B5: intakes CSV → array overlap. Empty tokens after split are
     # ignored so "?intakes=" is a no-op rather than a "match nothing" bug.
@@ -378,12 +384,43 @@ async def search_courses(
             "PTE": "c.pte_overall",
             "TOEFL": "c.toefl_overall",
             "CAE": "c.cae_overall",
+            "CAMBRIDGE": "c.cae_overall",
             "DUOLINGO": "c.duolingo_overall",
+            "DET": "c.duolingo_overall",
         }
         col = col_map.get(english_exam.upper().strip())
         if col:
             where.append(f"({col} IS NULL OR {col} <= :eng_overall)")
             params["eng_overall"] = english_overall
+
+    # As with overall, the applicant's achieved band score must meet every
+    # known stored requirement. Aggregate duplicates deterministically, ignoring
+    # test-type casing and supporting the same aliases as the public projection.
+    # Missing scores remain included, not falsely marked as an admission failure.
+    exam_aliases = {
+        "IELTS": ("IELTS",), "PTE": ("PTE",), "TOEFL": ("TOEFL",),
+        "CAE": ("CAE", "CAMBRIDGE"), "CAMBRIDGE": ("CAE", "CAMBRIDGE"),
+        "DUOLINGO": ("DUOLINGO", "DET"), "DET": ("DUOLINGO", "DET"),
+    }
+    aliases = exam_aliases.get((english_exam or "").strip().upper())
+    if aliases:
+        # Aliases and column identifiers are entirely server-owned, never input SQL.
+        test_sql = ", ".join(f"'{alias}'" for alias in aliases)
+        for band, score in (
+            ("reading", english_reading), ("writing", english_writing),
+            ("listening", english_listening), ("speaking", english_speaking),
+        ):
+            if score is not None:
+                where.append(
+                    f"COALESCE((SELECT max(er.{band}) FROM english_requirements er "
+                    f"WHERE er.course_id = c.id AND upper(btrim(er.test_type)) "
+                    f"IN ({test_sql})), 0) <= :eng_{band}"
+                )
+                params[f"eng_{band}"] = score
+
+    if other_exam and other_exam.strip():
+        where.append("strpos(lower(coalesce(c.other_test, '')), :other_exam) > 0")
+        params["other_exam"] = other_exam.strip().lower()
 
     if category:
         where.append("c.category = :cat")
@@ -532,7 +569,7 @@ async def search_courses(
     # B5: sort param. Default behaviour (no sort) preserves the
     # legacy "relevance when q present, alphabetical otherwise" order.
     sort_clause = (
-        ("rank DESC NULLS LAST, " if q else "") + "c.course_name"
+        ("rank DESC NULLS LAST, " if q or (course_name and course_name.strip()) else "") + "c.course_name, c.id"
     )
     if sort:
         s = sort.strip().lower()
@@ -555,6 +592,12 @@ async def search_courses(
         ") AS rank"
         if q else "NULL AS rank"
     )
+    if course_name and course_name.strip():
+        rank_select = (
+            "(CASE WHEN lower(btrim(c.course_name)) = :name_query THEN 3 "
+            "WHEN lower(c.course_name) ILIKE :name_like THEN 2 ELSE 0 END "
+            "+ strict_word_similarity(:name_query, lower(c.course_name))) AS rank"
+        )
     if currency and sort and sort.strip().lower() in ("fee_asc", "fee_desc"):
         # An award can have offerings in several currencies. Rank only the
         # same offering set that passed the currency/budget/location filters.
@@ -566,6 +609,30 @@ async def search_courses(
             + ") ELSE c.international_fee END"
         )
         sort_clause = f"{matched_fee} {direction} NULLS LAST, c.course_name, c.id"
+
+    matched_offerings_select = "NULL AS matched_offerings"
+    if offering_filters:
+        matched_offerings_select = (
+            "COALESCE((SELECT jsonb_agg(jsonb_build_object("
+            "'id', o.id::text, 'location', o.location, "
+            "'feeAmount', o.fee_amount, 'feeCurrency', o.fee_currency, "
+            "'feeTerm', o.fee_term, 'feeYear', o.fee_year"
+            ") ORDER BY o.fee_amount NULLS LAST, o.location, o.id) "
+            "FROM course_offerings o WHERE o.course_id=c.id AND "
+            + " AND ".join(offering_filters) + "), '[]'::jsonb) AS matched_offerings"
+        )
+    matched_locations_select = "NULL AS matched_locations"
+    if location and location.strip():
+        matched_locations_select = (
+            "CASE WHEN EXISTS (SELECT 1 FROM course_offerings o WHERE o.course_id=c.id) "
+            "THEN ARRAY(SELECT DISTINCT o.location FROM course_offerings o WHERE o.course_id=c.id AND "
+            + " AND ".join(offering_filters)
+            + " ORDER BY o.location) "
+            "ELSE ARRAY(SELECT DISTINCT btrim(part.place) "
+            f"FROM regexp_split_to_table({legacy_location}, '[,;|\\n]+') part(place) "
+            "WHERE " + location_match("btrim(part.place)") +
+            " ORDER BY btrim(part.place)) END AS matched_locations"
+        )
 
     base_sql = f"""
         WITH {_COURSE_SEARCH_CTE}
@@ -587,6 +654,8 @@ async def search_courses(
                c.fee_term,
                c.fee_year,
                c.offerings,
+               {matched_offerings_select},
+               {matched_locations_select},
                c.ielts_overall,
                c.pte_overall,
                c.toefl_overall,
@@ -803,6 +872,16 @@ async def search_compare(
                 {"ids": int_ids},
             )
         ).mappings().all()
+        scholarship_rows = (
+            await db.execute(
+                text(
+                    "SELECT id, course_id, name, details, eligibility_criteria, "
+                    "amount, percentage, currency FROM scholarships "
+                    "WHERE course_id = ANY(:ids) ORDER BY id"
+                ),
+                {"ids": [int(row["id"]) for row in mv_rows]},
+            )
+        ).mappings().all()
     except Exception as exc:  # noqa: BLE001 — match Node's 500 fallback
         log.error("search_compare SQL failed: %s", exc)
         return JSONResponse(
@@ -818,6 +897,11 @@ async def search_compare(
     for r in acad_rows:
         d = dict(r)
         acad_by_course.setdefault(int(d["course_id"]), []).append(d)
+    scholarships_by_course: dict[int, list[dict]] = {}
+    for r in scholarship_rows:
+        d = dict(r)
+        cid = int(d.pop("course_id"))
+        scholarships_by_course.setdefault(cid, []).append(d)
 
     # Preserve the request order — UI renders columns left-to-right in this order.
     by_id = {int(r["id"]): dict(r) for r in mv_rows}
@@ -870,6 +954,7 @@ async def search_compare(
                 "course_url": r.get("course_website"),
                 "english_requirements": eng_by_course.get(cid, []),
                 "academic_requirements": acad_by_course.get(cid, []),
+                "scholarships": scholarships_by_course.get(cid, []),
             }
         )
 

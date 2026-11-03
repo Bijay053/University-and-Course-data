@@ -65,7 +65,7 @@ export function SearchableSelect({ value, onChange, options, anyLabel, label, te
         <ChevronDown className={`h-4 w-4 shrink-0 text-[hsl(var(--sic-muted))] transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
       </button>
       {open && (
-        <div className="sic-rise absolute left-0 right-0 z-50 mt-1 overflow-hidden rounded-lg border border-[hsl(var(--sic-line))] bg-white shadow-[0_12px_32px_-12px_hsl(213_60%_12%/0.35)]">
+        <div className="relative mt-1 overflow-hidden rounded-lg border border-[hsl(var(--sic-line))] bg-white shadow-sm">
           <div className="sic-select-search flex items-center gap-2 border-b border-[hsl(var(--sic-line))] px-3 focus-within:bg-[hsl(var(--sic-mist))]">
             <Search className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--sic-muted))]" aria-hidden />
             <input autoFocus role="combobox" aria-expanded aria-controls={listId} aria-autocomplete="list" aria-label={`Filter ${label}`}

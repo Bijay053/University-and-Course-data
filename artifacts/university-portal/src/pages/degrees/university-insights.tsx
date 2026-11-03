@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ClipboardList } from "lucide-react";
 import { BASE } from "./lib";
 import { InsightCardsGrid, type InsightCard } from "@/components/insights/insight-cards";
+import { ReportCourseErrorButton } from "@/components/report-course-error";
 
 type Insight = { id: number; country: string; text: string; updated_at: string | null; parsed_data?: InsightCard[] | null };
 
@@ -72,14 +73,22 @@ export function UniversityInsights({ universityId, universityName, compact = fal
           )}
           {shown.map((note) => (
             <div key={note.id} className="border rounded-xl overflow-hidden bg-white" data-testid={`insight-note-${note.id}`}>
-              <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-red-50 border-b border-red-100">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-red-50 border-b border-red-100">
                 <div className="flex items-center gap-2">
                   <ClipboardList className="w-4 h-4 text-red-600" aria-hidden />
                   <span className="font-semibold text-sm text-red-800">{note.country || "General guidance"}</span>
                 </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 {note.updated_at && !Number.isNaN(Date.parse(note.updated_at)) && (
                   <span className="text-xs text-red-700/70">Updated {new Date(note.updated_at).toLocaleDateString()}</span>
                 )}
+                <ReportCourseErrorButton
+                  courseName={`Key Insights — ${note.country || "General guidance"}`}
+                  universityName={universityName}
+                  insight={{ universityId, id: note.id, country: note.country || "General guidance" }}
+                  className="inline-flex min-h-9 items-center gap-1.5 text-xs font-semibold text-red-700 hover:text-red-900"
+                />
+                </div>
               </div>
               {note.parsed_data && note.parsed_data.length > 0 ? (
                 <InsightCardsGrid cards={note.parsed_data} />

@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Link } from "wouter";
-import { ChevronRight, MapPin, RotateCcw, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, RotateCcw, Search, X } from "lucide-react";
 import type { OptionsResponse } from "./lib";
 import { SearchableSelect } from "./searchable-select";
 
 type Uni = OptionsResponse["universities"][number];
+const PAGE_SIZE = 24;
 
 /** Trimmed location value, or null for blank / placeholder values. */
 export function cleanPlace(v: string | null | undefined): string | null {
@@ -29,10 +30,12 @@ function initials(name: string) {
 type Props = {
   options: OptionsResponse | null; optionsError: boolean; onRetry: () => void;
   q: string; country: string; city: string;
+  page: number; onPage: (page: number) => void;
   onQ: (v: string) => void; onCountry: (v: string) => void; onCity: (v: string) => void;
 };
 
-export function UniversityDirectory({ options, optionsError, onRetry, q, country, city, onQ, onCountry, onCity }: Props) {
+export function UniversityDirectory({ options, optionsError, onRetry, q, country, city, page, onPage, onQ, onCountry, onCity }: Props) {
+  const resultsTop = useRef<HTMLElement>(null);
   const all = useMemo(() => options?.universities ?? [], [options]);
   const countries = useMemo(() => {
     const m = new Map<string, string>();
@@ -48,6 +51,17 @@ export function UniversityDirectory({ options, optionsError, onRetry, q, country
     return sortAlpha(m.values());
   }, [all, country]);
   const matches = useMemo(() => filterUniversities(all, q, country, city), [all, q, country, city]);
+  const totalPages = Math.max(1, Math.ceil(matches.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const visible = matches.slice(start, start + PAGE_SIZE);
+  useEffect(() => {
+    if (options && !optionsError && page > totalPages) onPage(totalPages);
+  }, [options, optionsError, page, totalPages, onPage]);
+  const goToPage = (next: number) => {
+    onPage(next);
+    resultsTop.current?.scrollIntoView?.({ block: "start" });
+  };
   const active = [q.trim() && { k: "q", label: `"${q.trim()}"`, clear: () => onQ("") }, country && { k: "country", label: country, clear: () => onCountry("") }, city && { k: "city", label: city, clear: () => onCity("") }]
     .filter(Boolean) as { k: string; label: string; clear: () => void }[];
   const reset = () => { onQ(""); onCountry(""); onCity(""); };
@@ -65,6 +79,15 @@ export function UniversityDirectory({ options, optionsError, onRetry, q, country
               </button>
             )}
           </div>
+          <form role="search" aria-label="University search" autoComplete="off" className="sic-university-search mt-4" onSubmit={(e) => e.preventDefault()}>
+            <label htmlFor="uni-q" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-[hsl(var(--sic-muted))]">University name</label>
+            <div className="flex items-center gap-2 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-3 focus-within:border-[hsl(var(--sic-navy))] focus-within:ring-1 focus-within:ring-[hsl(var(--sic-navy))]">
+              <Search className="h-4 w-4 shrink-0 text-[hsl(var(--sic-muted))]" aria-hidden />
+              <input id="uni-q" type="search" autoComplete="off" value={q} onChange={(e) => onQ(e.target.value)} placeholder="University name"
+                className="h-10 w-full min-w-0 bg-transparent text-sm text-[hsl(var(--sic-ink))] outline-none placeholder:text-[hsl(var(--sic-muted))] [&::-webkit-search-cancel-button]:appearance-none" data-testid="input-university-search" />
+              {q && <button type="button" aria-label="Clear university search" onClick={() => onQ("")} className="shrink-0 p-1 text-[hsl(var(--sic-muted))] hover:text-primary" data-testid="button-clear-university-search"><X className="h-4 w-4" aria-hidden /></button>}
+            </div>
+          </form>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <div>
               <p className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-[hsl(var(--sic-muted))]">Country</p>
@@ -83,7 +106,7 @@ export function UniversityDirectory({ options, optionsError, onRetry, q, country
         </div>
       </aside>
 
-      <section aria-labelledby="uni-heading" className="min-w-0">
+      <section aria-labelledby="uni-heading" className="min-w-0" ref={resultsTop}>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="uni-heading" className="sic-display text-2xl">Universities</h2>
@@ -122,7 +145,7 @@ export function UniversityDirectory({ options, optionsError, onRetry, q, country
           </div>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {matches.map((u) => {
+            {visible.map((u) => {
               const place = [cleanPlace(u.city), cleanPlace(u.country)].filter(Boolean).join(", ");
               return (
                 <li key={u.id}>
@@ -139,6 +162,26 @@ export function UniversityDirectory({ options, optionsError, onRetry, q, country
               );
             })}
           </ul>
+        )}
+        {options && !optionsError && matches.length > 0 && (
+          <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-[hsl(var(--sic-line))] pt-5 sm:flex-row">
+            <p className="text-sm text-[hsl(var(--sic-muted))]" aria-live="polite" data-testid="text-university-range">
+              Showing {start + 1}–{Math.min(start + PAGE_SIZE, matches.length)} of {matches.length.toLocaleString()} {matches.length === 1 ? "university" : "universities"}
+            </p>
+            {totalPages > 1 && (
+              <nav aria-label="University pagination" className="flex items-center gap-3">
+                <button type="button" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}
+                  data-testid="button-prev-university-page" className="inline-flex h-10 items-center gap-1 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-3 text-sm font-semibold hover:border-[hsl(var(--sic-navy))] disabled:cursor-not-allowed disabled:opacity-40">
+                  <ChevronLeft className="h-4 w-4" aria-hidden /> Previous
+                </button>
+                <span className="whitespace-nowrap text-sm tabular-nums" data-testid="text-university-page">Page {currentPage} of {totalPages}</span>
+                <button type="button" disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}
+                  data-testid="button-next-university-page" className="inline-flex h-10 items-center gap-1 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-3 text-sm font-semibold hover:border-[hsl(var(--sic-navy))] disabled:cursor-not-allowed disabled:opacity-40">
+                  Next <ChevronRight className="h-4 w-4" aria-hidden />
+                </button>
+              </nav>
+            )}
+          </div>
         )}
       </section>
     </main>

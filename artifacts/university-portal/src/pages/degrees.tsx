@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Search, LayoutGrid, List, Bookmark, SlidersHorizontal, X, ChevronLeft, ChevronRight, GraduationCap, Building2 } from "lucide-react";
 import "./degrees/degrees.css";
 import {
-  BASE, EMPTY_FILTERS, SORTS, buildSearchParams, filtersFromQuery, filtersToQuery, isFeeSort,
+  BASE, EMPTY_FILTERS, SORTS, countActiveFilters, buildSearchParams, filtersFromQuery, filtersToQuery, isFeeSort,
   type CourseResult, type DegreeFilters, type OptionsResponse, type SearchResponse, type SortKey,
 } from "./degrees/lib";
 import { useShortlist } from "./degrees/use-shortlist";
@@ -20,12 +20,12 @@ type Mode = "courses" | "universities";
 function readUniState(search: string) {
   const p = new URLSearchParams(search);
   const mode: Mode = p.get("mode") === "universities" ? "universities" : "courses";
-  return { mode, uq: p.get("uq") ?? "", ucountry: (p.get("ucountry") ?? "").trim(), ucity: (p.get("ucity") ?? "").trim() };
+  const requestedPage = Number(p.get("upage") ?? "1");
+  return { mode, uq: p.get("uq") ?? "", ucountry: (p.get("ucountry") ?? "").trim(), ucity: (p.get("ucity") ?? "").trim(),
+    page: Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1 };
 }
 
-function countActive(f: DegreeFilters) {
-  return [f.q.trim(), f.location.trim(), f.country, f.universityId, f.degreeLevel, f.budgetCurrency || f.budgetMax].filter(Boolean).length + (f.intakes.length ? 1 : 0);
-}
+const countActive = countActiveFilters;
 
 export default function DegreesPage() {
   usePageMeta(
@@ -37,9 +37,13 @@ export default function DegreesPage() {
   const [locationDraft, setLocationDraft] = useState(filters.location);
   const [initialUni] = useState(() => readUniState(window.location.search));
   const [mode, setMode] = useState<Mode>(initialUni.mode);
-  const [uniQ, setUniQ] = useState(initialUni.uq);
-  const [uniCountry, setUniCountry] = useState(initialUni.ucountry);
-  const [uniCity, setUniCity] = useState(initialUni.ucity);
+  const [uniQ, setUniQValue] = useState(initialUni.uq);
+  const [uniCountry, setUniCountryValue] = useState(initialUni.ucountry);
+  const [uniCity, setUniCityValue] = useState(initialUni.ucity);
+  const [uniPage, setUniPage] = useState(initialUni.page);
+  const setUniQ = useCallback((v: string) => { setUniQValue(v); setUniPage(1); }, []);
+  const setUniCountry = useCallback((v: string) => { setUniCountryValue(v); setUniPage(1); }, []);
+  const setUniCity = useCallback((v: string) => { setUniCityValue(v); setUniPage(1); }, []);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,11 +76,12 @@ export default function DegreesPage() {
       if (uniQ.trim()) p.set("uq", uniQ.trim());
       if (uniCountry) p.set("ucountry", uniCountry);
       if (uniCity) p.set("ucity", uniCity);
+      if (uniPage > 1) p.set("upage", String(uniPage));
       qs = p.toString();
     }
     const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
     if (next !== `${window.location.pathname}${window.location.search}`) window.history.replaceState(window.history.state, "", next);
-  }, [filters, mode, uniQ, uniCountry, uniCity]);
+  }, [filters, mode, uniQ, uniCountry, uniCity, uniPage]);
 
   const loadOptions = useCallback(async () => {
     setOptionsError(false);
@@ -111,6 +116,12 @@ export default function DegreesPage() {
   useEffect(() => { if (!loading) resultsTop.current?.scrollIntoView({ block: "start", behavior: "smooth" }); }, [filters.page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const clearAll = () => { setQDraft(""); setLocationDraft(""); setFilters(EMPTY_FILTERS); };
+  const searchFilters = () => {
+    patch({ q: qDraft, location: locationDraft });
+    setReloadKey((key) => key + 1);
+    setFiltersOpen(false);
+    resultsTop.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
   const openCourseById = (id: number) => {
     const found = data?.results.find((c) => c.id === id);
     if (found) { setSelected(found); setShortlistOpen(false); }
@@ -124,7 +135,13 @@ export default function DegreesPage() {
           <nav className="flex items-center justify-between" aria-label="Site">
             <Link href="/toolkit" className="flex items-center gap-2.5" data-testid="link-home">
               <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground sic-display font-semibold">SI</span>
-              <span className="leading-tight"><span className="block font-semibold">Study Info Centre</span><span className="block text-[11px] uppercase tracking-[0.16em] text-white/80">Course toolkit</span></span>
+              <span className="leading-tight">
+                <span className="block font-semibold">Study Info Centre</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.16em] text-white/80">Course toolkit</span>
+                  <span data-testid="badge-toolkit-beta" className="sic-beta shrink-0 rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white">Beta</span>
+                </span>
+              </span>
             </Link>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setShortlistOpen(true)} data-testid="button-open-shortlist"
@@ -146,24 +163,18 @@ export default function DegreesPage() {
                 </button>
               ))}
             </div>
-            {mode === "universities" && (<form role="search" aria-label="University search" className="flex max-w-3xl items-center gap-2 rounded-2xl bg-white p-2 shadow-xl" onSubmit={(e) => e.preventDefault()}>
-              <Building2 className="ml-2 h-5 w-5 text-[hsl(var(--sic-muted))]" aria-hidden />
-              <label htmlFor="uni-q" className="sr-only">Search universities by name</label>
-              <input id="uni-q" value={uniQ} onChange={(e) => { setUniQ(e.target.value); }} placeholder="University name"
-                className="h-11 min-w-0 flex-1 bg-transparent text-[hsl(var(--sic-ink))] outline-none placeholder:text-[hsl(var(--sic-muted))]" data-testid="input-university-search" />
-              {uniQ && <button type="button" aria-label="Clear university search" onClick={() => setUniQ("")} className="p-2 text-[hsl(var(--sic-muted))]" data-testid="button-clear-university-search"><X className="h-4 w-4" aria-hidden /></button>}
-            </form>)}
           </div>
         </div>
       </header>
 
       {mode === "universities" ? (
       <UniversityDirectory options={options} optionsError={optionsError} onRetry={() => void loadOptions()}
+        page={uniPage} onPage={setUniPage}
         q={uniQ} country={uniCountry} city={uniCity} onQ={setUniQ} onCountry={setUniCountry} onCity={setUniCity} />
       ) : (
       <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-8 grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_380px]">
         <aside className="hidden lg:block self-start lg:sticky lg:top-6" aria-label="Filters">
-          <FilterPanel searchValue={qDraft} onSearchChange={setQDraft} onSearchSubmit={() => patch({ q: qDraft })} filters={filters} options={options} optionsError={optionsError} onRetryOptions={loadOptions} onChange={patch} onClear={clearAll} activeCount={activeCount} />
+          <FilterPanel filters={filters} options={options} optionsError={optionsError} onRetryOptions={loadOptions} onChange={patch} onClear={clearAll} activeCount={activeCount} onSearch={searchFilters} />
         </aside>
 
         <section aria-labelledby="results-heading" className="min-w-0" ref={resultsTop}>
@@ -171,21 +182,31 @@ export default function DegreesPage() {
             <UniversityInsights compact key={filters.universityId} universityId={Number(filters.universityId)}
               universityName={options?.universities.find((u) => String(u.id) === filters.universityId)?.name ?? "Selected university"} />
           )}
-          <div className="flex flex-wrap items-center gap-3 justify-between mb-4 min-w-0">
-            <div>
+          <div className="grid gap-3 mb-4 min-w-0 sm:grid-cols-[minmax(0,1fr)_auto] items-start" data-testid="course-results-header">
+            <div className="min-w-0">
               <h2 id="results-heading" className="sic-display text-2xl">Courses</h2>
               <p className="text-sm text-[hsl(var(--sic-muted))]" aria-live="polite" data-testid="text-result-count">
                 {loading && !data ? "Loading courses" : data ? `${data.total.toLocaleString()} matching course${data.total === 1 ? "" : "s"}` : ""}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
+            <div className="flex min-w-0 flex-col gap-1 sm:items-end" data-testid="course-results-toolbar">
+              <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2 min-w-0 max-w-full">
               <button type="button" onClick={() => setFiltersOpen(true)} className="lg:hidden inline-flex h-10 items-center gap-2 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-3 text-sm" data-testid="button-open-filters">
                 <SlidersHorizontal className="h-4 w-4" aria-hidden /> Filters{activeCount ? ` (${activeCount})` : ""}
               </button>
               <label htmlFor="sort" className="sr-only">Sort by</label>
               <select id="sort" value={filters.sort} onChange={(e) => patch({ sort: e.target.value as SortKey })} data-testid="select-sort"
-                className="h-10 min-w-0 max-w-full flex-1 sm:flex-none rounded-lg border border-[hsl(var(--sic-line))] bg-white px-3 text-sm">
-                {SORTS.map((s) => { const off = isFeeSort(s.value) && !filters.budgetCurrency; return <option key={s.value} value={s.value} disabled={off}>{s.label}{off ? " (choose a currency)" : ""}</option>; })}
+                aria-describedby={!filters.budgetCurrency ? "fee-sort-help" : undefined}
+                className="h-9 w-44 min-w-0 max-w-full rounded-lg border border-[hsl(var(--sic-line))] bg-white px-2 text-xs">
+                {SORTS.map((s) => <option key={s.value} value={s.value} disabled={isFeeSort(s.value) && !filters.budgetCurrency}>{s.label}</option>)}
+              </select>
+              <label htmlFor="sort-currency" className="sr-only">Sorting currency</label>
+              <select id="sort-currency" value={filters.budgetCurrency} data-testid="select-sort-currency"
+                disabled={!options?.currencies?.length}
+                onChange={(e) => patch({ budgetCurrency: e.target.value, ...(!e.target.value && isFeeSort(filters.sort) ? { sort: "relevance" as SortKey } : {}) })}
+                className="h-9 w-24 min-w-0 rounded-lg border border-[hsl(var(--sic-line))] bg-white px-2 text-xs">
+                <option value="">Currency</option>
+                {options?.currencies?.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
               </select>
               <div className="flex rounded-lg border border-[hsl(var(--sic-line))] bg-white p-0.5" role="group" aria-label="Layout">
                 {(["grid", "list"] as const).map((v) => (
@@ -195,6 +216,8 @@ export default function DegreesPage() {
                   </button>
                 ))}
               </div>
+              </div>
+              {!filters.budgetCurrency && <p id="fee-sort-help" className="text-right text-xs text-[hsl(var(--sic-muted))]">Choose a currency to sort by fee.</p>}
             </div>
           </div>
 
@@ -271,8 +294,7 @@ export default function DegreesPage() {
         <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Filters" aria-description="Narrow courses by country, university, level, intake and currency" onKeyDown={(e) => e.key === "Escape" && setFiltersOpen(false)}>
           <button type="button" aria-label="Close filters" className="absolute inset-0 bg-[hsl(213_60%_12%/0.45)]" onClick={() => setFiltersOpen(false)} />
           <div className="sic-rise relative w-[88%] max-w-sm h-full overflow-y-auto bg-[hsl(var(--sic-paper))] p-5">
-            <FilterPanel searchValue={qDraft} onSearchChange={setQDraft} onSearchSubmit={() => patch({ q: qDraft })} filters={filters} options={options} optionsError={optionsError} onRetryOptions={loadOptions} onChange={patch} onClear={clearAll} activeCount={activeCount} />
-            <button type="button" autoFocus onClick={() => setFiltersOpen(false)} className="mt-6 h-11 w-full rounded-lg bg-[hsl(var(--sic-navy))] text-sm font-semibold text-white" data-testid="button-apply-filters">Show courses</button>
+            <FilterPanel filters={filters} options={options} optionsError={optionsError} onRetryOptions={loadOptions} onChange={patch} onClear={clearAll} activeCount={activeCount} onSearch={searchFilters} />
           </div>
         </div>
       )}

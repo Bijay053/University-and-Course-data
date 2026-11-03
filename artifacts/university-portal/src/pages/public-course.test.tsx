@@ -39,6 +39,20 @@ const renderAt = (path: string) => {
 };
 
 describe("public course page", () => {
+  it("keeps degree level in a responsive grid when study mode contains long text", async () => {
+    const longMode = "This degree equips you with the technical knowledge and practical skills needed to begin your career as a chartered accountant. Focusing on UK accounting standards in a real-world context, the course prepares you for a range of finance roles in global business environments.";
+    res = () => ({ ok: true, status: 200, json: async () => ({ courses: [{
+      ...course, degree_level: "Bachelor", duration: null, study_mode: longMode,
+      category: "Business & Management", sub_category: "Accounting",
+    }] }) });
+    renderAt("/toolkit/courses/7");
+    const facts = await screen.findByTestId("list-course-facts");
+    expect(facts.style.gridTemplateColumns).toBe("repeat(auto-fit, minmax(min(100%, 12rem), 1fr))");
+    expect(facts.className).not.toContain("sm:flex");
+    expect(facts.children[0].textContent).toBe("LevelBachelor");
+    expect(facts.children[1].textContent).toBe(`Study mode${longMode}`);
+    expect(facts.children[2].textContent).toBe("FieldBusiness & Management / Accounting");
+  });
   it("renders full details with fees, bands and academic entry, hiding missing fields", async () => {
     renderAt("/toolkit/courses/7");
     expect((await screen.findByTestId("text-course-name")).textContent).toBe("Master of Data Science");
@@ -78,5 +92,33 @@ describe("public course page", () => {
     res = () => ({ ok: true, status: 200, json: async () => ({ courses: [course] }) });
     fireEvent.click(retry);
     expect(await screen.findByTestId("text-course-name")).toBeTruthy();
+  });
+
+  it("splits combined location strings into clean unique places", async () => {
+    res = () => ({ ok: true, status: 200, json: async () => ({ courses: [{ ...course, offerings: [{ id: "a", location: "Sydney, Melbourne; Brisbane", feeAmount: 30000, feeCurrency: "AUD", feeTerm: "Year", feeYear: null }], course_location: " sydney ,Online|Adelaide " }] }) });
+    renderAt("/toolkit/courses/7");
+    const list = await screen.findByTestId("list-course-locations");
+    expect(Array.from(list.querySelectorAll("li")).map((li) => li.textContent)).toEqual(["Sydney", "Melbourne", "Brisbane", "Online", "Adelaide"]);
+    expect(screen.queryByTestId("section-scholarships")).toBeNull();
+    expect(screen.queryByText(/scholarship/i)).toBeNull();
+  });
+
+  it("shows course scholarships with full details, original currency and zero values", async () => {
+    const scholarships = [
+      { id: 1, name: "Vice-Chancellor International Merit Award", details: "Applied to each year of study.", eligibility_criteria: "GPA of 3.0 or higher", amount: 5000, percentage: 20, currency: "AUD" },
+      { id: 2, name: "Early Acceptance Grant", details: null, eligibility_criteria: null, amount: 0, percentage: null, currency: null },
+      { id: 3, name: "  ", details: "nameless", eligibility_criteria: null, amount: null, percentage: null, currency: null },
+    ];
+    res = () => ({ ok: true, status: 200, json: async () => ({ courses: [{ ...course, scholarships }] }) });
+    renderAt("/toolkit/courses/7");
+    const card = await screen.findByTestId("card-scholarship-1");
+    expect(card.textContent).toContain("Vice-Chancellor International Merit Award");
+    expect(card.textContent).toContain("Applied to each year of study.");
+    expect(card.textContent).toContain("GPA of 3.0 or higher");
+    expect(screen.getAllByTestId("text-scholarship-value-1").map((b) => b.textContent)).toEqual(["AUD 5,000", "20%"]);
+    expect(screen.getByTestId("text-scholarship-value-2").textContent).toBe("0");
+    expect(screen.getByTestId("card-scholarship-2").textContent).not.toContain("Eligibility");
+    expect(screen.queryByTestId("card-scholarship-3")).toBeNull();
+    expect(screen.getByTestId("link-summary-scholarships").textContent).toBe("2 scholarships for this course");
   });
 });
