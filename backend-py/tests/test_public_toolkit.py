@@ -22,8 +22,11 @@ async def test_public_search_currency_budget_visibility_and_comparison(hsu_datab
         uni = University(name="Toolkit University", country="United Kingdom", city="London")
         db.add(uni)
         await db.flush()
+        cards = [{"title": "Scholarship", "emoji": "🎓", "fields": [
+            {"label": "Scholarship", "value": "20% for eligible applicants", "badge": None}
+        ], "sections": []}]
         db.add(AssessmentNote(university_id=uni.id, country="Nepal",
-                              raw_text="Scholarship: 20% for eligible applicants", parsed_data=[]))
+                              raw_text="Scholarship: 20% for eligible applicants", parsed_data=cards))
         hidden_uni = University(name="Unpublished university", country="United Kingdom", city="London")
         db.add(hidden_uni)
         await db.flush()
@@ -67,7 +70,8 @@ async def test_public_search_currency_budget_visibility_and_comparison(hsu_datab
         note = insights.json()["insights"][0]
         assert note["country"] == "Nepal"
         assert note["text"] == "Scholarship: 20% for eligible applicants"
-        assert set(note) == {"id", "country", "text", "updated_at"}
+        assert set(note) == {"id", "country", "text", "updated_at", "parsed_data"}
+        assert note["parsed_data"] == cards
         assert (await client.get(f"/api/search/universities/{hidden_uni_id}/insights")).status_code == 404
         assert (await client.get("/api/search/universities/999999999/insights")).status_code == 404
         assert (await client.post(f"/api/search/universities/{uni_id}/insights", json={})).status_code == 405

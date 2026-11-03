@@ -45,7 +45,7 @@ async def public_university_insights(
     """Read-only saved guidance for universities visible in the public catalogue.
 
     Deliberately does not call the staff notes route: its lazy AI backfill writes
-    to the database. Expose only source text, country and update date here.
+    to the database. Expose saved guidance and its existing display cards only.
     """
     visible = await db.scalar(text(f"""
         WITH {_COURSE_SEARCH_CTE}
@@ -56,12 +56,17 @@ async def public_university_insights(
     if not visible:
         raise HTTPException(status_code=404, detail="University not found")
     rows = (await db.execute(text("""
-        SELECT id, country, raw_text AS text, updated_at
+        SELECT id, country, raw_text AS text, updated_at, parsed_data
         FROM assessment_notes
         WHERE university_id = :university_id AND btrim(raw_text) <> ''
         ORDER BY country, id
     """), {"university_id": university_id})).mappings().all()
-    return {"insights": [dict(row) for row in rows]}
+    return {"insights": [
+        {**dict(row), "parsed_data": [
+            card for card in row["parsed_data"] if isinstance(card, dict)
+        ] if isinstance(row["parsed_data"], list) else []}
+        for row in rows
+    ]}
 
 _SEARCH_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS ix_fees_course_id ON fees (course_id)",

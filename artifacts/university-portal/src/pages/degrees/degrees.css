@@ -27,6 +27,22 @@
 .sic-degrees .sic-hero form[role="search"] input:focus-visible {
   outline: none;
 }
+/* Cover the browser's autofill paint without affecting selection or the caret. */
+.sic-degrees form[role="search"] input {
+  background-color: #fff;
+}
+.sic-degrees form[role="search"] input:autofill {
+  box-shadow: 0 0 0 1000px #fff inset;
+  color: hsl(var(--sic-ink));
+  caret-color: hsl(var(--sic-ink));
+}
+.sic-degrees form[role="search"] input:-webkit-autofill,
+.sic-degrees form[role="search"] input:-webkit-autofill:hover,
+.sic-degrees form[role="search"] input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  -webkit-text-fill-color: hsl(var(--sic-ink));
+  caret-color: hsl(var(--sic-ink));
+}
 @keyframes sic-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .sic-degrees .sic-rise { animation: sic-rise 420ms cubic-bezier(.2,.7,.2,1) both; }
 @keyframes sic-shimmer { 0% { opacity: .55 } 50% { opacity: 1 } 100% { opacity: .55 } }

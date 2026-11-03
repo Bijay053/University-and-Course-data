@@ -9,6 +9,7 @@ class PublicUniversityInsight(BaseModel):
     country: str
     text: str
     updated_at: datetime | None = None
+    parsed_data: list[dict] = Field(default_factory=list)
 
 
 class PublicUniversityInsightsResponse(BaseModel):

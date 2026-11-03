@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { Search, LayoutGrid, List, Bookmark, SlidersHorizontal, X, ChevronLeft, ChevronRight, GraduationCap, Building2, ArrowRight } from "lucide-react";
+import { Search, LayoutGrid, List, Bookmark, SlidersHorizontal, X, ChevronLeft, ChevronRight, GraduationCap, Building2 } from "lucide-react";
 import "./degrees/degrees.css";
 import {
   BASE, EMPTY_FILTERS, SORTS, buildSearchParams, filtersFromQuery, filtersToQuery, isFeeSort,
@@ -19,8 +19,7 @@ type Mode = "courses" | "universities";
 function readUniState(search: string) {
   const p = new URLSearchParams(search);
   const mode: Mode = p.get("mode") === "universities" ? "universities" : "courses";
-  const uid = p.get("uid") ?? "";
-  return { mode, uq: p.get("uq") ?? "", uid: /^\d+$/.test(uid) ? uid : "" };
+  return { mode, uq: p.get("uq") ?? "" };
 }
 
 function countActive(f: DegreeFilters) {
@@ -37,13 +36,6 @@ export default function DegreesPage() {
   const [initialUni] = useState(() => readUniState(window.location.search));
   const [mode, setMode] = useState<Mode>(initialUni.mode);
   const [uniQ, setUniQ] = useState(initialUni.uq);
-  const [uniSel, setUniSel] = useState(initialUni.uid);
-  const universityPanel = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (mode === "universities" && uniSel && window.innerWidth < 1024) {
-      universityPanel.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-    }
-  }, [mode, uniSel]);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,12 +66,11 @@ export default function DegreesPage() {
     if (mode === "universities") {
       const p = new URLSearchParams({ mode: "universities" });
       if (uniQ.trim()) p.set("uq", uniQ.trim());
-      if (uniSel) p.set("uid", uniSel);
       qs = p.toString();
     }
     const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
     if (next !== `${window.location.pathname}${window.location.search}`) window.history.replaceState(window.history.state, "", next);
-  }, [filters, mode, uniQ, uniSel]);
+  }, [filters, mode, uniQ]);
 
   const loadOptions = useCallback(async () => {
     setOptionsError(false);
@@ -111,11 +102,6 @@ export default function DegreesPage() {
     const all = options?.universities ?? [];
     return term ? all.filter((u) => u.name.toLowerCase().includes(term)) : all;
   }, [options, uniQ]);
-  const selectedUni = options?.universities.find((u) => String(u.id) === uniSel) ?? null;
-  const viewCourses = (id: number) => {
-    setQDraft(""); setFilters({ ...EMPTY_FILTERS, universityId: String(id) });
-    setSelected(null); setMode("courses");
-  };
 
   const results = data?.results ?? [];
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
@@ -179,7 +165,7 @@ export default function DegreesPage() {
       </header>
 
       {mode === "universities" ? (
-      <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+      <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-8 grid gap-6 ">
         <section aria-labelledby="uni-heading" className="min-w-0">
           <h2 id="uni-heading" className="sic-display text-2xl">Universities</h2>
           <p className="mb-4 text-sm text-[hsl(var(--sic-muted))]" aria-live="polite" data-testid="text-university-count">
@@ -201,41 +187,22 @@ export default function DegreesPage() {
               {uniQ && <button type="button" onClick={() => setUniQ("")} className="mt-4 h-10 rounded-lg border border-[hsl(var(--sic-navy))] px-5 text-sm font-semibold" data-testid="button-university-empty-clear">Clear search</button>}
             </div>
           ) : (
-            <ul className="grid gap-3 sm:grid-cols-2">
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {uniMatches.map((u) => {
-                const on = String(u.id) === uniSel;
                 return (
                   <li key={u.id}>
-                    <button type="button" aria-pressed={on} onClick={() => setUniSel(String(u.id))} data-testid={`card-university-${u.id}`}
-                      className={`flex w-full items-center gap-3 rounded-xl border bg-white p-4 text-left transition-colors ${on ? "border-primary ring-2 ring-primary/30" : "border-[hsl(var(--sic-line))] hover:border-[hsl(var(--sic-navy))]"}`}>
+                    <Link href={`/toolkit/universities/${u.id}`} data-testid={`card-university-${u.id}`}
+                      className="group flex w-full items-center gap-3 rounded-xl border border-[hsl(var(--sic-line))] bg-white p-4 text-left transition-colors hover:border-[hsl(var(--sic-navy))]">
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[hsl(var(--sic-navy))] text-sm font-semibold text-white">{u.name.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).slice(0, 2).map((w) => w[0]).join("") || u.name[0]}</span>
-                      <span className="min-w-0 font-semibold break-words">{u.name}</span>
-                    </button>
+                      <span className="min-w-0 flex-1 font-semibold break-words">{u.name}</span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-[hsl(var(--sic-muted))] transition-transform group-hover:translate-x-0.5" aria-hidden />
+                    </Link>
                   </li>
                 );
               })}
             </ul>
           )}
         </section>
-        <aside ref={universityPanel} className={`min-w-0 self-start lg:sticky lg:top-6 ${uniSel ? "order-first lg:order-none" : ""}`} aria-label="Selected university">
-          {selectedUni ? (
-            <div className="rounded-2xl border border-[hsl(var(--sic-line))] bg-[hsl(var(--sic-mist))] p-4" data-testid="panel-university">
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="sic-display text-xl break-words" data-testid="text-selected-university">{selectedUni.name}</h3>
-                <button type="button" aria-label="Close university" onClick={() => setUniSel("")} className="p-1 text-[hsl(var(--sic-muted))]" data-testid="button-close-university"><X className="h-4 w-4" aria-hidden /></button>
-              </div>
-              <UniversityInsights key={selectedUni.id} universityId={selectedUni.id} universityName={selectedUni.name} />
-              <button type="button" onClick={() => viewCourses(selectedUni.id)} data-testid="button-view-courses"
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
-                View courses <ArrowRight className="h-4 w-4" aria-hidden />
-              </button>
-            </div>
-          ) : uniSel && options ? (
-            <p className="rounded-2xl border border-dashed border-[hsl(var(--sic-line))] p-6 text-sm text-[hsl(var(--sic-muted))]">This university is no longer listed.</p>
-          ) : (
-            <p className="rounded-2xl border border-dashed border-[hsl(var(--sic-line))] p-6 text-sm text-[hsl(var(--sic-muted))]">Select a university to read its Key Insights and browse its courses.</p>
-          )}
-        </aside>
       </main>
       ) : (
       <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-8 grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_380px]">
@@ -245,7 +212,7 @@ export default function DegreesPage() {
 
         <section aria-labelledby="results-heading" className="min-w-0" ref={resultsTop}>
           {filters.universityId && (
-            <UniversityInsights key={filters.universityId} universityId={Number(filters.universityId)}
+            <UniversityInsights compact key={filters.universityId} universityId={Number(filters.universityId)}
               universityName={options?.universities.find((u) => String(u.id) === filters.universityId)?.name ?? "Selected university"} />
           )}
           <div className="flex flex-wrap items-center gap-3 justify-between mb-4 min-w-0">

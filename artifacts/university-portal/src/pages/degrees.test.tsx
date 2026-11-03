@@ -90,35 +90,30 @@ describe("public degrees page", () => {
     expect(calls.some((u) => u.includes("/api/search/compare?ids=1,2"))).toBe(true);
   });
 
-  it("switches to university mode, searches, shows insights and views courses", async () => {
+  it("switches to university mode, searches and links each card to its own page", async () => {
     render(<DegreesPage />);
     await screen.findByTestId("card-course-1");
-    fireEvent.change(screen.getByTestId("input-search"), { target: { value: "nursing" } });
     fireEvent.click(screen.getByTestId("tab-universities"));
     expect(screen.queryByTestId("select-university")).toBeNull();
     expect(screen.queryByTestId("input-search")).toBeNull();
-    expect(await screen.findByTestId("card-university-9")).toBeTruthy();
+    const card = await screen.findByTestId("card-university-9");
+    expect(card.getAttribute("href")).toBe("/toolkit/universities/9");
+    expect(screen.queryByTestId("panel-university")).toBeNull();
     expect(screen.getByTestId("text-university-count").textContent).toBe("1 university");
     fireEvent.change(screen.getByTestId("input-university-search"), { target: { value: "zzz" } });
     expect(screen.getByTestId("state-university-empty")).toBeTruthy();
     fireEvent.change(screen.getByTestId("input-university-search"), { target: { value: "harb" } });
+    await waitFor(() => expect(window.location.search).toBe("?mode=universities&uq=harb"));
     fireEvent.click(screen.getByTestId("card-university-9"));
-    expect(await screen.findByText("Scholarship: 20% for eligible applicants")).toBeTruthy();
-    await waitFor(() => expect(window.location.search).toBe("?mode=universities&uq=harb&uid=9"));
-    calls = [];
-    fireEvent.click(screen.getByTestId("button-view-courses"));
-    await waitFor(() => expect(calls.some((u) => u.includes("university_id=9") && !u.includes("q="))).toBe(true));
-    expect(screen.getByTestId("tab-courses").getAttribute("aria-selected")).toBe("true");
-    expect((screen.getByTestId("input-search") as HTMLInputElement).value).toBe("");
-    expect(window.location.search).toBe("?university=9");
+    await waitFor(() => expect(window.location.pathname).toBe("/toolkit/universities/9"));
   });
 
   it("restores university mode from the URL", async () => {
-    window.history.replaceState(null, "", "/toolkit?mode=universities&uq=harbour&uid=9");
+    window.history.replaceState(null, "", "/toolkit?mode=universities&uq=harbour");
     render(<DegreesPage />);
-    expect(await screen.findByTestId("text-selected-university")).toBeTruthy();
+    expect(await screen.findByTestId("card-university-9")).toBeTruthy();
     expect((screen.getByTestId("input-university-search") as HTMLInputElement).value).toBe("harbour");
     expect(calls.some((u) => u.includes("/api/search/courses"))).toBe(false);
-    expect(window.location.search).toBe("?mode=universities&uq=harbour&uid=9");
+    expect(window.location.search).toBe("?mode=universities&uq=harbour");
   });
 });

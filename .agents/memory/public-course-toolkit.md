@@ -44,4 +44,13 @@ not only a university filter in the course sidebar.
 separate university search option.
 
 **How to apply:** Preserve distinct Courses and Universities browsing, with
-university results leading to Key Insights and that university's courses.
+university results opening a full public university page with Courses and
+Key Insights tabs, rather than a side panel.
+
+Public Key Insights must match the existing admin card design.
+
+**Why:** The user explicitly requested full university pages and the same
+Key Insights design shown when staff add insights.
+
+**How to apply:** Reuse the read-only card presentation, including country
+filters and structured fields, without exposing administration controls.
