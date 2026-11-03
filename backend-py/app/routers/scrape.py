@@ -2387,6 +2387,10 @@ def _filter_resolved_reextract_warnings(
     from app.services.scraper.confidence import CONFIDENCE_WARN, score_payload
 
     resolved_codes: set[str] = set()
+    from app.study_modes import normalize_study_mode
+
+    if normalize_study_mode(fresh_payload.get("study_mode")) is not None:
+        resolved_codes.add("invalid_study_mode")
 
     try:
         if float(fresh_payload.get("international_fee") or 0) > 0:
@@ -3069,11 +3073,27 @@ async def re_extract_staged(
         payload = sanitize_intake_months_payload(payload)
         from app.study_modes import sanitize_study_mode_payload
 
-        payload = sanitize_study_mode_payload(payload)
-        if payload.get("study_mode") is None and "invalid_study_mode" in (payload.get("scrape_warnings") or []):
+        mode_guard = sanitize_study_mode_payload({
+            **payload, "evidence": list(selected_evidence_by_field.values()),
+        })
+        guarded_evidence = mode_guard.pop("evidence")
+        payload = mode_guard
+        rejected_mode = (
+            payload.get("study_mode") is None
+            and "invalid_study_mode" in (payload.get("scrape_warnings") or [])
+        )
+        if rejected_mode:
             # A rejected candidate may remain in review evidence, but must not
             # be promoted as selected proof for a populated field.
             selected_evidence_by_field.pop("study_mode", None)
+            for item in guarded_evidence:
+                if item.get("field_key") == "study_mode":
+                    reviewed = {**item, "selected": False, "decision_status": "needs_review"}
+                    signature = (
+                        "study_mode", str(item.get("value")), str(item.get("method")),
+                        str(item.get("source_url")),
+                    )
+                    other_evidence[signature] = reviewed
         if (
             intake_clear_requested
             and (targeted_fields is None or "intake_months" in targeted_fields)
@@ -3191,6 +3211,10 @@ async def re_extract_staged(
         # Equal normalized values also refresh when their selected source details
         # changed, so canonical newer-year pages replace stale provenance.
         evidence_refreshed_fields = set(changed_fields) | provenance_changed_fields
+        if rejected_mode:
+            # Even an already-empty mode needs the rejected candidate saved for
+            # review. It is not selected provenance or successful field repair.
+            evidence_refreshed_fields.add("study_mode")
         await refresh_evidence_for_fields(
             db,
             scraped_course_id=row.id,

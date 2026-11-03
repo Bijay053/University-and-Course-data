@@ -88,13 +88,12 @@ describe("public degrees page", () => {
     expect((screen.getByTestId("input-fee-min") as HTMLInputElement).disabled).toBe(true);
     await pick("select-budget-currency", "GBP");
     fireEvent.click(screen.getByTestId("preset-fee-20000-40000"));
-    await waitFor(() => expect(last().get("fee_max")).toBe("40000"));
-    const p = last();
-    expect(Object.fromEntries(p)).toMatchObject({
+    // Text filters are debounced; the fee request can arrive before them.
+    await waitFor(() => expect(Object.fromEntries(last())).toMatchObject({
       course_name: "data", location: "Sydney", country: "Australia", highest_qualification: "Bachelor", grading_scheme: "GPA",
       grading_out_of: "4", grading_score: "3.2", english_exam: "IELTS", english_overall: "6.5", english_speaking: "6",
-      other_exam: "GMAT", intakes: "February", duration_years_min: "1", duration_years_max: "2", currency: "GBP", fee_min: "20000",
-    });
+      other_exam: "GMAT", intakes: "February", duration_years_min: "1", duration_years_max: "2", currency: "GBP", fee_min: "20000", fee_max: "40000",
+    }));
     expect(window.location.search).toContain("qual=Bachelor");
     // exam switch clears bands; qualification change clears grading
     await pick("select-english-exam", "PTE");

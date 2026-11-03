@@ -18,3 +18,15 @@ display values are cleared. Keep rejected source text available for review,
 not selected as proof. Do not make reads silently clean legacy records or
 replace missing delivery with a guessed on-campus default. Improve extraction
 coverage/recovery separately without bypassing this final write boundary.
+
+Storage coercion is a final safeguard, not a complete review workflow.
+
+**Why:** A bind-time rejection can save an unknown mode while losing its
+explanation. Removing a rejected candidate from selected proof can also erase
+the very source a reviewer needs to inspect.
+
+**How to apply:** Sanitize before persistence to retain warnings and rejected,
+unselected candidates. Save imported candidates atomically with their course.
+An already-empty mode still needs rejected evidence retained; that evidence
+alone is not successful field repair. Clear its warning only after a fresh,
+valid mode is explicitly written, never on an unrelated targeted update.

@@ -602,20 +602,43 @@ async def import_excel(
         existing_names.add(course_name.lower())
 
         try:
+            from app.study_modes import sanitize_study_mode_payload
+
+            imported_mode = payload.get("study_mode")
+            payload = sanitize_study_mode_payload(payload)
             payload["canonical_course_url"] = (
                 canonical_course_url_key(payload.get("course_website")) or None
             )
             try:
                 async with db.begin_nested():
-                    db.add(ScrapedCourse(
+                    staged = ScrapedCourse(
                         scrape_job_id=job_id,
                         university_id=uni.id,
                         status="pending",
                         auto_publish_status="pending_review",
                         eligibility_status="unknown",
                         **payload,
-                    ))
+                    )
+                    db.add(staged)
                     await db.flush()
+                    if "invalid_study_mode" in (payload.get("scrape_warnings") or []):
+                        from app.models import ScrapedFieldEvidence
+
+                        # The spreadsheet is operator input, not verified page
+                        # authority. Keep its rejected text for review atomically
+                        # with the course, never as selected delivery proof.
+                        db.add(ScrapedFieldEvidence(
+                            scraped_course_id=staged.id,
+                            field_key="study_mode",
+                            candidate_value=str(imported_mode),
+                            normalized_value=str(imported_mode),
+                            extraction_method="excel_import",
+                            page_type="operator_import",
+                            snippet=str(imported_mode)[:1000],
+                            selected=False,
+                            decision_status="needs_review",
+                            validation_status="invalid",
+                        ))
             except IntegrityError as exc:
                 if integrity_constraint_name(exc) != REVIEW_URL_IDENTITY_CONSTRAINT:
                     raise

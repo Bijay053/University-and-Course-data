@@ -92,6 +92,10 @@ args = "public-course-card-guards"
 task = "workflow.run"
 args = "study-mode-semantics"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "study-mode-route-persistence"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -298,6 +302,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_study_mode_semantics.py tests/test_study_mode.py tests/test_guards.py tests/test_recipe_rules.py tests/test_online_only_reextract_safety.py -q -c /dev/null -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "study-mode-route-persistence"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && ALLOW_ISOLATED_STUDY_MODE_TESTS=1 PYTHONPATH=. python -m pytest tests/test_study_mode_route_persistence.py -q -c /dev/null -o asyncio_mode=auto -p no:cacheprovider'"
 
 [workflows.workflow.metadata]
 isValidation = true
