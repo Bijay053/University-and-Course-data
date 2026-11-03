@@ -76,6 +76,51 @@ verify the manifest SHA-256, then fetch each listed file by its exact VersionId
 and verify its SHA-256 and byte count. Do not substitute an unversioned latest
 object. Serve recovered HTML only as untrusted evidence, not executable app UI.
 
+### Standalone verified restore
+
+Use `deploy/restore_acceptance_evidence.py`, **not** the smoke-receipt restore
+command. Copy the manifest key, version ID and SHA-256 from the recorded
+`status: retained` result. Supply the independently confirmed owner and the
+original bucket/region; do not discover or substitute a newer version.
+
+```bash
+cd /root/University-and-Course-data && python backend-py/deploy/restore_acceptance_evidence.py \
+  --directory generated-artifacts/restored-acceptance \
+  --bucket EXISTING_BUCKET --expected-owner OWNER_ACCOUNT_ID --region BUCKET_REGION \
+  --manifest-key RECORDED_MANIFEST_KEY \
+  --manifest-version-id RECORDED_MANIFEST_VERSION_ID \
+  --manifest-sha256 RECORDED_MANIFEST_SHA256
+```
+
+The destination must **not exist**, even if empty or holding matching evidence.
+Create its parent first; symlinked ancestors/destinations and traversal are
+rejected. Choose a private location outside web-served directories. Files use
+mode 0600 and newly created directories use 0700.
+
+This command needs only prefix-scoped `s3:GetObjectVersion`; it never lists
+objects, uses unversioned reads, changes bucket settings, uploads, deletes,
+reruns acceptance, or touches smoke receipts. It verifies the pinned manifest's
+bytes, metadata and returned version **before** parsing its strict schema.
+The manifest must agree with the selected owner, bucket, archive identity and
+reconstructed inventory digest. All listed paths, exact object keys, versions,
+sizes and digests are validated before any file downloads.
+
+Every listed version is fetched and checked before creating the destination.
+Downloads are bounded to 100 files, 16 MiB per file, 128 MiB total and a 1 MiB
+manifest. Local writes are exclusive and re-read for verification. The original
+manifest is preserved as `.acceptance-manifest.json`; original receipt bytes and
+acceptance claims remain unchanged, including incomplete or failed runs.
+
+Only exit code 0 and `status: restored` mean that all recovered files matched.
+The JSON result explicitly says `new_acceptance: false`. A missing/deleted
+version, integrity failure or local conflict fails closed with exit code 1 and
+`status: not_restored`; provider messages and evidence contents are not printed.
+There is no latest-version fallback and no automatic overwrite/resume.
+If a local write, disk flush or final verification fails, partial files may
+remain for inspection. A directory or manifest file alone is **not** a success
+receipt. Do not delete or overwrite these files automatically: inspect them,
+fix the cause and retry into a different new destination.
+
 Version identity prevents an overwrite changing the referenced evidence.
 It is not S3 Object Lock/WORM: an administrator with version-deletion permissions
 can still delete it. Keep deletion privileges away from the uploader and preserve
@@ -133,6 +178,7 @@ not permanent retention of the original HSU acceptance files.
 cd /root/University-and-Course-data && cd backend-py && python -m pytest \
   tests/test_archive_acceptance_evidence.py tests/test_archive_smoke_receipts.py \
   tests/test_restore_smoke_receipts.py tests/test_smoke_receipt.py \
+  tests/test_restore_acceptance_evidence.py \
   --import-mode=importlib -q -c /dev/null --noconftest -p no:cacheprovider
 ```
 
