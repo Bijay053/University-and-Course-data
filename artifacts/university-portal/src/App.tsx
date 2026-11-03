@@ -37,13 +37,13 @@ const queryClient = new QueryClient();
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
 
   useEffect(() => {
     if (!loading && !user) {
-      navigate("/login");
+      navigate(location === "/" ? "/toolkit" : "/login", { replace: true });
     }
-  }, [loading, user, navigate]);
+  }, [loading, user, location, navigate]);
 
   if (loading) {
     return (

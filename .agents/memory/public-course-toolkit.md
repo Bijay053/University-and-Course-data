@@ -20,3 +20,11 @@ rather than use a separate visual identity.
 
 **How to apply:** Reuse the portal's shared typography and brand colours when
 styling public course browsing.
+
+Visitors opening the website's main link should land on the public toolkit,
+not the staff sign-in page.
+
+**Why:** The user explicitly requested the toolkit when opening the website.
+
+**How to apply:** Keep anonymous home navigation public while preserving staff
+sign-in and protected administration.
