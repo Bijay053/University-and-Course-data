@@ -84,6 +84,49 @@ the bucket's non-expiring archive policy.
 No live upload is implied by committing an inventory or passing offline tests.
 Until success JSON is recorded, evidence is still workspace-local.
 
+## Disposable live verification
+
+`python -m deploy.rehearse_acceptance_evidence` exercises this uploader with
+synthetic HTML and a synthetic receipt, not the HSU evidence or production bucket.
+It requires the separate `DISPOSABLE_AWS_ACCESS_KEY_ID` /
+`DISPOSABLE_AWS_SECRET_ACCESS_KEY` credentials, an explicit non-production account,
+and separate approval to add temporary test-only permissions:
+
+```bash
+cd backend-py
+python -m deploy.rehearse_acceptance_evidence \
+  --account DISPOSABLE_ACCOUNT --production PRODUCTION_ACCOUNT \
+  --region DISPOSABLE_REGION --run-id SIXTEEN_HEX_CHARACTERS \
+  --output ../generated-artifacts/acceptance-storage \
+  --approve-temporary-permissions
+```
+
+Create the output directory first. Retain the run ID and state file for recovery.
+The harness grants its disposable operator access only to the exact new bucket
+and role. CloudFormation provisions and tags the bucket and role. It waits 15
+minutes for initial S3 versioning propagation, then assumes a separate role whose
+identity **and session policy** allow only the six uploader permissions above.
+Actual AWS calls must deny listing, missing-key reads, deletion, writes outside
+the archive prefix, and bucket mutation.
+
+The test requires real conditional-write conflicts without duplicate versions,
+manifest/inventory hashes, and exact-version recovery even after an authorized
+observer writes a newer corrupt version. The observer never substitutes for the
+uploader identity. Lost-response testing intentionally drops the client response
+after a real successful write; it does not claim an AWS transport outage.
+
+The `finally` path deletes exact object versions, removes the owned stack/bucket/
+role, verifies absence, then removes and checks the temporary permission grant.
+If interrupted or cleanup fails, rerun the same command with `--cleanup-only`;
+do not remove the saved state or grant until resource cleanup succeeds.
+This recovery must use the same account, principal, region, and run ID.
+
+Only after checks and cleanup pass does it write `<run-id>-proof.json`. This is an
+unsigned execution receipt, not a signed release authorization. Preserve its
+non-secret result in the repository verification report before workspace cleanup.
+The disposable objects are deliberately deleted: this proves storage behavior,
+not permanent retention of the original HSU acceptance files.
+
 ## Offline verification
 
 ```bash
@@ -92,3 +135,8 @@ cd /root/University-and-Course-data && cd backend-py && python -m pytest \
   tests/test_restore_smoke_receipts.py tests/test_smoke_receipt.py \
   --import-mode=importlib -q -c /dev/null --noconftest -p no:cacheprovider
 ```
+
+The disposable runner's offline safety tests are in
+`tests/test_acceptance_storage_harness.py`. They cover scoped policies, scenario
+execution, lost provisioning responses, failed checks, cleanup failure/recovery,
+and permission removal after resource cleanup.
