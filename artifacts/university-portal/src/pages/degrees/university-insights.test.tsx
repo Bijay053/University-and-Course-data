@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { UniversityInsights } from "./university-insights";
 
@@ -13,7 +13,7 @@ it("shows empty guidance, retries errors, and hides old university data", async 
   vi.stubGlobal("fetch", fetcher);
   const view = render(<UniversityInsights universityId={1} universityName="First" />);
   fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
-  expect(await screen.findByText(/No Key Insights have been added/)).toBeTruthy();
+  await waitFor(() => expect(view.container.textContent).toBe(""));
   view.rerender(<UniversityInsights universityId={2} universityName="Second" />);
   expect(screen.queryByText(/No Key Insights have been added/)).toBeNull();
   expect(await screen.findByText("<script>unsafe()</script>")).toBeTruthy();

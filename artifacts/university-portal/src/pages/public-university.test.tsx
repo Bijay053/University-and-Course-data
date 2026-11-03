@@ -16,14 +16,15 @@ const cards = [{ title: "Sponsor requirements", emoji: "👤", fields: [{ label:
 
 let calls: string[] = [];
 let mode: "ok" | "empty" | "error" = "ok";
+let insightsEmpty = false;
 beforeEach(() => {
-  calls = []; mode = "ok"; localStorage.clear();
+  calls = []; mode = "ok"; insightsEmpty = false; localStorage.clear();
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
   vi.stubGlobal("fetch", vi.fn(async (input: string) => {
     const url = String(input); calls.push(url);
     const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
     if (url.includes("/api/search/options")) return json({ countries: [], universities: [{ id: 9, name: "Harbour University" }] });
-    if (url.endsWith("/insights")) return json({ insights: [
+    if (url.endsWith("/insights")) return json({ insights: insightsEmpty ? [] : [
       { id: 1, country: "Nepal", text: "raw", updated_at: null, parsed_data: cards },
       { id: 2, country: "India", text: "Plain text guidance only", updated_at: null, parsed_data: null },
     ] });
@@ -41,6 +42,15 @@ const renderAt = (path: string) => {
 };
 
 describe("public university page", () => {
+  it("hides an unavailable insights tab and redirects direct empty-tab links to courses", async () => {
+    insightsEmpty = true;
+    renderAt("/toolkit/universities/9?tab=insights");
+    expect(await screen.findByTestId("card-course-1")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId("tab-uni-insights")).toBeNull());
+    expect(window.location.search).toBe("");
+    expect(screen.queryByText(/No Key Insights/)).toBeNull();
+  });
+
   it("shows the university's courses with pagination", async () => {
     renderAt("/toolkit/universities/9");
     expect((await screen.findByTestId("text-university-name")).textContent).toBe("Harbour University");

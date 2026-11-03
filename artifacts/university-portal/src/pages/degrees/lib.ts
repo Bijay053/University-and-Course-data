@@ -143,10 +143,10 @@ export function feeLines(c: Pick<CourseResult, "offerings" | "international_fee"
 
 export function formatFeeLine(l: FeeLine): string {
   if (l.amount == null) return `Fee ${NOT_PUBLISHED.toLowerCase()}`;
-  const cur = l.currency || "Currency not published";
-  const term = l.term ? ` \u00b7 ${l.term}` : " \u00b7 period not published";
+  const cur = l.currency || "";
+  const term = l.term ? ` \u00b7 ${l.term}` : "";
   const year = l.year != null ? ` (${l.year})` : "";
-  return `${cur} ${l.amount.toLocaleString()}${term}${year}`;
+  return `${cur ? `${cur} ` : ""}${l.amount.toLocaleString()}${term}${year}`;
 }
 
 /** Headline fee only when a single unambiguous published amount exists. */
@@ -157,7 +157,7 @@ export function headlineFee(c: CourseResult): string {
   const currencies = new Set(lines.map((l) => l.currency ?? ""));
   if (currencies.size === 1) {
     const min = Math.min(...lines.map((l) => l.amount as number));
-    return `From ${lines[0].currency || "Currency not published"} ${min.toLocaleString()} (${lines.length} locations)`;
+    return `From ${lines[0].currency ? `${lines[0].currency} ` : ""}${min.toLocaleString()} (${lines.length} locations)`;
   }
   return `${lines.length} location fees in different currencies`;
 }

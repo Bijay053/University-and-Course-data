@@ -52,7 +52,7 @@ describe("public degrees page", () => {
     render(<DegreesPage />);
     expect(await screen.findByTestId("card-course-1")).toBeTruthy();
     expect(document.title).toContain("Study Info Centre");
-    expect(screen.getByTestId("text-fee-2").textContent).toBe("Fee not published");
+    expect(screen.queryByTestId("text-fee-2")).toBeNull();
     fireEvent.click(screen.getByTestId("button-select-course-2"));
     const panels = screen.getAllByTestId("panel-detail");
     expect(within(panels[0]).queryByTestId("link-official-course")).toBeNull();

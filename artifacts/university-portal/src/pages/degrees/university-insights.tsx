@@ -34,6 +34,8 @@ export function UniversityInsights({ universityId, universityName, compact = fal
   const countries = useMemo(() => Array.from(new Set((current?.notes ?? []).map((n) => n.country || "General guidance"))).sort(), [current]);
   const shown = (current?.notes ?? []).filter((n) => country === "__all__" || (n.country || "General guidance") === country);
 
+  if (current && !current.error && current.notes.length === 0) return null;
+
   return (
     <section aria-label={`Key Insights — ${universityName}`} className={compact ? "my-5 rounded-xl border border-[hsl(var(--sic-line))] bg-white p-4" : ""} data-testid="section-insights">
       {compact && <><h3 className="sic-display text-lg">Key Insights</h3><p className="mb-3 text-sm text-[hsl(var(--sic-muted))]">{universityName}</p></>}

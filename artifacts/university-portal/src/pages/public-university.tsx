@@ -20,6 +20,25 @@ export default function PublicUniversityPage() {
   const [, navigate] = useLocation();
   const tab: Tab = new URLSearchParams(search).get("tab") === "insights" ? "insights" : "courses";
   const setTab = (t: Tab) => navigate(`/toolkit/universities/${id}${t === "insights" ? "?tab=insights" : ""}`);
+  const [insightsAvailability, setInsightsAvailability] = useState<{ id: number; available: boolean } | null>(null);
+  const hasNoInsights = insightsAvailability?.id === id && !insightsAvailability.available;
+  useEffect(() => {
+    if (id == null) return;
+    const controller = new AbortController();
+    fetch(`${BASE}/api/search/universities/${id}/insights`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = await response.json();
+        if (!controller.signal.aborted && Array.isArray(body.insights)) {
+          setInsightsAvailability({ id, available: body.insights.length > 0 });
+        }
+      })
+      .catch(() => { /* A failed request is not proof that insights are absent. */ });
+    return () => controller.abort();
+  }, [id]);
+  useEffect(() => {
+    if (hasNoInsights && tab === "insights") navigate(`/toolkit/universities/${id}`, { replace: true });
+  }, [hasNoInsights, tab, id, navigate]);
 
   const [options, setOptions] = useState<OptionsResponse | null>(null);
   const [optionsError, setOptionsError] = useState(false);
@@ -88,7 +107,7 @@ export default function PublicUniversityPage() {
           </div>
           {!notFound && (
             <div role="tablist" aria-label="University sections" className="flex gap-1">
-              {([["courses", "Courses", GraduationCap], ["insights", "Key Insights", Lightbulb]] as const).map(([t, label, Icon]) => (
+              {([["courses", "Courses", GraduationCap], ["insights", "Key Insights", Lightbulb]] as const).filter(([t]) => t !== "insights" || !hasNoInsights).map(([t, label, Icon]) => (
                 <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} data-testid={`tab-uni-${t}`}
                   className={`inline-flex h-11 items-center gap-2 rounded-t-xl px-5 text-sm font-semibold transition-colors ${tab === t ? "bg-[hsl(var(--sic-paper))] text-[hsl(var(--sic-navy))]" : "text-white/80 hover:bg-white/10"}`}>
                   <Icon className="h-4 w-4" aria-hidden /> {label}

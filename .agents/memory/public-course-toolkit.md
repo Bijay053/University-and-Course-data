@@ -37,6 +37,16 @@ the toolkit so visitors can see them.
 **How to apply:** Preserve country-specific context and original guidance,
 keep editing staff-only, and do not trigger AI parsing or writes on public reads.
 
+Hide missing public course details and empty Key Insights rather than showing
+"Not published", blank rows, or a no-insights placeholder. Hide the university's
+Key Insights tab too when there are no saved insights.
+
+**Why:** The user explicitly requested hiding unavailable information after
+seeing the empty Field row and Key Insights box.
+
+**How to apply:** Omit unavailable public display fields while keeping real
+values visible; do not confuse a failed request with confirmed absent data.
+
 University search must be a separate, prominent mode alongside course search,
 not only a university filter in the course sidebar.
 
