@@ -58,8 +58,8 @@ describe("public course page", () => {
     expect((await screen.findByTestId("text-course-name")).textContent).toBe("Master of Data Science");
     expect(calls).toContain("/api/search/compare?ids=7");
     const fees = screen.getByTestId("list-course-fees").textContent ?? "";
-    expect(fees).toContain("AUD 41,200 \u00b7 Year (2026)");
-    expect(fees).toContain("AUD 39,850 \u00b7 Semester");
+    expect(fees).toContain("AUD 41,200 / Year (2026)");
+    expect(fees).toContain("AUD 39,850 / Semester");
     expect(screen.getByTestId("list-course-locations").textContent).toContain("Melbourne");
     expect(screen.getByTestId("list-course-intakes").textContent).toBe("FebruaryJuly");
     expect(screen.getByTestId("row-english-0").textContent).toBe("IELTS6.56666");

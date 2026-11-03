@@ -239,7 +239,7 @@ export function feeLines(c: Pick<CourseResult, "offerings" | "matched_offerings"
 export function formatFeeLine(l: FeeLine): string {
   if (l.amount == null) return `Fee ${NOT_PUBLISHED.toLowerCase()}`;
   const cur = l.currency || "";
-  const term = l.term ? ` \u00b7 ${l.term}` : "";
+  const term = l.term ? ` / ${l.term}` : "";
   const year = l.year != null ? ` (${l.year})` : "";
   return `${cur ? `${cur} ` : ""}${l.amount.toLocaleString()}${term}${year}`;
 }

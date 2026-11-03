@@ -72,10 +72,9 @@ export function CourseErrorReportsPanel() {
             <ul className="divide-y rounded-md border">
               {q.data.reports.map((r) => {
                 const busy = update.isPending && update.variables?.id === r.id;
-                const universityHref = r.university_id ? `/universities/${r.university_id}` : null;
-                const reportHref = r.field === "key_insights"
-                  ? universityHref && `${universityHref}?tab=assessment`
-                  : r.course_id ? `/courses/${r.course_id}` : universityHref;
+                const universityHref = r.university_id
+                  ? `/universities/${r.university_id}?tab=${r.field === "key_insights" ? "assessment" : "courses"}`
+                  : null;
                 const title = r.field === "key_insights"
                   ? `Key Insights — ${r.insight_country || "General guidance"}`
                   : r.course_name ?? "Deleted course";
@@ -89,8 +88,8 @@ export function CourseErrorReportsPanel() {
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-medium" data-testid={`text-report-course-${r.id}`}>
-                          {reportHref ? (
-                            <Link href={reportHref} className="text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary" data-testid={`link-report-page-${r.id}`}>{title}</Link>
+                          {universityHref ? (
+                            <Link href={universityHref} className="text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary" data-testid={`link-report-page-${r.id}`}>{title}</Link>
                           ) : title}
                         </p>
                         <p className="text-xs text-muted-foreground">

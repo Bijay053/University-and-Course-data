@@ -27,13 +27,14 @@ Visitors must be able to report missing or incorrect course information and
 university Key Insights using a short form, and staff must see the submissions
 inside the dashboard. Key Insights reports must identify the university and
 the relevant insight country, not an unrelated course.
-Staff need direct navigation from dashboard reports to the affected course and
-university inside the staff dashboard, never the public toolkit or landing page,
-so they can investigate and fix the reported information. Key Insights reports
-must open the university's editable Key Insights tab.
+Both names in dashboard reports must open the university's matching management
+tab: course reports open Courses, and Key Insights reports open editable Key
+Insights. Do not send reports to a separate course page, the public toolkit or
+the landing page.
 
 **Why:** The user explicitly requested public error reports and dashboard review,
-then corrected report links that opened public pages instead of dashboard management.
+then clarified that report links must open the matching university tab rather
+than a separate course page. This does not request unique links for every tab.
 
 **How to apply:** Keep reports private and review-only. Never treat anonymous
 reports as scraper learning, source authority, or instructions to change course

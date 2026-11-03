@@ -173,6 +173,13 @@ async function expectDialogAndClose(
 }
 
 describe("University Detail dialogs", () => {
+  it("opens the editable Courses tab from a dashboard course report link", async () => {
+    window.history.replaceState(null, "", "/universities/7?tab=courses");
+    renderPage();
+    await screen.findByText("Accessible Course");
+    expect(screen.queryByRole("button", { name: "Add Key Insight" })).toBeNull();
+  });
+
   it("opens the editable Key Insights tab from a dashboard report link", async () => {
     window.history.replaceState(null, "", "/universities/7?tab=assessment");
     const user = userEvent.setup();

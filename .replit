@@ -84,6 +84,10 @@ args = "smoke-receipt-restore"
 task = "workflow.run"
 args = "acceptance-evidence-restore"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "public-course-card-guards"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -268,6 +272,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_restore_acceptance_evidence.py tests/test_archive_acceptance_evidence.py tests/test_restore_smoke_receipts.py tests/test_archive_smoke_receipts.py tests/test_smoke_receipt.py tests/test_acceptance_storage_harness.py --import-mode=importlib -q -c /dev/null --noconftest -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "public-course-card-guards"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/pnpm-secure.sh --filter @workspace/university-portal exec vitest run src/pages/degrees/course-card.test.tsx src/pages/degrees.test.tsx src/pages/public-university.test.tsx && bash scripts/pnpm-secure.sh --filter @workspace/university-portal run typecheck"
 
 [workflows.workflow.metadata]
 isValidation = true

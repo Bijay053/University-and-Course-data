@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_FILTERS, buildSearchParams, filtersFromQuery, filtersToQuery, headlineFee, locationText, safeHttpUrl, readShortlist, writeShortlist, type CourseResult } from "./lib";
+import { EMPTY_FILTERS, buildSearchParams, filtersFromQuery, filtersToQuery, formatFeeLine, headlineFee, locationText, safeHttpUrl, readShortlist, writeShortlist, type CourseResult } from "./lib";
 
 const course = (over: Partial<CourseResult> = {}): CourseResult => ({
   id: 1, course_name: "MSc Data", university: { id: 2, name: "Uni", logo_url: null, city: null, country: null },
@@ -10,13 +10,23 @@ const course = (over: Partial<CourseResult> = {}): CourseResult => ({
 });
 
 describe("degrees lib", () => {
+  it.each([
+    [29176, "AUD", "Annual", null, "AUD 29,176 / Annual"],
+    [32000, null, "year", null, "32,000 / year"],
+    [17000, "GBP", "Full Course", 2026, "GBP 17,000 / Full Course (2026)"],
+    [20000, "AUD", null, null, "AUD 20,000"],
+    [0, "AUD", "Semester", null, "AUD 0 / Semester"],
+  ] as const)("formats published fee %s with a slash only when a period exists", (amount, currency, term, year, expected) => {
+    expect(formatFeeLine({ label: null, amount, currency, term, year })).toBe(expected);
+  });
+
   it("shows only the offering fees which passed the selected currency and range", () => {
     const all = [
       { id: "1", location: "London", feeAmount: 20000, feeCurrency: "GBP", feeTerm: "Annual", feeYear: 2026 },
       { id: "2", location: "Sydney", feeAmount: 1000, feeCurrency: "AUD", feeTerm: "Annual", feeYear: 2026 },
     ];
     const c = course({ offerings: all, matched_offerings: [all[0]] });
-    expect(headlineFee(c)).toBe("GBP 20,000 · Annual (2026)");
+    expect(headlineFee(c)).toBe("GBP 20,000 / Annual (2026)");
     expect(headlineFee(course({ offerings: all }))).toContain("fees in different currencies");
   });
   it("scopes course-name input to names and displays the actual matched campus", () => {

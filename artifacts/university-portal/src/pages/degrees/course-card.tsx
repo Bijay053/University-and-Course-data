@@ -7,6 +7,10 @@ type Props = {
 };
 
 export function CourseCard({ course, view, selected, shortlisted, onSelect, onToggleShortlist, index }: Props) {
+  const hasFee = feeLines(course).some((fee) => fee.amount != null);
+  // Keep an 8px gap beside the corner control, including the larger phone
+  // button. In wide list cards with fees, that control is in the fee column.
+  const controlClearance = view === "list" && hasFee ? "pr-11 sm:pr-0" : "pr-11 sm:pr-9";
   const meta = (
     <ul className={`min-w-0 break-words text-[13px] text-[hsl(var(--sic-muted))] ${view === "list" ? "flex flex-wrap gap-x-5 gap-y-1" : "space-y-1"}`}>
       {locationText(course) !== NOT_PUBLISHED && <li className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />{locationText(course)}</li>}
@@ -16,21 +20,21 @@ export function CourseCard({ course, view, selected, shortlisted, onSelect, onTo
   );
   return (
     <article style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }} data-testid={`card-course-${course.id}`}
-      className={`sic-rise group relative rounded-2xl border bg-white/95 transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-18px_hsl(213_60%_22%/0.5)] ${selected ? "border-[hsl(var(--sic-teal))] ring-2 ring-[hsl(var(--sic-teal))]/25" : "border-[hsl(var(--sic-line))]"} ${view === "list" ? "p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4" : "p-4 sm:p-5 flex flex-col gap-3"}`}>
+      className={`sic-rise group relative min-w-0 rounded-2xl border bg-white/95 transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-18px_hsl(213_60%_22%/0.5)] ${selected ? "border-[hsl(var(--sic-teal))] ring-2 ring-[hsl(var(--sic-teal))]/25" : "border-[hsl(var(--sic-line))]"} ${view === "list" ? "p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4" : "p-4 sm:p-5 flex flex-col gap-3"}`}>
       <div className="flex-1 min-w-0 space-y-2">
-        <div className="flex flex-wrap items-center gap-2 pr-10">
-          {course.degree_level?.trim() && <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[hsl(var(--sic-teal))]">{course.degree_level}</span>}
+        <div className={`flex min-w-0 flex-wrap items-center gap-2 ${controlClearance}`}>
+          {course.degree_level?.trim() && <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[hsl(var(--sic-teal))] [overflow-wrap:anywhere]">{course.degree_level}</span>}
         </div>
-        <h3 className="sic-display pr-8 text-[17px] sm:text-[19px] leading-snug break-words [overflow-wrap:anywhere]">
+        <h3 className={`sic-display ${controlClearance} text-[17px] sm:text-[19px] leading-snug break-words [overflow-wrap:anywhere]`}>
           <button type="button" onClick={onSelect} aria-pressed={selected} data-testid={`button-select-course-${course.id}`}
-            className="text-left after:absolute after:inset-0 after:content-[''] hover:text-[hsl(var(--sic-teal))]">
+            className="block w-full min-w-0 max-w-full whitespace-normal text-left [overflow-wrap:anywhere] after:absolute after:inset-0 after:content-[''] hover:text-[hsl(var(--sic-teal))]">
             {course.course_name}
           </button>
         </h3>
         {course.university.name?.trim() && <p className="text-sm font-medium text-[hsl(var(--sic-navy))]">{course.university.name}</p>}
         {meta}
       </div>
-      {feeLines(course).some((fee) => fee.amount != null) && <div className={`${view === "list" ? "sm:w-56 sm:text-right" : "border-t border-dashed border-[hsl(var(--sic-line))] pt-3"}`}>
+      {hasFee && <div className={`${view === "list" ? "sm:w-56 sm:text-right" : "border-t border-dashed border-[hsl(var(--sic-line))] pt-3"}`}>
         <p className="text-[11px] uppercase tracking-[0.12em] text-[hsl(var(--sic-muted))]">International fee</p>
         <p className="text-sm font-semibold" data-testid={`text-fee-${course.id}`}>{headlineFee(course)}</p>
       </div>}

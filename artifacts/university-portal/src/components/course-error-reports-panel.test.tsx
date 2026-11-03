@@ -23,25 +23,28 @@ describe("CourseErrorReportsPanel", () => {
     expect(screen.queryByText("Deleted course")).toBeNull();
     const link = screen.getByTestId("link-report-page-5");
     expect(link.getAttribute("href")).toBe("/universities/4?tab=assessment");
+    expect(screen.getByTestId("link-report-university-5").getAttribute("href")).toBe("/universities/4?tab=assessment");
     fireEvent.click(link);
     expect(window.location.pathname).toBe("/universities/4");
     expect(window.location.search).toBe("?tab=assessment");
   });
 
-  it("opens the reported course and university from their names", async () => {
+  it.each(["fees", "english", "academic", "location", "scholarships"])("opens the university Courses tab from both names for a %s report", async (field) => {
     perms.set = new Set(["courses.view"]);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      reports: [{ ...report, university_id: 4 }], total: 1,
+      reports: [{ ...report, field, university_id: 4 }], total: 1,
     }), { status: 200 })));
     wrap();
     const course = await screen.findByTestId("link-report-page-5");
-    expect(course.getAttribute("href")).toBe("/courses/3");
+    expect(course.getAttribute("href")).toBe("/universities/4?tab=courses");
     fireEvent.click(course);
-    expect(window.location.pathname).toBe("/courses/3");
+    expect(window.location.pathname).toBe("/universities/4");
+    expect(window.location.search).toBe("?tab=courses");
     const university = screen.getByTestId("link-report-university-5");
-    expect(university.getAttribute("href")).toBe("/universities/4");
+    expect(university.getAttribute("href")).toBe("/universities/4?tab=courses");
     fireEvent.click(university);
     expect(window.location.pathname).toBe("/universities/4");
+    expect(window.location.search).toBe("?tab=courses");
   });
 
   it("falls back to the dashboard university when a reported course was deleted", async () => {
@@ -51,9 +54,10 @@ describe("CourseErrorReportsPanel", () => {
     }), { status: 200 })));
     wrap();
     const link = await screen.findByTestId("link-report-page-5");
-    expect(link.getAttribute("href")).toBe("/universities/4");
+    expect(link.getAttribute("href")).toBe("/universities/4?tab=courses");
     fireEvent.click(link);
     expect(window.location.pathname).toBe("/universities/4");
+    expect(window.location.search).toBe("?tab=courses");
   });
 
   it("keeps deleted target snapshots without broken navigation links", async () => {
@@ -64,6 +68,16 @@ describe("CourseErrorReportsPanel", () => {
     wrap();
     await screen.findByText("BSc Nursing");
     expect(screen.getByText("Harbour Uni")).toBeTruthy();
+    expect(screen.queryByTestId("link-report-page-5")).toBeNull();
+    expect(screen.queryByTestId("link-report-university-5")).toBeNull();
+  });
+  it("does not substitute a separate course page when the university is unknown", async () => {
+    perms.set = new Set(["courses.view"]);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      reports: [{ ...report, university_id: null }], total: 1,
+    }), { status: 200 })));
+    wrap();
+    await screen.findByText("BSc Nursing");
     expect(screen.queryByTestId("link-report-page-5")).toBeNull();
     expect(screen.queryByTestId("link-report-university-5")).toBeNull();
   });

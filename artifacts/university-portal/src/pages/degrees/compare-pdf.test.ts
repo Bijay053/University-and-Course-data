@@ -26,7 +26,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("comparison export data and PDF", () => {
   it("shares complete published values without converting currencies or unsafe links", () => {
     const rows = comparisonRows([course, { ...course, currency: "GBP", international_fee: 17000, course_url: "javascript:alert(1)" }]);
-    expect(rows.find((r) => r.label === "Fees (as published)")?.values).toEqual(["AUD 28,000 · Annual (2026)", "GBP 17,000 · Annual (2026)"]);
+    expect(rows.find((r) => r.label === "Fees (as published)")?.values).toEqual(["AUD 28,000 / Annual (2026)", "GBP 17,000 / Annual (2026)"]);
     expect(rows.find((r) => r.label === "English")?.values[0]).toBe("IELTS 6.5");
     expect(rows.find((r) => r.label === "Academic entry")?.values[0]).toBe("Bachelor degree, 60 Percentage");
     expect(rows.find((r) => r.label === "Official page")?.values).toEqual(["https://example.edu/course", "Not published"]);
