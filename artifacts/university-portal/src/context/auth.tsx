@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode, useCallback } from "react";
 import { fetchWithAuth, setAuthToken, loadAuthToken, setOnUnauthorized } from "@/lib/api";
 import { setUnauthorizedHandler } from "@workspace/api-client-react";
 import { toast } from "@/hooks/use-toast";
@@ -26,7 +26,7 @@ interface AuthState {
   permissions: Set<string>;
   can: (key: string) => boolean;
   canAny: (keys: string[]) => boolean;
-  login: (email: string, password: string) => Promise<LoginChallenge>;
+  login: (email: string, password: string, flow: "email-otp-v1") => Promise<LoginChallenge>;
   verifyOtp: (challengeToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -50,16 +50,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<Set<string>>(new Set());
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const authGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
+    const generation = authGeneration.current;
     try {
       loadAuthToken();
       const res = await fetchWithAuth(`${BASE}/api/auth/me`);
       const data = await res.json();
+      if (generation !== authGeneration.current) return;
       setUser(data.user ?? null);
       setPermissions(new Set<string>(Array.isArray(data.permissions) ? data.permissions : []));
       setIsSuperAdmin(Boolean(data.is_super_admin));
     } catch {
+      if (generation !== authGeneration.current) return;
       setUser(null);
       setPermissions(new Set());
       setIsSuperAdmin(false);
@@ -71,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const forceLogout = useCallback(() => {
+    authGeneration.current += 1;
     setAuthToken(null);
     setUser((prev) => {
       if (prev) {
@@ -99,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await fetch(`${BASE}/api/auth/${path}`, {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Portal-Login-Flow": "email-otp-v1" },
       body: JSON.stringify(body),
     });
     let data: Record<string, unknown> = {};
@@ -125,12 +130,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data;
   }
 
-  async function login(email: string, password: string): Promise<LoginChallenge> {
+  async function login(email: string, password: string, flow: "email-otp-v1"): Promise<LoginChallenge> {
+    if (flow !== "email-otp-v1") {
+      throw new Error("The sign-in page has been updated. Please reload this page to verify your email.");
+    }
     const data = await authRequest("login", { email, password });
     if (data.otp_required !== true || typeof data.challenge_token !== "string") {
       throw new Error("Email verification is required. Please reload and try again.");
     }
     // A challenge is not an authenticated session and stays only in component memory.
+    authGeneration.current += 1;
     setAuthToken(null);
     setUser(null);
     setPermissions(new Set());
@@ -148,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof data.token !== "string" || !data.user) {
       throw new Error("Verification did not complete. Please try again.");
     }
+    authGeneration.current += 1;
     setAuthToken(data.token);
     setUser((data.user as User) ?? null);
     setPermissions(new Set<string>(Array.isArray(data.permissions) ? data.permissions : []));
@@ -155,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
+    authGeneration.current += 1;
     await fetchWithAuth(`${BASE}/api/auth/logout`, { method: "POST" });
     setAuthToken(null);
     setUser(null);

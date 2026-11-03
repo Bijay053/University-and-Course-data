@@ -52,6 +52,7 @@ export default defineConfig(async ({ mode }) => {
       emptyOutDir: true,
     },
     server: {
+      headers: { "Cache-Control": "no-store" },
       port,
       host: "0.0.0.0",
       allowedHosts: true,
@@ -69,6 +70,7 @@ export default defineConfig(async ({ mode }) => {
       },
     },
     preview: {
+      headers: { "Cache-Control": "no-store" },
       port,
       host: "0.0.0.0",
       allowedHosts: true,

@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import secrets
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 
 from fastapi import HTTPException
 from redis.asyncio import Redis
@@ -12,7 +13,7 @@ from redis.exceptions import RedisError
 
 from app.config import settings
 
-PREFIX = "portal:login-otp:v1:"
+PREFIX = "portal:login-otp:v2:"
 TTL = 600
 COOLDOWN = 60
 _RATE = """
@@ -25,6 +26,7 @@ local old = redis.call('GET', KEYS[2])
 if old then redis.call('DEL', ARGV[1] .. 'challenge:' .. old) end
 redis.call('HSET', KEYS[1], 'user_id', ARGV[3], 'email', ARGV[4],
  'password_stamp', ARGV[5], 'digest', ARGV[6], 'attempts', 0)
+redis.call('HSET', KEYS[1], 'delivered', 0)
 redis.call('EXPIRE', KEYS[1], ARGV[7])
 redis.call('SET', KEYS[2], ARGV[2], 'EX', ARGV[7])
 return 1
@@ -32,6 +34,7 @@ return 1
 _VERIFY = """
 local uid = redis.call('HGET', KEYS[1], 'user_id')
 if not uid then return {0} end
+if redis.call('HGET', KEYS[1], 'delivered') ~= '1' then return {0} end
 local active = ARGV[1] .. 'active:' .. uid
 if redis.call('GET', active) ~= ARGV[2] then return {0} end
 if redis.call('HGET', KEYS[1], 'digest') ~= ARGV[3] then
@@ -44,6 +47,19 @@ local stamp = redis.call('HGET', KEYS[1], 'password_stamp')
 redis.call('DEL', KEYS[1], active)
 return {1, uid, email, stamp}
 """
+_DELIVERED = """
+if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
+redis.call('HSET', KEYS[1], 'delivered', 1)
+return 1
+"""
+
+
+@dataclass
+class Challenge:
+    token: str
+    code: str | None
+    expires_in: int = TTL
+    resend_after: int = COOLDOWN
 
 
 def stamp(value: str) -> str:
@@ -73,15 +89,31 @@ async def check_login_rate(address: str) -> None:
             raise HTTPException(429, "Too many sign-in attempts. Try again in 15 minutes.")
 
 
-async def issue(user) -> tuple[str, str]:
+async def issue(user) -> Challenge:
     async with _redis() as client:
         identity = stamp(user.email.lower())
+        cooldown_key = PREFIX + "cooldown:" + identity
+        if not await client.set(cooldown_key, "1", nx=True, ex=COOLDOWN):
+            # Password verification has already passed. Recover the SAME proof,
+            # without sending mail or renewing expiry/incorrect-attempt budgets.
+            token = await client.get(PREFIX + f"active:{user.id}")
+            if token:
+                key = PREFIX + "challenge:" + token
+                data = await client.hgetall(key)
+                remaining = await client.ttl(key)
+                if (
+                    remaining > 0 and data.get("delivered") == "1"
+                    and data.get("user_id") == str(user.id)
+                    and data.get("email", "").lower() == user.email.lower()
+                    and hmac.compare_digest(data.get("password_stamp", ""), stamp(user.password_hash))
+                ):
+                    return Challenge(token, None, remaining, max(1, await client.ttl(cooldown_key)))
+            retry_after = max(1, await client.ttl(cooldown_key))
+            raise HTTPException(429, "Please wait 60 seconds before requesting another code.",
+                                headers={"Retry-After": str(retry_after)})
         count = await client.eval(_RATE, 1, PREFIX + "mail-rate:" + identity, 900)
         if int(count) > 5:
             raise HTTPException(429, "Too many verification emails. Try again in 15 minutes.")
-        if not await client.set(PREFIX + "cooldown:" + identity, "1", nx=True, ex=COOLDOWN):
-            raise HTTPException(429, "Please wait 60 seconds before requesting another code.",
-                                headers={"Retry-After": str(COOLDOWN)})
         token = secrets.token_urlsafe(32)
         code = f"{secrets.randbelow(1_000_000):06d}"
         await client.eval(
@@ -89,7 +121,14 @@ async def issue(user) -> tuple[str, str]:
             PREFIX, token, str(user.id), user.email, stamp(user.password_hash),
             _digest(token, code), TTL,
         )
-        return token, code
+        return Challenge(token, code)
+
+
+async def mark_delivered(token: str) -> None:
+    async with _redis() as client:
+        marked = await client.eval(_DELIVERED, 1, PREFIX + "challenge:" + token)
+    if not marked:
+        raise HTTPException(401, "Verification expired. Please start sign-in again.")
 
 
 async def discard(token: str) -> None:

@@ -26,7 +26,7 @@ export default function Login() {
   }, [challenge]);
 
   async function sendCode() {
-    const next = await login(email, password);
+    const next = await login(email, password, "email-otp-v1");
     setChallenge(next);
     setResendWait(next.resend_after);
     setCode("");
@@ -138,7 +138,7 @@ export default function Login() {
                 value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
                 placeholder="6-digit code" className="text-center text-lg tracking-[0.25em]"
               />
-              <p className="text-xs text-muted-foreground">Expires in 10 minutes. Check your spam folder too.</p>
+              <p className="text-xs text-muted-foreground">Use the most recent code in your inbox. Codes expire after 10 minutes.</p>
             </div>}
             {error && (
               <p role="alert" className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">

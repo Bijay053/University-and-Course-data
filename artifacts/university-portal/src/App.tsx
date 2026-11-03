@@ -1,12 +1,12 @@
-import React, { useEffect } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter } from "wouter";
 import { aroundCourseEditNavigation } from "@/lib/course-edit-navigation-guard";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
-import { AuthProvider, useAuth } from "@/context/auth";
+import { AuthProvider } from "@/context/auth";
+import { AuthGuard } from "@/components/auth-guard";
 
 import Dashboard from "@/pages/dashboard";
 import Universities from "@/pages/universities";
@@ -36,31 +36,6 @@ import RecipeEditorPage from "@/pages/recipe-editor";
 import CertDashboardPage from "@/pages/cert-dashboard";
 
 const queryClient = new QueryClient();
-
-function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const [location, navigate] = useLocation();
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate(location === "/" ? "/toolkit" : "/login", { replace: true });
-    }
-  }, [loading, user, location, navigate]);
-
-  if (loading) {
-    return (
-      <div className="min-h-[100dvh] flex items-center justify-center text-muted-foreground text-sm">
-        Loading…
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  return <>{children}</>;
-}
 
 function Router() {
   return (

@@ -51,7 +51,7 @@ def _is_configured() -> bool:
     ))
 
 
-def _send_sync(to: str, subject: str, body: str) -> None:
+def _send_sync(to: str, subject: str, body: str, html_body: str | None = None) -> None:
     if _ses_is_configured():
         import boto3
         from botocore.config import Config
@@ -63,13 +63,16 @@ def _send_sync(to: str, subject: str, body: str) -> None:
             aws_secret_access_key=os.environ["SES_SECRET_KEY"],
             config=Config(connect_timeout=5, read_timeout=10, retries={"max_attempts": 1}),
         )
+        message_body = {"Text": {"Data": body, "Charset": "UTF-8"}}
+        if html_body:
+            message_body["Html"] = {"Data": html_body, "Charset": "UTF-8"}
         try:
             client.send_email(
                 Source=os.environ["DEFAULT_FROM_EMAIL"],
                 Destination={"ToAddresses": [to]},
                 Message={
                     "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body": {"Text": {"Data": body, "Charset": "UTF-8"}},
+                    "Body": message_body,
                 },
             )
         finally:
@@ -88,6 +91,8 @@ def _send_sync(to: str, subject: str, body: str) -> None:
     msg["To"] = to
     msg["Subject"] = subject
     msg.set_content(body)
+    if html_body:
+        msg.add_alternative(html_body, subtype="html")
 
     ctx = ssl.create_default_context()
     if port == 465:
@@ -102,7 +107,7 @@ def _send_sync(to: str, subject: str, body: str) -> None:
             s.send_message(msg)
 
 
-async def send_email(to: str, subject: str, body: str) -> bool:
+async def send_email(to: str, subject: str, body: str, *, html_body: str | None = None) -> bool:
     """Send an email asynchronously. Returns True on success.
 
     Never expose the message body or transport exception text in logs.
@@ -111,7 +116,7 @@ async def send_email(to: str, subject: str, body: str) -> bool:
         log.warning("Email delivery unavailable: sender settings are incomplete")
         return False
     try:
-        await asyncio.to_thread(_send_sync, to, subject, body)
+        await asyncio.to_thread(_send_sync, to, subject, body, html_body)
         log.info("Sent email to %s (subject=%r)", to, subject)
         return True
     except Exception as exc:  # noqa: BLE001 -- we intentionally swallow + log

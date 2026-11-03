@@ -40,6 +40,7 @@ from app.services.email import _is_configured as smtp_is_configured
 from app.services.email import send_email
 from app.services.passwords import hash_password, verify_password
 from app.services import login_otp
+from app.services.email_templates import login_code_email, password_reset_email
 
 log = logging.getLogger("uniportal.auth")
 router = APIRouter()
@@ -86,6 +87,14 @@ async def login(
     body: LoginBody, request: Request, response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> LoginChallengeResponse:
+    if request.headers.get("x-portal-login-flow") != "email-otp-v1":
+        # Old open tabs treat ANY successful login response as an authenticated
+        # session. Reject them before sending a code or consuming a rate limit.
+        raise HTTPException(
+            409, "The sign-in page has been updated for email verification. "
+            "Please reload this page, then sign in again.",
+            headers={"Cache-Control": "no-store"},
+        )
     await login_otp.check_login_rate(request.client.host if request.client else "unknown")
     user = await _load_user_by_email(db, body.email)
     if not user or not user.is_active or not verify_password(body.password, user.password_hash):
@@ -94,20 +103,23 @@ async def login(
         )
     if not smtp_is_configured():
         raise HTTPException(503, "Sign-in email delivery is unavailable. Please contact the portal administrator.")
-    challenge, code = await login_otp.issue(user)
-    sent = await send_email(
-        user.email, "Your Study Info Centre sign-in code",
-        f"Your sign-in verification code is: {code}\n\n"
-        "This code expires in 10 minutes and can be used once. "
-        "If you did not request it, do not share the code and change your password.",
-    )
-    if not sent:
-        await login_otp.discard(challenge)
-        raise HTTPException(503, "Could not send your verification email. Please try again later.")
+    challenge = await login_otp.issue(user)
+    if challenge.code is not None:
+        message = login_code_email(
+            challenge.code, user.full_name or "", expires_minutes=login_otp.TTL // 60,
+        )
+        sent = await send_email(
+            user.email, message.subject, message.text, html_body=message.html,
+        )
+        if not sent:
+            await login_otp.discard(challenge.token)
+            raise HTTPException(503, "Could not send your verification email. Please try again later.")
+        await login_otp.mark_delivered(challenge.token)
     response.delete_cookie("session", path="/")
     local, _, domain = user.email.partition("@")
     return LoginChallengeResponse(
-        challenge_token=challenge, masked_email=f"{local[:1]}***@{domain}",
+        challenge_token=challenge.token, masked_email=f"{local[:1]}***@{domain}",
+        expires_in=challenge.expires_in, resend_after=challenge.resend_after,
     )
 
 
@@ -222,14 +234,10 @@ async def forgot_password(
         await db.commit()
 
         reset_url = _build_reset_url(request, token)
-        body_text = (
-            f"Hi {user.full_name or user.email},\n\n"
-            f"We received a request to reset your password. Click the link below "
-            f"to set a new one (the link expires in {RESET_TOKEN_TTL_HOURS} hours):\n\n"
-            f"{reset_url}\n\n"
-            f"If you didn't request this, you can safely ignore this email.\n"
+        message = password_reset_email(
+            reset_url, user.full_name or "", expires_hours=RESET_TOKEN_TTL_HOURS,
         )
-        sent = await send_email(user.email, "Reset your password", body_text)
+        sent = await send_email(user.email, message.subject, message.text, html_body=message.html)
         if not sent:
             # Do not leave a usable reset credential for an undelivered email.
             # Keep the public acknowledgement identical to unknown accounts:

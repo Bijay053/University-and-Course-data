@@ -30,3 +30,24 @@ and a test email succeeded.
 **How to apply:** Keep the mail transport explicit and validate that transport
 before enforcing email-dependent authentication. Do not silently switch AWS
 identities when mail authentication fails.
+
+Validate the administrator's actual recipient before enforcing email-dependent
+sign-in, not just the configured sender.
+
+**Why:** The initial administrator used a non-deliverable placeholder mailbox;
+a successful test to the sender alone would still have left the owner locked out.
+
+**How to apply:** Confirm the administrator email with the user and test delivery
+to it. Preserve the existing account, password and permissions, and align the
+bootstrap identity so restarting cannot recreate a placeholder administrator.
+
+Authentication protocol changes must account for old open tabs and partially
+hot-reloaded clients, not just freshly loaded forms.
+
+**Why:** A password-only form treated a successful OTP challenge response as a
+finished login, navigated to the toolkit, and lost the code-entry step.
+
+**How to apply:** Reject incompatible forms before sending mail or consuming
+rate limits. Check both form and provider compatibility. Test real routing with
+the actual authentication provider and guard. Recover delivered pending challenges
+without renewing their expiry, wrong-attempt count, or email-send budget.

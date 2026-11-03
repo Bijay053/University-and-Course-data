@@ -32,7 +32,8 @@ def portal(monkeypatch):
     async def load(db, email):
         return user if email.lower() == user.email.lower() else None
 
-    async def mail(to, subject, body):
+    async def mail(to, subject, body, html_body=None):
+        assert html_body and "<html" in html_body
         sent.append(re.search(r"\b[0-9]{6}\b", body).group())
         return delivery["ok"]
 
@@ -51,7 +52,7 @@ def portal(monkeypatch):
     async def protected(payload=Depends(get_current_user)):
         return {"ok": True}
 
-    with TestClient(app) as client:
+    with TestClient(app, headers={"X-Portal-Login-Flow": "email-otp-v1"}) as client:
         yield SimpleNamespace(client=client, user=user, sent=sent, delivery=delivery)
 
     async def purge():
@@ -125,7 +126,10 @@ def test_account_changes_cancel_pending_login(portal, change):
 
 def test_resend_cooldown_and_new_code_invalidates_old_challenge(portal):
     old = start(portal).json()["challenge_token"]
-    assert start(portal).status_code == 429
+    resumed = start(portal)
+    assert resumed.status_code == 200
+    assert resumed.json()["challenge_token"] == old
+    assert len(portal.sent) == 1
 
     async def release():
         async with Redis.from_url(settings.redis_url) as redis:
@@ -155,12 +159,46 @@ def test_expiry_hash_only_storage_and_atomic_consumption(portal):
     asyncio.run(check())
 
     async def expire():
-        new, code = await login_otp.issue(SimpleNamespace(
+        challenge = await login_otp.issue(SimpleNamespace(
             id=888, email="other@example.test", password_hash="test-only-hash",
         ))
         async with Redis.from_url(settings.redis_url) as redis:
-            await redis.delete(login_otp.PREFIX + "challenge:" + new)
+            await redis.delete(login_otp.PREFIX + "challenge:" + challenge.token)
         with pytest.raises(HTTPException) as error:
-            await login_otp.consume(new, code)
+            await login_otp.consume(challenge.token, challenge.code)
         assert error.value.status_code == 401
     asyncio.run(expire())
+
+
+def test_old_login_pages_are_rejected_before_mail_or_rate_limits(portal):
+    response = portal.client.post("/api/auth/login", headers={"X-Portal-Login-Flow": ""}, json={
+        "email": portal.user.email, "password": "test-password",
+    })
+    assert response.status_code == 409
+    assert "reload" in response.json()["detail"]
+    assert portal.sent == []
+    assert start(portal).status_code == 200
+
+
+def test_recovering_a_challenge_does_not_reset_wrong_attempts_or_send_budget(portal):
+    old = start(portal).json()["challenge_token"]
+    wrong = "000000" if portal.sent[0] != "000000" else "111111"
+    for _ in range(4):
+        assert verify(portal, old, wrong).status_code == 401
+    for _ in range(6):
+        assert start(portal).json()["challenge_token"] == old
+    assert len(portal.sent) == 1
+    assert verify(portal, old, wrong).status_code == 401
+    assert start(portal).status_code == 429
+    assert verify(portal, old, portal.sent[0]).status_code == 401
+
+
+def test_undelivered_challenges_are_not_recovered_or_accepted(portal):
+    async def check():
+        challenge = await login_otp.issue(portal.user)
+        with pytest.raises(HTTPException) as error:
+            await login_otp.consume(challenge.token, challenge.code)
+        assert error.value.status_code == 401
+    asyncio.run(check())
+    assert start(portal).status_code == 429
+    assert portal.sent == []

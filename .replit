@@ -359,6 +359,7 @@ EMAIL_TRANSPORT = "smtp"
 SMTP_HOST = "email-smtp.ap-south-1.amazonaws.com"
 SMTP_PORT = "587"
 SMTP_USE_TLS = "true"
+ADMIN_EMAIL = "au@studyinfocentre.com"
 
 [userenv.development]
 PLAYWRIGHT_NODEJS_PATH = "/home/runner/workspace/scripts/secure-browser-node.sh"

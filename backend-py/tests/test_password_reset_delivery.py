@@ -57,6 +57,8 @@ def test_sent_reset_link_is_only_in_email_and_never_public_response(recovery, ca
     assert "debug_reset_url" not in result.json()
     assert TOKEN not in result.text + caplog.text
     assert TOKEN in sender.call_args.args[2]
+    assert TOKEN in sender.call_args.kwargs["html_body"]
+    assert "Reset password" in sender.call_args.kwargs["html_body"]
     db.add.assert_called_once()
     db.commit.assert_awaited_once()
 
@@ -105,7 +107,8 @@ async def test_transport_error_cannot_echo_credentials_into_logs(monkeypatch, ca
     assert "RuntimeError" in caplog.text
 
 
-def test_ses_uses_dedicated_identity_and_verified_sender(monkeypatch):
+@pytest.mark.parametrize("html_body", [None, "<html><body>Test HTML email</body></html>"])
+def test_ses_uses_dedicated_identity_and_verified_sender(monkeypatch, html_body):
     import boto3
 
     for key, value in {
@@ -118,7 +121,7 @@ def test_ses_uses_dedicated_identity_and_verified_sender(monkeypatch):
     factory = MagicMock(return_value=client)
     monkeypatch.setattr(boto3, "client", factory)
     assert email._is_configured()
-    email._send_sync("person@example.test", "Reset", TOKEN)
+    email._send_sync("person@example.test", "Reset", TOKEN, html_body)
     assert factory.call_args.kwargs["aws_access_key_id"] == "test-ses-identity"
     assert factory.call_args.kwargs["aws_secret_access_key"] == "test-ses-secret"
     assert factory.call_args.kwargs["region_name"] == "ap-southeast-2"
@@ -126,10 +129,15 @@ def test_ses_uses_dedicated_identity_and_verified_sender(monkeypatch):
     assert request["Source"] == "sender@example.test"
     assert request["Destination"] == {"ToAddresses": ["person@example.test"]}
     assert request["Message"]["Body"]["Text"]["Data"] == TOKEN
+    if html_body:
+        assert request["Message"]["Body"]["Html"] == {"Data": html_body, "Charset": "UTF-8"}
+    else:
+        assert "Html" not in request["Message"]["Body"]
     client.close.assert_called_once()
 
 
-def test_smtp_supports_supplied_credential_aliases(monkeypatch):
+@pytest.mark.parametrize("html_body", [None, "<html><body>Test HTML email</body></html>"])
+def test_smtp_supports_supplied_credential_aliases(monkeypatch, html_body):
     monkeypatch.setenv("EMAIL_TRANSPORT", "smtp")
     monkeypatch.setattr(email, "_ses_is_configured", lambda: False)
     for key in ("SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM"):
@@ -145,9 +153,14 @@ def test_smtp_supports_supplied_credential_aliases(monkeypatch):
     smtp.return_value.__enter__.return_value = connection
     monkeypatch.setattr(email.smtplib, "SMTP", smtp)
     assert email._is_configured()
-    email._send_sync("person@example.test", "Reset", TOKEN)
+    email._send_sync("person@example.test", "Reset", TOKEN, html_body)
     connection.starttls.assert_called_once()
     connection.login.assert_called_once_with("test-smtp-identity", "test-smtp-secret")
     message = connection.send_message.call_args.args[0]
     assert message["From"] == "sender@example.test"
-    assert TOKEN in message.get_content()
+    assert TOKEN in message.get_body(preferencelist=("plain",)).get_content()
+    if html_body:
+        assert message.get_content_type() == "multipart/alternative"
+        assert html_body in message.get_body(preferencelist=("html",)).get_content()
+    else:
+        assert not message.is_multipart()

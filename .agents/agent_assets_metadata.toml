@@ -161,3 +161,31 @@ mtime_ms = 1792547693771
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/32148324-e77e-469d-80c1-fdb47f31d8a0/4349ea85-23cc-45da-89ae-670b2cb48a69"
 storage_version_token = "1792548463768377"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "WUseTY9SBnhnGqkKPwtC-"
+uri = "file://generated-artifacts/email-previews/sign-in-code.html"
+type = "html"
+title = "OTP email preview"
+description = "Branded, mobile-friendly email preview. The sample code is for demonstration only."
+logical_id = "585da8c3-b840-40b0-9cff-c46efb58db4f"
+content_hash = "sha256:7e0d11a92f346d6cc26b35b812825aa83045e51d0714a0785558ae5cdab8c23b"
+size = 3571
+mtime_ms = 1793686717987
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/585da8c3-b840-40b0-9cff-c46efb58db4f/8b84004a-aac5-45a1-9fbf-3fd3d5155a5e"
+storage_version_token = "1793686820258526"
+content_type = "text/html"
+
+[[outputs]]
+id = "FlbP-YgL6-LBnOkEmRD6-"
+uri = "file://generated-artifacts/email-previews/password-reset.html"
+type = "html"
+title = "Password-reset email preview"
+description = "Branded reset-button email with expiry and security guidance. The sample link is not functional."
+logical_id = "f9435d0a-ec20-45a6-a773-fe74d1abbb23"
+content_hash = "sha256:8533f49659a8ad5a087a1053c1bae15a361bc9e6e45918a70f757cfe75a5723a"
+size = 4020
+mtime_ms = 1793686717988
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/f9435d0a-ec20-45a6-a773-fe74d1abbb23/a8cad115-484d-452b-9133-5beecdb5eb31"
+storage_version_token = "1793686821386322"
+content_type = "text/html"
