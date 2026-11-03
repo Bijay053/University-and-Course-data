@@ -299,12 +299,12 @@ isValidation = true
 name = "study-mode-semantics"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_study_mode_semantics.py tests/test_study_mode.py tests/test_guards.py tests/test_recipe_rules.py tests/test_online_only_reextract_safety.py -q -c /dev/null -p no:cacheprovider"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_study_mode_semantics.py tests/test_study_mode.py tests/test_guards.py tests/test_recipe_rules.py tests/test_online_only_reextract_safety.py tests/test_generated_study_mode_recovery.py -q -c /dev/null -p no:cacheprovider"
 
 [[workflows.workflow]]
 name = "study-mode-route-persistence"

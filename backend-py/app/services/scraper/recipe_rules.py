@@ -17,6 +17,7 @@ import logging
 import re
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
+from app.study_modes import normalize_study_mode
 
 log = logging.getLogger(__name__)
 
@@ -508,8 +509,14 @@ def _apply_study_mode_from_location(payload: dict, recipe: dict) -> None:
     if not recipe.get("study_mode_from_location"):
         return
 
-    # Only fill in if blank — don't overwrite a successfully extracted mode
-    if payload.get("study_mode"):
+    raw_mode = payload.get("study_mode")
+    # A validated detailed label is already a successful extraction.
+    if normalize_study_mode(raw_mode) is not None:
+        return
+    # Rejected prose is not success, but a city is not replacement delivery
+    # proof either. Keep the source for eligibility/review, not an On Campus
+    # default manufactured because semantic validation rejected the text.
+    if raw_mode or "invalid_study_mode" in (payload.get("scrape_warnings") or []):
         return
 
     loc = (payload.get("location") or payload.get("course_location") or "").lower()

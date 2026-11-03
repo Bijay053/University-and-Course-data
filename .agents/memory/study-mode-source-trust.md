@@ -16,8 +16,26 @@ The preventive change was explicitly separate from review of stored records.
 eligibility decisions seeing the original delivery/load facts before invalid
 display values are cleared. Keep rejected source text available for review,
 not selected as proof. Do not make reads silently clean legacy records or
-replace missing delivery with a guessed on-campus default. Improve extraction
-coverage/recovery separately without bypassing this final write boundary.
+replace missing delivery with a guessed on-campus default. Validate generated
+rule coverage, repair fill counts, and selected proof semantically, not by
+non-emptiness. Let fallback extraction see rejected generated values as missing,
+while retaining raw candidates for review and independently credible
+delivery/load facts for eligibility. Failure to recover is unknown, not
+inferred campus delivery. Rejected generated prose does not prove online-only
+delivery merely because it contains “online”; such a flag can defeat valid
+on-campus recovery. Preserve genuine online-only authority and study load.
+
+Automatic repair must withhold all field updates when fresh credible delivery
+or load facts fail eligibility, including updates to approved staging rows.
+Report a blocked repair rather than saving an excluded mode beside an unchanged
+approval or silently unpublishing operator-approved data.
+
+**Why:** Consuming the real extraction response can activate writes that were
+previously ineffective; semantic field validation alone does not prove course
+eligibility.
+
+**How to apply:** Reuse the staging online-only and part-time policies on fresh
+facts before applying or counting any automatic repair updates.
 
 Storage coercion is a final safeguard, not a complete review workflow.
 

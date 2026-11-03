@@ -989,6 +989,11 @@ _VIRTUAL_LOCATION_RE = re.compile(
 )
 
 
+def is_part_time_only_for_staging(payload: dict[str, Any]) -> bool:
+    """Whether the final canonical study load has no full-time route."""
+    return re.sub(r"[-_]+", " ", str(payload.get("study_load") or "")).strip().lower() == "part time"
+
+
 def is_online_only_for_staging(
     course_name: str,
     payload: dict[str, Any],
@@ -1180,7 +1185,7 @@ def should_stage_course(
     _study_load = re.sub(
         r"[-_]+", " ", str(payload.get("study_load") or "")
     ).strip().lower()
-    if _study_load == "part time":
+    if is_part_time_only_for_staging(payload):
         log.info(
             "[REJECT CHECK] course=%r study_load=%r "
             "decision=reject (part_time_only) global_policy=true",

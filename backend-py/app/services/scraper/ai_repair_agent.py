@@ -1713,7 +1713,38 @@ async def _run_extraction_scan(
                 raise RuntimeError("Repair row is no longer eligible; result not applied.")
             if current.fee_scope_key and not (current.extraction_method or {}).get("campus_fee_scope"):
                 raise RuntimeError("Campus scope metadata missing; repair not applied.")
-            result = scope_refresh_payload(current, result)
+            from app.study_modes import normalize_study_mode
+            from app.services.scraper.guards import (
+                is_online_only_for_staging, is_part_time_only_for_staging,
+            )
+            # The real pipeline returns an envelope; older replay callers may
+            # still provide a flat payload.
+            fresh = result.get("payload", result)
+            # Descriptions cannot establish delivery authority. Independent
+            # online-only flags and the canonical load remain available. This
+            # fill-only scan does not replace existing mode/load, so a fresh
+            # omission or conflicting label cannot erase their restrictions.
+            policy_sources = [
+                {"study_mode": normalize_study_mode(current.study_mode),
+                 "study_load": current.study_load},
+                {**fresh, "study_mode": normalize_study_mode(fresh.get("study_mode"))},
+            ]
+            exclusion = (
+                "online_only" if any(is_online_only_for_staging(
+                    current.course_name, facts, url, partial=True,
+                ) for facts in policy_sources)
+                else "part_time_only" if any(
+                    is_part_time_only_for_staging(facts) for facts in policy_sources
+                ) else None
+            )
+            if exclusion:
+                # Never commit newly ineligible facts (or fees/English from
+                # that extraction) into an approved row. Leave existing operator
+                # approval/publication untouched and report a blocked repair.
+                raise RuntimeError(
+                    f"{exclusion}: automatic repair withheld; delivery eligibility needs review"
+                )
+            result = scope_refresh_payload(current, fresh)
             update: dict[str, Any] = {}
             if current.international_fee is None and result.get("international_fee") is not None:
                 update["international_fee"] = result["international_fee"]
@@ -1721,8 +1752,9 @@ async def _run_extraction_scan(
             if current.ielts_overall is None and result.get("ielts_overall") is not None:
                 update["ielts_overall"] = result["ielts_overall"]
                 fills["ielts_fills"] += 1
-            if current.study_mode is None and result.get("study_mode") is not None:
-                update["study_mode"] = result["study_mode"]
+            recovered_mode = normalize_study_mode(result.get("study_mode"))
+            if current.study_mode is None and recovered_mode is not None:
+                update["study_mode"] = recovered_mode
                 fills["mode_fills"] += 1
             if current.fee_scope_key:
                 for key in ("international_fee", "extraction_method", "scrape_warnings",

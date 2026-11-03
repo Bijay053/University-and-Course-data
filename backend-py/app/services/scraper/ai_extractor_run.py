@@ -253,6 +253,15 @@ def _html_to_text(html: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def usable_rule_value(field: str, value: Any) -> Any:
+    """Validate coverage without discarding raw rule candidates for review."""
+    if field == "study_mode":
+        from app.study_modes import normalize_study_mode
+
+        return normalize_study_mode(value)
+    return value
+
+
 def apply_extraction_rules(
     html: str,
     rules: dict[str, dict[str, Any]],
@@ -331,11 +340,13 @@ def apply_extraction_rules(
 
         results[field] = (raw or None, method)
 
-    filled = sum(1 for v, _ in results.values() if v is not None)
+    # Keep raw values in results for evidence/eligibility, but never describe
+    # rejected delivery prose as a filled field.
+    filled = sum(1 for f, (v, _) in results.items() if usable_rule_value(f, v) is not None)
     log.debug(
         "[EXTRACTOR_RUN] %d/%d rules fired (fields: %s)",
         filled, len(rules),
-        [f for f, (v, _) in results.items() if v is not None],
+        [f for f, (v, _) in results.items() if usable_rule_value(f, v) is not None],
     )
     return results
 
@@ -361,7 +372,7 @@ def should_skip_gemini(
         return False
     filled = sum(
         1 for f in review_fields
-        if results.get(f, (None, ""))[0] is not None
+        if usable_rule_value(f, results.get(f, (None, ""))[0]) is not None
     )
     coverage = filled / len(review_fields)
     skip = coverage >= min_coverage

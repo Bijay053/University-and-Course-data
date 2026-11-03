@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from app.config import settings
+from app.study_modes import normalize_study_mode, sanitize_study_mode_payload
 
 if TYPE_CHECKING:
     # Type-checking-only import to avoid pulling per_course_vision (and
@@ -85,6 +86,14 @@ def _build_extraction_method_map(
         if not field_key or field_key in seen_fields:
             continue
         method = item.get("method") or "unknown"
+        if field_key == "study_mode":
+            mode = item.get("normalized") or item.get("value")
+            if isinstance(mode, dict):
+                mode = mode.get("study_mode")
+            valid_mode = normalize_study_mode(mode)
+            if valid_mode is None or valid_mode != normalize_study_mode(payload.get(field_key)):
+                extraction_method.setdefault(field_key, f"{method}:null")
+                continue
         if payload.get(field_key) not in (None, "", 0, []):
             extraction_method[field_key] = method
             seen_fields.add(field_key)
@@ -2152,12 +2161,25 @@ def _finalize_evidence_selection(payload: dict[str, Any], evidence: list[dict[st
         fk = ev.get("field_key")
         if not fk:
             continue
+        if fk == "study_mode":
+            raw_mode = ev.get("normalized") or ev.get("value")
+            if isinstance(raw_mode, dict):
+                raw_mode = raw_mode.get("study_mode")
+            if raw_mode not in (None, "") and normalize_study_mode(raw_mode) is None:
+                ev.update(
+                    selected=False, decision_status="needs_review",
+                    validation_status="invalid",
+                )
+                continue
         if ev.get("decision_status") == "superseded":
             continue
         by_field.setdefault(fk, []).append(ev)
 
     for field_key, candidates in by_field.items():
-        final_val = _coerce(payload.get(field_key))
+        final_val = _coerce(
+            normalize_study_mode(payload.get(field_key))
+            if field_key == "study_mode" else payload.get(field_key)
+        )
         if final_val is None:
             # Field was cleared or never set — reset any stale "selected" markers
             # left by Stage 0 or other early-write paths so the UI shows no winner.
@@ -4546,6 +4568,7 @@ async def extract_course(
     # to zero.  Results written with method "ai_rule:css/xpath/regex" so the
     # Evidence panel tracks provenance correctly.
     _stage0_covered: set[str] = set()
+    _rejected_stage0_mode: str | None = None
     # Authoritative-empty Otago metadata is distinct from an absent tag:
     # preserve the blank through AI/default fallbacks.
     _otago_authoritative_empty: set[str] = set()
@@ -4585,6 +4608,23 @@ async def extract_course(
             for _s0_field, (_s0_value, _s0_method) in _stage0_results.items():
                 if _s0_field in _s0_manual_override_fields:
                     continue
+                if _s0_field == "study_mode" and _s0_value is not None:
+                    _valid_s0_mode = normalize_study_mode(_s0_value)
+                    if _valid_s0_mode is None:
+                        _rejected_stage0_mode = _s0_value
+                        evidence.append({
+                            "field_key": "study_mode",
+                            "value": _s0_value,
+                            "method": _s0_method,
+                            "confidence": 0.80,
+                            "source_url": url,
+                            "snippet": f"{_s0_method}: {_s0_value}",
+                            "selected": False,
+                            "decision_status": "needs_review",
+                            "validation_status": "invalid",
+                        })
+                        continue
+                    _s0_value = _valid_s0_mode
                 if _s0_field == "course_name" and _s0_value is not None:
                     from app.services.scraper.course_name_cleaner import (
                         normalise_generated_course_name_with_config as _normalise_s0_name,
@@ -11415,6 +11455,13 @@ async def extract_course(
     # overwrite can happen.
     # Persist in payload so stage_course can store it without schema changes to
     # extract_course's callers (it is stripped in stage_course before DB write).
+    # Rejected generated copy is review evidence, not a delivery/load fact.
+    # Preserve genuine independent eligibility flags and study_load unchanged.
+    # An exhausted recovery remains unknown, with its raw candidate in evidence.
+    if _rejected_stage0_mode is not None and normalize_study_mode(payload.get("study_mode")) is None:
+        payload.update(sanitize_study_mode_payload({
+            **payload, "study_mode": _rejected_stage0_mode,
+        }))
     _attach_extraction_method_map(payload, evidence)
     if is_sqe2_course(url):
         if _sqe_review:
