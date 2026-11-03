@@ -1,0 +1,110 @@
+[
+  {
+    "table": "courses",
+    "id": 14470,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/postgraduate-courses/sustainable-textile-technologies-degree/sustainable-textile-technologies-degree.aspx",
+    "status": 404,
+    "final_url": "https://www.dmu.ac.uk/study/courses/postgraduate-courses/sustainable-textile-technologies-degree/sustainable-textile-technologies-degree.aspx",
+    "method": "Independent HTTPX GET with follow_redirects=True; redirect paths verified in shell output",
+    "checked_at": "2026-11-03T05:44:31.929Z"
+  },
+  {
+    "table": "courses",
+    "id": 14472,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/postgraduate-courses/sports-history-and-culture-ma-degree/sports-history-and-culture-ma-degree.aspx",
+    "status": 404,
+    "final_url": "https://www.dmu.ac.uk/study/courses/postgraduate-courses/sports-history-and-culture-ma-degree/sports-history-and-culture-ma-degree.aspx",
+    "method": "Independent HTTPX GET with follow_redirects=True; redirect paths verified in shell output",
+    "checked_at": "2026-11-03T05:44:31.929Z"
+  },
+  {
+    "table": "courses",
+    "id": 14531,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/postgraduate-courses/data-analytics-msc-degree/data-analytics-msc-degrees.aspx",
+    "status": 404,
+    "final_url": "https://www.dmu.ac.uk/study/courses/postgraduate-courses/data-analytics-msc-degree/data-analytics-msc-degrees.aspx",
+    "method": "Independent HTTPX GET with follow_redirects=True; redirect paths verified in shell output",
+    "checked_at": "2026-11-03T05:44:31.929Z"
+  },
+  {
+    "table": "courses",
+    "id": 14554,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/undergraduate-courses/partners/retail-design-ba-hons-online.aspx",
+    "status": 200,
+    "final_url": "https://www.nda.ac.uk/study/courses/ba-hons-degree/retail-design/",
+    "method": "Independent HTTPX GET with follow_redirects=True; redirect paths verified in shell output",
+    "checked_at": "2026-11-03T05:44:31.929Z"
+  },
+  {
+    "table": "courses",
+    "id": 14555,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/undergraduate-courses/partners/retail-design-ba-hons-top-up-online.aspx",
+    "status": 200,
+    "final_url": "https://www.nda.ac.uk/study/courses/ba-hons-degree/retail-design/",
+    "method": "Independent HTTPX GET with follow_redirects=True; redirect paths verified in shell output",
+    "checked_at": "2026-11-03T05:44:31.929Z"
+  },
+  {
+    "table": "courses",
+    "id": 14574,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/undergraduate-courses/pharmaceutical-science/pharmaceutical-science.aspx",
+    "status": 404,
+    "final_url": "https://www.dmu.ac.uk/study/courses/undergraduate-courses/pharmaceutical-science/pharmaceutical-science.aspx",
+    "method": "Independent HTTPX GET with follow_redirects=True; redirect paths verified in shell output",
+    "checked_at": "2026-11-03T05:44:31.929Z"
+  },
+  {
+    "table": "courses",
+    "id": 14593,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/undergraduate-courses/partners/interior-design-ba-online.aspx",
+    "status": 200,
+    "final_url": "https://www.nda.ac.uk/study/courses/ba-hons-degree/interior-design/",
+    "method": "Independent HTTPX GET with follow_redirects=True; redirect paths verified in shell output",
+    "checked_at": "2026-11-03T05:44:31.929Z"
+  },
+  {
+    "table": "courses",
+    "id": 14602,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/undergraduate-courses/partners/heritage-interior-design-ba-hons-online.aspx",
+    "status": 200,
+    "final_url": "https://www.nda.ac.uk/study/courses/ba-hons-degree/heritage-interior-design/",
+    "method": "Independent HTTPX GET with follow_redirects=True; redirect paths verified in shell output",
+    "checked_at": "2026-11-03T05:44:31.929Z"
+  },
+  {
+    "table": "courses",
+    "id": 14633,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/undergraduate-courses/partners/design-for-outdoor-living-ba-hons-top-up-online.aspx",
+    "status": 200,
+    "final_url": "https://www.nda.ac.uk/study/courses/ba-hons-top-up-degree/design-for-outdoor-living/",
+    "method": "Independent HTTPX GET with follow_redirects=True; redirect paths verified in shell output",
+    "checked_at": "2026-11-03T05:44:31.929Z"
+  },
+  {
+    "table": "courses",
+    "id": 14634,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/undergraduate-courses/partners/design-for-outdoor-living-ba-hons-online.aspx",
+    "status": 200,
+    "final_url": "https://www.nda.ac.uk/study/courses/ba-hons-degree/design-for-outdoor-living/",
+    "method": "Independent HTTPX GET with follow_redirects=True; redirect paths verified in shell output",
+    "checked_at": "2026-11-03T05:44:31.929Z"
+  },
+  {
+    "table": "scraped_courses",
+    "id": 142694,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/undergraduate-courses/partners/heritage-interior-design-ba-hons-top-up-online.aspx",
+    "status": 200,
+    "final_url": "https://www.nda.ac.uk/study/courses/ba-hons-degree/heritage-interior-design/",
+    "method": "Independent HTTPX GET with follow_redirects=True",
+    "checked_at": "2026-11-03T05:45:22.124Z"
+  },
+  {
+    "table": "scraped_courses",
+    "id": 142704,
+    "stored_url": "https://www.dmu.ac.uk/study/courses/undergraduate-courses/partners/interior-design-ba-hons-top-up-online.aspx",
+    "status": 200,
+    "final_url": "https://www.nda.ac.uk/study/courses/ba-hons-top-up-degree/interior-design/",
+    "method": "Independent HTTPX GET with follow_redirects=True",
+    "checked_at": "2026-11-03T05:45:22.124Z"
+  }
+]

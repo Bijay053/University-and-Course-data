@@ -189,3 +189,45 @@ mtime_ms = 1793686717988
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/f9435d0a-ec20-45a6-a773-fe74d1abbb23/a8cad115-484d-452b-9133-5beecdb5eb31"
 storage_version_token = "1793686821386322"
 content_type = "text/html"
+
+[[outputs]]
+id = "0GlYnWaW_yC7iOqYgcMZK"
+uri = "file://reports/study-mode-review/review.html"
+type = "html"
+title = "Study-mode evidence and correction review"
+description = "Read-only review of 64 affected courses, 67 historical staging rows and 13 ambiguous labels. Includes evidence, proposed corrections and unknowns."
+logical_id = "c1d68dc1-7fea-4890-8f10-9dafa101d3cd"
+content_hash = "sha256:1416e0ef2082209f5f3570f13ab21f1950759c08ee6e8e8d92139e5419a79271"
+size = 174420
+mtime_ms = 1793686914360
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/c1d68dc1-7fea-4890-8f10-9dafa101d3cd/9b19d13b-a25b-4829-af9f-1a206eb86969"
+storage_version_token = "1793686936255127"
+content_type = "text/html"
+
+[[outputs]]
+id = "KN873bl88k_rwcxre4p-y"
+uri = "file://reports/study-mode-review/course-review.csv"
+type = "table"
+title = "Affected courses — review spreadsheet"
+description = "All 64 course IDs, original values, official URLs, evidence and proposed corrections. No changes applied."
+logical_id = "614f7837-cbc4-4dde-aa0f-53820651a874"
+content_hash = "sha256:ad16999229ebf9b8c13f3c8ca34ae29e30a1f2b8777722a0bbbc8540874ab838"
+size = 60158
+mtime_ms = 1793686914356
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/614f7837-cbc4-4dde-aa0f-53820651a874/e368e8d4-dcd6-4888-9418-2497047e1707"
+storage_version_token = "1793686938560722"
+content_type = "text/csv"
+
+[[outputs]]
+id = "f-kgleQlyzhz17hG_Cj6R"
+uri = "file://reports/study-mode-review/staging-review.csv"
+type = "table"
+title = "Historical staging rows — reference spreadsheet"
+description = "67 historical copies for context only; no approval or rejection changes proposed."
+logical_id = "9919ccf7-fc12-476e-88c9-567eca785d17"
+content_hash = "sha256:c89641bc90c0f7569cc0e7853d79d1a908d01b9e22100d2ca7d6257b942d07cf"
+size = 68210
+mtime_ms = 1793686914360
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/9919ccf7-fc12-476e-88c9-567eca785d17/13676921-ec58-4cbc-9180-642fb35af051"
+storage_version_token = "1793686940003686"
+content_type = "text/csv"

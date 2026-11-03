@@ -1,0 +1,6 @@
+{
+  "courses": true,
+  "staged": true,
+  "checked_at": "2026-11-03T05:45:22.124Z",
+  "comparison": "Exact SELECT output equality against initial inventory; includes current study_mode, URL, status and course approval_status/updated_at. No mutations were invoked."
+}

@@ -30,3 +30,15 @@ unselected candidates. Save imported candidates atomically with their course.
 An already-empty mode still needs rejected evidence retained; that evidence
 alone is not successful field repair. Clear its warning only after a fresh,
 valid mode is explicitly written, never on an unrelated targeted update.
+
+Legacy review must preserve award identity across redirects. A former top-up
+URL that now lands on a full-degree page does not verify the old top-up route.
+Likewise, a verified Full-time study-load label does not establish On Campus
+delivery.
+
+**Why:** Official partner redirects can collapse distinct awards, while course
+pages legitimately use “Study mode” for study load rather than delivery.
+
+**How to apply:** Record the stored URL and actual final destination separately;
+keep unsupported replacements unknown and retain audience-specific alternatives.
+Do not use a content-fetch response's echoed request URL as redirect proof.

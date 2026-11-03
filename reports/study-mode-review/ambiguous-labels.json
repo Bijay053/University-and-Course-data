@@ -1,0 +1,93 @@
+[
+  {
+    "id": 191,
+    "name": "Conference Interpreting PG Dip",
+    "university": "London Metropolitan University",
+    "course_website": "https://www.londonmet.ac.uk/courses/postgraduate/conference-interpreting---pg-dip/",
+    "study_mode": "Both"
+  },
+  {
+    "id": 316,
+    "name": "Interpreting MA",
+    "university": "London Metropolitan University",
+    "course_website": "https://www.londonmet.ac.uk/courses/postgraduate/interpreting---ma/",
+    "study_mode": "Both"
+  },
+  {
+    "id": 329,
+    "name": "Legal Practice (SQE1 and 2) LLM",
+    "university": "London Metropolitan University",
+    "course_website": "https://www.londonmet.ac.uk/courses/postgraduate/legal-practice-sqe1-and-2---llm/",
+    "study_mode": "Both"
+  },
+  {
+    "id": 330,
+    "name": "Legal Practice (SQE1 and 2) PG Dip",
+    "university": "London Metropolitan University",
+    "course_website": "https://www.londonmet.ac.uk/courses/postgraduate/legal-practice-sqe1-and-2---pg-dip/",
+    "study_mode": "Both"
+  },
+  {
+    "id": 331,
+    "name": "Legal Practice (SQE1) PG Cert",
+    "university": "London Metropolitan University",
+    "course_website": "https://www.londonmet.ac.uk/courses/postgraduate/legal-practice-sqe1---pg-cert/",
+    "study_mode": "Both"
+  },
+  {
+    "id": 332,
+    "name": "Legal Practice (SQE2) PG Cert",
+    "university": "London Metropolitan University",
+    "course_website": "https://www.londonmet.ac.uk/courses/postgraduate/legal-practice-sqe2---pg-cert/",
+    "study_mode": "Both"
+  },
+  {
+    "id": 408,
+    "name": "Specialised Translation PG Cert",
+    "university": "London Metropolitan University",
+    "course_website": "https://www.londonmet.ac.uk/courses/postgraduate/specialised-translation---pg-cert/",
+    "study_mode": "Both"
+  },
+  {
+    "id": 427,
+    "name": "Translation Technology PG Cert",
+    "university": "London Metropolitan University",
+    "course_website": "https://www.londonmet.ac.uk/courses/postgraduate/translation-technology---pg-cert/",
+    "study_mode": "Both"
+  },
+  {
+    "id": 430,
+    "name": "Translation PG Dip",
+    "university": "London Metropolitan University",
+    "course_website": "https://www.londonmet.ac.uk/courses/postgraduate/translation---pg-dip/",
+    "study_mode": "Both"
+  },
+  {
+    "id": 1728,
+    "name": "Bachelor of Business (Accounting)",
+    "university": "Queensland University of Technology (QUT)",
+    "course_website": "https://www.qut.edu.au/courses/bachelor-of-business-accounting",
+    "study_mode": "Both"
+  },
+  {
+    "id": 1837,
+    "name": "Graduate Certificate in Education - Choice of Units",
+    "university": "Queensland University of Technology (QUT)",
+    "course_website": "https://www.qut.edu.au/courses/graduate-certificate-in-education-choice-of-units",
+    "study_mode": "Both"
+  },
+  {
+    "id": 18901,
+    "name": "Masters of International Business / International Relations",
+    "university": "Griffith University",
+    "course_website": "https://www.griffith.edu.au/study/degrees/master-of-international-businessmaster-of-international-relations-5659?location=intl",
+    "study_mode": "Mixed"
+  },
+  {
+    "id": 18916,
+    "name": "Bachelor of Cyber Security",
+    "university": "Griffith University",
+    "course_website": "https://www.griffith.edu.au/study/degrees/bachelor-of-cyber-security-1677?location=intl",
+    "study_mode": "Mixed"
+  }
+]
