@@ -63,7 +63,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 function Router() {
   return (
     <Switch>
-      <Route path="/degrees" component={DegreesPage} />
+      <Route path="/toolkit" component={DegreesPage} />
       <Route path="/login" component={Login} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />

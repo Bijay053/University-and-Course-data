@@ -98,7 +98,7 @@ export default function DegreesPage() {
       <header className="sic-hero sic-contour text-white">
         <div className="mx-auto max-w-[1400px] px-4 sm:px-6 pt-5 pb-10">
           <nav className="flex items-center justify-between" aria-label="Site">
-            <Link href="/degrees" className="flex items-center gap-2.5" data-testid="link-home">
+            <Link href="/toolkit" className="flex items-center gap-2.5" data-testid="link-home">
               <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground sic-display font-semibold">SI</span>
               <span className="leading-tight"><span className="block font-semibold">Study Info Centre</span><span className="block text-[11px] uppercase tracking-[0.16em] text-white/80">Course toolkit</span></span>
             </Link>

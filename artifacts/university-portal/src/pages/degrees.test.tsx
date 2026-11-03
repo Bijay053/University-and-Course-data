@@ -16,7 +16,7 @@ let calls: string[] = [];
 beforeEach(() => {
   calls = [];
   localStorage.clear();
-  window.history.replaceState(null, "", "/degrees");
+  window.history.replaceState(null, "", "/toolkit");
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
   vi.stubGlobal("fetch", vi.fn(async (input: string) => {
     const url = String(input);
