@@ -102,6 +102,12 @@ export default function Login() {
               {loading ? "Signing in…" : "Sign in"}
             </Button>
           </form>
+          <p className="mt-5 border-t pt-4 text-center text-sm text-muted-foreground">
+            Looking for a course?{" "}
+            <Link href="/degrees" className="font-medium text-primary hover:underline" data-testid="link-browse-courses">
+              Browse courses
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>

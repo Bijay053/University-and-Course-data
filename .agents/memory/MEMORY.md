@@ -1,3 +1,4 @@
+- [Public course toolkit](public-course-toolkit.md) — visitors can search and view fees without signing in; keep administration and pending records private.
 - [Background worker resources](background-worker-resources-index.md) — loop cleanup, client ownership, pre-claim isolation, and safe task testing after module reloads.
 - [Catalogue recovery evidence](catalogue-recovery-evidence.md) — reported counts are investigation inputs; sitemap counts alone do not prove discovery coverage.
 - [UC Canberra SPA + hidden-input fees](uc-canberra-fix.md) — Listing=SPA shell (0 links); sitemap at /services/wcm/site-map/course.xml has 184 courses; fees in id="N-eftsl-international" hidden inputs matched via id="current-year".

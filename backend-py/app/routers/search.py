@@ -214,6 +214,7 @@ async def search_courses(
     intakes: str | None = None,         # CSV: "Spring,Fall"
     fee_min: float | None = None,
     fee_max: float | None = None,
+    currency: Annotated[str | None, Query(pattern=r"^[A-Z]{3}$")] = None,
     duration_years_min: float | None = None,
     duration_years_max: float | None = None,
     english_exam: str | None = None,    # IELTS|PTE|TOEFL|CAE|DUOLINGO
@@ -302,6 +303,12 @@ async def search_courses(
     # match the lower bound (so "fee_min=0" doesn't drop unpriced
     # courses) but only match the upper bound when the slider is at
     # its max — handled UI-side by omitting the param entirely.
+    if currency:
+        legacy_offering_filters.append("upper(c.currency) = :fee_currency")
+        offering_filters.append("upper(o.fee_currency) = :fee_currency")
+        params["fee_currency"] = currency
+        if fee_max is not None:
+            legacy_offering_filters.append("c.international_fee IS NOT NULL")
     if fee_min is not None and fee_min > 0:
         legacy_offering_filters.append("(c.international_fee IS NOT NULL AND c.international_fee >= :fee_min)")
         offering_filters.append("o.fee_amount >= :fee_min")
@@ -515,6 +522,17 @@ async def search_courses(
         ") AS rank"
         if q else "NULL AS rank"
     )
+    if currency and sort and sort.strip().lower() in ("fee_asc", "fee_desc"):
+        # An award can have offerings in several currencies. Rank only the
+        # same offering set that passed the currency/budget/location filters.
+        direction = "DESC" if sort.strip().lower() == "fee_desc" else "ASC"
+        matched_fee = (
+            "CASE WHEN EXISTS (SELECT 1 FROM course_offerings o WHERE o.course_id=c.id) "
+            "THEN (SELECT min(o.fee_amount) FROM course_offerings o WHERE o.course_id=c.id AND "
+            + " AND ".join(offering_filters)
+            + ") ELSE c.international_fee END"
+        )
+        sort_clause = f"{matched_fee} {direction} NULLS LAST, c.course_name, c.id"
 
     base_sql = f"""
         WITH {_COURSE_SEARCH_CTE}
@@ -904,7 +922,16 @@ async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> Search
             detail="Search options are temporarily unavailable",
         ) from exc
 
+    currencies = (await db.execute(text(f"WITH {_COURSE_SEARCH_CTE}" + """
+        SELECT DISTINCT upper(code) FROM (
+          SELECT currency AS code FROM course_search_view
+          UNION ALL
+          SELECT o.fee_currency AS code FROM course_offerings o
+          JOIN course_search_view c ON c.id = o.course_id
+        ) currencies WHERE code ~ '^[A-Za-z]{3}$' ORDER BY 1
+    """))).scalars().all()
     return JSONResponse(content=jsonable_encoder({
+        "currencies": list(currencies),
         "countries": list(countries),
         "cities": list(cities),
         "universities": [dict(u) for u in unis],

@@ -36,6 +36,7 @@ class SearchCourseResponse(BaseModel):
 
 
 class SearchOptionsResponse(BaseModel):
+    currencies: list[str] = Field(default_factory=list)
     countries: list[str] = Field(default_factory=list)
     cities: list[str] = Field(default_factory=list)
     universities: list[dict] = Field(default_factory=list)

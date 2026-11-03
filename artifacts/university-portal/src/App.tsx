@@ -22,6 +22,7 @@ import SearchPage from "@/pages/search";
 import ComparePage from "@/pages/compare";
 import CourseDetail from "@/pages/course-detail";
 import Login from "@/pages/login";
+import DegreesPage from "@/pages/degrees";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import UsersPage from "@/pages/users";
@@ -62,6 +63,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 function Router() {
   return (
     <Switch>
+      <Route path="/degrees" component={DegreesPage} />
       <Route path="/login" component={Login} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
