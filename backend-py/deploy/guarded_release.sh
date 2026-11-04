@@ -156,7 +156,7 @@ if [ "$release_test_mode" != 1 ]; then
   # modifying installed code. Keep the helper beside its pinned proof assets.
   smoke_helper="$(mktemp "$backend_root/deploy/.release-smoke.XXXXXX.py")"
   manifest_helper="$(mktemp)"
-  trap 'retain_release_evidence; rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py" "$manifest_helper"' EXIT
+  trap 'retain_release_evidence; rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py" "${smoke_helper%.py}.managed.py" "$manifest_helper"' EXIT
   run_release_user git -C "$repo_root" show \
     "$target:backend-py/deploy/release_manifest.py" > "$manifest_helper"
   initialize_release_evidence
@@ -164,9 +164,11 @@ if [ "$release_test_mode" != 1 ]; then
     "$target:backend-py/deploy/safe_restart_smoke.py" > "$smoke_helper"
   run_release_user git -C "$repo_root" show \
     "$target:backend-py/deploy/smoke_receipt.py" > "${smoke_helper%.py}.receipt.py"
+  run_release_user git -C "$repo_root" show \
+    "$target:backend-py/app/managed_database_environment.py" > "${smoke_helper%.py}.managed.py"
   release_sample preflight "$python_bin" -B "$smoke_helper" \
     --expected-rehearsal-account-id "$expected_disposable_account"
-  rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py"
+  rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py" "${smoke_helper%.py}.managed.py"
   trap - EXIT
 fi
 

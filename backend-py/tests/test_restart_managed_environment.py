@@ -7,6 +7,46 @@ import sys
 
 import pytest
 
+
+@pytest.mark.parametrize("tls", ["true", "false"])
+def test_precheckout_sidecar_with_missing_predecessor_module(tmp_path, tls):
+    """Run target bootstrap against a predecessor with no managed loader."""
+    backend = Path(__file__).resolve().parents[1]
+    deploy = tmp_path / "deploy"
+    deploy.mkdir()
+    app = tmp_path / "app"
+    app.mkdir()
+    (app / "__init__.py").write_text("")
+    smoke = deploy / ".release-smoke.test.py"
+    smoke.write_text((backend / "deploy/safe_restart_smoke.py").read_text())
+    config = tmp_path / "database.env"
+    config.write_text(
+        f"DATABASE_URL=postgresql://test:dummy@managed.invalid/test\n"
+        f"DATABASE_REQUIRE_TLS={tls}\n"
+    )
+    loader = (backend / "app/managed_database_environment.py").read_text()
+    loader = loader.replace(
+        'Path("/etc/university-portal/database.env")', f"Path({str(config)!r})"
+    )
+    smoke.with_suffix(".managed.py").write_text(loader)
+    # This marker is reached only after the loader succeeds, before DB imports.
+    (deploy / "database_refresh_rehearsal_proof.py").write_text(
+        'raise SystemExit("MANAGED_BOOTSTRAP_PASSED")\n'
+    )
+    result = subprocess.run(
+        [sys.executable, "-B", str(smoke)],
+        cwd=tmp_path,
+        env={"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(tmp_path)},
+        capture_output=True, text=True, timeout=20,
+    )
+    if tls == "true":
+        assert "MANAGED_BOOTSTRAP_PASSED" in result.stderr
+    else:
+        assert "verified TLS is required" in result.stderr
+        assert "MANAGED_BOOTSTRAP_PASSED" not in result.stderr
+    assert "ModuleNotFoundError" not in result.stderr
+    assert "dummy" not in result.stderr
+
 ROOT = Path(__file__).resolve().parents[1]
 MARKER = "CREDENTIAL_CONTENT_MUST_NOT_APPEAR"
 GOOD = (

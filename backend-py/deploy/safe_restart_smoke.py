@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import fcntl
+import importlib.util
 import json
 import math
 import os
@@ -25,6 +26,17 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlparse
+
+# Pre-checkout releases run target smoke code against predecessor application
+# code. Load the exact target's sidecar before any application/database imports.
+_managed_sidecar = Path(__file__).with_suffix(".managed.py")
+if _managed_sidecar.exists():
+    _managed_spec = importlib.util.spec_from_file_location(
+        "app.managed_database_environment", _managed_sidecar
+    )
+    _managed_module = importlib.util.module_from_spec(_managed_spec)
+    _managed_spec.loader.exec_module(_managed_module)
+    sys.modules["app.managed_database_environment"] = _managed_module
 
 from app.managed_database_environment import (
     load_managed_database_environment as _load_managed_database_environment,

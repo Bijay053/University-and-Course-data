@@ -279,9 +279,11 @@ def test_precheckout_smoke_uses_target_without_modifying_installed_helper():
     cleanup = source.index('rm -f "$smoke_helper"', run)
     pause = source.index("# Pause consumption")
     assert fence < extract < run < cleanup < pause
-    assert 'trap \'retain_release_evidence; rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py" "$manifest_helper"\' EXIT' in source
+    assert 'trap \'retain_release_evidence; rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py" "${smoke_helper%.py}.managed.py" "$manifest_helper"\' EXIT' in source
     receipt_extract = source.index('"$target:backend-py/deploy/smoke_receipt.py"')
     assert extract < receipt_extract < run
+    managed_extract = source.index('"$target:backend-py/app/managed_database_environment.py"')
+    assert extract < managed_extract < run
 
 
 @pytest.mark.asyncio

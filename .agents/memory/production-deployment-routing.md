@@ -25,6 +25,16 @@ Replit deployment.
 **How to apply:** Prepare and verify the existing AWS release path; do not
 redirect the user to Replit publishing for this application.
 
+Pre-checkout smoke code must carry target-only bootstrap dependencies alongside
+the temporary checker, before importing the predecessor application.
+
+**Why:** A strict shared configuration loader introduced in the target was absent
+from the running checkout, so target smoke code failed before release preflight.
+
+**How to apply:** Extract the exact target loader as a temporary sidecar, load it
+before application/database imports, clean it up on success and failure, and test
+against a predecessor package that lacks the module. Never weaken TLS checks.
+
 An authenticated GitHub connection can transfer exact Git objects when saved
 push tokens are rejected. Bound each payload and verify every object's original
 SHA before updating the branch without force.
