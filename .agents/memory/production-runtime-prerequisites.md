@@ -3,6 +3,19 @@ name: Production runtime prerequisites
 description: Safe runtime security updates alongside an immutable guarded application release.
 ---
 
+Match the production build's pnpm major to the workspace tooling before
+interpreting a frozen-install overrides mismatch as a broken lockfile.
+
+**Why:** Production pnpm 9 rejected unchanged dependency files with an
+overrides mismatch; pinned pnpm 10 installed the same lockfile successfully
+and the isolated frontend build passed. A shared lockfile format version
+does not establish package-manager configuration compatibility.
+
+**How to apply:** Compare dependency files and package-manager versions first.
+Use an isolated, pinned build-user tool when possible, preserving the global
+tool and lockfile. Keep user-run build tools outside private service-state
+directories rather than widening those directories' permissions.
+
 Check installed Node and Python trust-package versions before starting a code release. A successful Git fetch does not satisfy the target's runtime requirements.
 
 **Why:** The security-baseline release required a newer Node major and certifi, but the guarded application script neither installs packages nor updates systemd configuration. Starting it first would fail after checkout.
