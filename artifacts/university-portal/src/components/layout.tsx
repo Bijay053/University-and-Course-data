@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut, Users as UsersIcon, BarChart2, Radio, Send, ChevronDown } from "lucide-react";
+import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut, Users as UsersIcon, BarChart2, Radio, Send, ChevronDown, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth";
 import {
@@ -142,9 +142,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
               >
                 SI
               </div>
-              <div className="font-semibold text-sm text-muted-foreground">Study Info Centre</div>
+              <div className="hidden sm:block font-semibold text-sm text-muted-foreground">Study Info Centre</div>
             </div>
           </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/toolkit"
+              data-testid="dashboard-toolkit-link"
+              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <Wrench className="h-4 w-4" aria-hidden="true" />
+              Toolkit
+            </Link>
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -173,6 +182,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
