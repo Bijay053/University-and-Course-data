@@ -96,6 +96,18 @@ args = "study-mode-semantics"
 task = "workflow.run"
 args = "study-mode-route-persistence"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "partial-release-recovery"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "surrey-catalogue-source-boundaries"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "lsbu-current-catalogue"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -313,6 +325,39 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && ALLOW_ISOLATED_STUDY_MODE_TESTS=1 PYTHONPATH=. python -m pytest tests/test_study_mode_route_persistence.py -q -c /dev/null -o asyncio_mode=auto -p no:cacheprovider'"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "partial-release-recovery"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_partial_release_recovery.py tests/test_release_manifest.py tests/test_deploy_release_identity.py tests/test_git_metadata_preflight.py -q -c /dev/null --noconftest -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "surrey-catalogue-source-boundaries"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_surrey_source_boundaries.py -q -c /dev/null --noconftest -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "lsbu-current-catalogue"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_lsbu_config.py tests/test_lsbu_fees.py tests/test_guards.py tests/test_acu_proxy_routing.py tests/test_curtin_transport_recovery.py -q -c /dev/null --noconftest -p no:cacheprovider"
 
 [workflows.workflow.metadata]
 isValidation = true

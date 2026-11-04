@@ -146,7 +146,9 @@ def test_command_failure_redacts_output(monkeypatch):
 
 def test_gate_precedes_any_sample_consumer_or_checkout_mutation():
     script = (DEPLOY / "guarded_release.sh").read_text()
-    production = script[script.index('if [ "$release_test_mode" != 1 ]; then'):]
+    # The exclusive-lock block also has a production-only condition. Start at
+    # the actual preflight invocation, not a matching if above helper definitions.
+    production = script[script.index("\n  verify_target_git_metadata\n"):]
     gate_index = production.index("verify_target_runtime")
     for later in ("verify_target_worker_schema", "initialize_release_evidence",
                   "release_sample preflight", 'cancel_consumer("scrape"',

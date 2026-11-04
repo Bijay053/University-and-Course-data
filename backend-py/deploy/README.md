@@ -355,6 +355,14 @@ in `../README.md`.
 
 ## Guarded application release
 
+If checkout advanced but services and release metadata remain on the
+predecessor, use the separate **operator-controlled baseline recovery** procedure
+in [`../docs/production/partial-release-recovery.md`](../docs/production/partial-release-recovery.md).
+It preserves original failed-attempt evidence and byte-exact operator recipes,
+does not forge release metadata or publish, and requires a new ordinary guarded
+attempt afterward. Never retry such a partial release by setting predecessor
+equal to target.
+
 The production entrypoint first verifies the full predecessor and target IDs,
 local commit availability, current HEAD and ancestry without network access or
 Git replacement objects. It reads the Git metadata checker from that exact

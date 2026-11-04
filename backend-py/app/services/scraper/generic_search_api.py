@@ -1122,6 +1122,11 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                 req_body: dict | None = copy.deepcopy(_body_tpl) if _body_tpl else None
 
                 if paginate:
+                    if not use_body_pagination:
+                        # Match the requested size to the size used below to
+                        # decide whether this is the final page. Otherwise an
+                        # API's default ten rows can truncate a 100-row config.
+                        req_params[cfg.page_size_param] = str(page_size)
                     if use_body_pagination and req_body is not None:
                         # Elastic App Search / Algolia style: pagination in JSON body
                         _deep_set(req_body, _body_pag.current_path, current_page)

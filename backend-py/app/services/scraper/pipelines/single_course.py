@@ -11786,6 +11786,8 @@ async def extract_course(
     # browser/default and broad reject-keyword passes, including omissions.
     from app.services.scraper.extractors.lsbu_fees import apply_course_fee_authority as _apply_lsbu_fee
     _apply_lsbu_fee(html or "", url, payload, evidence)
+    from app.services.scraper.extractors.uws_facts import apply_course_authority as _apply_uws
+    _apply_uws(html or "", url, payload, evidence)
 
     # Preserve HSU's course-owned campus and international year/price tuple
     # after generic extraction, browser/AI fallback and institutional defaults.

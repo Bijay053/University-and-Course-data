@@ -24,5 +24,6 @@ description: Pointers to site-specific discovery and extraction lessons for UK u
 - [Plymouth sitemap](plymouth-sitemap-delivery.md), [Plymouth campuses](plymouth-course-locations.md): misrouted award URLs and course-owned location authority.
 - [Portsmouth facts](portsmouth-course-authority.md): exact course-instance delivery and international tuition.
 - [Surrey catalogue and English authority](surrey-catalogue-english.md): current unversioned routes; central English tables are conversions, not course requirements.
+- [UWS catalogue and admission authority](uws-course-authority.md): verify PG coverage after filters; keep international tuition and admission English separate from domestic/module/pre-sessional prices.
 - [HSU campus and tuition authority](hsu-campus-tuition.md): navigation lists all campuses; UK tuition beside unconfirmed overseas fees is not international evidence.
 - [Essex TLS and subject catalogue](essex-tls-subject-catalogue.md): complete the verified issuer chain; subject pages, not the sitemap, contain current degree links.

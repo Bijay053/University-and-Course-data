@@ -5,6 +5,8 @@
 # Notes: Heavily blocked marketing/stories to prevent scraping alumni profiles.
 
 locked_config_paths:
+  - discovery.generic_search_api
+  - discovery.use_wayback
   - extraction.scrape_do_skip_fallbacks
   - extraction.scrape_do_request_timeout_seconds
   - extraction.scrape_do_wayback_after_first_failure
@@ -13,18 +15,37 @@ locked_config_paths:
   - extraction.skip_per_course_browser
 
 discovery:
-  # LSBU is fully Cloudflare-blocked: httpx, cffi, Scrape.do static all fail.
-  # The sitemap probe (4 URLs × ~75s each = ~300s) exhausts the discovery
-  # budget before the orchestrator's wayback_discover() can run.
-  #
-  # Fix: skip_sitemap_fallback=True causes discover_course_links() to return
-  # quickly (~15s — BFS tries homepage, gets CF-502, quits with 0 candidates).
-  # The orchestrator then calls wayback_discover() via use_wayback=True, which
-  # queries web.archive.org/cdx/search/cdx and finds ~384 cached course URLs.
+  # The current site exposes its course catalogue through this Funnelback
+  # collection. CDX contains retired aliases and search shells, not a current
+  # course inventory. An explicit provider also bypasses old discovery caches.
+  generic_search_api:
+    url: 'https://lsbu-search.funnelback.squiz.cloud/s/search.json'
+    fetch_via_scrape_do: true
+    scrape_do_render: true
+    require_all_urls: true
+    params:
+      collection: 'lsbu~ds-courses-new'
+      query: '!padrenull'
+      scope: 'www.lsbu.ac.uk/study/course-finder/'
+      num_ranks: '100'
+    root_path: 'response.resultPacket.results'
+    url_fields: [liveUrl]
+    title_fields: ['listMetadata.courseName.0', title]
+    allow_url_patterns:
+      - '^https://www\.lsbu\.ac\.uk/study/course-finder/[a-z0-9-]+/?$'
+    page_size: 100
+    page_size_param: num_ranks
+    offset_param: start_rank
+    offset_start: 1
+    max_pages: 10
+  # Keep direct-site fallback bounded if the current API is unavailable.
+  # Do not spend the discovery budget probing Cloudflare-blocked sitemaps.
   skip_sitemap_fallback: true   # skip sitemap probe + supplement (CF-blocked, slow)
   always_sitemap_supplement: false  # gated by skip_sitemap_fallback anyway; explicit
-  bfs_page_budget: 5  # homepage CF-blocked; quit fast so orchestrator CDX runs
-  use_wayback: true   # orchestrator wayback_discover() finds ~384 LSBU URLs via CDX
+  bfs_page_budget: 5
+  # null means fallback-only discovery, while still allowing bounded page replay.
+  # true would merge historic CDX aliases into the successful current API result.
+  use_wayback: null
   skip_browser_discovery: true
 
   allow_url_patterns:

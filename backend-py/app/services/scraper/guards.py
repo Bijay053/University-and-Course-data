@@ -1800,6 +1800,7 @@ _BLOCK_TITLE_EXACT: frozenset[str] = frozenset({
     "combined bachelor/master degrees",
     "double degree builder",
     "find a course",
+    "search module",
 })
 
 

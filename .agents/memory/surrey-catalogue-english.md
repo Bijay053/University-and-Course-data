@@ -26,3 +26,16 @@ links across the three current lists; degree variants need not have unique URLs.
 **How to apply:** Recheck the live lists before changing coverage expectations.
 A lower collapse threshold or a bounded discovery result is not proof of a
 complete extraction or of eligibility for every discovered course.
+
+The automatically detected REST endpoint is research-only; a positive result
+from it must not replace Surrey's verified undergraduate, taught-postgraduate
+and research listings.
+
+**Why:** Production returned a plausible research catalogue while omitting every
+bachelor's and taught master's course. Fresh discovery from the official lists
+restored all three levels; changing display filters would not fix the omission.
+
+**How to apply:** Preserve the verified catalogue's authority over auto-detected
+API shortcuts. When correcting a live configuration, retain its original
+settings, fence against concurrent edits, and use a fresh review-only scrape.
+Discovery candidates alone do not prove staging or publication.

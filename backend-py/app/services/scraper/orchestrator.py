@@ -3953,6 +3953,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             not links
             and not _archive_only
             and not _is_mq_host
+            and not _uni_cfg.discovery.skip_auto_api_discovery
             and uni_scrape_config
         ):
             _auto_cfg = uni_scrape_config.get("auto_config") or {}

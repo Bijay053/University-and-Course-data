@@ -14,6 +14,12 @@ if [[ ! "$expected_disposable_account" =~ ^[0-9]{12}$ ]]; then
 fi
 
 release_test_mode="${GUARDED_RELEASE_TEST_MODE:-0}"
+if [ "$release_test_mode" != 1 ]; then
+  # Recovery and ordinary releases must never mutate the checkout concurrently.
+  # /run is root-owned; do not put this root-written lock in a shared temp dir.
+  exec 9>/run/university-portal-release.lock
+  flock -n 9 || { echo "Another release or recovery is running." >&2; exit 1; }
+fi
 repo_root="${GUARDED_RELEASE_REPO_ROOT:-/opt/university-portal}"
 backend_root="$repo_root/backend-py"
 python_bin="${GUARDED_RELEASE_PYTHON:-$backend_root/.venv/bin/python}"

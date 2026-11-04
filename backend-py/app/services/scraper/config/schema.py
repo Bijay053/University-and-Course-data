@@ -1258,6 +1258,10 @@ class SitemapLocHostCanonicalizationConfig(BaseModel):
 
 
 class DiscoveryConfig(BaseModel):
+    skip_auto_api_discovery: bool = Field(
+        default=False,
+        description="Use verified catalogue discovery instead of an automatically detected API.",
+    )
     official_catalogue_fallback: bool = False
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 

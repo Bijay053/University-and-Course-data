@@ -143,6 +143,25 @@ def verify_phase(path, record, phase):
     return actual
 
 
+def verify_pre_restart_failure(path, predecessor, target):
+    """Read an interrupted/failed attempt without changing or adopting its proof."""
+    record = json.loads(path.read_text())
+    if (
+        record.get("schema_version") != 1
+        or record.get("kind") != "guarded_release_acceptance"
+        or record.get("predecessor_revision") != predecessor
+        or record.get("target_revision") != target
+        or record.get("status") not in {"failed", "preflight_passed"}
+        or record.get("release_completed") is not False
+        or record.get("preflight_passed") is not True
+        or set(record.get("phases", {})) != {"preflight"}
+        or record["phases"]["preflight"].get("status") != "passed"
+    ):
+        raise ValueError("not an exact pre-restart failed release")
+    verify_phase(path, record, "preflight")
+    return record
+
+
 def fail(path):
     record = json.loads(path.read_text())
     if record["release_completed"]:

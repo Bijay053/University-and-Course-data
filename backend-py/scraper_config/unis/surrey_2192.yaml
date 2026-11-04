@@ -4,6 +4,7 @@
 # Discovery: BFS from main study levels (undergraduate, postgraduate, research) following course links. Pages are primarily server-rendered HTML.
 # Notes: Course pages own English requirements; the central page is only a conversion reference.
 locked_config_paths:
+  - discovery.skip_auto_api_discovery
   - discovery.seed_urls
   - discovery.allow_url_patterns
   - discovery.expected_min_courses
@@ -12,6 +13,9 @@ locked_config_paths:
   - extraction.english.default_pte
   - extraction.english.default_toefl
 discovery:
+  # The auto-detected REST endpoint contains research degrees only; it is not
+  # Surrey's full catalogue and must not replace the three verified A–Z lists.
+  skip_auto_api_discovery: true
   always_sitemap_supplement: true
   seed_urls:
   - https://www.surrey.ac.uk/undergraduate

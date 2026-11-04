@@ -1414,6 +1414,10 @@ def is_reference_only_english_page(url: str) -> bool:
 
 
 async def extract(html: str, url: str) -> list[ExtractionResult]:
+    from app.services.scraper.extractors.uws_facts import course_english
+    uws_known, uws_english = course_english(html, url)
+    if uws_known:
+        return uws_english
     from urllib.parse import urlparse as _up
     _host = (_up(url).netloc or "").lower()
     if is_reference_only_english_page(url):

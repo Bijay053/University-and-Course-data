@@ -1,0 +1,60 @@
+# University of the West of Scotland
+# Hostname: www.uws.ac.uk
+locked_config_paths:
+  - discovery.generic_search_api
+  - discovery.allow_url_patterns
+  - discovery.block_url_patterns
+  - discovery.course_detail_url_patterns
+  - discovery.always_sitemap_supplement
+  - discovery.use_wayback
+  - extraction.staging.skip_degree_qualifier_check
+  - extraction.study_mode.suppress_nav_rule
+  - extraction.study_mode.online_only_requires_strong_evidence
+discovery:
+  always_sitemap_supplement: false
+  use_wayback: false
+  seed_urls:
+    - https://www.uws.ac.uk/study/undergraduate/undergraduate-course-search/
+    - https://www.uws.ac.uk/study/postgraduate/postgraduate-course-search/
+  generic_search_api:
+    url: https://www.uws.ac.uk/umbraco/api/coursesapi/searchcourses
+    method: POST
+    body:
+      Keyword: ''
+      PageNum: 1
+      PageType: courses
+      PageSize: 500
+      SortBy: 0
+      CourseType: ''
+      CpdCourseStartDates: []
+      CourseSubject: {Key: CourseSubject, Value: []}
+      CpdDeliveryMode: {Key: CpdDeliveryMode, Value: []}
+      CpdSubjectArea: {Key: CpdSubjectArea, Value: []}
+      CpdLocations: {Key: CpdLocations, Value: []}
+      Campus: {Key: Campus, Value: []}
+      StudyMode: {Key: StudyMode, Value: []}
+    root_path: Results
+    url_fields: [Url]
+    title_fields: [CourseTitle]
+    base_url: https://www.uws.ac.uk
+    normalize_relative_urls: true
+    allow_url_patterns:
+      - '^https://www\.uws\.ac\.uk/study/(undergraduate|postgraduate)/\1-course-search/[^/]+/?$'
+    require_all_urls: true
+  allow_url_patterns:
+    - '/study/(undergraduate|postgraduate)/\1-course-search/[^/]+/?$'
+  block_url_patterns:
+    - '/(?:about|news|events|jobs|apply|contact)(?:/|$)'
+  course_detail_url_patterns:
+    - '/study/(undergraduate|postgraduate)/\1-course-search/[^/]+/?$'
+  expected_min_courses: 130
+extraction:
+  study_mode:
+    suppress_nav_rule: true
+    online_only_requires_strong_evidence: true
+  staging:
+    skip_degree_qualifier_check: true
+  fees:
+    default_currency: GBP
+  english:
+    central_page: https://www.uws.ac.uk/international/english-language-requirements/

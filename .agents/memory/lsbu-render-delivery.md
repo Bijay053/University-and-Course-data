@@ -7,7 +7,7 @@ LSBU course pages are accessible through a rendered proxy, while direct requests
 
 **Why:** A large LSBU scrape ended with many per-course timeouts, and the browser passes visible in its log filled nothing. Page-wide study-mode rules also classified campus courses as Online, causing erroneous online-only skips. Broadly disabling Online detection would create the opposite error.
 
-**How to apply:** Limit render concurrency, avoid redundant browser work, and preserve explicit course-owned delivery labels while ignoring utility/navigation text. Treat archived URL discovery counts as candidates, not proof of a current catalogue. Verify recovery with a bounded fresh run before claiming the timeout problem is solved.
+**How to apply:** Limit render concurrency, avoid redundant browser work, and preserve explicit course-owned delivery labels while ignoring utility/navigation text. Treat archived URL discovery counts as candidates, not proof of a current catalogue. Verify bounded live-source probes and then a monitored review run before claiming full catalogue recovery. Full-catalogue review intentionally removes sampling caps; do not assume an unsupported request field limits it.
 
 Disabling browser rescue alone does not bound the proxy retry ladder. A failed rendered request can still consume the whole course deadline before archive fallback is reached.
 
@@ -26,3 +26,31 @@ consume other courses' deadlines while they wait without making a request.
 cleanly, and retain the bounded final live attempt. Keep unresolved URLs as
 explicit recoverable failures; do not present this transport bound as proof
 that the full archived catalogue is current or that AI extraction is fast.
+
+Use LSBU's dedicated current course-search collection as catalogue authority,
+not a historic CDX inventory or the general site-search meta collection.
+
+**Why:** A cached archive inventory contained retired slugs and duplicates.
+More than half failed, while a retired music-course URL returned a generic
+“Search Module” shell. The dedicated current collection returned working
+replacement addresses, including Adult Nursing. The general meta collection
+also includes separate web records and is not an equivalent course inventory.
+
+**How to apply:** Re-discover through the verified course collection and check
+live course-owned titles before a full retry. Preserve bounded archive transport
+for already identified courses; discovery authority and page transport are
+different decisions. A successful live catalogue must not be supplemented with
+historic CDX addresses. Check the effective archive mode after configuration
+writes: older loaders can ignore null admin overrides. Never stage the search
+shell as a course.
+
+When configuring the current production collector, specify the API's actual
+page-size query parameter as well as its pagination size.
+
+**Why:** The older deployed collector advanced offsets using the configured
+size but did not send that size to the API. The API defaulted to ten results,
+which appeared to be a last page.
+
+**How to apply:** Keep both values consistent until the collector update is
+published, and verify the full provider result rather than accepting any
+positive first-page count.

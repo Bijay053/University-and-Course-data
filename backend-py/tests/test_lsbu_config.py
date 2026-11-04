@@ -44,6 +44,74 @@ def test_lsbu_stale_admin_settings_cannot_restore_slow_retry_ladder():
     assert config.extraction.scrape_do_skip_fallbacks is True
 
 
+@pytest.mark.parametrize("university_id", [84, 2175])
+def test_lsbu_current_catalogue_replaces_archived_aliases(university_id):
+    config = load_uni_config(
+        slug="lsbu", name="London South Bank University",
+        scrape_url="https://www.lsbu.ac.uk/", university_id=university_id,
+        create_missing_stub=False,
+        db_scrape_config={"admin_config": {"discovery": {
+            "generic_search_api": None, "use_wayback": True,
+        }}},
+    )
+    api = config.discovery.generic_search_api
+    assert api is not None
+    assert api.params["collection"] == "lsbu~ds-courses-new"
+    assert api.root_path == "response.resultPacket.results"
+    assert api.url_fields == ["liveUrl"]
+    assert api.fetch_via_scrape_do and api.scrape_do_render
+    assert api.require_all_urls
+    assert (api.offset_param, api.offset_start, api.page_size) == ("start_rank", 1, 100)
+    assert api.params["num_ranks"] == "100"
+    assert config.discovery.use_wayback is None
+
+
+def test_search_module_is_not_a_course_even_at_a_course_shaped_url():
+    from app.services.scraper.guards import is_blocked_page
+    url = "https://www.lsbu.ac.uk/study/course-finder/ba-bsc-music-sound-design"
+    assert is_blocked_page(url, "Search Module")[0] is True
+    assert is_blocked_page(url, "Search Engine Design MSc")[0] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("numbered", [False, True])
+async def test_api_page_size_is_sent_before_deciding_last_page(monkeypatch, numbered):
+    import httpx
+    from app.services.scraper.config.schema import GenericSearchApiConfig
+    from app.services.scraper.generic_search_api import fetch_yaml_api_links
+
+    seen = []
+    rows = [
+        {"url": f"https://www.lsbu.ac.uk/study/course-finder/course-{i}",
+         "name": f"Course {i} MSc"} for i in range(3)
+    ]
+
+    def respond(request):
+        seen.append(dict(request.url.params))
+        size = int(request.url.params.get("num_ranks", "1"))
+        offset = (
+            (int(request.url.params["page"]) - 1) * size
+            if numbered else int(request.url.params["start_rank"]) - 1
+        )
+        return httpx.Response(200, json={"results": rows[offset:offset + size]})
+
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx, "AsyncClient",
+        lambda *a, **kw: original_client(*a, transport=httpx.MockTransport(respond), **kw),
+    )
+    config = GenericSearchApiConfig(
+        url="https://www.lsbu.ac.uk/catalogue-api",
+        root_path="results", url_fields=["url"], title_fields=["name"],
+        page_size=2, page_size_param="num_ranks",
+        offset_param="start_rank", offset_start=1,
+        page_number_param="page" if numbered else None,
+    )
+    links = await fetch_yaml_api_links(config)
+    assert len(links) == 3
+    assert [params["num_ranks"] for params in seen] == ["2", "2"]
+
+
 @pytest.mark.asyncio
 async def test_lsbu_utility_online_text_is_not_course_delivery():
     set_uni_config(_config(84))
