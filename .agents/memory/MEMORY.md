@@ -138,3 +138,4 @@
 - [HSU recovery source authority](hsu-recovery-source-authority.md) — null extraction is not proof of unpublished tuition; inspect inline/nested fees and preserve unknown campus facts for review.
 - [Git lazy-fetch backports](git-lazy-fetch-backports.md) — older distribution builds can honor lazy-fetch suppression; test transport denial independently of version numbers.
 - [Git stat-cache evidence](git-stat-cache-evidence.md) — byte-identical atomic restores can confuse metadata-only diff modes; require content comparison before declaring source dirty.
+- [Database CA loading](database-ca-loading.md) — explicitly load configured CA bundles; OpenSSL default paths may silently ignore a missing file.

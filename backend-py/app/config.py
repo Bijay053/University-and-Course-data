@@ -14,6 +14,9 @@ from pathlib import Path
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from app.managed_database_environment import load_managed_database_environment
+
+load_managed_database_environment()
 
 _ENV_FILE = Path(__file__).parent.parent / ".env"
 

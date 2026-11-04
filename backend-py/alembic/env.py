@@ -1,5 +1,9 @@
-"""Alembic env. Reads DATABASE_URL from app settings; uses synchronous psycopg2
-URL form (Alembic does not need async)."""
+"""Alembic launcher with the application's managed environment and verified TLS.
+
+Programmatic callers may supply a synchronous SQLAlchemy Connection through
+config.attributes["connection"] (AsyncConnection callers use run_sync).
+The caller owns that connection and any enclosing transaction.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -9,10 +13,15 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.config import settings
-from app.database import Base
+from app.managed_database_environment import load_managed_database_environment
+
+load_managed_database_environment()
+
+from app.config import Settings
+from app.database import Base, postgres_tls_connect_args
 from app import models  # noqa: F401  -- ensures all models are imported
 
+settings = Settings()
 config = context.config
 # ConfigParser treats bare '%' as interpolation syntax and raises ValueError
 # when the DATABASE_URL contains percent-encoded characters (e.g. %40 for '@'
@@ -49,14 +58,21 @@ async def run_async_migrations() -> None:
         config.get_section(config.config_ini_section) or {},
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=postgres_tls_connect_args(settings),
     )
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
+    try:
+        async with connectable.connect() as connection:
+            await connection.run_sync(do_run_migrations)
+    finally:
+        await connectable.dispose()
 
 
 def run_migrations_online() -> None:
-    asyncio.run(run_async_migrations())
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        do_run_migrations(connection)
+    else:
+        asyncio.run(run_async_migrations())
 
 
 if context.is_offline_mode():

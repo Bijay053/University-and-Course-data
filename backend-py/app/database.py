@@ -6,6 +6,7 @@ that yields a session and ensures it's always closed.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+import os
 import ssl
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -18,7 +19,7 @@ class Base(DeclarativeBase):
     """Project-wide declarative base."""
 
 
-def postgres_tls_connect_args() -> dict[str, ssl.SSLContext]:
+def postgres_tls_connect_args(settings=settings) -> dict[str, ssl.SSLContext]:
     """Return certificate-verifying TLS options for managed production.
 
     URL query flags such as ``sslmode`` are libpq-specific and are deliberately
@@ -28,7 +29,11 @@ def postgres_tls_connect_args() -> dict[str, ssl.SSLContext]:
     """
     if not settings.database_require_tls:
         return {}
-    return {"ssl": ssl.create_default_context()}
+    # OpenSSL's implicit SSL_CERT_FILE handling can silently ignore a missing
+    # bundle. Explicit loading must fail closed instead of trusting other CAs.
+    cafile = os.environ.get("SSL_CERT_FILE")
+    context = ssl.create_default_context(cafile=cafile) if cafile else ssl.create_default_context()
+    return {"ssl": context}
 
 
 engine = create_async_engine(
