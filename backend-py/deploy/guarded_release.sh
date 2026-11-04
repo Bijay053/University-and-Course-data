@@ -76,6 +76,20 @@ verify_target_worker_schema() {
   fi
 }
 
+verify_target_reporting_schema() {
+  # Legacy targets without reporting do not require the reporting migrations.
+  # Read the exact target checker before checkout, samples or service changes.
+  if run_release_user git -C "$repo_root" cat-file -e \
+      "$target:backend-py/app/routers/course_error_reports.py" 2>/dev/null; then
+    local checker="backend-py/app/services/reporting_schema.py" source
+    if ! source="$(run_release_user git -C "$repo_root" show "$target:$checker" 2>/dev/null)"; then
+      echo "Release refused: reporting target lacks a read-only schema prerequisite checker; review reporting migrations before release." >&2
+      return 1
+    fi
+    printf '%s\n' "$source" | "$python_bin" -B -
+  fi
+}
+
 verify_target_runtime() {
   # Bootstrap from immutable target bytes, without changing installed source.
   # Legacy targets have no helper; this entrypoint's checker can still read
@@ -137,6 +151,7 @@ if [ "$release_test_mode" != 1 ]; then
   run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
   verify_target_runtime
   verify_target_worker_schema
+  verify_target_reporting_schema
   # Use the reviewed target's sample lifecycle rules before checkout, without
   # modifying installed code. Keep the helper beside its pinned proof assets.
   smoke_helper="$(mktemp "$backend_root/deploy/.release-smoke.XXXXXX.py")"
@@ -274,6 +289,7 @@ if [ "$release_test_mode" = 1 ]; then
   : > "$tracked_recipe_manifest"
   run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
   verify_target_worker_schema
+  verify_target_reporting_schema
   # Optional hermetic lifecycle seam. Injected helpers are borrowed; the
   # ordinary reconciliation-only tests retain their existing behavior.
   if [ -n "${GUARDED_RELEASE_TEST_SMOKE:-}" ]; then

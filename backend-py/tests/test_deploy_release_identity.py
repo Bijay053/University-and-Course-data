@@ -149,6 +149,86 @@ def test_release_checks_target_fencing_schema_before_checkout(
         assert not (checkout / "backend-py/app/services/worker_fencing.py").exists()
 
 
+@pytest.mark.parametrize("schema_state", ["pre_report", "intermediate", "current", "checker_absent"])
+def test_release_checks_target_reporting_schema_before_checkout(tmp_path, schema_state):
+    from app.services.reporting_schema import REQUIRED_COLUMNS
+
+    checkout, source, predecessor, _ = _release_revision_repo(tmp_path)
+    router = source / "backend-py/app/routers/course_error_reports.py"
+    router.parent.mkdir(parents=True)
+    router.write_text("# reporting target\n")
+    checker = source / "backend-py/app/services/reporting_schema.py"
+    if schema_state != "checker_absent":
+        checker.parent.mkdir()
+        checker.write_text((DEPLOY_DIR.parent / "app/services/reporting_schema.py").read_text())
+    _git(source, "add", "backend-py")
+    _git(source, "commit", "-qm", "reporting target")
+    _git(source, "push", "-q", "origin", "main")
+    target = _git(source, "rev-parse", "HEAD")
+    (checkout / "backend-py").mkdir()
+
+    # Exercise the real target checker CLI with a hermetic catalog connection.
+    # The predecessor deliberately has no reporting helper.
+    columns = dict(REQUIRED_COLUMNS)
+    if schema_state == "pre_report":
+        columns = {}
+    elif schema_state == "intermediate":
+        for name in ("insight_id", "insight_country", "university_id"):
+            columns.pop(name)
+        columns["course_name"] = ("text", False)
+    rows = [
+        {"column_name": name, "column_type": kind, "nullable": nullable}
+        for name, (kind, nullable) in columns.items()
+    ]
+    stub = tmp_path / "stub/app"
+    stub.mkdir(parents=True)
+    (stub / "__init__.py").write_text("")
+    marker = tmp_path / "queries"
+    (stub / "database.py").write_text(f"""
+from pathlib import Path
+class Session:
+    async def __aenter__(self): return self
+    async def __aexit__(self, *args): pass
+    async def execute(self, statement):
+        sql = str(statement).strip()
+        assert sql == 'SET TRANSACTION READ ONLY' or sql.startswith('SELECT')
+        with Path({str(marker)!r}).open('a') as f: f.write(sql + '\\n')
+        return self
+    def mappings(self): return self
+    def all(self): return {rows!r}
+    async def rollback(self): pass
+class Engine:
+    async def dispose(self): pass
+AsyncSessionLocal = Session
+engine = Engine()
+""")
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(stub.parent),
+        "GUARDED_RELEASE_TEST_MODE": "1",
+        "GUARDED_RELEASE_REPO_ROOT": str(checkout),
+        "GUARDED_RELEASE_PYTHON": sys.executable,
+        "GUARDED_RELEASE_REVISION_FENCE": str(DEPLOY_DIR / "release_revision_fence.sh"),
+        "GUARDED_RELEASE_RECONCILER": str(DEPLOY_DIR / "reconcile_generated_configs.py"),
+        "GUARDED_RELEASE_RESUME_MARKER": str(tmp_path / "resume"),
+    }
+    result = subprocess.run(
+        [str(DEPLOY_DIR / "guarded_release.sh"), predecessor, target, "123456789012"],
+        capture_output=True, text=True, env=env, cwd=tmp_path,
+    )
+    if schema_state == "current":
+        assert result.returncode == 0, result.stderr
+        assert _git(checkout, "rev-parse", "HEAD") == target
+        assert "verified (read-only)" in result.stdout
+    else:
+        assert result.returncode != 0
+        assert "Release refused:" in result.stderr
+        assert _git(checkout, "rev-parse", "HEAD") == predecessor
+        assert not (checkout / "backend-py/app").exists()
+    if schema_state != "checker_absent":
+        assert marker.read_text().startswith("SET TRANSACTION READ ONLY\nSELECT")
+
+
 def test_schema_preflight_precedes_smoke_and_service_mutations():
     script = (DEPLOY_DIR / "guarded_release.sh").read_text()
     production = script[script.index('if [ "$release_test_mode" != 1 ]; then'):]
@@ -157,6 +237,11 @@ def test_schema_preflight_precedes_smoke_and_service_mutations():
     assert production.index("verify_target_worker_schema") < production.index("systemctl restart")
     assert "alembic upgrade" not in script
     assert "alembic stamp" not in script
+    # Check invocation order, not merely where the function is defined.
+    production = script[script.index("  verify_target_git_metadata\n"):]
+    assert production.index('verify "$repo_root" "$predecessor" "$target"') < production.index("verify_target_reporting_schema")
+    for mutation in ("release_sample preflight", "cancel_consumer", "systemctl restart"):
+        assert production.index("verify_target_reporting_schema") < production.index(mutation)
 
 
 def test_guarded_release_requires_exact_revision_arguments() -> None:

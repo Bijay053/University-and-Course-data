@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import Course, University, CourseErrorReport, AssessmentNote
 from app.routers import course_error_reports as reports
+from app.services.reporting_schema import require_reporting_schema, ReportingPrerequisiteError
 from tests.test_hsu_facts import hsu_database, hsu_postgres
 
 
@@ -30,8 +31,12 @@ async def test_reporting_migrations_create_missing_table_and_preserve_legacy_rep
     async with hsu_database() as db:
         # This fixture owns a disposable database and rolls back all test DDL.
         await db.execute(text("DROP TABLE course_error_reports"))
+        with pytest.raises(ReportingPrerequisiteError, match="391_public_course_reports"):
+            await require_reporting_schema(db)
         connection = await db.connection()
         await connection.run_sync(lambda c: migrate(c, "391_public_course_error_reports.py"))
+        with pytest.raises(ReportingPrerequisiteError, match="course_error_reports.course_name"):
+            await require_reporting_schema(db)
         university = University(name="Migration university", city="Sydney", country="Australia")
         db.add(university)
         await db.flush()
@@ -45,12 +50,32 @@ async def test_reporting_migrations_create_missing_table_and_preserve_legacy_rep
             VALUES (:course, 'Migration degree', 'Migration university', 'incorrect', 'fees', 'Check tuition')
         """), {"course": course.id})
         await connection.run_sync(lambda c: migrate(c, "392_key_insight_error_reports.py"))
+        await require_reporting_schema(db)
         result = await reports.list_reports(db, {"id": 1}, status="new", limit=20, offset=0)
         assert result["total"] == 1
         saved = result["reports"][0]
         assert saved.university_id == university.id
         assert saved.message == "Check tuition" and saved.status == "new"
         assert saved.insight_id is None and saved.insight_country is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change,column", [
+    ("ALTER COLUMN course_name SET NOT NULL", "course_name"),
+    ("ALTER COLUMN course_id SET NOT NULL", "course_id"),
+    ("DROP COLUMN insight_country", "insight_country"),
+    ("ALTER COLUMN insight_id TYPE text USING insight_id::text", "insight_id"),
+])
+async def test_reporting_prerequisite_rejects_partial_or_incompatible_schema(hsu_database, change, column):
+    from sqlalchemy import text
+
+    async with hsu_database() as db:
+        # Remove the FK only for the deliberately incompatible type fixture.
+        if "TYPE text" in change:
+            await db.execute(text("ALTER TABLE course_error_reports DROP CONSTRAINT course_error_reports_insight_id_fkey"))
+        await db.execute(text(f"ALTER TABLE course_error_reports {change}"))
+        with pytest.raises(ReportingPrerequisiteError, match=f"course_error_reports.{column}"):
+            await require_reporting_schema(db)
 
 
 @pytest.mark.asyncio

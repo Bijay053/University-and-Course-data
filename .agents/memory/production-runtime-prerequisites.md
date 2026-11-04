@@ -33,3 +33,9 @@ Never recursively change ownership of the production Git directory to fix housek
 **Why:** This host also retains private operational backups within Git metadata, while read-only object files can legitimately have a different owner. The observed failure needed only ref-directory and reflog ownership repairs.
 
 **How to apply:** Inventory active Git processes and locks, fence exact paths and owners, preserve file hashes and ref inventories, and repair only proven writable-metadata blockers.
+
+Treat reporting schema compatibility as a release prerequisite independent of API health and worker schema readiness.
+
+**Why:** Production served the dashboard reporting UI while the reporting table was absent; healthy API and worker checks did not prove the dashboard could query its data.
+
+**How to apply:** Inspect actual catalog types and nullability using the reviewed target's requirements before service changes. A migration ledger alone is not proof; missing prerequisites require a separately approved scoped migration, not an automatic broad upgrade.
