@@ -153,3 +153,72 @@ The recovery suite uses disposable local Git repositories and fake service
 controls, including actual process death at durable checkpoints. It does not
 contact AWS, use production credentials, alter the workspace database or
 perform a production recovery.
+
+## Opt-in production-style Linux ownership tests
+
+`tests/test_partial_release_permissions.py` additionally exercises the real
+root CLI entry point, its private umask/journals, the actual `sudo -H -u` handoff,
+Git checkout, and the pinned recipe reconciler together. Only service/frontend
+observations and consumer controls use the shared fake adapter; no systemd,
+Celery, database, network, AWS or production services are accessed. The CLI's
+production `ubuntu` account selection is replaced **in the test only** with a
+new unique `upr_<random>` account. No production CLI bypass flag is added.
+
+Run this **only on an expendable Linux test host**, not on the production host
+or a shared development machine. Prerequisites:
+
+- Genuine root with permission to create/delete local users and groups, and
+  noninteractive real sudo from root to the newly created account. A sudo shim
+  which leaves the UID unchanged is not sufficient.
+- `git`, `sudo`, `useradd`, `userdel`, `groupadd`, `groupdel`, and `setfacl`
+  installed. Use a local filesystem supporting Linux POSIX ACLs and the
+  reconciler's atomic no-replace rename/hard-link operations.
+- Python 3 with pytest and PyYAML installed. The same Python executable and
+  PyYAML must be accessible to the disposable account after sudo resets the
+  environment. A Python installation below a root-private home is unsuitable.
+- A writable `/tmp` with space for small disposable Git repositories. No
+  existing `ubuntu` account, production checkout, production credentials,
+  service unit, sudoers change or application environment file is needed.
+
+From the test checkout (adjust the path to that disposable checkout):
+
+```bash
+cd /root/University-and-Course-data && cd backend-py && \
+  sudo -n env ALLOW_DISPOSABLE_RECOVERY_PERMISSION_TESTS=1 PYTHONPATH=. \
+  python3 -m pytest tests/test_partial_release_permissions.py \
+  -v -c /dev/null --noconftest --import-mode=importlib -p no:cacheprovider
+```
+
+Without the opt-in variable all permission cases skip before creating accounts
+or files. With opt-in, missing root/tools or unusable sudo/Python/ACL support
+**fail**, rather than silently presenting skipped cases as permission proof.
+The normal hermetic recovery suite remains runnable without privileges.
+
+The tests verify:
+
+- `check` does not create a recovery journal or helper workspace.
+- Root-owned `0700` journal/archive directories and `0600` files deny both
+  reads and writes by the application owner, using actual owner-side opens.
+- Helper workspaces, recipe journals, backups and restored recipes belong to
+  the application UID/GID. Backups and restores retain exact UTF-8/CRLF bytes
+  and `0600`, `0640`, and `0644` recipe modes across checkout and resume.
+- Owner mode-bit denials and real named-user ACL denials at helper creation,
+  backup creation and restoration boundaries produce a nonzero CLI result,
+  never report baseline success, and preserve private evidence and backups.
+  Separate restoration cases exercise a real write denial and a concurrent
+  owner edit, including a refused subsequent resume.
+
+Each run creates only a new `/tmp/portal-recovery-permissions-*` tree and a
+unique account/group. Ownership changes are limited to that tree; ACL/mode
+denials are applied only to its fixture directories and restored in `finally`.
+Fixtures remove their directories and delete the exact account/group, including
+after assertion failures. They never use `userdel -r`, recursive permission
+repairs, existing service accounts, `/run` release locks, or production paths.
+
+SIGKILL or host loss can prevent fixture cleanup. On that disposable host,
+inspect `/tmp/portal-recovery-permissions-*` and `getent passwd` to match an
+exact `upr_...` account's home to the exact generated tree; confirm that no test
+process is running. Delete **only that verified account**, its matching group,
+and that exact temporary tree. Do not use a wildcard deletion or remove an
+account merely because its name starts with `upr_`. A successful unprivileged
+run with skips is not evidence that the privileged ownership checks passed.
