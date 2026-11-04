@@ -494,6 +494,59 @@ async def test_binary_documents_are_not_claimed_as_verified_html(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("readable", [True, False])
+async def test_pdf_activity_and_page_citations_survive_reload_without_value_writes(store, monkeypatch, readable):
+    from app.services import scrape_assistant_tools as tools
+    from tests.helpers.assistant_pdf_fixture import make_pdf
+    pdf_url = "https://www.example.edu/guidance.pdf"
+    async def fetch(url):
+        return make_pdf([
+            "International tuition for Bachelor of Example 2026",
+            "Annual GBP 18,900. Full Course GBP 56,700. Domestic GBP 9,790.",
+            "IELTS overall 6.5, with no component below 6.0.",
+        ] if readable else None)
+    monkeypatch.setattr(tools, "public_request", fetch)
+    async def ai(**kwargs):
+        import json
+        payload = json.loads(kwargs["user"])
+        source = payload["sources"][0]
+        assert source["sourceType"] == "pdf"
+        assert not source.get("facts")
+        return {
+            "answer": "PDF research complete; values have not been updated.",
+            "citations": [{"url": pdf_url, "quoteId": source["excerpts"][0]["id"]}] if readable else [],
+            "action": None,
+            # Unsupported generated numbers must never be persisted to rows.
+            "international_fee": 1, "ielts_overall": 9,
+        }
+    monkeypatch.setattr(service, "chat_json", ai)
+    async with store() as db:
+        row = await db.get(ScrapedCourse, 1)
+        before = (row.international_fee, row.ielts_overall)
+    thread_id, turn_id = await prompt_thread(store, f"Read fee and English guidance {pdf_url}; do not update anything")
+    await service.investigate(thread_id, turn_id)
+    async with store() as db:
+        result = await get_assistant("source", db, {"id": 1})
+        assert result["status"] == "ready"
+        label = "Official PDF checked" if readable else "Official PDF unavailable"
+        activity = next(item for item in result["activity"] if item["label"] == label)
+        assert activity["url"] == pdf_url
+        assert activity["status"] == ("completed" if readable else "error")
+        assert ("Read 1/1 PDF pages" if readable else "no readable text") in activity["detail"]
+        reply = result["messages"][-1]
+        assert any(item["label"] == label for item in reply["activity"])
+        if readable:
+            assert reply["sources"][0]["page"] == 1
+            assert "-p1-" in reply["sources"][0]["quoteId"]
+            assert "Annual GBP 18,900" in reply["sources"][0]["excerpt"]
+        else:
+            assert reply["sources"] == []
+        assert reply["actions"] == []
+        row = await db.get(ScrapedCourse, 1)
+        assert (row.international_fee, row.ielts_overall) == before
+
+
+@pytest.mark.asyncio
 async def test_confirmed_repair_keeps_verified_user_course_url(store, monkeypatch):
     research_fakes(monkeypatch)
     async def ai(**kwargs):

@@ -13,7 +13,7 @@ import { CatalogueComparisonView, type CatalogueComparison } from "./assistant-c
 
 export { safeSourceUrl };
 
-export type AssistantSource = { url: string; title: string; excerpt: string };
+export type AssistantSource = { url: string; title: string; excerpt: string; page?: number; quoteId?: string };
 export type AssistantAction = {
   id: string;
   kind: "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue";
@@ -588,17 +588,21 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                             <div className="mt-3 space-y-2">
                               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Evidence</p>
                               {m.sources.map((s, si) => {
-                                const href = safeSourceUrl(s.url);
+                                const sourceHref = safeSourceUrl(s.url);
+                                const page = typeof s.page === "number" && Number.isSafeInteger(s.page) && s.page > 0 ? s.page : null;
+                                const href = sourceHref && page ? `${sourceHref.split("#")[0]}#page=${page}` : sourceHref;
                                 return (
                                   <blockquote key={si} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12.5px]">
                                     {href ? (
                                       <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 font-medium text-teal-800 underline underline-offset-2" data-testid={`link-source-${i}-${si}`}>
-                                        {s.title || href} <ExternalLink className="h-3 w-3" aria-hidden />
+                                        {s.title || sourceHref}{page && <span> · Page {page}</span>} <ExternalLink className="h-3 w-3" aria-hidden />
                                       </a>
                                     ) : (
-                                      <span className="text-slate-700">{s.title} (link unavailable)</span>
+                                      <span className="text-slate-700">{s.title}{page && ` · Page ${page}`} (link unavailable)</span>
                                     )}
-                                    {s.excerpt && <p className="mt-1 italic text-slate-600">"{s.excerpt}"</p>}
+                                    {s.excerpt && <p className={page
+                                      ? "mt-1 overflow-x-auto whitespace-pre font-mono text-slate-600"
+                                      : "mt-1 italic text-slate-600"}>{page ? s.excerpt : `"${s.excerpt}"`}</p>}
                                   </blockquote>
                                 );
                               })}

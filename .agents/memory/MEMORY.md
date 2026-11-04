@@ -20,16 +20,15 @@
 - [JCU Cloudflare Enterprise escalation](jcu-cloudflare-lesson.md) — all transports dead except Scrape.do render=true; static 502 ROTATION_FAILED = fail fast, go render-first in discovery+extraction.
 - [JCU band_mapping flow fix](jcu-band-mapping-flow.md) — band_mapping must override central_page values; outer ielts_missing guard blocks it when central already filled the slot.
 - [Swinburne AEM extraction profile](swinburne-url-depth.md) — bound CPU concurrency; preserve audience-scoped hero/fee DOM; $0 international fee means unpublished, never fall back to Domestic.
-- [Waikato fee table patterns](waikato-fee-patterns.md) — Pattern A/B for degree-header tables; major-list annotation stripper needed for token_sort_ratio to work.
+- [New Zealand university lessons](new-zealand-university-lessons-index.md) — source-specific catalogue, programme points, fee periods, delivery and audience authority.
 - [Canterbury study-mode precedence](canterbury-study-mode-bug.md) — admin overrides can mask YAML; navigation mentions of online staff are not course delivery evidence.
-- [Canterbury programme-point fees](canterbury-programme-points.md) — special programme amounts are full-course; derive duration at 120 points/year and ignore separate SSL per-point wording.
 - [admin_config empty list overrides YAML patterns](admin-config-empty-list-override.md) — empty [] in admin_config.discovery clears YAML allow/block; fixed in _deep_merge + DB cleanup pattern.
 - [_fv_classify listing hint endswith-only fix](fv-classify-endswith-fix.md) — listing hints must use endswith, not substring; /study mid-path misclassifies course pages as listing.
 - [95% YAML scraper control](yaml-scraper-control.md) — new unis need only YAML edits; 5 new fields replace 5 hardcoded host lists.
 - [Scrape.do browser-fallback gap](scrape-do-browser-gap.md) — per-course browser rescue can bypass the normal proxy chain; retain proxy fallback after browser failure.
 - [UK structured fee tables](uk-fee-table-extractor.md) — select current international full-time tuition; missing applicable rows must not borrow domestic or part-time prices.
-- [IELTS split overall/band trap](ielts-split-overall-band.md) — resolve banner overall and prose component floors before broad first-score fallback.
 - [Staging URL-block parity](lancaster-skip-url-block.md) — a detail-page exception must survive both pre-extraction and staging guards.
+- [IELTS split overall/band trap](ielts-split-overall-band.md) — resolve banner overall and prose component floors before broad first-score fallback.
 - [Cross-university namespace guards](utas-flinders-substring-block.md) — site-specific hub blocks belong in YAML; shared namespace vetoes can also prevent repair from recognizing real courses.
 - [UG/PG English page routing](ug-pg-split-english.md) — fetch and retain separate undergraduate and postgraduate profiles to prevent cross-contamination.
 - [Admission filter safety revert](admission-filter-safety-revert.md) — flat CMS layouts can lose admission evidence during filtering; retain a bounded per-university safety escape.
@@ -61,7 +60,6 @@
 - [Location table-header contamination](location-table-header-contamination.md) — “Location” table headers must not turn adjacent column labels into campuses or override authoritative Online delivery.
 - [Non-tuition PDF fee safety](non-tuition-pdf-fee-safety.md) — incidental, ancillary, SSAF, application, deposit, materials, and equipment PDFs must never populate international tuition.
 - [Mixed standard and alternative values](mixed-standard-alternative-values.md) — preserve standard values beside accelerated alternatives; numeric test scores need boundaries on both sides.
-- [AUT points-based fees and duration](aut-points-fee-duration.md) — 120 points is one full-time year; annualize the headline levy-inclusive fee and prefer points over conflicting duration metadata.
 - [Fleet-wide non-degree gating](non-degree-gating.md) — Degree evidence wins over CPD paths; static rejection requires visible structured main/article evidence; discovery drops are not staging skips.
 - [Scrape slot persistence identity](scrape-slot-identity.md) — Persist multi-slot jobs by stable slot ID, never current grid position; reindexing positional keys can clone another active job.
 - [Authoritative provider overrides](authoritative-embedded-json-preservation.md) — preserve raw source and run deterministic provider authority outside optional AI/fallback gates.
@@ -103,21 +101,14 @@
 - [UWA campus and fee authority](uwa-campus-fee-authority.md) — use the current course’s labelled campus card and exact course-code lookup against UWA’s international fee calculator.
 - [Curtin structured offering authority](curtin-offering-authority.md) — use labelled key-information blocks and newest international year-1 JSON-LD offer; mixed year/month durations need conversion.
 - [Staged-row restore identity](staged-row-restore-identity.md) — exact backups deduplicate by canonical URL; name fallback is only for legacy snapshots whose fetched URL may differ.
-- [Auckland qualification filtering](auckland-qualification-filtering.md) — the shared study-option path mixes programmes and subjects; trust its explicit discovery labels before extraction.
-- [Otago fee authority](otago-mixed-fee-rows.md) — structured international metadata can be authoritative even when visible fee labels are absent.
-- [Massey qualification catalogue](massey-qualification-catalogue.md) — use the full qualification index and static proxy transport for long detail-page runs.
-- [VUW current international catalogue](vuw-current-international-catalogue.md) — bare JSON endpoints can serve stale prior-year fees; use the international query and align intakes to the fee year.
 - [Release cleanup paths](release-cleanup-paths.md) — deployment EXIT traps must use absolute paths or reset cwd before restoring paused consumers.
 - [Release worker readiness](release-worker-readiness.md) — service activity precedes worker replies; sample follow-ups need verified ownership and bounded completion.
 - [APU course delivery identity](apu-course-delivery-identity.md) — APU’s page-wide catalogue contaminates mode keywords; classify delivery from the current course title/H1/URL only.
-- [SIT course-panel authority](sit-course-panel-fee-authority.md) — match exact awards and current programme panels; exclude resource fees from central international tuition.
 - [Required-fee resume checkpoints](required-fee-resume-checkpoints.md) — exact central-fee recipes must reprocess unproven pending checkpoints and retire only matched rows after clean completion.
 - [Duration value-unit atomicity](duration-value-unit-atomicity.md) — preserve deterministic duration value/unit pairs; restore the unit only while the numeric value still matches.
 - [Generated config release collisions](generated-config-release-collisions.md) — reconcile verified stubs below tracked recipes; unknown files must keep blocking release.
 - [Algolia provider trust boundaries](algolia-provider-trust-boundaries.md) — enforce record type and URL before emitting trusted links; preserve authoritative payloads through retries.
-- [Otago Polytechnic fee cards](otago-polytechnic-fee-cards.md) — use the International Standard card; Full tuition is full-course, while First year/Course one are annual.
 - [Python local-import shadowing](python-local-import-shadowing.md) — late local imports shadow earlier uses; swallowed errors can misreport lock contention.
-- [Canterbury embedded course-year facts](canterbury-embedded-course-year-facts.md) — select the actual entry year and reject unpublished future fees instead of using blanket defaults.
 - [Settings-backed academic requirements](settings-backed-academic-requirements.md) — stable semantic option identities let setting renames propagate without remapping degrees.
 - [AI repair live-evidence seeds](ai-repair-live-evidence-seeds.md) — probe staged course URLs; historical jobs may need the current review cohort after row replacement.
 - [Claimed-worker recovery fencing](claimed-worker-recovery-fencing.md) — heartbeat age never proves worker death; safe autonomous reclaim requires generation-fenced writes.

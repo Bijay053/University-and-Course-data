@@ -17,6 +17,12 @@ The user said: “do not ask for review and run do it and give me result” and 
 **How to apply:** Automatically dispatch supported research, discovery and pending-record corrections, report actual outcomes in chat, and avoid asking the user to select or run routine operations. Honor explicit read-only requests. Publishing, deletion and production deployment remain outside automatic pending-record work.
 
 ## Grounding
+Official PDF research must remain separate from HTML field extraction and numeric writes.
+
+**Why:** Flattened PDF tables lose the DOM ownership that HTML audience/fee guards rely on. Reusing a general PDF downloader can also bypass the assistant's stricter pinned-host transport. A readable official document proves its text, not that every amount or IELTS score applies to the requested course.
+
+**How to apply:** Reuse parsing primitives, not weaker transport. Keep document/page identity in quotations, report unreadable pages and bounded failures, and treat audience, tuition purpose, year and Annual/Full Course applicability as separate requirements. Continue using validated pending-only correction pipelines rather than assigning generated values.
+
 The user wants this assistant to replace their reliance on Replit for fixes, including software issues, not merely answer scraping questions.
 
 **Why:** They explicitly asked for a capability comparison, scenario checks and a more capable agent after repeated incomplete answers.

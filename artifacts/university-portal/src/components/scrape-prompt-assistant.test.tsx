@@ -20,6 +20,46 @@ afterEach(() => {
 });
 
 describe("ScrapePromptAssistant", () => {
+  it("restores PDF page links and aligned table excerpts after reloading", async () => {
+    const excerpt = "Course           Annual       Full Course\nBachelor Arts    GBP 18,900    GBP 56,700";
+    const saved: AssistantThread = { ...empty, threadId: "pdf-thread", status: "ready",
+      messages: [{ role: "assistant", content: "Read the official tuition schedule.", createdAt: "2024-01-01T00:00:00Z",
+        sources: [{ url: "https://uni.edu/fees.pdf", title: "Tuition schedule", page: 2,
+          quoteId: "pdf-immutable-p2-q0", excerpt }],
+        activity: [{ id: "pdf-check", at: "2024-01-01T00:00:00Z", label: "Official PDF checked",
+          status: "completed", detail: "Read 2/2 PDF pages." }] }] };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => json(saved));
+    const first = render(<ScrapePromptAssistant jobId="j1" />);
+    expect((await screen.findByTestId("link-source-0-0")).getAttribute("href")).toBe("https://uni.edu/fees.pdf#page=2");
+    expect(screen.getByText("· Page 2")).toBeTruthy();
+    first.unmount();
+    render(<ScrapePromptAssistant jobId="j1" />);
+    const restored = await screen.findByTestId("link-source-0-0");
+    expect(restored.textContent).toContain("Page 2");
+    expect(restored.getAttribute("href")).toBe("https://uni.edu/fees.pdf#page=2");
+    const quote = restored.closest("blockquote")?.querySelector("p");
+    expect(quote?.textContent).toBe(excerpt);
+    expect(quote?.className).toContain("whitespace-pre");
+    expect(quote?.className).toContain("font-mono");
+    expect(await screen.findByTestId("activity-item-pdf-check")).toBeTruthy();
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("never turns an unsafe PDF URL or invalid page into a page link", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ ...empty, status: "ready", messages: [
+      { role: "assistant", content: "PDF guidance.", createdAt: "2024-01-01T00:00:00Z", sources: [
+        { url: "javascript:alert(1)", title: "Unsafe PDF", excerpt: "Untrusted", page: 2 },
+        { url: "https://uni.edu/fees.pdf", title: "No page", excerpt: "Text", page: -1 },
+        { url: "https://uni.edu/fees.pdf", title: "Injected page", excerpt: "Text", page: "2&x=bad" },
+      ] },
+    ] }));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    expect((await screen.findByTestId("link-source-0-1")).getAttribute("href")).toBe("https://uni.edu/fees.pdf");
+    expect(screen.queryByTestId("link-source-0-0")).toBeNull();
+    expect(screen.getByTestId("link-source-0-2").getAttribute("href")).toBe("https://uni.edu/fees.pdf");
+    expect(screen.queryByText("Page -1")).toBeNull();
+  });
+
   it("submits a prompt to the job assistant endpoint", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(json(empty))

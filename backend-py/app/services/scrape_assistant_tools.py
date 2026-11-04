@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import ipaddress
 import json
+from pathlib import Path
 import re
 import socket
+import sys
 from urllib.parse import urljoin, urlsplit
 
 import httpx
@@ -13,11 +16,71 @@ from bs4 import BeautifulSoup
 from httpcore._backends.auto import AutoBackend
 
 MAX_BYTES = 2_000_000
+PDF_PARSE_SECONDS = 4
 
 
-def evidence_excerpts(text: str, facts: list[dict]) -> list[dict]:
+class SourceReadError(ValueError):
+    """A safe, user-facing failure (never expose raw transport/parser errors)."""
+
+
+async def pdf_pages(raw: bytes) -> dict:
+    """Kill and reap the parser on timeout or cancellation, not just its await."""
+    process = await asyncio.create_subprocess_exec(
+        sys.executable, str(Path(__file__).with_name("scrape_assistant_pdf.py")),
+        stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    try:
+        output, _ = await asyncio.wait_for(process.communicate(raw), PDF_PARSE_SECONDS)
+        if process.returncode:
+            raise SourceReadError("PDF parsing failed within the memory or CPU budget.")
+        result = json.loads(output)
+        if result.get("error"):
+            raise SourceReadError(result["error"])
+        return result
+    except TimeoutError:
+        raise SourceReadError("PDF parsing reached its time budget.") from None
+    finally:
+        if process.returncode is None:
+            process.kill()
+        await process.wait()
+
+
+async def inspect_pdf(raw: bytes, url: str) -> dict:
+    from app.services.scraper.pdf_classifier import is_non_tuition_fee_pdf
+
+    document = await pdf_pages(raw)
+    digest = hashlib.sha256(raw).hexdigest()[:20]
+    excerpts = []
+    for page in document["pages"]:
+        # IDs bind the immutable document bytes, page and exact excerpt.
+        for excerpt in evidence_excerpts(page["text"], [], preserve_layout=True)[:4]:
+            excerpts.append({
+                **excerpt, "id": f"pdf-{digest}-p{page['page']}-{excerpt['id']}",
+                "page": page["page"],
+            })
+    text = "\n\n".join(page["text"] for page in document["pages"])
+    non_tuition = is_non_tuition_fee_pdf(url, document["pages"][0]["text"])
+    return {
+        "url": url, "title": urlsplit(url).path.rsplit("/", 1)[-1] or "Official PDF guidance",
+        "sourceType": "pdf", "verified": True, "text": text[:24000], "_fullText": text,
+        "facts": [], "excerpts": excerpts, "englishLinks": [],
+        "pageCount": document["pageCount"], "pagesRead": len(document["pages"]),
+        "unreadablePages": document["unreadablePages"], "nonTuition": non_tuition,
+        "note": (
+            "Text-only PDF research; no fee or IELTS values assigned. "
+            "Keep page/table headers, course, international/domestic audience, year and Annual/Full Course "
+            "period together; missing or ambiguous scope is unverified. Never infer annual tuition from a total. "
+            + ("This is non-tuition guidance: its amounts cannot establish international tuition. " if non_tuition else "")
+            + (f"Unreadable pages {document['unreadablePages']} remain unverified." if document["unreadablePages"] else "")
+        ),
+    }
+
+
+def evidence_excerpts(text: str, facts: list[dict], *, preserve_layout=False) -> list[dict]:
     """Give the model immutable quote IDs instead of asking it to copy prose."""
-    text = " ".join(text.split())
+    if not preserve_layout:
+        text = " ".join(text.split())
     starts = {0}
     for fact in facts:
         value = fact.get("value")
@@ -27,6 +90,8 @@ def evidence_excerpts(text: str, facts: list[dict]) -> list[dict]:
             starts.update(max(0, match.start() - 230) for match in list(re.finditer(pattern, text))[:3])
     for cue in ("IELTS", "international", "tuition", "fees", "award", "duration", "location"):
         starts.update(max(0, match.start() - 160) for match in list(re.finditer(re.escape(cue), text, re.I))[:2])
+    if preserve_layout:
+        starts = {text.rfind("\n", 0, start) + 1 for start in starts}
     selected = sorted(starts)[:24]
     return [{"id": f"q{index}", "text": text[start:start + 800]} for index, start in enumerate(selected)]
 
@@ -71,7 +136,7 @@ async def public_request(url: str, *, method="GET", body=None, params=None) -> b
     transport = httpx.AsyncHTTPTransport(retries=0)
     transport._pool._network_backend = PublicNetworkBackend()
     async with httpx.AsyncClient(
-        transport=transport, follow_redirects=False, timeout=httpx.Timeout(9, connect=4),
+        transport=transport, follow_redirects=False, trust_env=False, timeout=httpx.Timeout(9, connect=4),
         headers={"User-Agent": "StudyInfoCentre-SourceVerifier/1.0"},
     ) as client:
         async with client.stream(method, url, json=body if method == "POST" else None, params=params or None) as response:
@@ -80,21 +145,29 @@ async def public_request(url: str, *, method="GET", body=None, params=None) -> b
                 # Revalidate every hop, limit redirects and never forward credentials.
                 if target == url:
                     raise ValueError("Source redirect could not be verified.")
-                raise ValueError("Source redirects; provide its final official URL.")
+                raise SourceReadError("Source redirects; provide its final official URL.")
             response.raise_for_status()
             chunks = bytearray()
             async for chunk in response.aiter_bytes():
                 chunks.extend(chunk)
                 if len(chunks) > MAX_BYTES:
-                    raise ValueError("Source exceeds the safe research size limit.")
+                    raise SourceReadError("Source exceeds the safe research size limit.")
             return bytes(chunks)
 
 
 async def inspect_source(url: str, home: str) -> dict:
+    source_type = "pdf" if urlsplit(url).path.lower().endswith(".pdf") else "html"
     try:
         url = official_url(url, home)
         raw = await asyncio.wait_for(public_request(url), timeout=12)
-        if raw.lstrip().startswith(b"%PDF") or b"\x00" in raw[:500]:
+        if len(raw) > MAX_BYTES:
+            raise SourceReadError("Source exceeds the safe research size limit.")
+        if raw.lstrip().startswith(b"%PDF"):
+            source_type = "pdf"
+            return await inspect_pdf(raw, url)
+        if source_type == "pdf":
+            raise SourceReadError("Official PDF URL did not return a PDF document.")
+        if b"\x00" in raw[:500]:
             raise ValueError("This research tool needs a readable HTML page, not a binary document.")
         html = raw.decode("utf-8", errors="replace")
         from app.services.scraper.extractors.fee import extract as extract_fee
@@ -115,24 +188,38 @@ async def inspect_source(url: str, home: str) -> dict:
                 })
         title = soup.title.get_text(" ", strip=True) if soup.title else urlsplit(url).path
         english_links = []
+        fee_links = []
         for anchor in soup.select("a[href]"):
-            if not re.search(r"english|language.requirements", anchor.get_text(" ", strip=True) + " " + anchor["href"], re.I):
+            label = anchor.get_text(" ", strip=True) + " " + anchor["href"]
+            english = bool(re.search(r"english|language.requirements", label, re.I))
+            fee_pdf = bool(
+                re.search(r"fee|tuition", label, re.I)
+                and (urlsplit(anchor["href"]).path.lower().endswith(".pdf")
+                     or re.search(r"\bPDF\b", anchor.get_text(" ", strip=True), re.I))
+            )
+            if not english and not fee_pdf:
                 continue
             try:
                 link = official_url(urljoin(url, anchor["href"]), home)
             except (ValueError, TypeError):
                 continue
-            if link not in english_links:
+            if english and link not in english_links:
                 english_links.append(link)
+            if fee_pdf and link not in fee_links:
+                fee_links.append(link)
         return {
             "url": url, "title": title[:200], "text": text[:24000], "_fullText": text,
             "facts": facts, "excerpts": evidence_excerpts(text, facts), "verified": True,
-            "englishLinks": english_links[:8],
+            "englishLinks": english_links[:8], "feeLinks": fee_links[:8],
         }
     except asyncio.CancelledError:
         raise
-    except Exception:
-        return {"url": url, "verified": False, "error": "Official page could not be verified within the research limit."}
+    except Exception as exc:
+        return {
+            "url": url, "verified": False, "sourceType": source_type,
+            "error": str(exc) if isinstance(exc, SourceReadError) else
+            f"Official {source_type.upper()} source could not be verified within the research limit.",
+        }
 
 
 def quote_in_source(quote: str, source: dict) -> bool:

@@ -8,6 +8,7 @@ import uuid
 import hashlib
 import time
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 from sqlalchemy import select, update, func
 
@@ -493,15 +494,26 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                 if remaining <= 0:
                     raise TimeoutError()
                 await record_activity(thread_id, turn_id, run_id, event(
-                    "Opening official page", status="running", url=url, event_id=identifier,
+                    "Opening official PDF" if urlsplit(url).path.lower().endswith(".pdf") else "Opening official page",
+                    status="running", url=url, event_id=identifier,
                 ))
                 result = await asyncio.wait_for(inspect_source(url, ctx["home"]), timeout=min(12, remaining))
             except TimeoutError:
-                result = {"url": url, "verified": False, "error": "Source check reached its time budget; this page remains unchecked."}
+                result = {
+                    "url": url, "verified": False,
+                    "sourceType": "pdf" if urlsplit(url).path.lower().endswith(".pdf") else "html",
+                    "error": "Source check reached its time budget; this source remains unchecked.",
+                }
         await record_activity(thread_id, turn_id, run_id, event(
-            "Official page checked" if result.get("verified") else "Official page unavailable",
+            ("Official PDF checked" if result.get("verified") else "Official PDF unavailable")
+            if result.get("sourceType") == "pdf" else
+            ("Official page checked" if result.get("verified") else "Official page unavailable"),
             status="completed" if result.get("verified") else "error", url=url, event_id=identifier,
-            detail=f"{len(result.get('facts', []))} extracted field facts." if result.get("verified") else result.get("error"),
+            detail=(
+                f"Read {result.get('pagesRead')}/{result.get('pageCount')} PDF pages. {result.get('note', '')}"
+                if result.get("sourceType") == "pdf" else
+                f"{len(result.get('facts', []))} extracted field facts."
+            ) if result.get("verified") else result.get("error"),
             duration_ms=(time.monotonic() - started) * 1000,
         ))
         return result
@@ -531,13 +543,18 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         running = [group.create_task(task) for task in tasks]
     findings = [task.result() for task in running]
     sources, catalogue = (findings[:-1], findings[-1]) if check_catalogue else (findings, None)
+    link_keys = []
     if re.search(r"ielts|english|band|language", prompt, re.I):
+        link_keys.append("englishLinks")
+    if re.search(r"fee|tuition", prompt, re.I):
+        link_keys.append("feeLinks")
+    if link_keys:
         seen = {source["url"] for source in sources}
         followups = []
         for source in sources:
             if not source.get("verified"):
                 continue
-            for link in source.get("englishLinks", []):
+            for link in [value for key in link_keys for value in source.get(key, [])]:
                 try:
                     link = official_url(link, ctx["home"])
                 except (ValueError, TypeError):
@@ -565,6 +582,9 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             "latest published year, Annual from Full Course/module prices, taught/research/course-specific IELTS "
             "and pre-sessional scores. Never invent a fee, score, campus, requirement, source or completeness. "
             "Use fee periods exactly: annual tuition is not a full-programme total. "
+            "PDF excerpts are page-specific research only, not extracted field authority. "
+            "Respect nonTuition and unreadablePages: incidental charges cannot establish tuition, "
+            "unreadable pages remain unchecked, and missing audience/period/course headers mean unverified applicability. "
             "Never use the contradictory phrase 'annual full-course fee'. "
             "Citations MUST select an existing excerpts[].id as quoteId from that URL. "
             "Do not type or combine quotes yourself. The server displays the immutable source excerpt. "
@@ -644,7 +664,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
     if re.search(r"\b(?:do not|don't|dont|never|stop)\s+(?:\w+\s+){0,2}(?:add|recover|import|fetch|rescrape|reextract|fix|correct|update|verify|recheck|refresh)\b", prompt, re.I):
         wants_review = False
     targeted_review = wants_review and bool(recent_user_urls) and all(
-        value in verified and verified[value].get("excerpts") for value in recent_user_urls)
+        value in verified and verified[value].get("excerpts")
+        and verified[value].get("sourceType") != "pdf" for value in recent_user_urls)
     citations = []
     for citation in ([] if targeted_review else result.get("citations", [])[:6]):
         if not isinstance(citation, dict):
@@ -654,7 +675,10 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         quote = excerpt["text"] if excerpt else ""
         if not source or not quote_in_source(quote, source):
             raise ValueError("A claimed source excerpt could not be verified.")
-        citations.append({"url": source["url"], "title": source["title"], "excerpt": quote})
+        citations.append({
+            "url": source["url"], "title": source["title"], "excerpt": quote,
+            **({"page": excerpt["page"], "quoteId": excerpt["id"]} if "page" in excerpt else {}),
+        })
     scoped_ids = [item["id"] for item in ctx["samples"] if item.get("url", "").rstrip("/") in
                   {value.rstrip("/") for value in recent_user_urls}] if recent_user_urls else ctx["eligible_ids"]
     action = action_proposal(result.get("action"), scoped_ids) if verified and not targeted_review else None
