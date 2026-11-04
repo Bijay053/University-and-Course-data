@@ -49,6 +49,7 @@ celery_app = Celery(
     # tasks/ — keep them in one ``include`` list so a single worker
     # process can serve both queues.
     include=[
+        "app.tasks.scrape_assistant",
         "app.tasks.scrape_tasks",
         "app.tasks.snapshot_tasks",
         "app.tasks.monitoring_tasks",

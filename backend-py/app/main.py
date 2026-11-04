@@ -112,6 +112,8 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
 
         async with AsyncSessionLocal() as _s:
             await asyncio.wait_for(ensure_ai_repair_audit_schema(_s), timeout=10)
+            from app.services.scrape_assistant import ensure_schema as ensure_assistant_schema
+            await asyncio.wait_for(ensure_assistant_schema(_s), timeout=10)
         log.info("AI repair audit schema ensured")
     except TimeoutError:
         log.warning(
@@ -179,6 +181,8 @@ app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(course_error_reports.router, prefix="/api/course-error-reports", tags=["course-error-reports"])
 app.include_router(reviews.router, prefix="/api", tags=["reviews"])
 app.include_router(scrape.router, prefix="/api/scrape", tags=["scrape"])
+from app.routers import scrape_assistant
+app.include_router(scrape_assistant.router, prefix="/api/scrape", tags=["scrape-assistant"])
 app.include_router(api_discovery.router, prefix="/api/scrape", tags=["scrape"])
 app.include_router(scrape_health.router, prefix="/api/scrape", tags=["scrape-health"])
 app.include_router(per_course_resources.router, prefix="/api", tags=["per-course"])

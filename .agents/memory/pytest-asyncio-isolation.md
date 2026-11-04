@@ -3,6 +3,13 @@ name: pytest asyncio isolation
 description: Keep pytest async resources on the configured session loop and isolate synchronous helpers
 ---
 
+## Private-schema DDL isolation
+Use an explicit schema translation map for test DDL and ORM statements, without a public search-path fallback. Assert that the seeded table belongs to the private schema before inserting fixtures.
+
+**Why:** `create_all(checkfirst=True)` can see a same-named public table through the fallback and skip creating its private copy. A private search-path prefix alone therefore does not isolate fixture writes.
+
+**How to apply:** Map both unqualified and explicit public metadata to the disposable schema, keep connections test-owned, and drop only that schema during cleanup.
+
 ## The rule
 Keep fully async tests and fixtures on pytest-asyncio's configured session loop, especially when they share asyncpg engines, Redis clients, or other loop-bound pools. When synchronous tests need to call isolated async functions, never rely on ambient `asyncio.get_event_loop()` state; use `asyncio.run()`:
 

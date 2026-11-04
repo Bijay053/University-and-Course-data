@@ -10,3 +10,4 @@ export * from "./import_jobs";
 export * from "./scraped_courses";
 export * from "./course_review";
 export * from "./assessment_notes";
+export * from "./scrape_assistant";

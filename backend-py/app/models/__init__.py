@@ -31,6 +31,7 @@ from app.models.scrape_run_summary import ScrapeRunSummary
 from app.models.gemini_call_log import GeminiCallLog
 from app.models.scrape_runtime import ScrapeRuntimeJob, ScrapeRuntimeLog
 from app.models.scraped_course import ScrapedCourse
+from app.models.scrape_assistant import ScrapeAssistantThread
 from app.models.dated_catalogue_review_history import DatedCatalogueReviewHistory
 from app.models.scraping_change import ScrapingChange
 from app.models.performance_ledger import ScrapePerformanceLedger

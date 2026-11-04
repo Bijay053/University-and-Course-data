@@ -77,3 +77,8 @@ async def chat_json(
     except Exception as exc:
         log.warning("openai_client: chat_json failed: %s", exc)
         return None
+    finally:
+        try:
+            await c.close()
+        except Exception:
+            log.warning("openai_client: client cleanup failed")

@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { countPendingReviewCourses } from "@/utils/pending-review-count";
 import { CourseReport } from "@/components/course-report";
 import { useCan } from "@/components/can";
+import { ScrapePromptAssistant } from "@/components/scrape-prompt-assistant";
 import {
   TargetedRetryAllFilteredNotice,
   type TargetedRetryDiagnostic,
@@ -1563,6 +1564,24 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
       setQualityLoading(false);
     }
   }, []);
+
+  // Refresh job-scoped data after an assistant action reaches a terminal
+  // state. Only refetches derived counts/quality; never resets form state.
+  const handleAssistantChanged = useCallback(() => {
+    const jobId = completedJobId;
+    if (!jobId) return;
+    void fetchQualityData(jobId);
+    pendingReviewCountJobRef.current = jobId;
+    void fetch(`/api/scrape/staged/${encodeURIComponent(jobId)}?view=summary`, {
+      cache: "no-store", headers: { "Cache-Control": "no-cache" }, credentials: "include",
+    })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const count = countPendingReviewCourses(await readResponseJson<unknown>(response));
+        if (count !== null && pendingReviewCountJobRef.current === jobId) setPendingReviewCount(count);
+      })
+      .catch(() => { /* keep previous count */ });
+  }, [completedJobId, fetchQualityData]);
 
   const handleRunOptimizer = useCallback(async () => {
     if (!completedJobId || qualityStatus === "queued" || qualityStatus === "polling") return;
@@ -3611,6 +3630,15 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                   <span className="text-gray-400 italic">unavailable</span>
                 )}
               </div>
+            )}
+
+            {/* Review panel hosts the assistant when this job's review is open. */}
+            {completedJobId && currentReview?.jobId !== completedJobId && (
+              <ScrapePromptAssistant
+                jobId={completedJobId}
+                onChanged={handleAssistantChanged}
+                onReviewJob={id => onReviewReady(id, uniName, true)}
+              />
             )}
 
             {/* ── Quality Optimizer panel ─────────────────────────── */}

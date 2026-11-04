@@ -27,7 +27,7 @@ import {
   Database, Download, RotateCcw, Activity,
 } from "lucide-react";
 import { Link } from "wouter";
-import { confirmCourseEditNavigation, confirmHistoryReportDiscard, hasUnsavedCourseReports, registerCourseEditNavigationGuard } from "@/lib/course-edit-navigation-guard";
+import { confirmCourseEditNavigation, confirmHistoryReportDiscard, hasUnsavedCourseReports, registerCourseEditNavigationGuard, subscribeCourseReportGuardChanges } from "@/lib/course-edit-navigation-guard";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { Can, useCan } from "@/components/can";
 import {
@@ -36,6 +36,7 @@ import {
   type ReviewEvidenceItem,
 } from "@/components/review-scraped-courses-table";
 import { ScrapeJobCard } from "@/components/scrape-job-card";
+import { ScrapePromptAssistant } from "@/components/scrape-prompt-assistant";
 import { CourseReport, type CourseReportPrefillCourse } from "@/components/course-report";
 import { DurationReviewNotice, type DurationReviewStatus } from "@/components/duration-review-status";
 import { TargetedRetryAllFilteredNotice, type TargetedRetryDiagnostic } from "@/components/targeted-retry-diagnostic";
@@ -2109,6 +2110,39 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     loadStagedCourses(jobId, !force);
   }, [loadStagedCourses]);
 
+  // Assistant actions write to review data. Never reload over unsaved edits or
+  // report drafts: defer until they are saved/discarded, then refresh.
+  const [assistantRefreshDeferred, setAssistantRefreshDeferred] = useState(false);
+  const hasDirtyEditRef = useRef(hasDirtyEdit);
+  hasDirtyEditRef.current = hasDirtyEdit;
+  const handleAssistantReviewChanged = useCallback(() => {
+    const jobId = reviewJobIdRef.current;
+    if (!jobId) return;
+    if (hasDirtyEditRef.current || hasUnsavedCourseReports()) {
+      setAssistantRefreshDeferred(true);
+      return;
+    }
+    void loadStagedCourses(jobId);
+  }, [loadStagedCourses]);
+  // Bumped when a report draft opens/changes/closes so the deferred refresh re-evaluates.
+  const [reportGuardTick, setReportGuardTick] = useState(0);
+  useEffect(() => {
+    if (!assistantRefreshDeferred) return;
+    return subscribeCourseReportGuardChanges(() => setReportGuardTick(tick => tick + 1));
+  }, [assistantRefreshDeferred, reviewJobId]);
+  useEffect(() => {
+    if (!assistantRefreshDeferred || hasDirtyEdit || hasUnsavedCourseReports()) return;
+    setAssistantRefreshDeferred(false);
+    const jobId = reviewJobIdRef.current;
+    if (jobId) void loadStagedCourses(jobId);
+  }, [assistantRefreshDeferred, hasDirtyEdit, reportGuardTick, loadStagedCourses]);
+  useEffect(() => { setAssistantRefreshDeferred(false); }, [reviewJobId]);
+  const handleAssistantOpenReview = useCallback((jobId: string) => {
+    // Explicit user action; confirm before dropping unsaved edits/report drafts.
+    if (!confirmCourseEditNavigation()) return;
+    handleReviewReady(jobId, undefined, true);
+  }, [handleReviewReady]);
+
   const resetActiveScrapeState = useCallback((message?: string) => {
     if (pollRef.current) {
       clearTimeout(pollRef.current);
@@ -4114,6 +4148,21 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   <p className="mt-2 text-xs text-muted-foreground">One attempt per click. Any rows that still fail remain pending for review; there is no automatic retry.</p>
                 </section>
               </Can>
+            )}
+            {reviewJobId && (
+              <div className="mb-3">
+                {assistantRefreshDeferred && (
+                  <p role="status" className="mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800" data-testid="status-assistant-refresh-deferred">
+                    Assistant changes are ready. The review list will refresh after you save or discard your open edits.
+                  </p>
+                )}
+                <ScrapePromptAssistant
+                  jobId={reviewJobId}
+                  onChanged={handleAssistantReviewChanged}
+                  onReviewJob={handleAssistantOpenReview}
+                  disabled={reviewRefreshing}
+                />
+              </div>
             )}
             <DatedCatalogueReview courses={stagedCourses} />
             {bulkFixJob && (
