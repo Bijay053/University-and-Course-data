@@ -13,7 +13,6 @@ import json
 import math
 import os
 import re
-import shlex
 import statistics
 import subprocess
 import sys
@@ -27,26 +26,9 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlparse
 
-MANAGED_DATABASE_ENV_FILE = Path("/etc/university-portal/database.env")
-_MANAGED_DATABASE_KEYS = {
-    "DATABASE_URL",
-    "DATABASE_REQUIRE_TLS",
-    "DATABASE_SECRET_VERSION",
-    "SSL_CERT_FILE",
-}
-
-
-def _load_managed_database_environment() -> None:
-    if not MANAGED_DATABASE_ENV_FILE.is_file():
-        return
-    with MANAGED_DATABASE_ENV_FILE.open(encoding="utf-8") as stream:
-        for raw_line in stream:
-            parsed = shlex.split(raw_line, comments=False, posix=True)
-            if not parsed:
-                continue
-            key, value = parsed[0].split("=", 1)
-            if key in _MANAGED_DATABASE_KEYS:
-                os.environ[key] = value
+from app.managed_database_environment import (
+    load_managed_database_environment as _load_managed_database_environment,
+)
 
 
 _load_managed_database_environment()
