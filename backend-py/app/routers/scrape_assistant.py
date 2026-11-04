@@ -91,23 +91,22 @@ async def response(thread, db):
                 changed = True
             elif target is not None:
                 action["progress"] = {"current": target.current or 0, "total": target.total_found or action["courseCount"], "status": target.status}
-                if target.status in {"completed", "completed_with_warnings"}:
+                if action["kind"] in {"review_courses", "recover_catalogue"} and target.status not in {"queued", "running", "awaiting_approval"}:
+                    from app.services.assistant_recovery_results import review_course_results
+                    results, complete, summary = await review_course_results(
+                        db, target, action.get("_requestedUrls", []), service.REVIEW_STATUSES,
+                    )
+                    action["courseResults"] = results
+                    action["resultSummary"] = summary
+                    action["state"] = "completed" if complete else "error"
+                    if complete:
+                        action.pop("error", None)
+                    else:
+                        action["error"] = summary
+                elif target.status in {"completed", "completed_with_warnings"}:
                     action["state"] = "completed"
                     if action["kind"] == "scan_catalogue":
                         action["resultSummary"] = f"Discovery finished: {target.total_found or 0} found, {target.imported or 0} staged, {target.skipped or 0} skipped, {target.errors or 0} errors. Nothing was published."
-                    if action["kind"] in {"review_courses", "recover_catalogue"}:
-                        from app.services.assistant_catalogue import identity, is_course_candidate_url
-                        requested = {identity(value) for value in action.get("_requestedUrls", [])}
-                        actual = (await db.execute(select(ScrapedCourse.course_website).where(
-                            ScrapedCourse.scrape_job_id == target.runtime_job_id,
-                            ScrapedCourse.university_id == target.university_id,
-                            ScrapedCourse.status.in_(service.REVIEW_STATUSES),
-                        ))).scalars().all()
-                        if not requested or not all(is_course_candidate_url(value) for value in requested) or not requested.issubset({identity(value) for value in actual if value}):
-                            action["state"] = "error"
-                            action["error"] = "The check finished without all requested courses in pending review. Open the review and job skip/error results; no complete recovery is claimed."
-                        else:
-                            action["resultSummary"] = f"Verified: {len(requested)} requested course(s) are now in pending review. Nothing was published."
                 elif target.status not in {"queued", "running", "awaiting_approval"}:
                     action["state"] = "error"
                     action["error"] = "The correction job stopped. Review its results before retrying."

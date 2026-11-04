@@ -25,6 +25,9 @@ def secure_module(monkeypatch, tmp_path):
 
     monkeypatch.setenv("DATABASE_URL", TEST_URL)
     monkeypatch.setenv("DATABASE_REQUIRE_TLS", "false")
+    # Record the original state even when this key was absent. The loader
+    # writes directly to os.environ, and delenv on an absent key has no undo.
+    monkeypatch.setenv("SSL_CERT_FILE", "fixture-placeholder")
     monkeypatch.delenv("SSL_CERT_FILE", raising=False)
     monkeypatch.setattr(managed, "MANAGED_DATABASE_ENV_FILE", tmp_path / "absent" / "database.env")
     monkeypatch.delitem(sys.modules, "app.legacy_migration_database", raising=False)

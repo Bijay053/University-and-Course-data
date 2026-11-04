@@ -803,6 +803,77 @@ async def test_footer_reports_confirmed_work_not_stale_research_status(store, ca
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("reason,kind,checkpoint,expected", [
+    ("domestic_only", "skipped", "skipped", "international_ineligible"),
+    ("online_only", "skipped", "skipped", "online_only"),
+    ("part_time_only", "skipped", "skipped", "international_ineligible"),
+    ("challenge_page", "extract_error", "error", "blocked_fetch"),
+    ("fetch_failed", "extract_error", "error", "blocked_fetch"),
+    ("extract_exception", "extract_error", "error", "incomplete_extraction"),
+    ("no_international_fee", "skipped", "skipped", "incomplete_extraction"),
+    ("", "stage_error", "error", "incomplete_extraction"),
+    ("", None, "error", "incomplete_extraction"),
+    ("", None, "skipped", "excluded"),
+    ("", None, "staged", "unverified"),
+    ("", None, None, "unverified"),
+    ("blocked_path", "extract_gate_drop", "skipped", "excluded"),
+    ("", "extract_course_detail_filter", "skipped", "excluded"),
+    ("rejected: domestic_only", "skipped", "skipped", "international_ineligible"),
+    ("rejected: online_only", "skipped", "skipped", "online_only"),
+    ("rejected: part_time_only", "skipped", "skipped", "international_ineligible"),
+    ("rejected: listed_but_ineligible_online_only", "skipped", "skipped", "online_only"),
+    ("rejected: no_international_fee", "skipped", "skipped", "incomplete_extraction"),
+])
+@pytest.mark.parametrize("job_status", ["completed", "failed", "cancelled"])
+@pytest.mark.parametrize("partial", [True, False])
+@pytest.mark.parametrize("action_kind", ["review_courses", "recover_catalogue"])
+async def test_recovery_inline_outcomes_are_persisted_and_url_scoped(store, reason, kind, checkpoint, expected, job_status, partial, action_kind):
+    from app.models.scrape_runtime import ScrapeRuntimeLog
+    await prompt_thread(store)
+    urls = ["https://www.example.edu/counselling", "https://www.example.edu/criminology"]
+    async with store() as db:
+        target = ScrapeRuntimeJob(
+            runtime_job_id="result-job", university_id=1, job_type="targeted",
+            status=job_status, imported=9, skipped=7, errors=5,
+            discovered_config={"autonomousVerification": {
+                "completed_urls": urls,
+                "url_outcomes": {urls[1]: checkpoint} if checkpoint else {},
+            }},
+        )
+        db.add(target)
+        await db.flush()
+        db.add(ScrapedCourse(id=2, university_id=1, scrape_job_id="result-job", status="pending",
+                            course_name="Counselling", course_website=urls[0]))
+        # Old failed attempts cannot override a verified pending row.
+        db.add(ScrapeRuntimeLog(runtime_job_id="result-job", sequence=1, event="status",
+                               payload={"kind": "skipped", "url": urls[0], "reason": "online_only"}))
+        if kind:
+            db.add(ScrapeRuntimeLog(runtime_job_id="result-job", sequence=2, event="status",
+                                   payload={"kind": kind, "reason": reason, **(
+                                       {"dropped_sample": [urls[1]]} if kind == "extract_course_detail_filter"
+                                       else {"url": urls[1]}
+                                   )}))
+        thread = (await db.execute(select(ScrapeAssistantThread))).scalar_one()
+        thread.status = "ready"
+        thread.messages = [{"role": "assistant", "content": "Checking", "actions": [{
+            "id": "operation", "kind": action_kind, "state": "running",
+            "jobId": "result-job", "_requestedUrls": urls if partial else urls[1:],
+            "fields": [], "courseCount": 2 if partial else 1,
+        }]}]
+        await db.commit()
+        result = await get_assistant("source", db, {"id": 1})
+        action = result["messages"][0]["actions"][0]
+        assert action["state"] == "error"
+        assert action["jobId"] == "result-job"
+        assert ("Partial recovery: 1 of 2" if partial else "No recovery verified for 1") in action["error"]
+        assert [item["status"] for item in action["courseResults"]] == (["recovered", expected] if partial else [expected])
+        assert "_requestedUrls" not in action
+        assert (target.imported, target.skipped, target.errors) == (9, 7, 5)
+        restored = await get_assistant("source", db, {"id": 1})
+        assert restored["messages"][0]["actions"][0] == action
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("allowed,automatic", [(True, True), (False, True), (True, False)])
 async def test_automatic_dispatch_authorization_and_no_duplicate_alternatives(store, monkeypatch, allowed, automatic):
     from app.models.user import User

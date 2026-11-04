@@ -22,6 +22,7 @@ export type AssistantAction = {
   fields: string[];
   state: "proposed" | "starting" | "running" | "completed" | "error" | "superseded";
   resultSummary?: string;
+  courseResults?: { url: string; status: string; message: string }[];
   jobId?: string;
   error?: string;
   progress?: { current: number; total: number; status: string };
@@ -461,10 +462,20 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
           )}
           {a.state === "error" && (
             <p role="alert" className="mt-1.5 text-[12px] text-red-700">
-              {a.error || "Action failed."}{a.jobId ? " Some courses may already have been updated; review data was refreshed." : ""}
+              {a.error || "Action failed."}{a.jobId && !a.courseResults ? " Some courses may already have been updated; review data was refreshed." : ""}
             </p>
           )}
           {a.state === "completed" && <p className="mt-1.5 text-[12px] text-green-800">{a.resultSummary || "Job finished. Updated pending data was refreshed. Nothing was published."}</p>}
+          {!!a.courseResults?.length && (
+            <ul className="mt-2 space-y-2 text-[12px] text-amber-950" data-testid={`course-results-${a.id}`}>
+              {a.courseResults.map(result => (
+                <li key={result.url}>
+                  <span className="block break-all font-medium">{result.url}</span>
+                  <span>{result.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           {(a.state === "completed" || a.state === "error") && a.jobId && onReviewJob && (
             <Button size="sm" variant="outline" className="mt-2 h-8 text-[12px]"
               onClick={() => onReviewJob(a.jobId!)} data-testid={`button-open-review-${a.id}`}>

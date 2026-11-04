@@ -20,6 +20,38 @@ afterEach(() => {
 });
 
 describe("ScrapePromptAssistant", () => {
+  it("shows partial recovery and each exclusion inline with the resulting review link", async () => {
+    const messages = [
+      "Verified in pending review.",
+      "Excluded by the international-student eligibility check.",
+      "Excluded because the course is online-only.",
+      "The source page could not be fetched; eligibility was not verified.",
+      "Extraction did not complete; no pending course was verified.",
+      "No pending course or conclusive failure reason was found; eligibility is unknown.",
+    ];
+    const saved: AssistantThread = { ...empty, status: "ready", threadId: "saved",
+      messages: [{ role: "assistant", content: "Check finished.", createdAt: "2024-01-01T00:00:00Z",
+        actions: [{ id: "recovery", kind: "review_courses", label: "Check requested courses",
+          state: "error", courseCount: 6, fields: [], jobId: "result-job",
+          error: "Partial recovery: 1 of 6 requested courses verified in pending review. Nothing was published.",
+          courseResults: messages.map((message, index) => ({
+            url: `https://example.edu/course-${index}`, status: index ? "unverified" : "recovered", message,
+          })) }] }] };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => json(saved));
+    const openReview = vi.fn();
+    const first = render(<ScrapePromptAssistant jobId="source" onReviewJob={openReview} />);
+    await screen.findByTestId("course-results-recovery");
+    for (const message of messages) expect(screen.getByText(message)).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("Partial recovery: 1 of 6");
+    expect(screen.queryByText(/Some courses may already have been updated/)).toBeNull();
+    fireEvent.click(screen.getByTestId("button-open-review-recovery"));
+    expect(openReview).toHaveBeenCalledWith("result-job");
+    first.unmount();
+    render(<ScrapePromptAssistant jobId="source" onReviewJob={openReview} />);
+    await screen.findByTestId("course-results-recovery");
+    for (const message of messages) expect(screen.getByText(message)).toBeTruthy();
+  });
+
   it("restores PDF page links and aligned table excerpts after reloading", async () => {
     const excerpt = "Course           Annual       Full Course\nBachelor Arts    GBP 18,900    GBP 56,700";
     const saved: AssistantThread = { ...empty, threadId: "pdf-thread", status: "ready",

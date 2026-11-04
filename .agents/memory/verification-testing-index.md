@@ -14,3 +14,4 @@ description: Pointers for test isolation, lifecycle proof, frontend timing and d
 - [Dispatch failure sentinels](dispatch-test-failure-sentinels.md) — broad delivery exception handling can swallow assertion failures.
 - [Disposable worker reconnects](disposable-worker-reconnect-testing.md) — distinguish worker and observer sockets before disconnect injection.
 - [Evidence proof persistence](evidence-proof-persistence.md) — verify proof after real persistence, not from truncated display excerpts.
+- [Environment fixture undo](environment-fixture-undo.md) — deleting an absent environment key does not register teardown for later direct writes.
