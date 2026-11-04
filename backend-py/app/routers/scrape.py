@@ -9419,6 +9419,7 @@ async def start_ai_repair(
     job_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[dict, Depends(require_permission("scraping.trigger"))],
+    evidence_urls: Annotated[list[str] | None, Body(max_length=3)] = None,
 ) -> dict:
     """Start bounded live repair and one isolated, review-only verification run."""
     from sqlalchemy import text as _text
@@ -9450,6 +9451,17 @@ async def start_ai_repair(
     )).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found")
+    requested_urls = []
+    if evidence_urls:
+        from app.services.scrape_assistant_tools import official_url as validate_official_url
+        target_uni = await db.get(University, row["university_id"])
+        try:
+            requested_urls = list(dict.fromkeys(
+                validate_official_url(value, target_uni.scrape_url or target_uni.website or "")
+                for value in evidence_urls
+            ))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise HTTPException(422, "Repair evidence must use this university's official HTTPS course URLs.") from exc
     missing_repairable = (await db.execute(
         _text(
             "SELECT COUNT(*) FROM scraped_courses "
@@ -9551,6 +9563,7 @@ async def start_ai_repair(
 
     # Write initial queued state so the poller sees something immediately
     queued_session = {
+        "requested_course_urls": requested_urls,
         "session_id":      session_id,
         "job_id":          job_id,
         "status":          "queued",

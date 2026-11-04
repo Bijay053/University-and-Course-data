@@ -1,5 +1,7 @@
 """Visitor reporting and private review, using disposable PostgreSQL only."""
 import pytest
+import importlib.util
+from pathlib import Path
 from fastapi import FastAPI, Request
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
@@ -8,6 +10,75 @@ from app.database import get_db
 from app.models import Course, University, CourseErrorReport, AssessmentNote
 from app.routers import course_error_reports as reports
 from tests.test_hsu_facts import hsu_database, hsu_postgres
+
+
+@pytest.mark.asyncio
+async def test_reporting_migrations_create_missing_table_and_preserve_legacy_reports(hsu_database):
+    """Reproduce production's pre-report schema instead of relying on create_all."""
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import text
+
+    def migrate(connection, filename):
+        path = Path(__file__).parents[1] / "alembic" / "versions" / filename
+        spec = importlib.util.spec_from_file_location("visitor_report_migration", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.op = Operations(MigrationContext.configure(connection))
+        module.upgrade()
+
+    async with hsu_database() as db:
+        # This fixture owns a disposable database and rolls back all test DDL.
+        await db.execute(text("DROP TABLE course_error_reports"))
+        connection = await db.connection()
+        await connection.run_sync(lambda c: migrate(c, "391_public_course_error_reports.py"))
+        university = University(name="Migration university", city="Sydney", country="Australia")
+        db.add(university)
+        await db.flush()
+        course = Course(name="Migration degree", university_id=university.id,
+                        status="active", approval_status="approved")
+        db.add(course)
+        await db.flush()
+        await db.execute(text("""
+            INSERT INTO course_error_reports
+                (course_id, course_name, university_name, kind, field, message)
+            VALUES (:course, 'Migration degree', 'Migration university', 'incorrect', 'fees', 'Check tuition')
+        """), {"course": course.id})
+        await connection.run_sync(lambda c: migrate(c, "392_key_insight_error_reports.py"))
+        result = await reports.list_reports(db, {"id": 1}, status="new", limit=20, offset=0)
+        assert result["total"] == 1
+        saved = result["reports"][0]
+        assert saved.university_id == university.id
+        assert saved.message == "Check tuition" and saved.status == "new"
+        assert saved.insight_id is None and saved.insight_country is None
+
+
+@pytest.mark.asyncio
+async def test_reporting_upgrade_uses_existing_transaction_and_advances_ledger(hsu_database):
+    from alembic.config import Config
+    from alembic.runtime.environment import EnvironmentContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy import text
+
+    async with hsu_database() as db:
+        await db.execute(text("DROP TABLE course_error_reports"))
+        await db.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) PRIMARY KEY)"))
+        await db.execute(text("INSERT INTO alembic_version VALUES ('390_qualification_guidance')"))
+        connection = await db.connection()
+        config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+        config.set_main_option("script_location", str(Path(__file__).parents[1] / "alembic"))
+        scripts = ScriptDirectory.from_config(config)
+
+        def upgrade(sync):
+            with EnvironmentContext(config, scripts, fn=lambda rev, ctx: scripts._upgrade_revs("392_insight_error_reports", rev)) as env:
+                env.configure(connection=sync)
+                with env.begin_transaction():
+                    env.run_migrations()
+
+        await connection.run_sync(upgrade)
+        assert (await db.execute(text("SELECT version_num FROM alembic_version"))).scalar_one() == "392_insight_error_reports"
+        result = await reports.list_reports(db, {"id": 1}, status="new", limit=20, offset=0)
+        assert result == {"reports": [], "total": 0}
 
 
 @pytest.mark.asyncio

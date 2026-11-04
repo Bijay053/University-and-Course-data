@@ -1,4 +1,6 @@
 - [Public course toolkit](public-course-toolkit.md) — visitors can search and view fees without signing in; keep administration and pending records private.
+- [ACAP course availability](acap-course-availability.md) — marked online/campus restrictions are not whole-course exclusions; verify research and repair use usable live transport.
+- [Excelsia course facts](excelsia-course-facts.md) — prefer verified static pages; keep own-award facts, international prices, fee periods and IELTS evidence aligned.
 - [Portal login security](portal-login-security.md) — the user requires mandatory email OTP before portal sign-in completes.
 - [Study-mode source trust](study-mode-source-trust.md) — selected generated evidence can still be prose; validate writes without guessing delivery or silently repairing old records.
 - [Background worker resources](background-worker-resources-index.md) — loop cleanup, client ownership, pre-claim isolation, and safe task testing after module reloads.
@@ -69,7 +71,7 @@
 - [INTI fee currency and period authority](inti-fee-authority.md) — INTI’s RM figures are full-programme totals; force MYR and Full Course after extraction, without annualization.
 - [INTI duration badge authority](inti-duration-authority.md) — use the current programme’s top facts badge; related product cards repeat other courses’ durations and corrupt generic extraction.
 - [AI extraction is fill-only](ai-extraction-fill-only.md) — across all universities, deterministic static extraction owns populated values; AI is requested only for remaining gaps.
-- [Prompt assistant scope and grounding](prompt-assistant-safety.md) — scraping/reviews only; existing OpenAI, confirmed corrections and immutable source excerpts.
+- [Prompt assistant scope and grounding](prompt-assistant-safety.md) — scraping/reviews only; automatic pending corrections, separate publication approval and immutable source excerpts.
 - [Live catalogue removal safety](live-catalogue-removal-safety.md) — never auto-hide courses solely because they are absent from one approved scrape; removals need explicit audited review.
 - [Protected catalogue onboarding](protected-catalogue-onboarding.md) — commit probe state before task publish; reject engagement APIs/200 shells; preserve pagination queries and exact retries.
 - [Audience-scoped study mode](audience-scoped-study-mode.md) — international Location/Delivery is authoritative; Online must block synthetic campus defaults.

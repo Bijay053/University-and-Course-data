@@ -34,6 +34,8 @@ _NEG = re.compile(
 async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG001
     if not html:
         return []
+    from app.services.scraper.acap_source import eligibility_html
+    html = eligibility_html(html, url)
     text = html_to_text(html)
     if not text:
         return []

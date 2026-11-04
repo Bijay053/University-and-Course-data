@@ -20,4 +20,6 @@ class ScrapeAssistantThread(Base):
     phase: Mapped[str] = mapped_column(Text, nullable=False, default="")
     error: Mapped[str | None] = mapped_column(Text)
     messages: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    activity: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    run_id: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

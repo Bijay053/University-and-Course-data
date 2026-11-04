@@ -1,39 +1,68 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertCircle, ExternalLink, Loader2, MessageSquareText, Send, ShieldAlert, Wrench } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowUp, ExternalLink, Loader2, ShieldAlert, Sparkles, Wrench } from "lucide-react";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { useAuth } from "@/context/auth";
+import { safeSourceUrl } from "./assistant-safe-url";
+import { AssistantMarkdown, CodeBlock } from "./assistant-markdown";
+import { CatalogueComparisonView, type CatalogueComparison } from "./assistant-catalogue-comparison";
+
+export { safeSourceUrl };
 
 export type AssistantSource = { url: string; title: string; excerpt: string };
 export type AssistantAction = {
   id: string;
-  kind: "fix_fields" | "repair_catalogue";
+  kind: "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue";
   label: string;
   courseCount: number;
   fields: string[];
-  state: "proposed" | "starting" | "running" | "completed" | "error";
+  state: "proposed" | "starting" | "running" | "completed" | "error" | "superseded";
+  resultSummary?: string;
   jobId?: string;
   error?: string;
   progress?: { current: number; total: number; status: string };
+  /** recover_catalogue only: server-owned not-recorded candidates (eligibility unverified). */
+  courses?: { url: string; title: string }[];
+};
+export const RECOVER_MAX = 20;
+export type AssistantActivity = {
+  id: string;
+  at: string;
+  label: string;
+  detail?: string;
+  url?: string;
+  status: "running" | "completed" | "error" | "info";
+  durationMs?: number;
 };
 export type AssistantMessage = {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  turnId?: string;
   sources?: AssistantSource[];
   actions?: AssistantAction[];
+  /** Archived real tool events for the turn this reply concluded. */
+  activity?: AssistantActivity[];
+  comparison?: CatalogueComparison;
 };
+export type AssistantRelatedReview = { jobId: string; courseName: string; status: string };
 export type AssistantThread = {
   threadId: string | null;
   status: "idle" | "queued" | "researching" | "ready" | "error";
   phase: string;
   error: string | null;
   messages: AssistantMessage[];
+  /** Real events of the current (in-flight or most recent) turn. */
+  activity?: AssistantActivity[];
+  turnId?: string | null;
+  queuedAt?: string | null;
+  startedAt?: string | null;
+  updatedAt?: string | null;
+  relatedReviews?: AssistantRelatedReview[];
 };
 
 export type ScrapePromptAssistantProps = {
@@ -44,9 +73,7 @@ export type ScrapePromptAssistantProps = {
   onReviewJob?: (jobId: string) => void;
 };
 
-export const ASSISTANT_POLL_MS = 2500;
-const MIN_LEN = 5;
-const MAX_LEN = 2000;
+export const ASSISTANT_POLL_MS = 1000;
 export const AUTO_CORRECTABLE_FIELDS = ["international_fee", "ielts_overall", "duration", "course_location"] as const;
 const FIELD_LABELS: Record<string, string> = {
   international_fee: "International fee",
@@ -60,14 +87,54 @@ const EXAMPLES = [
   "Why are international fees blank for some postgraduate courses?",
   "Check IELTS overall and band scores against the official English requirements page.",
 ];
+const NEAR_BOTTOM_PX = 96;
 
-export function safeSourceUrl(url: string): string | null {
-  try {
-    const u = new URL(url);
-    return u.protocol === "https:" && !u.username && !u.password ? u.href : null;
-  } catch {
-    return null;
+export function formatDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${(ms / 1000).toFixed(s < 10 ? 1 : 0)}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+function parseTime(v?: string | null): number | null {
+  if (!v) return null;
+  const n = Date.parse(v);
+  return Number.isFinite(n) ? n : null;
+}
+const validEvents = (list: unknown): AssistantActivity[] =>
+  Array.isArray(list) ? list.filter((a): a is AssistantActivity => !!a && typeof a.label === "string") : [];
+
+/** Valid related reviews, excluding the current job and duplicate job IDs. */
+export function relatedReviewsFor(t: AssistantThread | null, currentJobId: string): AssistantRelatedReview[] {
+  const list = t && Array.isArray(t.relatedReviews) ? t.relatedReviews : [];
+  const seen = new Set<string>([currentJobId]);
+  const out: AssistantRelatedReview[] = [];
+  for (const r of list) {
+    if (!r || typeof r.jobId !== "string" || !r.jobId || seen.has(r.jobId)) continue;
+    seen.add(r.jobId);
+    out.push(r);
   }
+  return out;
+}
+
+const PUBLIC_ACTION_KEYS = ["kind", "state", "label", "fields", "courseCount", "courses", "jobId", "error", "progress"] as const;
+/** JSON of the public action fields actually supplied by the server; underscore/private keys are never included. */
+export function operationDetailsJson(a: AssistantAction): string {
+  const out: Record<string, unknown> = {};
+  const src = a as unknown as Record<string, unknown>;
+  for (const k of PUBLIC_ACTION_KEYS) if (src[k] !== undefined && src[k] !== null) out[k] = src[k];
+  return JSON.stringify(out, null, 2);
+}
+
+/** Current-turn events not already archived onto a message (deduped by turn and event id). */
+export function currentTurnEvents(t: AssistantThread | null): AssistantActivity[] {
+  if (!t) return [];
+  const events = validEvents(t.activity);
+  if (!events.length) return [];
+  if (t.turnId && t.messages.some(m => m.role === "assistant" && m.turnId === t.turnId && validEvents(m.activity).length)) return [];
+  const archived = new Set<string>();
+  t.messages.forEach(m => validEvents(m.activity).forEach(a => a.id && archived.add(a.id)));
+  return events.filter(a => !a.id || !archived.has(a.id));
 }
 
 function isActiveThread(t: AssistantThread | null): boolean {
@@ -92,6 +159,54 @@ async function errorFor(res: Response): Promise<string> {
   return getFetchErrorMessage(res);
 }
 
+const STATUS_TEXT: Record<AssistantActivity["status"], string> = {
+  running: "In progress", completed: "Done", error: "Failed", info: "Note",
+};
+
+function EventRow({ a, idx }: { a: AssistantActivity; idx: number }) {
+  const key = a.id || String(idx);
+  const href = a.url ? safeSourceUrl(a.url) : null;
+  const detail = a.detail ? String(a.detail) : "";
+  const tone = a.status === "error" ? "text-red-700" : a.status === "running" ? "text-teal-900" : "text-slate-700";
+  return (
+    <li className="relative flex gap-2.5 pl-0.5" data-testid={`activity-item-${key}`} data-status={a.status}>
+      <span className="relative z-10 mt-[5px] flex h-3 w-3 shrink-0 items-center justify-center rounded-full bg-[#f6f4ee]" aria-hidden>
+        {a.status === "running"
+          ? <Loader2 className="h-3 w-3 text-teal-700 motion-safe:animate-spin" />
+          : <span className={`h-1.5 w-1.5 rounded-full ${a.status === "error" ? "bg-red-600" : a.status === "completed" ? "bg-teal-700" : "bg-slate-400"}`} />}
+      </span>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-baseline gap-2 text-[12.5px]">
+          <span className={`min-w-0 flex-1 break-words ${tone}`}>
+            <span className="sr-only">{STATUS_TEXT[a.status] ?? "Note"}: </span>{a.label}
+          </span>
+          {a.status === "error" && <span className="shrink-0 text-[11px] font-medium text-red-700">Failed</span>}
+          {typeof a.durationMs === "number" && (
+            <span className="shrink-0 font-mono text-[11px] tabular-nums text-slate-500" data-testid={`text-activity-duration-${key}`}>{formatDuration(a.durationMs)}</span>
+          )}
+        </div>
+        {a.url && (href ? (
+          <a href={href} target="_blank" rel="noopener noreferrer nofollow"
+            className="inline-flex max-w-full items-center gap-1 font-mono text-[11px] text-teal-800 underline decoration-teal-300 underline-offset-2 hover:text-teal-950"
+            data-testid={`link-activity-${key}`}>
+            <span className="truncate">{href}</span><ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+          </a>
+        ) : <span className="text-[11px] text-slate-500">(link unavailable)</span>)}
+        {detail && <p className={`whitespace-pre-wrap break-words text-[12px] ${a.status === "error" ? "text-red-700" : "text-slate-600"}`}>{detail}</p>}
+      </div>
+    </li>
+  );
+}
+
+function EventList({ events, testId }: { events: AssistantActivity[]; testId: string }) {
+  if (!events.length) return null;
+  return (
+    <ol className="relative space-y-2 before:absolute before:bottom-2 before:left-[7px] before:top-2 before:w-px before:bg-teal-200" aria-label="Assistant tool activity" data-testid={testId}>
+      {events.map((a, i) => <EventRow key={a.id || i} a={a} idx={i} />)}
+    </ol>
+  );
+}
+
 export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob }: ScrapePromptAssistantProps) {
   const { user } = useAuth();
   // History is private per staff member: every cache is keyed by identity + job.
@@ -114,6 +229,15 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
   const confirming = confirmingState && confirmingState.key === viewKey ? confirmingState.action : null;
   const setConfirming = (action: AssistantAction | null) => setConfirmingState(action ? { key: viewKeyRef.current, action } : null);
   const [actionBusy, setActionBusy] = useState(false);
+  const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
+  const recoverCandidates = (a: AssistantAction | null) =>
+    a?.kind === "recover_catalogue" && Array.isArray(a.courses) ? a.courses.filter(c => c && typeof c.url === "string" && c.url) : [];
+  const openConfirm = (a: AssistantAction) => {
+    setSelectedUrls(recoverCandidates(a).slice(0, RECOVER_MAX).map(c => c.url));
+    setConfirming(a);
+  };
+  const toggleUrl = (url: string) => setSelectedUrls(cur =>
+    cur.includes(url) ? cur.filter(u => u !== url) : cur.length >= RECOVER_MAX ? cur : [...cur, url]);
   const [reloadKey, setReloadKey] = useState(0);
 
   const onChangedRef = useRef(onChanged);
@@ -122,6 +246,10 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
   viewKeyRef.current = viewKey;
   const seenCompleted = useRef<Set<string> | null>(null);
   const mutateAbort = useRef<AbortController | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const nearBottom = useRef(true);
+  const [showJump, setShowJump] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const base = `/api/scrape/jobs/${encodeURIComponent(jobId)}/assistant`;
 
@@ -146,6 +274,8 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     setPromptState({ key: null, text: "" });
     setActionBusy(false);
     setSubmitting(false);
+    setShowJump(false);
+    nearBottom.current = true;
     seenCompleted.current = null;
     mutateAbort.current?.abort();
     if (!viewKey) { setLoading(false); return; }
@@ -168,6 +298,13 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
   }, [base, viewKey, reloadKey, accept]);
 
   const active = isActiveThread(thread);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [active]);
 
   // Poll while active.
   useEffect(() => {
@@ -194,14 +331,52 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
 
   useEffect(() => () => mutateAbort.current?.abort(), []);
 
+  const liveEvents = currentTurnEvents(thread);
+
+  // Follow new content only when the reader is already near the bottom.
+  const contentSig = thread
+    ? `${thread.messages.length}|${thread.status}|${validEvents(thread.activity).map(a => `${a.id}:${a.status}`).join(",")}`
+    : "";
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !contentSig) return;
+    if (nearBottom.current) { el.scrollTop = el.scrollHeight; setShowJump(false); }
+    else setShowJump(true);
+  }, [contentSig]);
+
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
+    if (nearBottom.current) setShowJump(false);
+  };
+  const jumpToLatest = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (typeof el.scrollTo === "function") el.scrollTo({ top: el.scrollHeight, behavior: reduce ? "auto" : "smooth" });
+    else el.scrollTop = el.scrollHeight;
+    nearBottom.current = true;
+    setShowJump(false);
+  };
+
+  // Auto-grow composer.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [prompt]);
+
   const trimmed = prompt.trim();
-  const lengthOk = trimmed.length >= MIN_LEN && trimmed.length <= MAX_LEN;
+  const lengthOk = trimmed.length > 0;
   const busy = submitting || active;
 
   const submit = async () => {
     if (!lengthOk || busy || disabled || !viewKey) return;
     setSubmitting(true);
     setSubmitError(null);
+    nearBottom.current = true;
     const ctrl = new AbortController();
     mutateAbort.current = ctrl;
     const forKey = viewKey;
@@ -219,6 +394,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
       accept(forKey, t);
       if (viewKeyRef.current === forKey) setPrompt("");
     } catch (err) {
+      // Draft is kept so the user can retry.
       if (!ctrl.signal.aborted) setSubmitError(err instanceof Error ? err.message : String(err));
     } finally {
       if (!ctrl.signal.aborted) setSubmitting(false);
@@ -237,7 +413,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm: true }),
+        body: JSON.stringify(action.kind === "recover_catalogue" ? { confirm: true, courseUrls: recoverCandidates(action).slice(0, RECOVER_MAX).map(c => c.url) } : { confirm: true }),
         signal: ctrl.signal,
       });
       if (!res.ok) throw new Error(await errorFor(res));
@@ -251,193 +427,327 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     }
   };
 
+  const queued = parseTime(thread?.queuedAt);
+  const started = parseTime(thread?.startedAt);
+  let elapsed = "";
+  if (active && thread?.status === "queued" && queued !== null) elapsed = `Waiting ${formatDuration(Math.max(0, now - queued))}`;
+  else if (active && started !== null) elapsed = `Researching ${formatDuration(Math.max(0, now - started))}`;
+  const runningEvent = [...liveEvents].reverse().find(a => a.status === "running");
+  const statusLine = runningEvent ? runningEvent.label
+    : thread?.status === "queued" ? "Queued, waiting for a research slot"
+    : (thread?.phase || "Working");
+  const related = onReviewJob ? relatedReviewsFor(thread, jobId) : [];
+  const hasConversation = !!thread && (thread.messages.length > 0 || liveEvents.length > 0 || active);
+
+  const renderActions = (m: AssistantMessage) => !!m.actions?.length && (
+    <div className="mt-3 space-y-2">
+      {m.actions.map(a => (
+        <div key={a.id} className="rounded-xl border border-amber-200 bg-amber-50/80 p-3" data-testid={`assistant-action-${a.id}`}>
+          <div className="flex items-center gap-2 text-[13px]">
+            <Wrench className="h-3.5 w-3.5 text-amber-700" aria-hidden />
+            <span className="flex-1 font-medium text-amber-950">{a.label}</span>
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 font-mono text-[10.5px] text-amber-900" data-testid={`status-action-${a.id}`}>{a.state}</span>
+          </div>
+          <p className="mt-1 text-[12px] text-amber-900">
+            {a.courseCount} course{a.courseCount === 1 ? "" : "s"}{a.fields.length ? ` · ${a.fields.map(fieldLabel).join(", ")}` : ""}
+          </p>
+          {a.progress && (a.state === "starting" || a.state === "running") && (
+            <div className="mt-2">
+              <div className="h-1.5 overflow-hidden rounded-full bg-amber-100" role="progressbar" aria-valuemin={0} aria-valuemax={a.progress.total} aria-valuenow={a.progress.current}>
+                <div className="h-full origin-left bg-amber-500 motion-safe:transition-transform" style={{ transform: `scaleX(${a.progress.total ? a.progress.current / a.progress.total : 0})` }} />
+              </div>
+              <p className="mt-1 font-mono text-[11px] text-amber-800">{a.progress.current}/{a.progress.total} · {a.progress.status}</p>
+            </div>
+          )}
+          {a.state === "error" && (
+            <p role="alert" className="mt-1.5 text-[12px] text-red-700">
+              {a.error || "Action failed."}{a.jobId ? " Some courses may already have been updated; review data was refreshed." : ""}
+            </p>
+          )}
+          {a.state === "completed" && <p className="mt-1.5 text-[12px] text-green-800">{a.resultSummary || "Job finished. Updated pending data was refreshed. Nothing was published."}</p>}
+          {(a.state === "completed" || a.state === "error") && a.jobId && onReviewJob && (
+            <Button size="sm" variant="outline" className="mt-2 h-8 text-[12px]"
+              onClick={() => onReviewJob(a.jobId!)} data-testid={`button-open-review-${a.id}`}>
+              <ExternalLink className="mr-1 h-3 w-3" aria-hidden />
+              {a.kind === "repair_catalogue" ? "Open verification review" : "Open course review"}
+            </Button>
+          )}
+          <details className="group mt-2" data-testid={`details-operation-${a.id}`}>
+            <summary className="cursor-pointer select-none text-[11.5px] font-medium text-amber-900 hover:text-amber-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600">Operation details</summary>
+            <div className="mt-1.5"><CodeBlock code={operationDetailsJson(a)} lang="json" testId={`code-operation-${a.id}`} /></div>
+          </details>
+          {a.state === "proposed" && (
+            <Button size="sm" variant="outline" className="mt-2 h-8 border-amber-300 text-[12px]" disabled={disabled || actionBusy}
+              onClick={() => void runAction(a)} data-testid={`button-run-action-${a.id}`}>
+              Run now
+            </Button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <section
-      className="rounded-lg border border-teal-200 bg-teal-50/40 overflow-hidden"
-      aria-label="Scrape prompt assistant"
+      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[#f6f4ee] shadow-[0_1px_0_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,60,60,0.18)]"
+      aria-label="Scrape assistant"
       data-testid="scrape-prompt-assistant"
     >
-      <header className="flex items-center gap-2 px-3 py-2 bg-teal-50 border-b border-teal-200">
-        <MessageSquareText className="w-3.5 h-3.5 text-teal-700" aria-hidden />
-        <span className="text-xs font-semibold text-teal-900">Ask about this scrape</span>
+      <header className="flex items-center gap-2.5 border-b border-slate-200/80 bg-[#fbfaf6] px-4 py-3">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-800 text-teal-50" aria-hidden>
+          <Sparkles className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-[14px] font-semibold leading-tight text-slate-900">Scrape assistant</h3>
+          <p className="truncate text-[11.5px] text-slate-500">Runs research and pending-record repairs automatically. Reports results here. Never publishes automatically.</p>
+        </div>
         {active && (
-          <span className="ml-auto flex items-center gap-1 text-[11px] text-teal-800" role="status" data-testid="status-assistant-active">
-            <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
-            {thread?.phase || thread?.status || "Working"}
+          <span className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full bg-teal-100 px-2.5 py-1 text-[11.5px] font-medium text-teal-900" data-testid="status-assistant-active">
+            <Loader2 className="h-3 w-3 motion-safe:animate-spin" aria-hidden />
+            {thread?.status === "queued" ? "Queued" : "Working"}
           </span>
         )}
       </header>
-      <div className="p-3 space-y-3">
-        <p className="text-[11px] text-gray-600">
-          Investigates official university pages for this job only. Automatic corrections are limited to international fee, IELTS overall and bands, duration and course location; other topics (for example intakes) can be investigated but not auto-applied. Findings may be incomplete or uncertain; verify sources before relying on them. Nothing is applied or published without your confirmation.
-        </p>
 
-        {loading && (
-          <div className="space-y-2" aria-busy="true" data-testid="assistant-loading">
-            <div className="h-3 w-2/3 rounded bg-teal-100 animate-pulse" />
-            <div className="h-3 w-1/2 rounded bg-teal-100 animate-pulse" />
-          </div>
-        )}
-
-        {loadError && (
-          <div role="alert" className="flex items-start gap-2 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700" data-testid="assistant-load-error">
-            <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden />
-            <span className="flex-1">{loadError}</span>
-            <Button size="sm" variant="outline" className="h-6 text-[11px]" onClick={() => setReloadKey(k => k + 1)} data-testid="button-assistant-retry">
-              Retry
-            </Button>
-          </div>
-        )}
-
-        {thread?.status === "error" && thread.error && (
-          <div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700" data-testid="assistant-thread-error">
-            Investigation failed: {thread.error}
-          </div>
-        )}
-
-        {thread && thread.messages.length > 0 && (
-          <ol className="space-y-2 max-h-96 overflow-y-auto" aria-live="polite" data-testid="assistant-history">
-            {thread.messages.map((m, i) => (
-              <li
-                key={`${m.createdAt}-${i}`}
-                className={`rounded-md p-2 text-xs ${m.role === "user" ? "bg-white border border-gray-200" : "bg-white border border-teal-200"}`}
-                data-testid={`assistant-message-${i}`}
-              >
-                <div className="flex justify-between text-[10px] uppercase tracking-wide text-gray-500 mb-1">
-                  <span>{m.role === "user" ? "You" : "Assistant"}</span>
-                  <time dateTime={m.createdAt}>{new Date(m.createdAt).toLocaleString()}</time>
-                </div>
-                {/* Rendered as a React text node: model output is never parsed as HTML. */}
-                <p className="whitespace-pre-wrap break-words text-gray-800">{String(m.content ?? "")}</p>
-                {!!m.sources?.length && (
-                  <div className="mt-2 space-y-1.5">
-                    <p className="text-[10px] font-semibold text-gray-600">Evidence</p>
-                    {m.sources.map((s, si) => {
-                      const href = safeSourceUrl(s.url);
-                      return (
-                        <blockquote key={si} className="border-l-2 border-teal-300 pl-2">
-                          {href ? (
-                            <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-teal-800 underline" data-testid={`link-source-${i}-${si}`}>
-                              {s.title || href} <ExternalLink className="w-3 h-3" aria-hidden />
-                            </a>
-                          ) : (
-                            <span className="text-gray-700">{s.title} (link unavailable)</span>
-                          )}
-                          {s.excerpt && <p className="text-gray-600 italic mt-0.5">"{s.excerpt}"</p>}
-                        </blockquote>
-                      );
-                    })}
-                  </div>
-                )}
-                {!!m.actions?.length && (
-                  <div className="mt-2 space-y-1.5">
-                    {m.actions.map(a => (
-                      <div key={a.id} className="rounded border border-amber-200 bg-amber-50 p-2" data-testid={`assistant-action-${a.id}`}>
-                        <div className="flex items-center gap-2">
-                          <Wrench className="w-3 h-3 text-amber-700" aria-hidden />
-                          <span className="font-medium text-amber-900 flex-1">{a.label}</span>
-                          <span className="text-[10px] text-amber-800" data-testid={`status-action-${a.id}`}>{a.state}</span>
-                        </div>
-                        <p className="text-[11px] text-amber-900 mt-0.5">
-                          {a.courseCount} course{a.courseCount === 1 ? "" : "s"}{a.fields.length ? ` · ${a.fields.map(fieldLabel).join(", ")}` : ""}
-                        </p>
-                        {a.progress && (a.state === "starting" || a.state === "running") && (
-                          <div className="mt-1">
-                            <div className="h-1.5 rounded bg-amber-100 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={a.progress.total} aria-valuenow={a.progress.current}>
-                              <div className="h-full bg-amber-500 origin-left transition-transform" style={{ transform: `scaleX(${a.progress.total ? a.progress.current / a.progress.total : 0})` }} />
-                            </div>
-                            <p className="text-[10px] text-amber-800 mt-0.5">{a.progress.current}/{a.progress.total} · {a.progress.status}</p>
-                          </div>
-                        )}
-                        {a.state === "error" && (
-                          <p role="alert" className="text-[11px] text-red-700 mt-1">
-                            {a.error || "Action failed."}{a.jobId ? " Some courses may already have been updated; review data was refreshed." : ""}
-                          </p>
-                        )}
-                        {a.state === "completed" && <p className="text-[11px] text-green-700 mt-1">Finished. Review data was refreshed; check values before approving.</p>}
-                        {(a.state === "completed" || a.state === "error") && a.jobId && onReviewJob && (
-                          <Button size="sm" variant="outline" className="mt-1.5 h-7 text-[11px]"
-                            onClick={() => onReviewJob(a.jobId!)} data-testid={`button-open-review-${a.id}`}>
-                            <ExternalLink className="w-3 h-3 mr-1" aria-hidden />
-                            {a.kind === "repair_catalogue" ? "Open verification review" : "Open course review"}
-                          </Button>
-                        )}
-                        {a.state === "proposed" && (
-                          <Button size="sm" variant="outline" className="mt-1.5 h-7 text-[11px]" disabled={disabled || actionBusy}
-                            onClick={() => setConfirming(a)} data-testid={`button-run-action-${a.id}`}>
-                            Review and run
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ol>
-        )}
-
-        {thread && thread.messages.length === 0 && !active && (
-          <div className="space-y-1.5" data-testid="assistant-empty">
-            <p className="text-[11px] text-gray-600">No questions yet. Try one of these:</p>
-            <div className="flex flex-col gap-1">
-              {EXAMPLES.map((ex, i) => (
-                <button key={i} type="button" disabled={disabled}
-                  onClick={() => setPrompt(ex)}
-                  className="text-left text-[11px] rounded border border-teal-200 bg-white px-2 py-1 hover:bg-teal-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600 disabled:opacity-50"
-                  data-testid={`button-example-${i}`}>
-                  {ex}
-                </button>
-              ))}
+      <div className="relative">
+        <div
+          ref={scrollRef}
+          onScroll={onScroll}
+          className="max-h-[min(70vh,640px)] min-h-[200px] overflow-y-auto px-4 py-5 sm:px-6"
+          data-testid="assistant-scroll"
+        >
+          {loading && (
+            <div className="space-y-3" aria-busy="true" data-testid="assistant-loading">
+              <div className="ml-auto h-9 w-1/2 rounded-2xl bg-slate-200/70 motion-safe:animate-pulse" />
+              <div className="h-3 w-2/3 rounded bg-slate-200/70 motion-safe:animate-pulse" />
+              <div className="h-3 w-1/2 rounded bg-slate-200/70 motion-safe:animate-pulse" />
             </div>
-          </div>
-        )}
+          )}
 
-        {thread && (
-          <form onSubmit={e => { e.preventDefault(); void submit(); }} className="space-y-1.5">
-            <label htmlFor={`assistant-prompt-${jobId}`} className="sr-only">Question about this scrape</label>
-            <Textarea
+          {loadError && (
+            <div role="alert" className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-800" data-testid="assistant-load-error">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex-1">{loadError}</span>
+              <Button size="sm" variant="outline" className="h-7 text-[12px]" onClick={() => setReloadKey(k => k + 1)} data-testid="button-assistant-retry">
+                Retry
+              </Button>
+            </div>
+          )}
+
+          {thread && !hasConversation && (
+            <div className="mx-auto max-w-lg py-4 text-center" data-testid="assistant-empty">
+              <p className="text-[15px] font-semibold text-slate-900">What should I look into?</p>
+              <p className="mt-1 text-[12.5px] text-slate-600">
+                Ask to fetch a specific official course into a fresh review, or correct international fee, IELTS overall and bands, duration and location. Existing approved courses can be checked again without replacing an unrelated review row. Other topics can be investigated but not auto-applied. Findings may be incomplete; verify sources.
+              </p>
+              <div className="mt-4 flex flex-col gap-2 text-left">
+                {EXAMPLES.map((ex, i) => (
+                  <button key={i} type="button" disabled={disabled}
+                    onClick={() => { setPrompt(ex); inputRef.current?.focus(); }}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] text-slate-700 hover:border-teal-300 hover:bg-teal-50/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600 disabled:opacity-50 motion-safe:transition-colors"
+                    data-testid={`button-example-${i}`}>
+                    {ex}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {thread && hasConversation && (
+            <ol className="space-y-5" data-testid="assistant-history">
+              {thread.messages.map((m, i) => {
+                const archived = m.role === "assistant" ? validEvents(m.activity) : [];
+                return (
+                  <Fragment key={`${m.createdAt}-${i}`}>
+                    {archived.length > 0 && (
+                      <li className="pl-1" data-testid={`assistant-turn-activity-${i}`}>
+                        <EventList events={archived} testId={`list-activity-${i}`} />
+                      </li>
+                    )}
+                    {m.role === "user" ? (
+                      <li className="flex justify-end" data-testid={`assistant-message-${i}`} data-role="user">
+                        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-teal-900 px-3.5 py-2.5 text-[13.5px] leading-relaxed text-teal-50">
+                          <span className="sr-only">You said: </span>
+                          <p className="whitespace-pre-wrap break-words">{String(m.content ?? "")}</p>
+                          <time dateTime={m.createdAt} className="mt-1 block text-right text-[10.5px] text-teal-200/80">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+                        </div>
+                      </li>
+                    ) : (
+                      <li className="flex gap-3" data-testid={`assistant-message-${i}`} data-role="assistant">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-teal-800 text-teal-50" aria-hidden>
+                          <Sparkles className="h-3 w-3" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1 flex items-baseline gap-2 text-[11px] text-slate-500">
+                            <span className="font-medium text-slate-700">Assistant</span>
+                            <time dateTime={m.createdAt}>{new Date(m.createdAt).toLocaleString()}</time>
+                          </div>
+                          {/* Safe markdown: rendered as React text nodes, never as HTML. */}
+                          <AssistantMarkdown content={String(m.content ?? "")} />
+                          {!!m.sources?.length && (
+                            <div className="mt-3 space-y-2">
+                              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Evidence</p>
+                              {m.sources.map((s, si) => {
+                                const href = safeSourceUrl(s.url);
+                                return (
+                                  <blockquote key={si} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12.5px]">
+                                    {href ? (
+                                      <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 font-medium text-teal-800 underline underline-offset-2" data-testid={`link-source-${i}-${si}`}>
+                                        {s.title || href} <ExternalLink className="h-3 w-3" aria-hidden />
+                                      </a>
+                                    ) : (
+                                      <span className="text-slate-700">{s.title} (link unavailable)</span>
+                                    )}
+                                    {s.excerpt && <p className="mt-1 italic text-slate-600">"{s.excerpt}"</p>}
+                                  </blockquote>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {m.comparison && typeof m.comparison === "object" && (
+                            <CatalogueComparisonView comparison={m.comparison} onReviewJob={onReviewJob} testId={`assistant-comparison-${i}`} />
+                          )}
+                          {renderActions(m)}
+                        </div>
+                      </li>
+                    )}
+                  </Fragment>
+                );
+              })}
+
+              {liveEvents.length > 0 && (
+                <li className="pl-1" data-testid="assistant-turn-activity-current">
+                  <EventList events={liveEvents} testId="list-activity" />
+                </li>
+              )}
+
+              {active && (
+                <li className="flex items-center gap-2 pl-1 text-[12.5px] text-teal-900" data-testid="assistant-turn-working">
+                  <Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin" aria-hidden />
+                  <span role="status" aria-live="polite" data-testid="text-activity-current">{statusLine}</span>
+                  {elapsed && <span className="ml-auto font-mono text-[11.5px] tabular-nums text-slate-500" data-testid="text-activity-elapsed">{elapsed}</span>}
+                </li>
+              )}
+
+              {thread.status === "error" && thread.error && (
+                <li role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-800" data-testid="assistant-thread-error">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                  <span>Investigation failed: {thread.error}</span>
+                </li>
+              )}
+            </ol>
+          )}
+        </div>
+
+        {showJump && (
+          <button type="button" onClick={jumpToLatest}
+            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-700 shadow-md hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600"
+            data-testid="button-jump-latest">
+            <ArrowDown className="h-3.5 w-3.5" aria-hidden /> Jump to latest
+          </button>
+        )}
+      </div>
+
+      {related.length > 0 && (
+        <div className="mx-4 mb-3 space-y-2 rounded-xl border border-teal-200 bg-white p-3 sm:mx-6" data-testid="assistant-related-reviews">
+          <p className="text-[12.5px] font-semibold text-teal-900">Available course review</p>
+          <p className="text-[11.5px] text-slate-600">A pending review in another job of this university includes a course you asked about. Opening it does not change earlier results here.</p>
+          {related.map(r => (
+            <div key={r.jobId} className="flex items-center gap-2 text-[12.5px]" data-testid={`related-review-${r.jobId}`}>
+              <span className="min-w-0 flex-1 break-words text-slate-800">{String(r.courseName || "Course")}</span>
+              <span className="font-mono text-[11px] text-slate-500">{String(r.status ?? "")}</span>
+              <Button size="sm" variant="outline" className="h-8 text-[12px]"
+                onClick={() => onReviewJob!(r.jobId)} data-testid={`button-open-related-review-${r.jobId}`}>
+                <ExternalLink className="mr-1 h-3 w-3" aria-hidden /> Open review
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {thread && (
+        <form onSubmit={e => { e.preventDefault(); void submit(); }} className="border-t border-slate-200/80 bg-[#fbfaf6] px-4 py-3 sm:px-6">
+          <label htmlFor={`assistant-prompt-${jobId}`} className="sr-only">Message the scrape assistant</label>
+          <div className="flex items-end gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 focus-within:border-teal-600 focus-within:ring-2 focus-within:ring-teal-600/20 motion-safe:transition-shadow">
+            <textarea
+              ref={inputRef}
               id={`assistant-prompt-${jobId}`}
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }}
-              placeholder="e.g. Why is IELTS missing for nursing courses?"
-              maxLength={MAX_LEN}
-              rows={3}
-              disabled={disabled || busy}
-              className="text-xs bg-white"
+              onKeyDown={e => {
+                if (e.key !== "Enter" || e.shiftKey) return;
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                e.preventDefault();
+                void submit();
+              }}
+              placeholder={active ? "The assistant is working. You can draft your next message." : "Ask about missing courses, fees, IELTS, durations..."}
+              rows={1}
+              disabled={disabled}
+              aria-describedby={`assistant-hint-${jobId}`}
+              className="max-h-60 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[13.5px] leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-60"
               data-testid="input-assistant-prompt"
             />
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-gray-500">{trimmed.length}/{MAX_LEN}{trimmed.length > 0 && trimmed.length < MIN_LEN ? " · at least 5 characters" : ""}</span>
-              <Button type="submit" size="sm" className="ml-auto h-7 text-[11px] bg-teal-700 hover:bg-teal-800"
-                disabled={disabled || busy || !lengthOk} data-testid="button-assistant-submit">
-                {submitting || active ? <Loader2 className="w-3 h-3 mr-1 animate-spin" aria-hidden /> : <Send className="w-3 h-3 mr-1" aria-hidden />}
-                {active ? "Investigating" : submitting ? "Sending" : "Ask"}
-              </Button>
-            </div>
-          </form>
-        )}
-
-        {submitError && (
-          <p role="alert" className="text-xs text-red-700" data-testid="assistant-submit-error">{submitError}</p>
-        )}
-      </div>
+            <Button type="submit" size="icon" aria-label={active ? "Assistant is working" : submitting ? "Sending" : "Send message"}
+              className="h-8 w-8 shrink-0 rounded-full bg-teal-800 text-teal-50 hover:bg-teal-900 disabled:bg-slate-300"
+              disabled={disabled || busy || !lengthOk} data-testid="button-assistant-submit">
+              {busy ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden /> : <ArrowUp className="h-4 w-4" aria-hidden />}
+            </Button>
+          </div>
+          <p id={`assistant-hint-${jobId}`} className="mt-1.5 text-[11px] text-slate-500">Enter to send, Shift+Enter for a new line.</p>
+          {submitError && (
+            <p role="alert" className="mt-1 text-[12px] text-red-700" data-testid="assistant-submit-error">{submitError}</p>
+          )}
+        </form>
+      )}
 
       <AlertDialog open={!!confirming} onOpenChange={open => { if (!open && !actionBusy) setConfirming(null); }}>
         <AlertDialogContent data-testid="dialog-confirm-action">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-amber-600" aria-hidden /> Run "{confirming?.label}"?
+              <ShieldAlert className="h-4 w-4 text-amber-600" aria-hidden /> Run "{confirming?.label}"?
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm">
                 <p>
                   {confirming?.kind === "repair_catalogue"
                     ? "This starts a bounded scraper repair for this job's catalogue."
+                    : confirming?.kind === "recover_catalogue"
+                    ? "This checks the selected not-recorded catalogue links and scrapes any that pass the usual eligibility checks into review data. Some may turn out not to be eligible courses."
+                    : confirming?.kind === "scan_catalogue"
+                    ? "This runs the existing configured full catalogue discovery for this university, bypassing cached pages, as a review-only run. It does not delete existing review rows. It may take considerably longer than the quick check. It cannot guarantee that every course on the website is discoverable, and it does not approve, delete or publish anything."
+                    : confirming?.kind === "review_courses"
+                    ? "This fetches the requested official course URLs into a fresh pending review. It does not rename the course in the current review or duplicate a published course."
                     : "This re-extracts the listed fields for staged review courses."}
-                  {" "}It affects {confirming?.courseCount} course{confirming?.courseCount === 1 ? "" : "s"} in review data only.
+                  {confirming?.kind === "scan_catalogue" ? " Results land in review data only."
+                    : confirming?.kind === "recover_catalogue" ? ` It checks ${selectedUrls.length} selected link${selectedUrls.length === 1 ? "" : "s"}; results land in review data only.`
+                    : ` It affects ${confirming?.courseCount} course${confirming?.courseCount === 1 ? "" : "s"} in review data only.`}
                 </p>
+                {confirming?.kind === "recover_catalogue" && (
+                  <fieldset className="space-y-1.5" data-testid="fieldset-recover-courses">
+                    <legend className="text-[12.5px] font-medium text-slate-800">
+                      Not recorded candidates: select up to {RECOVER_MAX} <span className="font-mono" data-testid="text-recover-count">({selectedUrls.length}/{Math.min(RECOVER_MAX, recoverCandidates(confirming).length)} selected)</span>
+                    </legend>
+                    {recoverCandidates(confirming).length === 0 && <p className="text-[12px] text-red-700">No candidate links were supplied.</p>}
+                    <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2">
+                      {recoverCandidates(confirming).map((c, ci) => {
+                        const checked = selectedUrls.includes(c.url);
+                        const href = safeSourceUrl(c.url);
+                        return (
+                          <label key={c.url} className="flex items-start gap-2 text-[12.5px]">
+                            <input type="checkbox" className="mt-0.5 accent-teal-700" checked={checked}
+                              disabled={actionBusy || (!checked && selectedUrls.length >= RECOVER_MAX)}
+                              onChange={() => toggleUrl(c.url)} data-testid={`checkbox-recover-${ci}`} />
+                            <span className="min-w-0">
+                              <span className="block text-slate-800">{String(c.title || c.url)}</span>
+                              <span className="block truncate font-mono text-[11px] text-slate-500">{href ?? "(link unavailable)"}</span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {selectedUrls.length === 0 && recoverCandidates(confirming).length > 0 && <p className="text-[12px] text-red-700" data-testid="text-recover-empty">Select at least one course.</p>}
+                  </fieldset>
+                )}
                 {!!confirming?.fields.length && <p>Fields: {confirming.fields.map(fieldLabel).join(", ")}</p>}
                 <p>It does not approve or publish any course. Results are not guaranteed to be accurate; review every changed value and its source afterwards.</p>
               </div>
@@ -446,12 +756,12 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
           <AlertDialogFooter>
             <AlertDialogCancel disabled={actionBusy} data-testid="button-cancel-action">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              disabled={actionBusy}
+              disabled={actionBusy || (confirming?.kind === "recover_catalogue" && (selectedUrls.length < 1 || selectedUrls.length > RECOVER_MAX))}
               onClick={e => { e.preventDefault(); if (confirming) void runAction(confirming); }}
               data-testid="button-confirm-action"
             >
-              {actionBusy && <Loader2 className="w-3 h-3 mr-1 animate-spin" aria-hidden />}
-              Confirm and start
+              {actionBusy && <Loader2 className="mr-1 h-3 w-3 motion-safe:animate-spin" aria-hidden />}
+              {confirming?.kind === "recover_catalogue" ? "Check selected courses" : "Confirm and start"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

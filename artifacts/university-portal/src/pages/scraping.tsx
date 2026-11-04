@@ -394,6 +394,14 @@ function readableRequirementField(field: string): string {
   return field.replace(/^ielts[_ ]?/i, "").replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function unresolvedRequirementLabel(status: CourseRequirementStatus): string {
+  const academic = ["missing", "unverified"].includes(status.academic.state);
+  const english = ["missing", "unknown"].includes(status.englishComponents.state);
+  if (academic && english) return "Academic + English";
+  if (academic) return status.academic.state === "missing" ? "Academic missing" : "Academic unverified";
+  return status.englishComponents.state === "missing" ? "English missing" : "English unverified";
+}
+
 function requirementStatusNeedsSource(status: CourseRequirementStatus | null | undefined): boolean {
   if (!status) return false;
   return (
@@ -4506,7 +4514,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                             }`}>{course.completeness}%</span>
                           ) : course.requirementStatus && requirementRepairFields(course).length ? (
                             <span className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
-                              Unverified
+                              {unresolvedRequirementLabel(course.requirementStatus)}
                             </span>
                           ) : <span className="text-gray-300">-</span>}
                         </td>
@@ -4580,7 +4588,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                 ) : (
                                   <span className="text-green-700">
                                     {currSym}{course.internationalFee.toLocaleString()}
-                                    <span className="text-xs text-gray-400 ml-1">/{course.feeTerm || "yr"}</span>
+                                    <span className="text-xs text-gray-400 ml-1">{course.feeTerm ? `/${course.feeTerm}` : " · period not stated"}</span>
                                   </span>
                                 )}
                                 {isFullCourse && annualEquiv !== null && (
@@ -4607,6 +4615,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                           ) : course.ieltsOverall ? (
                             <span className="inline-flex flex-col text-purple-700 font-medium">
                               <span>{course.ieltsOverall}</span>
+                              {course.requirementStatus?.englishComponents.state === "verified" && (
+                                <span className="text-[10px] font-medium text-green-700" title="IELTS overall and component requirements have verified source evidence. Other requirements are assessed separately.">
+                                  IELTS verified
+                                </span>
+                              )}
                               {course.requirementStatus?.englishComponents.state === "unknown" && (
                                 <span
                                   className="mt-0.5 text-[10px] font-medium text-amber-700"

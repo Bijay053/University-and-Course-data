@@ -2996,6 +2996,7 @@ async def run_ai_repair_loop(
         if live_enabled:
             autonomous["phase"] = "live_probe"
             _write_session(job_id, session)
+            ctx["requested_course_urls"] = list(session.get("requested_course_urls") or [])[:3]
             live = LiveRepairEvidence(ctx, autonomous["limits"])
             from app.services.scraper.config.context import current_uni_config
             uni_config_token = current_uni_config.set(live.config)

@@ -653,6 +653,9 @@ def _domestic_only_relevant_html(html: str, url: str | None = None) -> str:
     if not html or not url:
         return html
     host = (urlparse(url).hostname or "").lower()
+    if host in {"acap.edu.au", "www.acap.edu.au"}:
+        from app.services.scraper.acap_source import eligibility_html
+        return eligibility_html(html, url)
     if host in {"adelaide.edu.au", "www.adelaide.edu.au"}:
         return _ADELAIDE_DORMANT_DOMESTIC_MODAL_RE.sub(" ", html)
     if host in {"utas.edu.au", "www.utas.edu.au"}:
@@ -3048,6 +3051,9 @@ async def extract_course(
                 url,
                 _griffith_prefetch_exc,
             )
+    if html is None and _fetch_host in {"excelsia.edu.au", "www.excelsia.edu.au"}:
+        from app.services.scraper.excelsia_source import fetch_course as _fetch_excelsia
+        html = await _fetch_excelsia(url)
     if html is None:
         # ── skip_initial_http_fetch gate ──────────────────────────────────────
         # For 100%-Cloudflare-protected universities (e.g. UEL), every plain
@@ -11788,6 +11794,12 @@ async def extract_course(
     _apply_lsbu_fee(html or "", url, payload, evidence)
     from app.services.scraper.extractors.uws_facts import apply_course_authority as _apply_uws
     _apply_uws(html or "", url, payload, evidence)
+    from app.services.scraper.acap_source import apply_campus_authority as _apply_acap_campus
+    _apply_acap_campus(html or "", url, payload, evidence)
+    from app.services.scraper.excelsia_source import apply_authority as _apply_excelsia
+    _apply_excelsia(html or "", url, payload, evidence)
+    if _fetch_host in {"excelsia.edu.au", "www.excelsia.edu.au"} and str(payload.get("course_name") or "").lower().strip() in {"excelsia.edu.au", "www.excelsia.edu.au"}:
+        return {"url": url, "error": "unverified_course_title", "payload": {}, "evidence": [], "_perf": _perf_flags}
 
     # Preserve HSU's course-owned campus and international year/price tuple
     # after generic extraction, browser/AI fallback and institutional defaults.

@@ -8,11 +8,68 @@ The user chose “Scraping and course reviews” for the prompt assistant and sa
 
 **Why:** They want it to find correct information, fix wrong fees/IELTS and missing courses, and avoid unexplained waiting—not a separate general administration chatbot.
 
-**How to apply:** Reuse the existing OpenAI connection and guarded scraper/review operations. Keep research read-only until an explicit corrective-action confirmation; never let generated numbers bypass deterministic source authority or approval.
+**How to apply:** Reuse the existing OpenAI connection and guarded scraper/review operations. New chat requests authorize supported pending-only work automatically; never let generated numbers bypass deterministic source authority or publication approval.
+
+The user said: “do not ask for review and run do it and give me result” and “i do not want manual work.”
+
+**Why:** The user explicitly removed the extra confirmation step for the scrape assistant.
+
+**How to apply:** Automatically dispatch supported research, discovery and pending-record corrections, report actual outcomes in chat, and avoid asking the user to select or run routine operations. Honor explicit read-only requests. Publishing, deletion and production deployment remain outside automatic pending-record work.
 
 ## Grounding
+The user wants this assistant to replace their reliance on Replit for fixes, including software issues, not merely answer scraping questions.
+
+**Why:** They explicitly asked for a capability comparison, scenario checks and a more capable agent after repeated incomplete answers.
+
+**How to apply:** Treat general coding capability as an unmet product goal, not an existing feature. Code editing/testing needs controlled isolated execution; do not give the production chat unrestricted shell access or claim prompt changes supply missing tools.
+
 Ask the model to select immutable excerpt IDs, not to reproduce quotations.
 
 **Why:** In live tests, even an explicit verbatim-quotation instruction produced apparently plausible quotations stitched from nonadjacent table rows and course facts. Strict text validation correctly rejected them but made otherwise useful research fail.
 
 **How to apply:** Generate actual source excerpts server-side, let the model select their IDs, then retrieve and validate the original excerpt. Do not relax validation to accept synthesized extractor summaries as quotations.
+
+## Visible activity and response time
+The user requested visible background work and faster answers after seeing only a waiting-worker spinner.
+
+**Why:** A spinner and a changing phase alone do not explain whether research has started, which official pages were checked, or what failed. Long course-scraping jobs must not delay short research requests.
+
+**How to apply:** Show persisted, observed tool activity, failures and real elapsed times—not fabricated progress or private model reasoning. Prefer known official URLs and concurrent independent checks over redundant model planning. Measure queue delay as well as end-to-end time.
+
+Research may run independently of scraping workers, but automatic pending corrections must still use the existing audited worker operations.
+
+**Why:** Low research latency must not bypass source validation, review approval or publication controls. Retries and server restarts can overlap earlier deliveries.
+
+**How to apply:** Bound research concurrency and lifetime. Fence every event and final reply to its current owner; a late old attempt must not overwrite a resumed investigation.
+
+## Verify the requested outcome, not just the research
+Check the university's existing course records and other reviews before calling a course missing. Carry the user's verified official course URL into repair validation.
+
+**Why:** ACAP research read the right course while the repair checked unrelated historical pages and failed. The named course also already had an approved record outside the current pending review, so a discovery repair was the wrong conclusion.
+
+**How to apply:** Distinguish pending-only views, existing approved records and genuine discovery gaps. Show actual failure reasons and link to matching newer pending reviews. Do not change unrelated pending courses or rewrite historical failed attempts as successful.
+
+An explicit course URL takes priority over the open review's course. Follow-up phrases such as “this course” and “add this” refer to that user-supplied course, not an unrelated sampled row. An approved record elsewhere is not a reason to refuse a fresh pending review.
+
+**Why:** The user corrected Counselling versus Criminology repeatedly, but the assistant kept answering about the open Criminology review and refusing to add Counselling because it was approved elsewhere.
+
+**How to apply:** Restrict source research and field-edit scope to the requested course. Run a URL-targeted fresh review for “add this”; retain eligibility checks and publication approval. Claim recovery only when the requested course is actually present in the resulting review.
+
+Topic changes end old course references. Review-wide requests, including “all course” and “not only this course,” must stay review-wide through subsequent “do it” or “where is result” messages.
+
+**Why:** The user explicitly changed from Counselling to all unverified courses, but historical URL lookup and stale assistant replies kept restoring Counselling as the subject.
+
+**How to apply:** Fence conversation history at the latest topic change, not just the last URL. Do not use old assistant wording as evidence of the user's current subject. Keep review-wide field corrections separate from missing-course catalogue comparisons.
+
+## Conversation presentation
+Confirmed operations must be included in the next answer's context, with their requested URLs and verified results. Approval is not proof that source data is current; allow source-backed corrections through a fresh pending review.
+
+**Why:** The assistant could see conversation prose but not the executed action outcome, repeatedly refused an already-approved course, and left a “no changes applied” research footer above running or completed work.
+
+**How to apply:** Distinguish overall review warnings from IELTS verification. Keep current-review summaries available even when a requested URL is outside that review. Report job completion separately from proven field changes, and exclude editorial/news links from quick catalogue candidates and confirmation.
+
+The user wants the scrape assistant to resemble Replit's live agent chat: no visible 0/2000 limit, and activities and code in the conversation rather than a separate activity panel.
+
+**Why:** The user explicitly requested this presentation instead of the small form and separate activity view.
+
+**How to apply:** Keep observed tool events with their conversation turn, preserve them across subsequent questions, and render actual code or operation details inline. Do not substitute invented commands, fabricated progress, or private reasoning for real activity. Preserve publication approval controls, not extra confirmations for routine pending-only work.

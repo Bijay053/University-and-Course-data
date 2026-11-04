@@ -143,10 +143,14 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
     # or several retries. Every request consumes exactly one page-budget slot.
     insecure = set(getattr(config.discovery, "insecure_tls_direct_hostnames", []) or [])
     fetch_started = time.monotonic()
+    from app.services.scrape_assistant_tools import PublicNetworkBackend
+    transport = httpx.AsyncHTTPTransport(verify=(urlsplit(url).hostname not in insecure), retries=0)
+    transport._pool._network_backend = PublicNetworkBackend()
     async with httpx.AsyncClient(
         timeout=timeout, follow_redirects=False,
+        transport=transport, trust_env=False,
         verify=(urlsplit(url).hostname not in insecure),
-        headers={"User-Agent": "Mozilla/5.0", "Accept": "text/html,application/xhtml+xml"},
+        headers={"User-Agent": "StudyInfoCentre-SourceVerifier/1.0", "Accept": "text/html,application/xhtml+xml"},
     ) as client:
         async with client.stream("GET", url) as response:
             if response.status_code in (404, 410):
@@ -696,7 +700,10 @@ def inspect_page(url: str, html: str, config=None) -> dict:
             or is_confirmed_host_online_only_page(owned_html, url)):
         return {**result, "classification": "ineligible", "reason": "Shared international course eligibility gate"}
     from app.services.scraper.extractors.eligibility import _NEG
-    if _NEG.search(region.get_text(" ", strip=True)):
+    from bs4 import BeautifulSoup
+    from app.services.scraper.acap_source import eligibility_html
+    eligibility_region = BeautifulSoup(eligibility_html(str(region), url), "html.parser")
+    if _NEG.search(eligibility_region.get_text(" ", strip=True)):
         return {**result, "classification": "ineligible", "reason": "Explicit international-audience exclusion"}
     if re.search(r"\b(?:study mode|mode of study|delivery)\b\s*[:\-]?\s*online\s+only\b", region.get_text(" ", strip=True), re.I):
         return {**result, "classification": "ineligible", "reason": "Explicit online-only delivery"}
@@ -835,7 +842,8 @@ class LiveRepairEvidence:
             for n in (1, 2)
         ] if missing_fees else []
         targets = list(dict.fromkeys(
-            missing_location
+            list(self.ctx.get("requested_course_urls") or [])
+            + missing_location
             + [row.get("url") for row in affected if row.get("url")]
             + list(quality.get("critical_urls") or [])
             + fee_targets
@@ -871,7 +879,9 @@ class LiveRepairEvidence:
             selected = [anchors[0]]
             if len(anchors) > 1:
                 selected.append(anchors[len(anchors) // 2])
-            course_candidates = list(dict.fromkeys(selected + course_candidates))[:4]
+            course_candidates = list(dict.fromkeys(
+                list(self.ctx.get("requested_course_urls") or []) + selected + course_candidates
+            ))[:4]
         passed = [
             url for url in self.ctx.get("passed_sample") or []
             if not is_intentionally_excluded_course_url(url)

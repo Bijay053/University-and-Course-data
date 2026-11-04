@@ -25,12 +25,13 @@ Actor = Annotated[dict, Depends(require_permission("scraping.trigger"))]
 
 class PromptBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    prompt: str = Field(min_length=5, max_length=2000)
+    prompt: str = Field(min_length=1)
 
 
 class ConfirmBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     confirm: StrictBool
+    courseUrls: list[str] | None = Field(default=None, max_length=20)
 
 
 async def owned_thread(job_id: str, actor: dict, db, *, lock=False):
@@ -48,12 +49,15 @@ async def owned_thread(job_id: str, actor: dict, db, *, lock=False):
 
 async def response(thread, db):
     if thread is None:
-        return {"threadId": None, "status": "idle", "phase": "", "error": None, "messages": []}
+        return {"threadId": None, "status": "idle", "phase": "", "error": None, "messages": [],
+                "activity": [], "queuedAt": None, "startedAt": None, "updatedAt": None}
     messages = deepcopy(thread.messages)
     changed = False
     for message in messages:
         for action in message.get("actions", []):
-            if action["state"] not in {"starting", "running"}:
+            if action["state"] not in {"starting", "running"} and not (
+                action["kind"] == "repair_catalogue" and action.get("_sessionId") and action["state"] == "error"
+            ):
                 continue
             target = await db.get(ScrapeRuntimeJob, action.get("jobId")) if action.get("jobId") else None
             if action["kind"] == "repair_catalogue" and action.get("_sessionId"):
@@ -73,13 +77,37 @@ async def response(thread, db):
                     action["error"] = "Verification finished but still needs human review. No approval or publication was performed."
                 elif status in {"failed", "error", "blocked", "cancelled", "stopped"}:
                     action["state"] = "error"
-                    action["error"] = "Repair stopped without a verified completion. See the scrape's repair progress."
+                    reason = state.get("reason") or session.get("error") or session.get("final_verdict")
+                    probe = session.get("live_probe") or {}
+                    if probe.get("accepted") is False and probe.get("course_pages") == 0:
+                        reason = "The repair could not verify official course pages."
+                        failed = next((sample.get("reason") for sample in probe.get("samples", [])
+                                       if sample.get("reason")), None)
+                        if failed:
+                            reason += " " + failed
+                    action["error"] = (str(reason or "Repair stopped before verification.")[:700]
+                                       + " No verified recovery was completed.")
                 action["progress"] = {"current": session.get("current_attempt", 0), "total": 5, "status": status}
                 changed = True
             elif target is not None:
                 action["progress"] = {"current": target.current or 0, "total": target.total_found or action["courseCount"], "status": target.status}
                 if target.status in {"completed", "completed_with_warnings"}:
                     action["state"] = "completed"
+                    if action["kind"] == "scan_catalogue":
+                        action["resultSummary"] = f"Discovery finished: {target.total_found or 0} found, {target.imported or 0} staged, {target.skipped or 0} skipped, {target.errors or 0} errors. Nothing was published."
+                    if action["kind"] in {"review_courses", "recover_catalogue"}:
+                        from app.services.assistant_catalogue import identity, is_course_candidate_url
+                        requested = {identity(value) for value in action.get("_requestedUrls", [])}
+                        actual = (await db.execute(select(ScrapedCourse.course_website).where(
+                            ScrapedCourse.scrape_job_id == target.runtime_job_id,
+                            ScrapedCourse.university_id == target.university_id,
+                            ScrapedCourse.status.in_(service.REVIEW_STATUSES),
+                        ))).scalars().all()
+                        if not requested or not all(is_course_candidate_url(value) for value in requested) or not requested.issubset({identity(value) for value in actual if value}):
+                            action["state"] = "error"
+                            action["error"] = "The check finished without all requested courses in pending review. Open the review and job skip/error results; no complete recovery is claimed."
+                        else:
+                            action["resultSummary"] = f"Verified: {len(requested)} requested course(s) are now in pending review. Nothing was published."
                 elif target.status not in {"queued", "running", "awaiting_approval"}:
                     action["state"] = "error"
                     action["error"] = "The correction job stopped. Review its results before retrying."
@@ -91,30 +119,99 @@ async def response(thread, db):
     if changed:
         thread.messages = messages
         await db.commit()
-    if thread.status in service.ACTIVE and service.now() - thread.updated_at > timedelta(minutes=3):
-        thread.status = "error"
-        thread.error = "The investigation was interrupted. No corrections were applied; you can retry."
+    if thread.status == "researching" and service.now() - thread.updated_at > timedelta(seconds=100):
+        thread.status, thread.run_id = "queued", None
+        thread.phase, thread.error = "Reconnecting interrupted research", None
+        items = [dict(item) for item in (thread.activity or [])]
+        for item in items:
+            if item["status"] == "running":
+                item["status"] = "error"
+                item["detail"] = "This attempt was interrupted; a fenced new attempt will continue."
+        thread.activity = items + [service.event("Reconnecting interrupted research", status="info")]
+        thread.updated_at = service.now()
         await db.commit()
     public = deepcopy(messages)
+    live_phase = thread.phase
+    if thread.status == "ready":
+        current_start = max((index for index, message in enumerate(messages)
+                             if message["role"] == "user"), default=0)
+        actions = [action for message in messages[current_start:] for action in message.get("actions", [])]
+        if any(action["state"] in {"starting", "running"} for action in actions):
+            live_phase = "Research complete — work is running. Results are not yet verified."
+        elif actions and actions[-1]["state"] == "completed":
+            live_phase = actions[-1].get("resultSummary") or "Confirmed job finished. Open its review to inspect the results."
+        elif actions and actions[-1]["state"] == "error":
+            live_phase = "Confirmed work needs attention. See the action result above."
+        elif actions and actions[-1]["state"] == "proposed":
+            automatic = any(message.get("autoRun") for message in messages[current_start:] if message["role"] == "user")
+            live_phase = ("Preparing automatic execution. No changes applied yet." if automatic
+                          else "Action proposed. No changes applied.")
     for message in public:
         for action in message.get("actions", []):
             for key in list(action):
                 if key.startswith("_"):
                     del action[key]
-    return {"threadId": thread.id, "status": thread.status, "phase": thread.phase,
-            "error": thread.error, "messages": public}
+    activity = [{key: value for key, value in item.items() if not key.startswith("_")}
+                for item in (thread.activity or [])]
+    # Hydrate pre-chat records without rewriting their historical text.
+    if public and activity:
+        user_index = next((i for i in range(len(public) - 1, -1, -1) if public[i]["role"] == "user"), None)
+        if user_index is not None:
+            public[user_index].setdefault("turnId", thread.turn_id)
+            if thread.status not in service.ACTIVE and public[-1]["role"] == "assistant":
+                public[-1].setdefault("turnId", thread.turn_id)
+                public[-1].setdefault("activity", activity)
+    queued_at = next((item["createdAt"] for item in reversed(public) if item["role"] == "user"), None)
+    started_at = next((item["at"] for item in activity if item["id"].startswith("started-")), None)
+    related = []
+    latest_prompt = next((item["content"] for item in reversed(messages) if item["role"] == "user"), "")
+    if latest_prompt:
+        source = await db.get(ScrapeRuntimeJob, thread.job_id)
+        university = await db.get(University, source.university_id) if source else None
+        if university:
+            # Navigation keeps recent results discoverable when the next
+            # question names a different course. Research/action scope still
+            # follows only the current request.
+            urls = []
+            home = university.scrape_url or university.website or ""
+            for message in reversed(messages):
+                if message["role"] != "user":
+                    continue
+                for value in service.requested_course_urls(message["content"], [message], home):
+                    if value not in urls:
+                        urls.append(value)
+                if len(urls) >= 3:
+                    break
+            urls = urls[:3]
+            inventory = await service.inventory_for_urls(university.id, urls)
+            seen = {thread.job_id}
+            for item in inventory["otherReviews"]:
+                if item["status"] in service.REVIEW_STATUSES and item["jobId"] and item["jobId"] not in seen:
+                    related.append({"jobId": item["jobId"], "courseName": item["name"], "status": item["status"]})
+                    seen.add(item["jobId"])
+                if len(related) == 3:
+                    break
+    return {"threadId": thread.id, "turnId": thread.turn_id, "status": thread.status, "phase": live_phase,
+            "error": thread.error, "messages": public, "activity": activity,
+            "queuedAt": queued_at, "startedAt": started_at, "updatedAt": thread.updated_at.isoformat(),
+            "relatedReviews": related}
 
 
 @router.get("/jobs/{job_id}/assistant")
 async def get_assistant(job_id: str, db: Database, actor: Actor):
     _, thread = await owned_thread(job_id, actor, db, lock=True)
-    return await response(thread, db)
+    result = await response(thread, db)
+    await db.commit()
+    if thread and result["status"] == "queued":
+        from app.services.scrape_assistant_runner import schedule
+        schedule(thread.id, thread.turn_id)
+    return result
 
 
 @router.post("/jobs/{job_id}/assistant", status_code=202)
 async def prompt_assistant(job_id: str, body: PromptBody, db: Database, actor: Actor):
     prompt = body.prompt.strip()
-    if len(prompt) < 5:
+    if not prompt:
         raise HTTPException(422, "Describe what you want checked.")
     await owned_thread(job_id, actor, db)
     await db.execute(insert(ScrapeAssistantThread).values(
@@ -126,19 +223,26 @@ async def prompt_assistant(job_id: str, body: PromptBody, db: Database, actor: A
         raise HTTPException(409, "An investigation is already in progress.")
     if any(a["state"] in {"starting", "running"} for m in thread.messages for a in m.get("actions", [])):
         raise HTTPException(409, "Wait for the current correction to finish before starting another investigation.")
+    service.archive_activity(thread)
     turn = uuid.uuid4().hex
     thread.turn_id = turn
-    thread.status, thread.phase, thread.error = "queued", "Waiting for a research worker", None
+    thread.status, thread.phase, thread.error = "queued", "Starting the assistant", None
+    thread.run_id = None
+    thread.activity = [service.event("Request received", status="completed",
+                                     detail="Preparing a bounded, official-source investigation.")]
+    from app.services.scrape_assistant_autorun import execution_requested
     thread.messages = list(thread.messages[-18:]) + [{
-        "role": "user", "content": prompt, "createdAt": service.now().isoformat(),
+        "role": "user", "content": prompt, "createdAt": service.now().isoformat(), "turnId": turn, "autoRun": execution_requested(prompt),
     }]
     thread.updated_at = service.now()
     await db.commit()
     try:
-        from app.tasks.scrape_assistant import research_scrape
-        research_scrape.apply_async(args=[thread.id, turn], queue="scrape")
+        from app.services.scrape_assistant_runner import schedule
+        if not schedule(thread.id, turn):
+            thread.phase = "Waiting for an assistant research slot"
+            await db.commit()
     except Exception:
-        thread.status, thread.error = "error", "A research worker could not be reached. No changes were made; try again."
+        thread.status, thread.error = "error", "The assistant could not start. No changes were made; try again."
         await db.commit()
     return await response(thread, db)
 
@@ -161,6 +265,22 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
     uni = (await db.execute(select(University).where(University.id == job.university_id).with_for_update())).scalar_one()
     if service.fingerprint(uni.scrape_config or {}) != action.get("_configVersion"):
         raise HTTPException(409, "University settings changed. Ask the assistant to investigate again.")
+    if action["kind"] == "review_courses":
+        from app.services.assistant_catalogue import is_course_candidate_url
+        if any(not is_course_candidate_url(value) for value in action.get("_requestedUrls", [])):
+            raise HTTPException(422, "Supply an official course-detail page, not a news or event page.")
+    if action["kind"] == "recover_catalogue":
+        from app.services.assistant_catalogue import compare_candidates, is_course_candidate_url
+        selected = list(dict.fromkeys(body.courseUrls or []))
+        if not selected or any(url not in action.get("_requestedUrls", []) or not is_course_candidate_url(url) for url in selected):
+            raise HTTPException(422, "Select 1–20 courses from this comparison.")
+        candidates = [{"url": url, "title": url} for url in selected]
+        current = await compare_candidates(candidates, job.university_id, service.AsyncSessionLocal)
+        if any(row["status"] != "missing" for row in current):
+            raise HTTPException(409, "A selected course is now recorded. Compare the catalogue again before recovering it.")
+        action["_requestedUrls"], action["courseCount"] = selected, len(selected)
+    elif body.courseUrls is not None:
+        raise HTTPException(422, "Course selection is only supported for catalogue recovery.")
     if action["kind"] == "fix_fields":
         ids = action.get("_ids", [])
         rows = (await db.execute(select(ScrapedCourse).where(
@@ -185,9 +305,35 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
             action["jobId"] = result.get("jobId") or result.get("job_id")
             if not action["jobId"]:
                 raise ValueError("No durable correction job returned.")
+        elif action["kind"] in {"review_courses", "recover_catalogue"}:
+            from app.routers.scrape import start_scrape
+            from app.schemas.scrape import StartScrapeBody
+            from app.services.scrape_assistant_tools import official_url
+            urls = action.get("_requestedUrls") or []
+            limit = 20 if action["kind"] == "recover_catalogue" else 3
+            if not urls or len(urls) > limit or any(value not in action.get("_evidenceUrls", []) for value in urls):
+                raise ValueError("Verified requested course URLs are required.")
+            urls = [official_url(value, uni.scrape_url or uni.website) for value in urls]
+            result = await start_scrape(StartScrapeBody(
+                universityId=job.university_id, courseUrls=urls,
+                retrySourceJobId=job_id, fastMode=True,
+            ), db)
+            action["jobId"] = result.job_id if hasattr(result, "job_id") else result.model_dump(by_alias=True)["jobId"]
+            if not action["jobId"]:
+                raise ValueError("No durable review job returned.")
+        elif action["kind"] == "scan_catalogue":
+            from app.routers.scrape import start_scrape
+            from app.schemas.scrape import StartScrapeBody
+            result = await start_scrape(StartScrapeBody(
+                universityId=job.university_id, fullCatalogueReviewOnly=True,
+                forceDiscovery=True,
+            ), db)
+            action["jobId"] = result.job_id
         elif action["kind"] == "repair_catalogue":
             from app.routers.scrape import start_ai_repair
-            result = await start_ai_repair(job_id, db, actor)
+            evidence_urls = action.get("_evidenceUrls") or []
+            result = (await start_ai_repair(job_id, db, actor, evidence_urls)
+                      if evidence_urls else await start_ai_repair(job_id, db, actor))
             if not isinstance(result, dict) or not result.get("session_id"):
                 raise ValueError("A distinct repair session could not be started.")
             action["_sessionId"], action["jobId"] = result["session_id"], job_id
@@ -196,14 +342,16 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
         action["state"] = "running"
         thread.messages = deepcopy(messages)
         await db.commit()
-    except Exception:
+    except Exception as exc:
+        dispatch_error = (str(exc.detail) if isinstance(exc, HTTPException) and exc.status_code in {400, 403, 404, 409, 422}
+                          else "This correction could not be confirmed. Check existing job progress before retrying.")
         await db.rollback()
         _, thread = await owned_thread(job_id, actor, db, lock=True)
         latest = deepcopy(thread.messages)
         for message in latest:
             for item in message.get("actions", []):
                 if item["id"] == action_id:
-                    item["state"], item["error"] = "error", "This correction could not be confirmed. Check existing job progress before retrying."
+                    item["state"], item["error"] = "error", dispatch_error
         thread.messages = latest
         await db.commit()
     return await response(thread, db)

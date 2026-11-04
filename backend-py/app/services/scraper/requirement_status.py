@@ -153,7 +153,7 @@ def _component_evidence_matches(field: str, value: Any, snippet: str) -> bool:
     # accidentally cross-bind an overall value to a lower component value.
     named = (
         rf"\b{component}\b\s*(?:(?:minimum|at\s+least)\s+)?"
-        rf"(?:(?:band|score)\s*)?(?:(?:of|is|must\s+be)\s*)?[:=-]?\s*"
+        rf"(?:(?:band|score)\s*)?(?:(?:of|at|is|must\s+be)\s*)?[:=-]?\s*"
         rf"\b{score}\b"
         rf"|\b{score}\b\s*(?:in|for)\s+(?:the\s+)?{component}\b"
     )
@@ -166,7 +166,7 @@ def _component_evidence_matches(field: str, value: Any, snippet: str) -> bool:
         rf"(?P<skills>\b(?:listening|reading|writing|speaking)\b"
         rf"(?:\s*(?:,|and|&)\s*\b(?:listening|reading|writing|speaking)\b)+)"
         rf"\s*(?:(?:minimum|at\s+least)\s+)?"
-        rf"(?:(?:band|score)\s*)?[:=-]?\s*\b{score}\b",
+        rf"(?:(?:band|score)\s*)?(?:(?:of|at|is)\s*)?[:=-]?\s*\b{score}\b",
         text,
         re.I,
     )

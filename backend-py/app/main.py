@@ -152,6 +152,8 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     except Exception:  # noqa: BLE001
         log.exception("[SNAPSHOT] startup check failed (non-fatal)")
     yield
+    from app.services.scrape_assistant_runner import shutdown as shutdown_assistant
+    await shutdown_assistant()
     log.info("Python backend shutting down")
 
 

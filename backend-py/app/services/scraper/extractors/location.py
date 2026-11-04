@@ -145,7 +145,8 @@ _INST_LABEL_PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 _REMOVE_VIRTUAL = re.compile(
-    r"\b(?:online|virtual|remote|distance(?:\s*learning)?|off[-\s]?campus|external)\b",
+    r"\b(?:online|virtual|remote|distance(?:\s*learning)?|off[-\s]?campus|external)\b"
+    r"|^\s*(?:on[-\s]?campus|in[-\s]?person|face[-\s]?to[-\s]?face|blended|hybrid)\s*$",
     re.I,
 )
 

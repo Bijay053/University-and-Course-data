@@ -94,6 +94,8 @@ async def inspect_source(url: str, home: str) -> dict:
     try:
         url = official_url(url, home)
         raw = await asyncio.wait_for(public_request(url), timeout=12)
+        if raw.lstrip().startswith(b"%PDF") or b"\x00" in raw[:500]:
+            raise ValueError("This research tool needs a readable HTML page, not a binary document.")
         html = raw.decode("utf-8", errors="replace")
         from app.services.scraper.extractors.fee import extract as extract_fee
         from app.services.scraper.extractors.english_test import extract as extract_english
@@ -112,9 +114,20 @@ async def inspect_source(url: str, home: str) -> dict:
                     "method": result.method,
                 })
         title = soup.title.get_text(" ", strip=True) if soup.title else urlsplit(url).path
+        english_links = []
+        for anchor in soup.select("a[href]"):
+            if not re.search(r"english|language.requirements", anchor.get_text(" ", strip=True) + " " + anchor["href"], re.I):
+                continue
+            try:
+                link = official_url(urljoin(url, anchor["href"]), home)
+            except (ValueError, TypeError):
+                continue
+            if link not in english_links:
+                english_links.append(link)
         return {
             "url": url, "title": title[:200], "text": text[:24000], "_fullText": text,
             "facts": facts, "excerpts": evidence_excerpts(text, facts), "verified": True,
+            "englishLinks": english_links[:8],
         }
     except asyncio.CancelledError:
         raise

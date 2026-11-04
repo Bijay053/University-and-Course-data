@@ -98,6 +98,11 @@ def test_action_whitelist_or_server_scope(action):
 
 @pytest_asyncio.fixture
 async def store(monkeypatch):
+    # Legacy confirmation tests isolate dispatch; automatic orchestration has
+    # explicit tests below that restore the real dispatcher.
+    async def no_automatic_dispatch(*args):
+        return None
+    monkeypatch.setattr(service, "run_automatic_action", no_automatic_dispatch)
     schema = "assistant_test_" + uuid.uuid4().hex
     admin = create_async_engine(settings.database_url, poolclass=NullPool)
     async with admin.begin() as conn:
@@ -115,6 +120,8 @@ async def store(monkeypatch):
             ), {"schema": schema}) == 1
         factory = async_sessionmaker(engine, expire_on_commit=False)
         monkeypatch.setattr(service, "AsyncSessionLocal", factory)
+        from app.services import scrape_assistant_runner
+        monkeypatch.setattr(scrape_assistant_runner, "schedule", lambda *args: True)
         async with factory() as db:
             db.add(University(id=1, name="Example University", country="UK", city="Example",
                               scrape_url="https://www.example.edu", scrape_config={}))
@@ -136,9 +143,9 @@ async def store(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_prompt_persists_and_is_private_to_actor(store, monkeypatch):
-    from app.tasks.scrape_assistant import research_scrape
+    from app.services import scrape_assistant_runner
     queued = []
-    monkeypatch.setattr(research_scrape, "apply_async", lambda **kwargs: queued.append(kwargs))
+    monkeypatch.setattr(scrape_assistant_runner, "schedule", lambda *args: queued.append(args) or True)
     async with store() as db:
         result = await prompt_assistant("source", PromptBody(prompt="Check these international fees"), db, {"id": 7})
         assert result["status"] == "queued" and queued
@@ -155,7 +162,6 @@ async def test_real_persistence_research_has_evidence_but_no_automatic_writes(st
     from app.tasks.scrape_assistant import research_scrape
     monkeypatch.setattr(research_scrape, "apply_async", lambda **kwargs: None)
     answers = iter([
-        {"urls": ["https://www.example.edu/course"], "check_catalogue": False},
         {"answer": "The official international fee differs. Confirm a fresh targeted extraction.",
          "citations": [{"url": "https://www.example.edu/course", "quoteId": "q0"}],
          "action": {"kind": "fix_fields", "fields": ["international_fee"]}},
@@ -196,7 +202,6 @@ async def test_unverified_citation_never_becomes_ready(store, monkeypatch):
                status="queued", messages=[{"role": "user", "content": "Check tuition", "createdAt": service.now().isoformat()}]))
         await db.commit()
     answers = iter([
-        {"urls": ["https://www.example.edu/course"]},
         {"answer": "The fee is verified", "citations": [{"url": "https://evil.test", "quote": "Invented tuition evidence"}]},
     ])
     async def ai(**kwargs): return next(answers)
@@ -286,11 +291,564 @@ async def test_superseded_worker_cannot_overwrite_new_turn(store):
 
 @pytest.mark.asyncio
 async def test_dispatch_failure_is_persisted_as_error(store, monkeypatch):
-    from app.tasks.scrape_assistant import research_scrape
-    def unavailable(**kwargs):
+    from app.services import scrape_assistant_runner
+    def unavailable(*args):
         raise ConnectionError("broker unavailable")
-    monkeypatch.setattr(research_scrape, "apply_async", unavailable)
+    monkeypatch.setattr(scrape_assistant_runner, "schedule", unavailable)
     async with store() as db:
         result = await prompt_assistant("source", PromptBody(prompt="Check international tuition"), db, {"id": 7})
         assert result["status"] == "error"
         assert "No changes" in result["error"]
+
+
+async def prompt_thread(store, prompt="Check the international fee"):
+    async with store() as db:
+        result = await prompt_assistant("source", PromptBody(prompt=prompt), db, {"id": 1})
+        thread = await db.get(ScrapeAssistantThread, result["threadId"])
+        return thread.id, thread.turn_id
+
+
+def research_fakes(monkeypatch):
+    calls = []
+    async def ai(**kwargs):
+        calls.append(kwargs)
+        return {"answer": "The bounded checks are complete. No course changes were applied.",
+                "citations": [], "action": None}
+    async def source(url, home):
+        return {"url": url, "title": "Official source", "verified": True, "text": "Official source",
+                "facts": [], "excerpts": [{"id": "q0", "text": "Official source"}]}
+    monkeypatch.setattr(service, "chat_json", ai)
+    monkeypatch.setattr(service, "inspect_source", source)
+    return calls
+
+
+@pytest.mark.asyncio
+async def test_known_sources_use_one_model_call_and_persist_activity(store, monkeypatch):
+    calls = research_fakes(monkeypatch)
+    thread_id, turn_id = await prompt_thread(store)
+    await service.investigate(thread_id, turn_id)
+    async with store() as db:
+        result = await get_assistant("source", db, {"id": 1})
+    assert result["status"] == "ready"
+    assert len(calls) == 1
+    assert result["queuedAt"] <= result["startedAt"] <= result["updatedAt"]
+    assert any(item["label"] == "Official page checked" and item["durationMs"] >= 0
+               for item in result["activity"])
+    assert result["activity"][-1]["label"] == "Answer ready"
+    assert not any(item["status"] == "running" for item in result["activity"])
+    assert result["turnId"] == turn_id
+    assert result["messages"][-1]["turnId"] == turn_id
+    assert result["messages"][-1]["activity"] == result["activity"]
+
+
+def test_chat_prompt_no_longer_has_the_2000_character_cap():
+    assert PromptBody(prompt="x" * 12000).prompt == "x" * 12000
+    assert PromptBody(prompt="yes").prompt == "yes"
+    assert "maxLength" not in PromptBody.model_json_schema()["properties"]["prompt"]
+
+
+def test_failed_turn_keeps_its_real_work_when_next_prompt_starts():
+    thread = SimpleNamespace(
+        turn_id="old-turn", error="Source check failed; no correction was applied.",
+        messages=[{"role": "user", "content": "Check this source", "createdAt": service.now().isoformat()}],
+        activity=[{**service.event("Checking official source", status="running"), "_internal": "private"}],
+    )
+    service.archive_activity(thread)
+    reply = thread.messages[-1]
+    assert reply["role"] == "assistant" and reply["turnId"] == "old-turn"
+    assert reply["content"] == thread.error
+    assert reply["activity"][0]["status"] == "error"
+    assert "_internal" not in reply["activity"][0]
+    service.archive_activity(thread)
+    assert len(thread.messages) == 2
+
+
+@pytest.mark.asyncio
+async def test_next_long_prompt_preserves_previous_turn_activity(store, monkeypatch):
+    from app.services import scrape_assistant_runner
+    research_fakes(monkeypatch)
+    thread_id, turn_id = await prompt_thread(store)
+    await service.investigate(thread_id, turn_id)
+    monkeypatch.setattr(scrape_assistant_runner, "schedule", lambda *_: True)
+    long_prompt = "Check official tuition and IELTS. " * 200
+    async with store() as db:
+        result = await prompt_assistant("source", PromptBody(prompt=long_prompt), db, {"id": 1})
+    assert result["messages"][-1]["content"] == long_prompt.strip()
+    assert result["messages"][-1]["turnId"] != turn_id
+    assert result["messages"][-2]["activity"][-1]["label"] == "Answer ready"
+    assert result["messages"][-2]["turnId"] == turn_id
+    assert result["activity"][0]["label"] == "Request received"
+
+
+@pytest.mark.asyncio
+async def test_page_and_catalogue_checks_are_concurrent(store, monkeypatch):
+    research_fakes(monkeypatch)
+    source_started, catalogue_started = asyncio.Event(), asyncio.Event()
+    async def source(url, home):
+        source_started.set()
+        await catalogue_started.wait()
+        return {"url": url, "verified": False, "error": "Page was unavailable"}
+    async def catalogue(*args):
+        catalogue_started.set()
+        await source_started.wait()
+        return {"available": True, "observed": 12, "note": "Bounded observation, not proof of eligibility."}
+    monkeypatch.setattr(service, "inspect_source", source)
+    monkeypatch.setattr(service, "inspect_comparison", catalogue)
+    thread_id, turn_id = await prompt_thread(store, "Why are all courses not listed?")
+    await asyncio.wait_for(service.investigate(thread_id, turn_id), timeout=8)
+    async with store() as db:
+        result = await get_assistant("source", db, {"id": 1})
+    assert result["status"] == "ready"
+    assert any(item["label"] == "Catalogue check finished" for item in result["activity"])
+    assert any(item["status"] == "error" and item["label"] == "Official page unavailable"
+               for item in result["activity"])
+
+
+@pytest.mark.asyncio
+async def test_duplicate_deliveries_claim_only_one_investigation(store, monkeypatch):
+    calls = research_fakes(monkeypatch)
+    thread_id, turn_id = await prompt_thread(store)
+    await asyncio.gather(service.investigate(thread_id, turn_id), service.investigate(thread_id, turn_id))
+    assert len(calls) == 1
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, thread_id)
+        assert thread.status == "ready"
+        assert len([m for m in thread.messages if m["role"] == "assistant"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_cancelled_api_research_requeues_with_fenced_ownership(store, monkeypatch):
+    research_fakes(monkeypatch)
+    started = asyncio.Event()
+    async def blocking_source(url, home):
+        started.set()
+        await asyncio.Event().wait()
+    monkeypatch.setattr(service, "inspect_source", blocking_source)
+    thread_id, turn_id = await prompt_thread(store)
+    task = asyncio.create_task(service.investigate(thread_id, turn_id))
+    await asyncio.wait_for(started.wait(), timeout=8)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, thread_id)
+        assert thread.status == "queued" and thread.run_id is None
+        assert not any(item["status"] == "running" for item in thread.activity)
+    assert await service.claim(thread_id, turn_id, "new-owner")
+    with pytest.raises(ValueError, match="superseded"):
+        await service.record_activity(thread_id, turn_id, "old-owner", service.event("Stale result"))
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, thread_id)
+        assert thread.run_id == "new-owner"
+        assert not any(item["label"] == "Stale result" for item in thread.activity)
+
+
+@pytest.mark.asyncio
+async def test_opening_a_lost_queued_request_schedules_it_again(store, monkeypatch):
+    from app.services import scrape_assistant_runner
+    thread_id, turn_id = await prompt_thread(store)
+    scheduled = []
+    monkeypatch.setattr(scrape_assistant_runner, "schedule", lambda *args: scheduled.append(args))
+    async with store() as db:
+        result = await get_assistant("source", db, {"id": 1})
+    assert result["status"] == "queued" and result["error"] is None
+    assert scheduled == [(thread_id, turn_id)]
+
+
+@pytest.mark.asyncio
+async def test_api_runner_is_bounded_and_does_not_duplicate_local_tasks(monkeypatch):
+    from app.services import scrape_assistant_runner as runner
+    blocked = asyncio.Event()
+    calls = []
+    async def research(*args):
+        calls.append(args)
+        await blocked.wait()
+    monkeypatch.setattr(service, "investigate", research)
+    try:
+        assert runner.schedule("one", "turn")
+        assert runner.schedule("one", "turn")
+        assert runner.schedule("two", "turn")
+        assert not runner.schedule("three", "turn")
+        await asyncio.sleep(0)
+        assert len(calls) == 2
+        await runner.shutdown()
+        assert not runner._tasks
+    finally:
+        await runner.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_binary_documents_are_not_claimed_as_verified_html(monkeypatch):
+    from app.services import scrape_assistant_tools as tools
+    async def pdf(*args, **kwargs):
+        return b"%PDF-1.7\n" + b"x" * 1000
+    monkeypatch.setattr(tools, "public_request", pdf)
+    result = await tools.inspect_source("https://www.example.edu/fees.pdf", "https://www.example.edu")
+    assert not result["verified"]
+
+
+@pytest.mark.asyncio
+async def test_confirmed_repair_keeps_verified_user_course_url(store, monkeypatch):
+    research_fakes(monkeypatch)
+    async def ai(**kwargs):
+        return {"answer": "Confirm the bounded repair for this missing course.",
+                "citations": [{"url": "https://www.example.edu/course", "quoteId": "q0"}],
+                "action": {"kind": "repair_catalogue", "fields": []}}
+    monkeypatch.setattr(service, "chat_json", ai)
+    thread_id, turn_id = await prompt_thread(store, "https://www.example.edu/course is missing; fix it")
+    await service.investigate(thread_id, turn_id)
+    from app.routers import scrape
+    from app.services import ai_repair_workflow
+    received = []
+    async def start(job, db, actor, evidence):
+        received.append(evidence)
+        return {"session_id": "new-repair"}
+    async def load(*args):
+        return {"status": "queued", "autonomous": {"phase": "queued"}}
+    monkeypatch.setattr(scrape, "start_ai_repair", start)
+    monkeypatch.setattr(ai_repair_workflow, "load", load)
+    async with store() as db:
+        result = await get_assistant("source", db, {"id": 1})
+        action = result["messages"][-1]["actions"][0]
+        assert "_evidenceUrls" not in action
+        await confirm_action("source", action["id"], ConfirmBody(confirm=True), db, {"id": 1})
+    assert received == [["https://www.example.edu/course"]]
+
+
+@pytest.mark.asyncio
+async def test_old_failed_repair_exposes_its_actual_failure(store, monkeypatch):
+    from app.services import ai_repair_workflow
+    thread_id, turn_id = await prompt_thread(store)
+    async def load(*args):
+        return {"status": "failed", "error": "Accepted live validation is required",
+                "autonomous": {"phase": "blocked"},
+                "live_probe": {"accepted": False, "course_pages": 0,
+                               "samples": [{"reason": "HTTP 403; access not verified"}]}}
+    monkeypatch.setattr(ai_repair_workflow, "load", load)
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, thread_id)
+        thread.status = "ready"
+        thread.messages = [{"role": "assistant", "content": "Earlier failed repair", "actions": [{
+            "id": "failed-action", "kind": "repair_catalogue", "state": "error",
+            "_sessionId": "old", "jobId": "source", "courseCount": 0,
+        }]}]
+        await db.commit()
+        result = await get_assistant("source", db, {"id": 1})
+        assert "HTTP 403" in result["messages"][0]["actions"][0]["error"]
+
+
+def test_followup_uses_last_course_url_but_new_broad_question_does_not():
+    messages = [{"role": "user", "content": "https://www.example.edu/old"},
+                {"role": "user", "content": "https://www.example.edu/recent is missing"}]
+    assert service.requested_course_urls("fix this", messages, "https://www.example.edu") == [
+        "https://www.example.edu/recent"]
+    assert service.requested_course_urls("where is result", messages, "https://www.example.edu") == [
+        "https://www.example.edu/recent"]
+    assert service.requested_course_urls("why this is missing from list add this", messages, "https://www.example.edu") == [
+        "https://www.example.edu/recent"]
+    assert not service.requested_course_urls("Why are all courses missing?", messages, "https://www.example.edu")
+    assert service.requested_course_urls("https://www.example.edu/new", messages, "https://www.example.edu") == [
+        "https://www.example.edu/new"]
+
+
+@pytest.mark.parametrize("switch", [
+    "not only this course all course it is mentuin unverified fix this",
+    "Fix IELTS for all courses",
+    "still lots of courses ielts is unverified, veify it",
+    "many courses still show unverified",
+    "verify the remaining courses",
+    "Check every pending course",
+    "New topic: check fees",
+    "Now check this Master of Psychology",
+])
+def test_topic_switch_and_followups_do_not_resurrect_old_course(switch):
+    messages = [
+        {"role": "user", "content": "https://www.example.edu/bachelor-of-counselling/"},
+        {"role": "assistant", "content": "Bachelor of Counselling is approved."},
+        {"role": "user", "content": switch},
+        {"role": "assistant", "content": "For Bachelor of Counselling..."},
+        {"role": "user", "content": "do it i need verified data only"},
+    ]
+    assert not service.requested_course_urls(switch, messages[:3], "https://www.example.edu")
+    assert not service.requested_course_urls(messages[-1]["content"], messages, "https://www.example.edu")
+    assert not service.requested_course_urls("where is result", messages, "https://www.example.edu")
+
+
+@pytest.mark.asyncio
+async def test_review_wide_followup_passes_current_scope_not_stale_course_to_model(store, monkeypatch):
+    import json
+    research_fakes(monkeypatch)
+    original = service.chat_json
+    seen = []
+    async def model(**kwargs):
+        data = json.loads(kwargs["user"])
+        seen.append(data)
+        assert data["reviewWideScope"] is True
+        assert data["requestedCourseUrls"] == []
+        assert data["sampledRows"]
+        assert "Counselling" not in json.dumps(data["recentConversation"])
+        return await original(**kwargs)
+    monkeypatch.setattr(service, "chat_json", model)
+    tid, turn = await prompt_thread(store, "do it i need verified data only")
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, tid)
+        thread.messages = [
+            {"role": "user", "content": "https://www.example.edu/bachelor-of-counselling/"},
+            {"role": "assistant", "content": "Bachelor of Counselling is approved"},
+            {"role": "user", "content": "not only this course all course it is mentuin unverified fix this"},
+            {"role": "assistant", "content": "For Bachelor of Counselling..."},
+        ] + thread.messages
+        await db.commit()
+    assert await service.claim(tid, turn, "scope-test")
+    await service._investigate(tid, turn, "scope-test")
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, tid)
+        assert thread.status == "ready", thread.error
+        assert seen
+        assert all("bachelor-of-counselling" not in source["url"] for source in thread.messages[-1]["sources"])
+
+
+@pytest.mark.asyncio
+async def test_already_registered_course_does_not_trigger_unrelated_repair(store, monkeypatch):
+    from app.models.course import Course
+    url = "https://www.example.edu/already-approved"
+    async with store() as db:
+        db.add(Course(id=17, university_id=1, name="Already approved degree", course_website=url,
+                      status="active", approval_status="approved"))
+        await db.commit()
+    research_fakes(monkeypatch)
+    async def ai(**kwargs):
+        assert "Already approved degree" in kwargs["user"]
+        return {"answer": "Incorrect model proposal must not run.", "citations": [{"url": url, "quoteId": "q0"}],
+                "action": {"kind": "repair_catalogue", "fields": []}}
+    monkeypatch.setattr(service, "chat_json", ai)
+    thread_id, turn_id = await prompt_thread(store, f"{url} is missing; fix it")
+    await service.investigate(thread_id, turn_id)
+    async with store() as db:
+        result = await get_assistant("source", db, {"id": 1})
+    assert result["status"] == "ready"
+    action = result["messages"][-1]["actions"][0]
+    assert action["kind"] == "review_courses" and action["courseCount"] == 1
+    assert action["state"] == "proposed" and action["fields"] == []
+    assert "existing course record does not prevent" in result["messages"][-1]["content"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("matching_row", [False, True])
+async def test_add_this_keeps_requested_course_and_creates_confirmable_targeted_review(store, monkeypatch, matching_row):
+    import json
+    from app.models.course import Course
+    from app.routers import scrape
+    from app.services import scrape_assistant_runner
+    url = "https://www.example.edu/counselling"
+    async with store() as db:
+        db.add(Course(id=17, university_id=1, name="Bachelor of Counselling", course_website=url,
+                      status="active", approval_status="approved"))
+        await db.commit()
+    research_fakes(monkeypatch)
+    seen = []
+    async def source(value, home):
+        seen.append(value)
+        return {"url": value, "title": "Bachelor of Counselling", "verified": True,
+                "text": "Bachelor of Counselling", "facts": [],
+                "excerpts": [{"id": "q0", "text": "Bachelor of Counselling"}]}
+    async def ai(**kwargs):
+        context = json.loads(kwargs["user"])
+        assert context["requestedCourseUrls"] == [url]
+        assert context["sampledRows"] == []
+        return {"answer": "Cannot add because it is approved.", "citations": [], "action": None}
+    monkeypatch.setattr(service, "inspect_source", source)
+    monkeypatch.setattr(service, "chat_json", ai)
+    thread_id, turn = await prompt_thread(store, url + " this course is missing")
+    await service.investigate(thread_id, turn)
+    monkeypatch.setattr(scrape_assistant_runner, "schedule", lambda *_: True)
+    async with store() as db:
+        reply = await prompt_assistant("source", PromptBody(prompt="why this is missing from list add this"), db, {"id": 1})
+    await service.investigate(thread_id, reply["turnId"])
+    async with store() as db:
+        reply = await get_assistant("source", db, {"id": 1})
+    action = reply["messages"][-1]["actions"][0]
+    assert action["kind"] == "review_courses"
+    assert "Bachelor of Counselling" in reply["messages"][-1]["content"]
+    assert "Nothing has been added yet" in reply["messages"][-1]["content"]
+    assert set(seen) == {url}
+    calls = []
+    async def start(body, db):
+        calls.append(body)
+        db.add(ScrapeRuntimeJob(runtime_job_id="requested-review", university_id=1,
+                               job_type="targeted", status="queued"))
+        await db.flush()
+        return SimpleNamespace(job_id="requested-review")
+    monkeypatch.setattr(scrape, "start_scrape", start)
+    async with store() as db:
+        await confirm_action("source", action["id"], ConfirmBody(confirm=True), db, {"id": 1})
+        await confirm_action("source", action["id"], ConfirmBody(confirm=True), db, {"id": 1})
+        assert len(calls) == 1 and calls[0].course_urls == [url]
+        assert calls[0].retry_source_job_id == "source"
+        job = await db.get(ScrapeRuntimeJob, "requested-review")
+        job.status = "completed"
+        if matching_row:
+            db.add(ScrapedCourse(id=2, university_id=1, scrape_job_id="requested-review", status="pending",
+                                course_name="Bachelor of Counselling", course_website=url))
+        await db.commit()
+        result = await get_assistant("source", db, {"id": 1})
+        assert result["messages"][-1]["actions"][0]["state"] == ("completed" if matching_row else "error")
+
+
+@pytest.mark.asyncio
+async def test_specific_url_cannot_fix_unrelated_open_review_rows(store, monkeypatch):
+    research_fakes(monkeypatch)
+    url = "https://www.example.edu/a-different-course"
+    async def ai(**kwargs):
+        return {"answer": "Fix the fee.", "citations": [{"url": url, "quoteId": "q0"}],
+                "action": {"kind": "fix_fields", "fields": ["international_fee"]}}
+    monkeypatch.setattr(service, "chat_json", ai)
+    thread_id, turn = await prompt_thread(store, url + " correct its tuition")
+    await service.investigate(thread_id, turn)
+    async with store() as db:
+        reply = await get_assistant("source", db, {"id": 1})
+    assert reply["status"] == "ready"
+    action = reply["messages"][-1]["actions"][0]
+    assert action["kind"] == "review_courses" and action["state"] == "proposed"
+    assert action["fields"] == [] and action["courseCount"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["running", "verified", "missing"])
+async def test_footer_reports_confirmed_work_not_stale_research_status(store, case):
+    await prompt_thread(store)
+    url = "https://www.example.edu/counselling"
+    async with store() as db:
+        db.add(ScrapeRuntimeJob(runtime_job_id="result-job", university_id=1, job_type="targeted",
+                               status="running" if case == "running" else "completed"))
+        await db.flush()
+        if case == "verified":
+            db.add(ScrapedCourse(id=2, university_id=1, scrape_job_id="result-job", status="pending",
+                                course_name="Bachelor of Counselling", course_website=url))
+        thread = (await db.execute(select(ScrapeAssistantThread))).scalar_one()
+        thread.status = "ready"
+        thread.phase = "Investigation ready — no changes applied"
+        thread.messages = [{"role": "assistant", "content": "Confirmed action", "actions": [{
+            "id": "operation", "kind": "review_courses", "state": "running",
+            "jobId": "result-job", "_requestedUrls": [url], "fields": [], "courseCount": 1,
+        }]}]
+        await db.commit()
+        result = await get_assistant("source", db, {"id": 1})
+    assert "no changes applied" not in result["phase"].lower()
+    action = result["messages"][0]["actions"][0]
+    assert action["state"] == {"running": "running", "verified": "completed", "missing": "error"}[case]
+    if case == "verified":
+        assert "Verified: 1 requested course" in result["phase"]
+    if case == "missing":
+        assert "needs attention" in result["phase"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allowed,automatic", [(True, True), (False, True), (True, False)])
+async def test_automatic_dispatch_authorization_and_no_duplicate_alternatives(store, monkeypatch, allowed, automatic):
+    from app.models.user import User
+    from app.services.scrape_assistant_autorun import autorun
+    from app.routers import scrape_assistant as routes
+    thread_id, turn = await prompt_thread(store)
+    async with store() as db:
+        db.add(User(id=1, email="fixture@example.test", password_hash="fixture-only", is_super_admin=allowed))
+        thread = await db.get(ScrapeAssistantThread, thread_id)
+        thread.status = "ready"
+        thread.messages = [
+            {"role": "user", "content": "Run the catalogue check", "autoRun": automatic},
+            {"role": "assistant", "content": "Starting", "actions": [
+                {"id": "recover", "kind": "recover_catalogue", "state": "proposed"},
+                {"id": "scan", "kind": "scan_catalogue", "state": "proposed"}]}]
+        await db.commit()
+    calls = []
+    async def dispatch(job_id, action_id, body, db, actor):
+        calls.append(action_id)
+        assert body.confirm is True and body.courseUrls is None
+        thread = await db.get(ScrapeAssistantThread, thread_id)
+        messages = deepcopy(thread.messages)
+        messages[-1]["actions"][1]["state"] = "running"
+        thread.messages = messages
+        await db.commit()
+    monkeypatch.setattr(routes, "confirm_action", dispatch)
+    await autorun(thread_id, "stale-turn")
+    assert not calls
+    await autorun(thread_id, turn)
+    if allowed and automatic:
+        await autorun(thread_id, turn)
+        assert calls == ["scan"]
+        async with store() as db:
+            thread = await db.get(ScrapeAssistantThread, thread_id)
+            assert thread.messages[-1]["actions"][0]["state"] == "superseded"
+    else:
+        assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_new_prompt_dispatches_after_research_without_another_user_click(store, monkeypatch):
+    from app.models.user import User
+    from app.services.scrape_assistant_autorun import autorun
+    from app.routers import scrape_assistant as routes
+    research_fakes(monkeypatch)
+    async def answer(**kwargs):
+        return {"answer": "I will recheck the fee.", "citations": [{"url": "https://www.example.edu/course", "quoteId": "q0"}],
+                "action": {"kind": "fix_fields", "fields": ["international_fee"]}}
+    monkeypatch.setattr(service, "chat_json", answer)
+    monkeypatch.setattr(service, "run_automatic_action", autorun)
+    async with store() as db:
+        db.add(User(id=1, email="fixture@example.test", password_hash="fixture-only", is_super_admin=True))
+        await db.commit()
+    calls = []
+    async def dispatch(job_id, action_id, body, db, actor):
+        calls.append((job_id, body.confirm, actor["id"]))
+    monkeypatch.setattr(routes, "confirm_action", dispatch)
+    thread_id, turn = await prompt_thread(store, "Fix the international fee")
+    await service.investigate(thread_id, turn)
+    assert calls == [("source", True, 1)]
+
+
+@pytest.mark.parametrize("prompt,expected", [
+    ("Fix the fees", True), ("Find missing courses and run it", True),
+    ("Only explain the differences", False), ("Compare but don't change anything", False),
+    ("Research this but do not apply any changes", False), ("Do a read-only check", False),
+    ("Fix pending fees; do not publish anything", True),
+])
+def test_explicit_read_only_requests_never_authorize_execution(prompt, expected):
+    from app.services.scrape_assistant_autorun import execution_requested
+    assert execution_requested(prompt) is expected
+
+
+@pytest.mark.asyncio
+async def test_new_research_status_does_not_reuse_historical_completed_action(store):
+    thread_id, turn = await prompt_thread(store, "Check IELTS")
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, thread_id)
+        thread.status = "ready"
+        thread.phase = "Current research complete"
+        thread.messages = [
+            {"role": "assistant", "content": "Earlier work", "actions": [
+                {"id": "old", "kind": "fix_fields", "state": "completed",
+                 "fields": [], "courseCount": 1, "resultSummary": "OLD RESULT"}]},
+            {"role": "user", "content": "Check IELTS", "autoRun": True, "createdAt": service.now().isoformat()},
+            {"role": "assistant", "content": "Current comparison", "actions": []},
+        ]
+        await db.commit()
+        result = await get_assistant("source", db, {"id": 1})
+        assert result["phase"] == "Current research complete"
+
+
+@pytest.mark.asyncio
+async def test_thread_links_to_matching_pending_review_not_approved_history(store):
+    await prompt_thread(store, "https://www.example.edu/course is missing")
+    async with store() as db:
+        db.add(ScrapeRuntimeJob(runtime_job_id="fresh-review", university_id=1, job_type="targeted",
+                               status="completed"))
+        await db.flush()
+        db.add(ScrapedCourse(id=2, university_id=1, scrape_job_id="fresh-review", status="pending",
+                            course_name="BSc Music Technology", course_website="https://www.example.edu/course"))
+        await db.commit()
+        thread = (await db.execute(select(ScrapeAssistantThread))).scalar_one()
+        thread.messages = list(thread.messages) + [{"role": "user", "content": "https://www.example.edu/another-course",
+                                                   "createdAt": thread.messages[0]["createdAt"]}]
+        await db.commit()
+        result = await get_assistant("source", db, {"id": 1})
+    assert result["relatedReviews"] == [{"jobId": "fresh-review", "courseName": "BSc Music Technology", "status": "pending"}]

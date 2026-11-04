@@ -116,6 +116,19 @@ consumers, and observe whether the separate guarded release finishes before
 considering another attempt.
 
 Production's Alembic ledger can lag schema changes already present. Inspect
+the feature tables as well as the ledger: a healthy API and worker-fencing
+prerequisite check do not prove that newly deployed features have their tables.
+
+**Why:** Visitor-report UI code was serving while its reporting migrations were
+unapplied; normal health checks passed while the private dashboard query failed.
+
+**How to apply:** Check application-feature schema prerequisites before release.
+For production migration connections, load the managed database environment and
+preserve the application's TLS connection configuration. The generic Alembic
+environment may not carry the application's TLS connect arguments; an existing
+verified connection can be passed to Alembic inside a fenced transaction instead.
+
+Inspect
 the actual schema before replaying a migration chain. An isolated additive
 revision can be run through Alembic Operations without falsely stamping its
 unexecuted ancestors. Advance the ledger only when every intermediate schema

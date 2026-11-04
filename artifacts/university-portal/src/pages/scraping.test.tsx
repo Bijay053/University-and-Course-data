@@ -28,6 +28,21 @@ import {
 } from "./scraping";
 
 describe("annualFeeEquivalentForDisplay", () => {
+  it("does not display an unknown fee period as yearly", () => {
+    const review = initialReview();
+    review.courses = [{ ...review.courses[0], internationalFee: 18720, feeTerm: null }] as ScrapingInitialReviewState["courses"];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: review.courses });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    }));
+    render(<ScrapingForTest initialReviewState={review} />);
+    expect(screen.getByText("· period not stated")).toBeTruthy();
+  });
   it("does not annualize full-course fees shorter than 12 months", () => {
     expect(annualFeeEquivalentForDisplay(48_300, 8, "Month")).toBeNull();
     expect(annualFeeEquivalentForDisplay(24_000, 51, "Week")).toBeNull();
@@ -1460,6 +1475,26 @@ describe("Scraping repair reviewer", () => {
     expect(screen.queryByTestId("fee-choice-1-full-2027")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Approve (2 courses)" }));
     await waitFor(() => expect(fetchMock.mock.calls.filter(args => String(args[0]) === "/api/scrape/staged/approve-selected")).toHaveLength(2));
+  });
+
+  it.each(["missing", "unverified"] as const)("distinguishes verified IELTS from %s academic requirements", (academicState) => {
+    const review = initialReview();
+    review.courses = [{
+      ...review.courses[0], courseName: "Verified English, unresolved academics", ieltsOverall: 6.5,
+      requirementStatus: {
+        academic: { state: academicState },
+        englishComponents: { state: "verified", sourceUrl: "https://uni.test/english" },
+      },
+    }] as ScrapingInitialReviewState["courses"];
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+    render(<ScrapingForTest initialReviewState={review} />);
+    const row = screen.getByText("Verified English, unresolved academics").closest("tr")!;
+    expect(within(row).getByText("IELTS verified")).toBeTruthy();
+    expect(within(row).queryByText("Unverified")).toBeNull();
+    expect(within(row).getByText(/^Academic (missing|unverified)$/)).toBeTruthy();
+    const ielts = within(row).getByText("IELTS verified").closest("td")!;
+    expect(within(ielts).getByText("6.5")).toBeTruthy();
+    expect(within(ielts).getByRole("link", { name: "Official source" }).getAttribute("href")).toBe("https://uni.test/english");
   });
 
   it.each([6.0, 6.5, null])("keeps available IELTS %s visible alongside Unverified", async (score) => {

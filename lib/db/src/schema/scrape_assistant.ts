@@ -10,6 +10,8 @@ export const scrapeAssistantThreadsTable = pgTable("scrape_assistant_threads", {
   phase: text("phase").notNull().default(""),
   error: text("error"),
   messages: jsonb("messages").notNull().default([]),
+  activity: jsonb("activity").notNull().default([]),
+  runId: text("run_id"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   unique("uq_scrape_assistant_owner").on(table.jobId, table.actorId),

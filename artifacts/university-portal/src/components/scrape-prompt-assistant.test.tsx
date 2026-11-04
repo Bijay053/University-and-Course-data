@@ -80,19 +80,17 @@ describe("ScrapePromptAssistant", () => {
     expect((await screen.findByTestId("assistant-load-error")).textContent).toMatch(/permission/i);
   });
 
-  it("requires explicit confirmation before running an action", async () => {
+  it.each(["fix_fields", "review_courses"] as const)("runs legacy %s without another confirmation", async (kind) => {
     const thread: AssistantThread = { ...empty, status: "ready", messages: [
       { role: "assistant", content: "Fees can be refetched.", createdAt: "2024-01-01T00:00:00Z",
-        actions: [{ id: "a1", kind: "fix_fields", label: "Refetch fees", courseCount: 4, fields: ["internationalFee"], state: "proposed" }] },
+        actions: [{ id: "a1", kind, label: kind === "review_courses" ? "Fetch requested courses" : "Refetch fees", courseCount: 4, fields: kind === "review_courses" ? [] : ["internationalFee"], state: "proposed" }] },
     ] };
     const done: AssistantThread = { ...thread, messages: [{ ...thread.messages[0], actions: [{ ...thread.messages[0].actions![0], state: "completed" }] }] };
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json(thread)).mockResolvedValueOnce(json(done));
     const onChanged = vi.fn();
     render(<ScrapePromptAssistant jobId="j1" onChanged={onChanged} />);
     fireEvent.click(await screen.findByTestId("button-run-action-a1"));
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(await screen.findByTestId("dialog-confirm-action")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("button-confirm-action"));
+    expect(screen.queryByTestId("dialog-confirm-action")).toBeNull();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const [url, init] = fetchMock.mock.calls[1];
     expect(url).toBe("/api/scrape/jobs/j1/assistant/actions/a1");
@@ -163,5 +161,195 @@ describe("ScrapePromptAssistant", () => {
     render(<ScrapePromptAssistant jobId="j1" />);
     await screen.findByTestId("assistant-action-r1");
     expect(screen.queryByTestId("button-open-review-r1")).toBeNull();
+  });
+
+  it("renders archived events inline between the prompt and the reply, with no separate activity panel", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({ ...empty, status: "ready", turnId: "t1",
+      activity: [
+        { id: "x1", at: "2024-01-01T00:00:01Z", label: "Fetched fees page", url: "https://uni.edu/fees", status: "completed", durationMs: 1500 },
+        { id: "x3", at: "2024-01-01T00:00:03Z", label: "Answer ready", status: "completed" },
+      ],
+      messages: [
+        { role: "user", content: "Why fees?", createdAt: "2024-01-01T00:00:00Z", turnId: "t1" },
+        { role: "assistant", content: "Found.", createdAt: "2024-01-01T00:00:04Z", turnId: "t1", activity: [
+          { id: "x1", at: "2024-01-01T00:00:01Z", label: "Fetched fees page", url: "https://uni.edu/fees", status: "completed", durationMs: 1500 },
+          { id: "x2", at: "2024-01-01T00:00:02Z", label: "Fetch failed", detail: "timeout", url: "javascript:alert(1)", status: "error", durationMs: 30000 },
+          { id: "x3", at: "2024-01-01T00:00:03Z", label: "Answer ready", status: "completed" },
+        ] },
+      ] }));
+    const { container } = render(<ScrapePromptAssistant jobId="j1" />);
+    await screen.findByText("Found.");
+    const order = Array.from(container.querySelectorAll("[data-testid^='assistant-message-'],[data-testid^='activity-item-']")).map(e => e.getAttribute("data-testid"));
+    expect(order).toEqual(["assistant-message-0", "activity-item-x1", "activity-item-x2", "activity-item-x3", "assistant-message-1"]);
+    expect(screen.getAllByText("Answer ready")).toHaveLength(1);
+    expect(screen.queryByTestId("button-toggle-activity")).toBeNull();
+    expect(screen.queryByTestId("assistant-activity")).toBeNull();
+    expect(screen.getByTestId("link-activity-x1").getAttribute("href")).toBe("https://uni.edu/fees");
+    expect(screen.queryByTestId("link-activity-x2")).toBeNull();
+    expect(screen.getByText("(link unavailable)")).toBeTruthy();
+    expect(screen.getByTestId("text-activity-duration-x1").textContent).toBe("1.5s");
+    expect(screen.getByText("timeout")).toBeTruthy();
+  });
+
+  it("handles legacy threads without activity or turn ids", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({ ...empty, status: "ready", messages: [
+      { role: "assistant", content: "old", createdAt: "2024-01-01T00:00:00Z" }] }));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    await screen.findByText("old");
+    expect(screen.queryByTestId(/^activity-item-/)).toBeNull();
+  });
+
+  it("renders fenced code and markdown safely as text", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({ ...empty, status: "ready", messages: [
+      { role: "assistant", createdAt: "2024-01-01T00:00:00Z",
+        content: "**Note** see [page](https://uni.edu/a) and [bad](javascript:alert(1))\n```html\n<script>alert(1)</script>\n```" }] }));
+    const { container } = render(<ScrapePromptAssistant jobId="j1" />);
+    const code = await screen.findByTestId("assistant-code-block");
+    expect(code.textContent).toContain("<script>alert(1)</script>");
+    expect(container.querySelector("script")).toBeNull();
+    expect(container.querySelector("a[href^='javascript']")).toBeNull();
+    expect(screen.getByText("page").getAttribute("href")).toBe("https://uni.edu/a");
+    expect(screen.getByText("Note").tagName).toBe("STRONG");
+  });
+
+  it("shows public operation details JSON without private fields", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({ ...empty, status: "ready", messages: [
+      { role: "assistant", content: "x", createdAt: "2024-01-01T00:00:00Z", actions: [
+        { id: "a1", kind: "fix_fields", label: "Fix", courseCount: 2, fields: ["duration"], state: "proposed", _secret: "s" }] }] }));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    const code = await screen.findByTestId("code-operation-a1");
+    const parsed = JSON.parse(code.querySelector("pre")!.textContent!);
+    expect(parsed).toEqual({ kind: "fix_fields", state: "proposed", label: "Fix", fields: ["duration"], courseCount: 2 });
+    expect(screen.getByText("Operation details")).toBeTruthy();
+  });
+
+  it("sends long prompts unchanged, Enter sends, Shift+Enter and IME do not", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json(empty))
+      .mockImplementation(async () => json({ ...empty, status: "ready" }));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    const input = await screen.findByTestId("input-assistant-prompt");
+    expect(input.getAttribute("maxLength")).toBeNull();
+    const long = "a".repeat(2600);
+    fireEvent.change(input, { target: { value: long } });
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({ prompt: long });
+  });
+
+  it("keeps the draft and shows an error when sending fails", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json(empty)).mockResolvedValueOnce(json({ error: "nope" }, 500));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    const input = await screen.findByTestId("input-assistant-prompt");
+    fireEvent.change(input, { target: { value: "yes" } });
+    fireEvent.click(screen.getByTestId("button-assistant-submit"));
+    await screen.findByTestId("assistant-submit-error");
+    expect((input as HTMLTextAreaElement).value).toBe("yes");
+  });
+
+  it("shows live events inline with elapsed time, polls at 1s and stops on unmount", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2024-01-01T00:00:12Z"));
+    const running = { ...empty, threadId: "t", status: "researching", phase: "Reading", turnId: "t2", startedAt: "2024-01-01T00:00:00Z",
+      activity: [{ id: "s1", at: "2024-01-01T00:00:01Z", label: "Searching official site", status: "running" }],
+      messages: [{ role: "user", content: "Check", createdAt: "2024-01-01T00:00:00Z", turnId: "t2" }] };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => json(running));
+    const { unmount } = render(<ScrapePromptAssistant jobId="j1" />);
+    expect(await screen.findByTestId("activity-item-s1")).toBeTruthy();
+    expect(screen.getByTestId("text-activity-current").textContent).toBe("Searching official site");
+    expect(screen.getByTestId("text-activity-elapsed").textContent).toMatch(/^Researching 1[2-3]s$/);
+    const before = fetchMock.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(1100);
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(before));
+    unmount();
+    const after = fetchMock.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fetchMock.mock.calls.length).toBe(after);
+    vi.useRealTimers();
+  });
+
+  it("offers related pending reviews via onReviewJob, ignoring current and duplicate jobs", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({ ...empty, status: "ready",
+      relatedReviews: [
+        { jobId: "other", courseName: "Bachelor of Nursing", status: "pending" },
+        { jobId: "other", courseName: "Dup", status: "pending" },
+        { jobId: "j1", courseName: "Self", status: "pending" },
+      ],
+      messages: [{ role: "assistant", content: "Missing.", createdAt: "2024-01-01T00:00:00Z", actions: [
+        { id: "f1", kind: "fix_fields", label: "Fix", courseCount: 1, fields: [], state: "error", error: "not found" }] }] }));
+    const onReviewJob = vi.fn();
+    render(<ScrapePromptAssistant jobId="j1" onReviewJob={onReviewJob} />);
+    const btn = await screen.findByTestId("button-open-related-review-other");
+    expect(screen.queryByTestId("button-open-related-review-j1")).toBeNull();
+    expect(screen.getAllByTestId(/^related-review-/)).toHaveLength(1);
+    expect(screen.getByTestId("status-action-f1").textContent).toBe("error");
+    expect(onReviewJob).not.toHaveBeenCalled();
+    fireEvent.click(btn);
+    expect(onReviewJob).toHaveBeenCalledWith("other");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits related reviews for old servers or without a navigation handler", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({ ...empty, status: "ready",
+      relatedReviews: [{ jobId: "other", courseName: "X", status: "pending" }], messages: [] }));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    await screen.findByTestId("assistant-empty");
+    expect(screen.queryByTestId("assistant-related-reviews")).toBeNull();
+  });
+
+  it("renders a partial catalogue comparison with counts, rows and safe links", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({ ...empty, status: "ready", messages: [
+      { role: "assistant", content: "Compared.", createdAt: "2024-01-01T00:00:00Z", comparison: {
+        complete: false, note: "Page 3 timed out.", observed: 3,
+        counts: { published: 1, pending: 1, recorded: 0, missing: 1 },
+        sources: [{ url: "https://uni.edu/courses", status: "ok" }, { url: "javascript:alert(1)", status: "error" }],
+        courses: [
+          { url: "https://uni.edu/c/a", title: "BA Arts", status: "published", courseIds: [7], reviewJobIds: [] },
+          { url: "https://uni.edu/c/b", title: "BSc Nursing", status: "pending", courseIds: [], reviewJobIds: ["rj1"] },
+          { url: "https://uni.edu/c/c", title: "MBA", status: "missing", courseIds: [], reviewJobIds: [] },
+        ] } }] }));
+    const onReviewJob = vi.fn();
+    const { container } = render(<ScrapePromptAssistant jobId="j1" onReviewJob={onReviewJob} />);
+    expect((await screen.findByTestId("comparison-partial")).textContent).toMatch(/Partial comparison.*Page 3 timed out/);
+    expect(screen.queryByText(/all courses/i)).toBeNull();
+    expect(screen.getByTestId("count-comparison-missing").textContent).toBe("1");
+    expect(screen.getByTestId("count-comparison-published").textContent).toBe("1");
+    expect(screen.getByTestId("status-comparison-row-2").textContent).toBe("Not recorded");
+    expect(screen.getByTestId("status-comparison-row-0").textContent).toBe("Approved active");
+    expect(screen.queryByText(/Visible in search/i)).toBeNull();
+    expect(screen.getByTestId("text-comparison-approved-note").textContent).toMatch(/does not prove/);
+    expect(screen.getByTestId("link-comparison-source-0").getAttribute("href")).toBe("https://uni.edu/courses");
+    expect(container.querySelector("a[href^='javascript']")).toBeNull();
+    fireEvent.click(screen.getByTestId("button-comparison-row-1"));
+    fireEvent.click(screen.getByTestId("button-comparison-review-1-rj1"));
+    expect(onReviewJob).toHaveBeenCalledWith("rj1");
+  });
+
+  it("runs bounded recovery without manual selection", async () => {
+    const courses = Array.from({ length: 23 }, (_, i) => ({ url: `https://uni.edu/c/${i}`, title: `Course ${i}` }));
+    const thread: AssistantThread = { ...empty, status: "ready", messages: [
+      { role: "assistant", content: "Candidates found.", createdAt: "2024-01-01T00:00:00Z", actions: [
+        { id: "rc", kind: "recover_catalogue", label: "Recover", courseCount: 23, fields: [], state: "proposed", courses }] }] };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json(thread)).mockResolvedValueOnce(json(thread));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    fireEvent.click(await screen.findByTestId("button-run-action-rc"));
+    expect(screen.queryByTestId("dialog-confirm-action")).toBeNull();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({ confirm: true, courseUrls: courses.slice(0, 20).map(c => c.url) });
+  });
+
+  it("confirms a fresh catalogue scan with an honest description and plain body", async () => {
+    const thread: AssistantThread = { ...empty, status: "ready", messages: [
+      { role: "assistant", content: "Partial.", createdAt: "2024-01-01T00:00:00Z", actions: [
+        { id: "sc", kind: "scan_catalogue", label: "Run fresh catalogue discovery into review", courseCount: 0, fields: [], state: "proposed" }] }] };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json(thread)).mockResolvedValueOnce(json(thread));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    fireEvent.click(await screen.findByTestId("button-run-action-sc"));
+    expect(screen.queryByTestId("dialog-confirm-action")).toBeNull();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({ confirm: true });
   });
 });

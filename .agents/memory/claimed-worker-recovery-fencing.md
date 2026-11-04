@@ -5,6 +5,12 @@ description: Safety boundary for autonomously reclaiming repair and verification
 
 Never clear or replace a claimed repair or verification worker solely because its runtime or heartbeat is old. Safe autonomous reclaim requires a durable claim generation/token that every later audit, staging, status, and completion write verifies.
 
+Before a development worker restart, check for active scraping and defer or safely drain it. Do not restart Celery merely because an API-only assistant change was made.
+
+**Why:** Restarting the worker while a user was scraping interrupted an unrelated university job and required restoration through the normal start/resume path.
+
+**How to apply:** Distinguish API/frontend changes from worker-loaded changes. Preserve original run settings and checkpoint semantics if a confirmed worker interruption needs recovery; never imply that dispatching the replacement proves completion.
+
 **Why:** A delayed worker can remain alive after its heartbeat appears stale. Resetting its job lets a second worker run while the first can still commit, causing duplicate or conflicting course writes.
 
 **How to apply:** Automatic recovery may safely handle pre-claim collisions and unclaimed broker delivery loss. Keep claimed workers fenced until authoritative termination or stop acknowledgement exists; only then revoke their generation and redispatch.
