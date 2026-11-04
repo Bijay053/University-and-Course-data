@@ -5,7 +5,7 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
 
-from tests.test_scrape_prompt_assistant import store, prompt_thread, research_fakes
+from tests.test_scrape_prompt_assistant import assistant_postgres, store, prompt_thread, research_fakes
 from app.models import ScrapedCourse, ScrapeRuntimeJob, University
 from app.models.course import Course
 from app.models.scrape_assistant import ScrapeAssistantThread

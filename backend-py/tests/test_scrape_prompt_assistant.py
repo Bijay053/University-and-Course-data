@@ -12,7 +12,6 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
-from app.config import settings
 from app.database import Base
 from app.models import University, ScrapeRuntimeJob, ScrapedCourse
 from app.models.scrape_assistant import ScrapeAssistantThread
@@ -23,6 +22,10 @@ from app.services import scrape_assistant as service
 from app.services.scrape_assistant_tools import (
     PublicNetworkBackend, evidence_excerpts, official_url, quote_in_source,
 )
+from tests.test_hsu_facts import hsu_postgres as assistant_postgres
+
+# The imported module-scoped fixture owns a socket-only disposable cluster;
+# each store still owns its schema. No application/shared database is used.
 
 
 @pytest.mark.parametrize("url", [
@@ -97,20 +100,20 @@ def test_action_whitelist_or_server_scope(action):
 
 
 @pytest_asyncio.fixture
-async def store(monkeypatch):
+async def store(monkeypatch, assistant_postgres):
     # Legacy confirmation tests isolate dispatch; automatic orchestration has
     # explicit tests below that restore the real dispatcher.
     async def no_automatic_dispatch(*args):
         return None
     monkeypatch.setattr(service, "run_automatic_action", no_automatic_dispatch)
     schema = "assistant_test_" + uuid.uuid4().hex
-    admin = create_async_engine(settings.database_url, poolclass=NullPool)
+    admin = create_async_engine("postgresql+asyncpg://", connect_args=assistant_postgres, poolclass=NullPool)
     async with admin.begin() as conn:
         await conn.execute(text(f'CREATE SCHEMA "{schema}"'))
     engine = create_async_engine(
-        settings.database_url, poolclass=NullPool,
+        "postgresql+asyncpg://", poolclass=NullPool,
         execution_options={"schema_translate_map": {None: schema, "public": schema}},
-        connect_args={"server_settings": {"search_path": schema}},
+        connect_args={**assistant_postgres, "server_settings": {"search_path": schema}},
     )
     try:
         async with engine.begin() as conn:

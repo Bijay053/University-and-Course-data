@@ -10,6 +10,19 @@ Use an explicit schema translation map for test DDL and ORM statements, without 
 
 **How to apply:** Map both unqualified and explicit public metadata to the disposable schema, keep connections test-owned, and drop only that schema during cleanup.
 
+## Imported fixture dependencies
+
+Modules importing a composed fixture must expose that fixture's named
+dependencies too; importing the fixture function does not import its original
+module's fixture registry.
+
+**Why:** A fixture could pass in its defining module while a consumer failed
+setup after a new disposable-database dependency was added.
+
+**How to apply:** Check fixture importers when changing dependencies. Import the
+dependent fixtures explicitly or move genuinely shared fixtures into an
+appropriately scoped conftest, then run the consumer tests as well.
+
 ## The rule
 Keep fully async tests and fixtures on pytest-asyncio's configured session loop, especially when they share asyncpg engines, Redis clients, or other loop-bound pools. When synchronous tests need to call isolated async functions, never rely on ambient `asyncio.get_event_loop()` state; use `asyncio.run()`:
 

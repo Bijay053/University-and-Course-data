@@ -5,7 +5,7 @@
 - [Study-mode source trust](study-mode-source-trust.md) — selected generated evidence can still be prose; validate writes without guessing delivery or silently repairing old records.
 - [Background worker resources](background-worker-resources-index.md) — loop cleanup, client ownership, pre-claim isolation, and safe task testing after module reloads.
 - [Catalogue recovery evidence](catalogue-recovery-evidence.md) — reported counts are investigation inputs; sitemap counts alone do not prove discovery coverage.
-- [UC Canberra SPA + hidden-input fees](uc-canberra-fix.md) — Listing=SPA shell (0 links); sitemap at /services/wcm/site-map/course.xml has 184 courses; fees in id="N-eftsl-international" hidden inputs matched via id="current-year".
+- [UC Canberra SPA + hidden-input fees](uc-canberra-fix.md) — SPA listings need sitemap discovery; match hidden international fees to the selected current year.
 - [MQ coursehandbook resolver](mq-coursehandbook-resolver.md) — Sitemap needs patchright (CF-guarded); resolver needs httpx (127→223/383); BFS seeds return 0 in dev (expected).
 - [MQ Funnelback authority + CF bypass](mq-search-page-tier.md) — rendered Funnelback discovery must retain page-data fees; bare links fall into domestic HTML, so incomplete enrichment fails closed.
 - [MQ current-year admissions routes](mq-current-year-routes.md) — Funnelback may return stale year-stamped snapshots; current extraction must resolve the unversioned course route first.
@@ -15,45 +15,44 @@
 - [Targeted continuation review scope](targeted-continuation-review-scope.md) — retrySourceJobId chains are one review set; exact recovery requires post-staging row backups, not extractor payloads.
 - [UK university scraper lessons index](uk-university-scraper-lessons-index.md) — site-specific UK discovery, transport, fee, IELTS, and page-guard lessons.
 - [CASCADE smart split](cascade-split.md) — staged<5 → discovery_failure (probe_and_configure); staged≥5+avg<70% → extraction_failure (repair_extractor); YAML always wins
-- [Scrape.do discovery timeout mismatch](scrape-do-discovery-timeout-mismatch.md) — generic short per-page timeout wrapping a slow-but-successful rendering-proxy call discards every response; widen timeout + prefetch seeds concurrently.
+- [Scrape.do discovery timeout mismatch](scrape-do-discovery-timeout-mismatch.md) — short outer timeouts can discard successful proxy calls; budget for rendering latency.
 - [Protected-site URL onboarding](url-onboarding-protected-sites.md) — reject challenge HTML, render as fallback, and let re-added URLs repair weak names and unverified locations.
 - [JCU Cloudflare Enterprise escalation](jcu-cloudflare-lesson.md) — all transports dead except Scrape.do render=true; static 502 ROTATION_FAILED = fail fast, go render-first in discovery+extraction.
 - [JCU band_mapping flow fix](jcu-band-mapping-flow.md) — band_mapping must override central_page values; outer ielts_missing guard blocks it when central already filled the slot.
 - [Swinburne AEM extraction profile](swinburne-url-depth.md) — bound CPU concurrency; preserve audience-scoped hero/fee DOM; $0 international fee means unpublished, never fall back to Domestic.
 - [Waikato fee table patterns](waikato-fee-patterns.md) — Pattern A/B for degree-header tables; major-list annotation stripper needed for token_sort_ratio to work.
-- [Canterbury UC staging bug & study_mode fix](canterbury-study-mode-bug.md) — admin_config (HIGHEST priority) silently overrode YAML online_only; nav "UC Online Staff" in non-<nav> div → add host to _STUDY_MODE_RULE_SUPPRESSED_HOSTS.
+- [Canterbury study-mode precedence](canterbury-study-mode-bug.md) — admin overrides can mask YAML; navigation mentions of online staff are not course delivery evidence.
 - [Canterbury programme-point fees](canterbury-programme-points.md) — special programme amounts are full-course; derive duration at 120 points/year and ignore separate SSL per-point wording.
 - [admin_config empty list overrides YAML patterns](admin-config-empty-list-override.md) — empty [] in admin_config.discovery clears YAML allow/block; fixed in _deep_merge + DB cleanup pattern.
 - [_fv_classify listing hint endswith-only fix](fv-classify-endswith-fix.md) — listing hints must use endswith, not substring; /study mid-path misclassifies course pages as listing.
 - [95% YAML scraper control](yaml-scraper-control.md) — new unis need only YAML edits; 5 new fields replace 5 hardcoded host lists.
-- [scrape.do browser-fallback gap](scrape-do-browser-gap.md) — [BROWSER↑] path in single_course.py bypasses http_fetcher.py's scrape.do chain; must re-check _http_fetcher_mod._scrape_do_enabled after browser retries exhaust.
-- [UK structured fee table extractor](uk-fee-table-extractor.md) — Pre-pass 0 in fee.extract(); _FEE_TABLE_FOUND_NO_INTL sentinel → return []; picks Intl+FT latest-year row; part-time-only courses get no fee.
-- [SearchStax multi-endpoint + use_generic_mapper trap](searchstax-multi-endpoint.md) — endpoint is Union[str,list]; missing use_generic_mapper:true silently falls back to HUD mapper and rejects most docs (200 vs 1000+); model= must be per-endpoint URL not extra_params.
-- [IELTS split overall/band trap](ielts-split-overall-band.md) — overall in banner + per-band floor in prose; "each component" cue marks a floor; resolve split BEFORE any broad first-score fallback or it downgrades overall to the band.
-- [stage_course skip_url_block flag](lancaster-skip-url-block.md) — course_detail_url_patterns bypass in pre-extraction gate doesn't protect stage_course's own is_blocked_page() call; add skip_url_block param + move _gate_detail_pats outside the if block.
+- [Scrape.do browser-fallback gap](scrape-do-browser-gap.md) — per-course browser rescue can bypass the normal proxy chain; retain proxy fallback after browser failure.
+- [UK structured fee tables](uk-fee-table-extractor.md) — select current international full-time tuition; missing applicable rows must not borrow domestic or part-time prices.
+- [IELTS split overall/band trap](ielts-split-overall-band.md) — resolve banner overall and prose component floors before broad first-score fallback.
+- [Staging URL-block parity](lancaster-skip-url-block.md) — a detail-page exception must survive both pre-extraction and staging guards.
 - [Cross-university namespace guards](utas-flinders-substring-block.md) — site-specific hub blocks belong in YAML; shared namespace vetoes can also prevent repair from recognizing real courses.
-- [UG/PG split English page routing](ug-pg-split-english.md) — central_page_ug/pg in EnglishConfig → entryPageUG/PG in uniPages → separate fetch in prefetch_central_pages → english_by_level; flat english={} prevents cross-contamination.
-- [Admission filter safety revert](admission-filter-safety-revert.md) — strip_non_admission_content can zero out visible text on flat-CMS sites; safety revert triggers when filtered <15% of original (>300 chars); disable per-uni with strip_non_admission_content:false.
-- [genai/pydantic import stall in dev](env-genai-import-stall.md) — load ~36 on 2 cores stalls cold google.genai/pydantic + pytest conftest; run isolated copies with -c /dev/null and stub the lazy genai, or wait for scrape load to drop.
+- [UG/PG English page routing](ug-pg-split-english.md) — fetch and retain separate undergraduate and postgraduate profiles to prevent cross-contamination.
+- [Admission filter safety revert](admission-filter-safety-revert.md) — flat CMS layouts can lose admission evidence during filtering; retain a bounded per-university safety escape.
+- [GenAI import stalls under load](env-genai-import-stall.md) — overloaded hosts can stall cold imports; isolate deterministic tests from optional AI initialization.
 - [ACU JSON-API discovery + title-suffix](acu-json-api.md) — Vue SPA catalogue via /webapi (httpx-open, pages CF-blocked); no-H1 pages need strip_title_suffixes for "| ACU courses".
 - [Sitemap retry sleeps hang mocked tests](sitemap-retry-sleep-test-hang.md) — real 5s+15s backoffs in _fetch_text = ~20s/empty probe; zero _RETRY_DELAYS or stub discover_from_sitemap.
 - [httpx params={} strips URL query](httpx-params-empty-dict-trap.md) — empty dict deletes the query string already in the URL; pass params=req_params or None.
-- [SearchStax pagination silent truncation](searchstax-pagination-retry.md) — one failed page mid-pagination silently truncated results with zero exclusion counters (looked like legit filtering); retry+backoff+emit warning fixes it.
-- [Discovery-phase stall prevention](discovery-stall-fixes.md) — scrape_do_skip_fallbacks needs BOTH extraction:/discovery:; zero-candidate logs need a per-branch reason; unwrap redirector links (Funnelback) in all 3 link-observation code paths before filtering.
-- [Celery worker stale-code trap](celery-stale-code-worker-restart.md) — a scraper fix on disk that still fails in prod: check worker process start time vs commit time before re-debugging the fix itself.
-- [Discovery budget guard](discovery-budget-guard.md) — Cardiff silent-stall: N failing seed URLs can burn the whole discovery_phase_timeout_s before sitemap fallback runs; gate retries/fallback on remaining budget, not just per-call timeout.
+- [SearchStax pagination truncation](searchstax-pagination-retry.md) — failed pages can resemble legitimate filtering; retry and report incomplete pagination explicitly.
+- [Discovery-phase stall prevention](discovery-stall-fixes.md) — align extraction/discovery transport controls and unwrap redirectors consistently before filtering.
+- [Celery worker stale-code trap](celery-stale-code-worker-restart.md) — compare worker start time with source updates before assuming a fix failed.
+- [Discovery budget guard](discovery-budget-guard.md) — failing seeds must not consume the entire phase budget before sitemap fallback can run.
 - [Fetch reliability overhaul T01-T08](fetch-reliability-overhaul.md) — ScrapedoAccountError + 3-attempt retry (2s/8s/30s) in fetch_html_scrape_do; sweep pass + failed_degraded guard in orchestrator.
-- [Stage-0 auto-rule vs manual override precedence](stage0-manual-override-precedence.md) — CASCADE-regenerated extraction_rules can silently reclobber a manual per-uni YAML fix via payload write-order.
-- [ECU discovery (Funnelback + PG seeds)](ecu-discovery-funnelback.md) — pre-seed ALL pagination pages; Funnelback JS doubles params (append not replace) → _resolve() dup-key guard + block_url_patterns traversal block fixed.
-- [Multi-campus slug collision](multi-campus-slug-collision.md) — "University of X (City)" satellite campuses get the SAME slug-derived filename as an unrelated same-named uni; verify scrape_url domain matches YAML seed_urls domain before trusting an existing {slug}_{id}.yaml.
+- [Stage-0 rule precedence](stage0-manual-override-precedence.md) — generated extraction rules must not silently overwrite reviewed university-specific fixes.
+- [ECU Funnelback discovery](ecu-discovery-funnelback.md) — seed all pagination pages; guard against duplicated query parameters and blocked traversal.
+- [Multi-campus slug collision](multi-campus-slug-collision.md) — matching slugs can belong to unrelated universities; verify recipe seed domains before reuse.
 - [Discovery URL cache](discovery-url-cache.md) — cached fast-paths must carry the skipped phase's side-channel outputs (blocked fee URLs) too; never cache provider-payload links.
-- [block_url_patterns traversal guard](block-url-patterns-traversal.md) — block_url_patterns is now ALSO a BFS traversal-level guard (compiled early, checked pre-fetch); critical for Scrape.do-backed discovery where each blocked URL saves ~6s.
-- [Bond ES API discovery](bond-es-discovery.md) — program finder is React SPA/AJAX; query /api/v1/elasticsearch/bond_prod_default/_search with generic_search_api; _source.url.0 dot-path extracts array fields.
+- [Blocked-URL traversal guard](block-url-patterns-traversal.md) — apply exclusions before discovery fetches, not only after extraction, to avoid expensive irrelevant pages.
+- [Bond Elasticsearch discovery](bond-es-discovery.md) — the SPA finder has a search API; discovery must extract URLs from its nested array fields.
 - [Australian university discovery and extraction index](australian-university-lessons-index.md) — grouped pointers for catalogue transport, field authority, audience scope, and course-page structure.
 - [payload.get(key, default) None trap](payload-get-none-trap.md) — key present with None value → get() returns None not default; use `(payload.get(key) or "").strip()` always.
-- [Global international-audience filters](global-international-audience-filters.md) — confirmed domestic-only and online-only courses are never staged, regardless of per-university YAML or admin overrides.
+- [Global international-audience filters](global-international-audience-filters.md) — confirmed domestic-only and online-only courses must not be staged, even under overrides.
 - [Global full-time eligibility](global-full-time-eligibility.md) — mixed/equivalent wording keeps the full-time route; explicit part-time-only wording wins; unresolved Part Time fails closed.
-- [SSR courses with missing English](ssr-missing-english-browser-skip.md) — “English missing” can still trigger generic Playwright; proven SSR hosts need skip_per_course_browser and central English fallback.
+- [SSR courses with missing English](ssr-missing-english-browser-skip.md) — missing English must not force browser rescue on proven SSR sites; prefer central English evidence.
 - [Evidence dedup schema drift](evidence-dedup-schema-drift.md) — long-lived DBs may lack the model-declared evidence unique constraint; verify pg_indexes before named ON CONFLICT.
 - [Safe cross-site HTML compaction](safe-html-compaction.md) — preserve chrome text/order, never flatten structured descendants, and require per-university full-payload parity before opt-in.
 - [Required browser state validation](required-browser-actions-timeout.md) — pooled sessions and timeout DOM require idempotent audience-state checks before extraction.
@@ -67,7 +66,6 @@
 - [Scrape slot persistence identity](scrape-slot-identity.md) — Persist multi-slot jobs by stable slot ID, never current grid position; reindexing positional keys can clone another active job.
 - [Authoritative provider overrides](authoritative-embedded-json-preservation.md) — preserve raw source and run deterministic provider authority outside optional AI/fallback gates.
 - [Search English-score casing](search-english-score-casing.md) — stored test types are mostly lowercase; normalize case and aggregate deterministically in live search.
-- [Vitest accessibility hook ordering](vitest-accessibility-hook-ordering.md) — global DOM assertions must run before test-local cleanup; explicitly use list hook sequencing.
 - [INTI fee currency and period authority](inti-fee-authority.md) — INTI’s RM figures are full-programme totals; force MYR and Full Course after extraction, without annualization.
 - [INTI duration badge authority](inti-duration-authority.md) — use the current programme’s top facts badge; related product cards repeat other courses’ durations and corrupt generic extraction.
 - [AI extraction is fill-only](ai-extraction-fill-only.md) — across all universities, deterministic static extraction owns populated values; AI is requested only for remaining gaps.
@@ -76,7 +74,7 @@
 - [Protected catalogue onboarding](protected-catalogue-onboarding.md) — commit probe state before task publish; reject engagement APIs/200 shells; preserve pagination queries and exact retries.
 - [Audience-scoped study mode](audience-scoped-study-mode.md) — international Location/Delivery is authoritative; Online must block synthetic campus defaults.
 - [SEGi dual current catalogues](segi-current-catalogue.md) — university host uses exact-host TLS; www host has a distinct current college catalogue via rendered WordPress search.
-- [UNE recipe and fee authority](une-recipe-fee-authority.md) — keep slug/ID recipes aligned; current pages mix international tuition with CSP/scholarship blocks, so ambiguous fees must fail to review.
+- [UNE recipe and fee authority](une-recipe-fee-authority.md) — align recipe aliases and reject ambiguous mixtures of international, CSP and scholarship prices.
 - [UNE research offerings](une-research-offerings.md) — availability pivots use duplicated responsive labels; retain Research Period 1/2 and apply UNE’s research-specific English profile.
 - [Pilot training cost fee safety](pilot-training-fee-safety.md) — extra flight licences, ratings, and training costs are not tuition; BNU undergraduate blanks use its published annual fallback.
 - [Verified scraper recipe contracts](verified-scraper-recipe-contracts.md) — sitemap allow rules see full URLs; lock critical verified YAML paths against stale generated/operator overrides.
@@ -85,18 +83,18 @@
 - [Autonomous URL repair safety](autonomous-url-repair-safety.md) — OpenAI may propose URL fixes, but full-filter simulation, fenced ownership, and verified atomic persistence control every write.
 - [Production deployment routing](production-deployment-routing.md) — trust the live Git origin and dedicated SSM identity; stale targets or default AWS credentials can fail.
 - [Autonomous config repair rollback](autonomous-config-repair-rollback.md) — validate without writes; fence both apply and compensating rollback against exact config documents.
-- [Automated repair normalization parity](automated-repair-normalization-parity.md) — quality detection, replay validation, and runtime assignment must share canonicalization and fail closed on valid-value misses.
+- [Repair normalization parity](automated-repair-normalization-parity.md) — detection, replay and assignment must share canonicalization and fail closed on mismatches.
 - [Snapshot canary cleanup and locking](snapshot-canary-safety.md) — delete exact S3 versions, verify absence, and use transaction-scoped advisory locks so pooled connections cannot strand monitors.
-- [Disposable AWS integration safety](disposable-aws-integration-safety.md) — verify account and ownership tags before destructive tests; hand off signed receipts before workspace recycling can lose them.
+- [Disposable AWS integration safety](disposable-aws-integration-safety.md) — verify account and ownership before destructive tests; preserve signed receipts outside temporary workspaces.
 - [Re-extraction warning lifecycle](reextract-warning-lifecycle.md) — clear only warnings whose condition the new payload proves resolved; preserve unrelated review warnings.
 - [Re-extraction evidence promotion](reextract-evidence-promotion.md) — equal values still refresh when selected evidence replaces previously unselected provenance.
 - [Targeted Fix progress](targeted-fix-progress.md) — count only previewed issue-field updates; job identity includes courses, target fields, and source review.
 - [Requirement verification display](requirement-verification-display.md) — show stored IELTS scores alongside verification warnings, never replace the value with “Unverified.”
 - [University onboarding locality safety](university-onboarding-locality.md) — navigation labels are never cities; invalid stored localities may be repaired by verified onboarding fallback.
-- [University onboarding name authority](university-onboarding-name-authority.md) — URL metadata is marketing copy until sanitized; clean official names may replace wrapped phrases even when both contain “University.”
+- [University onboarding name authority](university-onboarding-name-authority.md) — sanitize marketing metadata before trusting it as an official institution name.
 - [Category-page warning parity](category-page-warning-parity.md) — URL-shape warnings must respect degree-qualifier overrides and be discarded when their candidate count differs from the live job.
 - [Skip reason counter conservation](skip-reason-counter-conservation.md) — every completed skipped-course increment must flow through one helper that also increments exactly one stable reason bucket.
-- [Expected-failure teardown proof](expected-failure-teardown-proof.md) — a deliberate nonzero exit can mask cleanup failure; verify resource absence independently.
+- [Testing and verification lessons](verification-testing-index.md) — isolation, teardown proof, frontend timing, resource ownership and persisted evidence.
 - [QUT static extraction and delivery gates](qut-static-extraction.md) — prefer the usable static payload; browser rescue is blocked, and bare “online” text is not delivery authority.
 - [Central profiles in staged re-extraction](central-profiles-staged-reextract.md) — Review → Fix must prefetch central pages; semantic parser changes must bump the English cache schema.
 - [UQ start-semester intake authority](uq-start-semester-intake.md) — UQ intake comes only from the selected program’s Drupal start_semester fact; page-wide date scanning is unsafe.
@@ -107,49 +105,41 @@
 - [Staged-row restore identity](staged-row-restore-identity.md) — exact backups deduplicate by canonical URL; name fallback is only for legacy snapshots whose fetched URL may differ.
 - [Auckland qualification filtering](auckland-qualification-filtering.md) — the shared study-option path mixes programmes and subjects; trust its explicit discovery labels before extraction.
 - [Otago fee authority](otago-mixed-fee-rows.md) — structured international metadata can be authoritative even when visible fee labels are absent.
-- [Massey qualification catalogue](massey-qualification-catalogue.md) — use the all-qualifications index; route detail extraction through static proxy because the origin blocks long direct-request runs.
+- [Massey qualification catalogue](massey-qualification-catalogue.md) — use the full qualification index and static proxy transport for long detail-page runs.
 - [VUW current international catalogue](vuw-current-international-catalogue.md) — bare JSON endpoints can serve stale prior-year fees; use the international query and align intakes to the fee year.
 - [Release cleanup paths](release-cleanup-paths.md) — deployment EXIT traps must use absolute paths or reset cwd before restoring paused consumers.
 - [Release worker readiness](release-worker-readiness.md) — service activity precedes worker replies; sample follow-ups need verified ownership and bounded completion.
 - [APU course delivery identity](apu-course-delivery-identity.md) — APU’s page-wide catalogue contaminates mode keywords; classify delivery from the current course title/H1/URL only.
-- [SIT course panel and fee authority](sit-course-panel-fee-authority.md) — compact to the current programme panel; central international tuition excludes resource fees and requires exact award matching.
+- [SIT course-panel authority](sit-course-panel-fee-authority.md) — match exact awards and current programme panels; exclude resource fees from central international tuition.
 - [Required-fee resume checkpoints](required-fee-resume-checkpoints.md) — exact central-fee recipes must reprocess unproven pending checkpoints and retire only matched rows after clean completion.
 - [Duration value-unit atomicity](duration-value-unit-atomicity.md) — preserve deterministic duration value/unit pairs; restore the unit only while the numeric value still matches.
-- [Generated config release collisions](generated-config-release-collisions.md) — reconcile only integrity-verified stubs; preserve them below tracked recipe precedence and keep unknown files blocking.
+- [Generated config release collisions](generated-config-release-collisions.md) — reconcile verified stubs below tracked recipes; unknown files must keep blocking release.
 - [Algolia provider trust boundaries](algolia-provider-trust-boundaries.md) — enforce record type and URL before emitting trusted links; preserve authoritative payloads through retries.
 - [Otago Polytechnic fee cards](otago-polytechnic-fee-cards.md) — use the International Standard card; Full tuition is full-course, while First year/Course one are annual.
-- [Python local-import shadowing](python-local-import-shadowing.md) — a late function-local alias shadows earlier uses across the whole function; caught lock checks can misreport the resulting error as contention.
-- [Verification revision provenance](verification-revision-provenance.md) — completion can integrate concurrent changes; live evidence certifies its recorded revision, not a later merged tree.
-- [Injected release resource ownership](injected-release-resource-ownership.md) — cleanup seams must distinguish borrowed test resources from production-owned temporaries.
-- [Canterbury embedded course-year facts](canterbury-embedded-course-year-facts.md) — read the selected Contensis Redux entry year; reject unpublished future-year rows instead of applying blanket fee defaults.
-- [Settings-backed academic requirements](settings-backed-academic-requirements.md) — derive requirement option IDs from stable semantic keys so setting renames propagate without changing degree mappings.
-- [AI repair live-evidence seeds](ai-repair-live-evidence-seeds.md) — rejection-storm repairs must probe staged course URLs; historical jobs may need the latest review set after their rows are replaced.
+- [Python local-import shadowing](python-local-import-shadowing.md) — late local imports shadow earlier uses; swallowed errors can misreport lock contention.
+- [Canterbury embedded course-year facts](canterbury-embedded-course-year-facts.md) — select the actual entry year and reject unpublished future fees instead of using blanket defaults.
+- [Settings-backed academic requirements](settings-backed-academic-requirements.md) — stable semantic option identities let setting renames propagate without remapping degrees.
+- [AI repair live-evidence seeds](ai-repair-live-evidence-seeds.md) — probe staged course URLs; historical jobs may need the current review cohort after row replacement.
 - [Claimed-worker recovery fencing](claimed-worker-recovery-fencing.md) — heartbeat age never proves worker death; safe autonomous reclaim requires generation-fenced writes.
 - [Verification continuation safety](verification-continuation-safety.md) — continue acknowledged timeouts on exact remaining samples; aggregate every child's safety evidence.
-- [HTTPX connected-peer metadata](httpx-connected-peer-metadata.md) — verify remote peers using peername with server_addr fallback; AnyIO streams may expose only the latter.
+- [HTTPX connected-peer metadata](httpx-connected-peer-metadata.md) — AnyIO may expose server_addr instead of peername; support both when verifying peers.
 - [Course-report URL field parity](course-report-url-field-parity.md) — a verified programme URL may arrive as catalogue_url; preserve proof and target semantics across report URL fields.
 - [Developer-free recovery UX](developer-free-recovery-ux.md) — blocked recovery must request an official course URL, never scraper settings or manual developer investigation.
 - [Automatic repair JS-shell evidence](automatic-repair-js-shell-evidence.md) — live repair probes must render JS-only shells and recognize site-owned field labels before rejecting valid course pages.
 - [Resume count semantics](resume-count-semantics.md) — settled URLs are not imports; same-child rows must not be added twice during database reconciliation.
 - [Settled URL outcome semantics](settled-url-outcome-semantics.md) — completed URL checkpoints include errors; recovery must use outcome provenance before resolving or suppressing work.
-- [Pytest asyncio isolation](pytest-asyncio-isolation.md) — session-loop defaults can hide pool reuse failures; loop-independent suites need test-owned connections.
-- [Evidence proof persistence](evidence-proof-persistence.md) — test authority after real persistence; truncated display excerpts cannot prove omitted alternatives.
 - [Fee approval race ordering](fee-approval-race-ordering.md) — variant selection must be rechecked after row locking; a stale pre-lock rejection defeats concurrent reviewer selection.
 - [Grouped review action boundaries](grouped-review-action-boundaries.md) — row-group delete/force-approve must use explicit group IDs, never inherit unrelated bulk selections.
 - [Reconciled aliases and scoped approval](reconciled-alias-scoped-approval.md) — preserved legacy aliases must not block later scoped approvals of their canonical course.
-- [Full regression Redis ownership](full-regression-redis-ownership.md) — overlapping suites can shut down a shared temporary Redis; keep the managed Redis workflow running.
 - [Legacy unscoped collision inventory](legacy-unscoped-collision-inventory.md) — scoped previews omit older published same-award records; compare against the full live course inventory before write.
 - [Reconciliation identity coverage](reconciliation-identity-coverage.md) — evidence-connected groups may still collide under the app’s published identity; validate both partitions before write.
 - [SQE2 source scope](sqe2-source-scope.md) — linked demands own English requirements; teaching-content weeks do not establish total course duration.
 - [ULaw joint qualification recovery](ulaw-joint-qualification-recovery.md) — shared course pages do not merge awards; widening the verified cohort requires fresh award and campus evidence.
 - [Current delivery over historical fees](current-delivery-over-historical-fees.md) — exclusive current Online delivery overrides old campus prices, including during targeted fee repair.
 - [Approval guidance lifetime](approval-guidance-lifetime.md) — failure advice belongs to uninterrupted evidence state; restoring old values must not revive it.
-- [Database latency validation](database-latency-validation.md) — rollback isolation does not eliminate parallel load or DDL locks; check isolated timing before changing budgets.
 - [Review payload measurement](review-payload-measurement.md) — include background counts and history reads; endpoint-only savings can hide eager evidence downloads.
 - [Review quality snapshot](review-quality-snapshot.md) — review scores and chips must derive from the same loaded rows as their displayed fields.
 - [Wouter navigation guards](wouter-navigation-guards.md) — aroundNav handles app links and hook navigation, not browser history; reload uses native beforeunload.
-- [Deferred React test responses](deferred-react-test-responses.md) — resolve controlled network responses outside async act when other requests remain pending.
-- [Dispatch test failure sentinels](dispatch-test-failure-sentinels.md) — verify mock outcomes outside broad delivery exception handlers so ordering assertions cannot be swallowed.
 - [Discovery alert scope](discovery-alert-scope.md) — selected-course recoveries need outcome-based alerts, not catalogue-size thresholds.
 - [Repair comparison and linked tuition](repair-matched-cohort-and-linked-fees.md) — match course identities; follow owned fee links without borrowing domestic or thesis-pending prices.
 - [Hidden Node runtimes](node-runtime-security.md) — shell, Nix pnpm, and Python browser drivers may use different Node releases; check certifi separately from OS trust.
@@ -157,4 +147,3 @@
 - [HSU recovery source authority](hsu-recovery-source-authority.md) — null extraction is not proof of unpublished tuition; inspect inline/nested fees and preserve unknown campus facts for review.
 - [Git lazy-fetch backports](git-lazy-fetch-backports.md) — older distribution builds can honor lazy-fetch suppression; test transport denial independently of version numbers.
 - [Git stat-cache evidence](git-stat-cache-evidence.md) — byte-identical atomic restores can confuse metadata-only diff modes; require content comparison before declaring source dirty.
-- [Disposable worker reconnect tests](disposable-worker-reconnect-testing.md) — distinguish worker and observer sockets before injecting a real broker disconnect.
