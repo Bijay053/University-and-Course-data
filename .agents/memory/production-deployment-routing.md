@@ -3,6 +3,20 @@ name: Production deployment routing
 description: Non-obvious routing constraints for deploying this project to its external AWS host.
 ---
 
+Treat a failed release after checkout but before service restart as a partial
+release, not as a same-revision redeployment.
+
+**Why:** A frontend dependency failure advanced Git while leaving the prior
+runtime identity in place. Retrying with predecessor equal to target then
+failed the mandatory predecessor smoke identity check.
+
+**How to apply:** Preserve original manifests and receipts, establish checkout,
+runtime and frontend identities separately, and review a recovery procedure
+before retrying. Never edit release metadata to make an old process appear new,
+discard operator recipes, or regenerate a production lockfile to bypass a
+frozen-install mismatch. Check package-manager compatibility and configuration
+provenance first.
+
 Release requests target the existing AWS production deployment only, not a new
 Replit deployment.
 
