@@ -13,7 +13,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
-from app.database import engine
+from app.legacy_migration_database import engine
 
 
 async def main():

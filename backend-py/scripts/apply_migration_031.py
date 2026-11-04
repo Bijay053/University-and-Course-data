@@ -15,14 +15,6 @@ import asyncio
 import json
 import os
 
-_raw_url = os.environ.get(
-    "DATABASE_URL",
-    "postgresql+asyncpg://postgres:password@127.0.0.1:5432/university_portal",
-)
-# Strip sslmode and other params not supported by asyncpg driver
-import re as _re
-_raw_url = _re.sub(r"\?.*$", "", _raw_url)
-DATABASE_URL = _raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS country_patterns (
@@ -245,10 +237,10 @@ ON CONFLICT (country) DO UPDATE SET
 
 
 async def main() -> None:
-    from sqlalchemy.ext.asyncio import create_async_engine
+    from app.legacy_migration_database import create_migration_engine
     from sqlalchemy import text
 
-    engine = create_async_engine(DATABASE_URL, echo=False)
+    engine = create_migration_engine(echo=False)
     async with engine.begin() as conn:
         print("Creating country_patterns table …")
         await conn.execute(text(_DDL))

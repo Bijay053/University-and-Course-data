@@ -4,17 +4,16 @@ Apply on production:
     cd /root/University-and-Course-data
     sudo -u postgres psql -d university_portal -f backend-py/scripts/migration_032.sql
 
-Or via Python (strips sslmode from DATABASE_URL):
+Or via Python (uses managed configuration and verified TLS):
     PYTHONPATH=backend-py python3 backend-py/scripts/apply_migration_032.py
 """
 from __future__ import annotations
 
 import asyncio
-import os
-import re
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from app.legacy_migration_database import create_migration_engine
 
 SQL = """
 CREATE TABLE IF NOT EXISTS university_watchers (
@@ -57,16 +56,15 @@ COMMENT ON TABLE university_watchers IS
 """
 
 
-def _clean_url(raw: str) -> str:
-    return re.sub(r"\?sslmode=\w+", "", raw).rstrip("?&")
-
-
-async def _apply(url: str) -> None:
-    engine = create_async_engine(url, pool_size=1, max_overflow=0, future=True)
+async def _apply() -> None:
+    engine = create_migration_engine(pool_size=1, max_overflow=0, future=True)
     try:
         async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         async with async_session() as db:
-            await db.execute(text(SQL))
+            # This constant contains only ordinary DDL, not procedural bodies.
+            for statement in SQL.split(";"):
+                if statement.strip():
+                    await db.execute(text(statement.strip()))
             await db.commit()
         print("Migration 032 applied — university_watchers table ready.")
     finally:
@@ -74,6 +72,4 @@ async def _apply(url: str) -> None:
 
 
 if __name__ == "__main__":
-    raw = os.environ.get("DATABASE_URL", "postgresql+asyncpg://uniportal:uniportal@127.0.0.1/university_portal")
-    url = _clean_url(raw)
-    asyncio.run(_apply(url))
+    asyncio.run(_apply())

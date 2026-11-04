@@ -21,7 +21,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sqlalchemy import text
-from app.database import AsyncSessionLocal
+from app.legacy_migration_database import AsyncSessionLocal
 
 # Each statement must be executed individually with asyncpg
 STATEMENTS = [

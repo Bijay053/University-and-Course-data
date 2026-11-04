@@ -18,7 +18,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sqlalchemy import text
-from app.database import AsyncSessionLocal
+from app.legacy_migration_database import AsyncSessionLocal
 
 
 DROP_DDL = "DROP VIEW IF EXISTS v_university_health CASCADE"

@@ -23,9 +23,8 @@ import asyncio
 import logging
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+from app.legacy_migration_database import create_migration_engine
 
-from app.config import settings
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -44,7 +43,7 @@ STATEMENTS = [
 
 
 async def main() -> None:
-    engine = create_async_engine(settings.database_url, echo=False)
+    engine = create_migration_engine(echo=False)
     async with engine.begin() as conn:
         for stmt in STATEMENTS:
             await conn.execute(text(stmt))

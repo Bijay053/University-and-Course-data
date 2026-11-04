@@ -19,7 +19,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sqlalchemy import text
-from app.database import AsyncSessionLocal
+from app.legacy_migration_database import AsyncSessionLocal
 
 STATEMENTS = [
     "ALTER TABLE universities ADD COLUMN IF NOT EXISTS certification_status TEXT NOT NULL DEFAULT 'draft'",

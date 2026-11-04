@@ -17,11 +17,6 @@ Apply on production:
 import asyncio
 import os
 
-_raw_url = os.environ.get(
-    "DATABASE_URL",
-    "postgresql+asyncpg://postgres:password@127.0.0.1:5432/university_portal",
-)
-DATABASE_URL = _raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 _STMTS = [
     # ── courses.campus_id ────────────────────────────────────────────────────
@@ -100,7 +95,7 @@ _STMTS = [
 
 async def main() -> None:
     from sqlalchemy import text
-    from app.database import engine
+    from app.legacy_migration_database import engine
 
     async with engine.begin() as conn:
         for stmt in _STMTS:
@@ -109,7 +104,7 @@ async def main() -> None:
                 await conn.execute(text(stripped))
 
     # Report backfill results
-    from app.database import AsyncSessionLocal
+    from app.legacy_migration_database import AsyncSessionLocal
     from sqlalchemy import text as t
     async with AsyncSessionLocal() as s:
         r = await s.execute(t(

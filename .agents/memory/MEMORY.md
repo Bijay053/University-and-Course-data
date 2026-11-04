@@ -139,3 +139,4 @@
 - [Git lazy-fetch backports](git-lazy-fetch-backports.md) — older distribution builds can honor lazy-fetch suppression; test transport denial independently of version numbers.
 - [Git stat-cache evidence](git-stat-cache-evidence.md) — byte-identical atomic restores can confuse metadata-only diff modes; require content comparison before declaring source dirty.
 - [Database CA loading](database-ca-loading.md) — explicitly load configured CA bundles; OpenSSL default paths may silently ignore a missing file.
+- [Legacy repair scope](legacy-repair-scope.md) — hardening connections must not turn a targeted repair into a full upgrade or bypass local-only restrictions.

@@ -14,7 +14,7 @@ import asyncio
 
 from sqlalchemy import text
 
-from app.database import AsyncSessionLocal, engine
+from app.legacy_migration_database import AsyncSessionLocal, engine
 
 
 async def _apply() -> None:

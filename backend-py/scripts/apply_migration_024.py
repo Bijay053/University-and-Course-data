@@ -16,11 +16,6 @@ Apply on production:
 import asyncio
 import os
 
-_raw_url = os.environ.get(
-    "DATABASE_URL",
-    "postgresql+asyncpg://postgres:password@127.0.0.1:5432/university_portal",
-)
-DATABASE_URL = _raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 _STMTS = [
     """
@@ -87,7 +82,7 @@ _STMTS = [
 
 
 async def run() -> None:
-    from app.database import engine
+    from app.legacy_migration_database import engine
     from sqlalchemy import text
 
     async with engine.begin() as conn:

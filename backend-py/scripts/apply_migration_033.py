@@ -37,10 +37,9 @@ Verify:
 
     sudo -u postgres psql -d university_portal -c "\\d publishing_ledger"
 """
-import os
-import sys
-
-DB_URL = os.environ.get("DATABASE_URL", "")
+import asyncio
+from sqlalchemy import text
+from app.legacy_migration_database import create_migration_engine
 
 SQL = """
 ALTER TABLE scraped_courses
@@ -68,14 +67,18 @@ CREATE INDEX IF NOT EXISTS idx_publishing_ledger_created ON publishing_ledger(cr
 CREATE INDEX IF NOT EXISTS idx_sc_pub_decision          ON scraped_courses(pub_decision);
 """
 
-if __name__ == "__main__":
-    import subprocess
-    result = subprocess.run(
-        ["psql", DB_URL, "-c", SQL],
-        capture_output=True, text=True
-    )
-    print(result.stdout)
-    if result.returncode != 0:
-        print(result.stderr, file=sys.stderr)
-        sys.exit(result.returncode)
+async def main():
+    engine = create_migration_engine(echo=False)
+    try:
+        async with engine.begin() as connection:
+            # Fixed simple DDL only; preserve psql -c's single transaction.
+            for statement in SQL.split(";"):
+                if statement.strip():
+                    await connection.execute(text(statement.strip()))
+    finally:
+        await engine.dispose()
     print("Migration 033 complete.")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -31,7 +31,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sqlalchemy import text
-from app.database import AsyncSessionLocal
+from app.legacy_migration_database import AsyncSessionLocal
 from app.services.scraper.taxonomy import LEGACY_PARENT_ALIASES, TAXONOMY_PAIRS
 
 _SEED = TAXONOMY_PAIRS
