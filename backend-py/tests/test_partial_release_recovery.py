@@ -1,4 +1,4 @@
-"""Real disposable Git transitions; fake services only. Never production or AWS."""
+"""Disposable Git transitions and worker transport. Never production or AWS."""
 import hashlib
 import json
 import multiprocessing
@@ -765,3 +765,261 @@ def test_real_frontend_adapter_requires_local_and_public_predecessor_marker(tmp_
     asset.write_bytes(b"UNIVERSITY_PORTAL_RELEASE:" + b"b" * 40)
     with pytest.raises(recovery.RecoveryRefused, match="published frontend"):
         host.verify_frontend("a" * 40)
+
+
+class TransportHost(FixtureHost):
+    """Use production observation/control; replace only host identity and stop."""
+
+    observe = RecoveryHost.observe
+    pause = RecoveryHost.pause
+    resume_consumers = RecoveryHost.resume_consumers
+
+    def stop_worker(self):
+        self.events.append("stop")
+        self.cluster.stop_all()
+
+    def checkout(self, predecessor):
+        self.events.append("checkout")
+        # Record the actual queue bindings at the destructive Git boundary.
+        queues = self.cluster.queues()
+        assert set(queues) == set(self.cluster.processes)
+        assert all(not any(q["name"] == "scrape" for q in qs) for qs in queues.values())
+        super().checkout(predecessor)
+
+
+@pytest.fixture
+def transport_installation(installation, monkeypatch):
+    from tests.helpers.recovery_celery_fixture import private_cluster
+
+    old, plan, _, originals, evidence, states = installation
+    with private_cluster(states.parent / "transport", old.repo, plan.predecessor) as cluster:
+        # Keep hermetic failures bounded: this changes only reply wait budgets,
+        # never the real Redis commands, worker replies or production defaults.
+        control = cluster.app.control
+        inspect = control.inspect
+        add, cancel = control.add_consumer, control.cancel_consumer
+        monkeypatch.setattr(control, "inspect",
+                            lambda **kw: inspect(**dict(kw, timeout=0.3)))
+        def bounded(method):
+            def call(*args, **kwargs):
+                return method(*args, **dict(kwargs, timeout=0.7))
+            return call
+        monkeypatch.setattr(control, "add_consumer", bounded(add))
+        monkeypatch.setattr(control, "cancel_consumer", bounded(cancel))
+        cluster.start("recovery-a@fixture")
+        host = TransportHost(old.repo, plan.predecessor, old.controls)
+        host.cluster = cluster
+        module = ModuleType("app.tasks.celery_app")
+        module.celery_app = cluster.app
+        monkeypatch.setitem(sys.modules, "app.tasks.celery_app", module)
+        monkeypatch.setenv("RELEASE_REVISION", plan.predecessor)
+
+        async def idle(timeout):
+            inspection = cluster.inspect()
+            complete = {state: getattr(inspection, state)()
+                        for state in ("ping", "active", "reserved", "scheduled")}
+            ping = complete["ping"]
+            if not ping or any(not isinstance(complete[state], dict)
+                               or set(complete[state]) != set(ping)
+                               for state in ("active", "reserved", "scheduled")):
+                raise recovery.RecoveryRefused("incomplete worker replies")
+            if any(tasks for state in ("active", "reserved", "scheduled")
+                   for tasks in complete[state].values()):
+                raise recovery.RecoveryRefused("unrelated worker task")
+            return {"complete_worker_replies": complete}
+
+        async def counts():
+            return {}
+
+        async def dispose():
+            pass
+
+        def identity(unit, revision):
+            assert unit in {"uni-api-py", "uni-celery"}
+            assert host.service_revision == revision == plan.predecessor
+
+        # Host process identity, signed AWS proof and DB counts are deliberately
+        # local seams. All four worker inspections and consumer commands are real.
+        host._smoke = SimpleNamespace(
+            DEFAULT_REHEARSAL_PROOF=states.parent / "unused-proof",
+            verify_service_process_release_identity=identity,
+            validate_database_rehearsal_requirement=lambda *a, **kw: None,
+            _wait_for_worker_idle=idle, _active_counts=counts,
+            validate_idle_counts=lambda value: None,
+            engine=SimpleNamespace(dispose=dispose),
+        )
+        yield host, plan, recovery.Recovery(host, plan), originals, evidence, states
+
+
+def assert_transport_failure(fixture, expected_status, expected_head):
+    host, plan, tool, originals, evidence, states = fixture
+    state = state_path(states)
+    record = json.loads(state.read_text())
+    assert record["status"] == expected_status
+    assert record["release_completed"] is False
+    assert host.head() == expected_head
+    assert host.metadata.read_text() == f"RELEASE_REVISION={plan.predecessor}\n"
+    assert_originals(originals, evidence)
+    assert recovery.evidence_snapshot(
+        state.parent / "original-evidence/manifest.json",
+    ) == record["evidence"]
+    assert not list(state.parent.glob("post_restart/*"))
+    assert not list(plan.failed_manifest.parent.glob("post_restart/*"))
+    return state
+
+
+@pytest.mark.parametrize("lose_every_reply", [False, True])
+def test_real_worker_lost_cancel_ack_requires_containment_and_explicit_resume(
+    transport_installation, monkeypatch, lose_every_reply,
+):
+    host, plan, tool, _, _, _ = transport_installation
+    original = host.cluster.app.control.cancel_consumer
+    deliveries = []
+
+    def lost_reply(*args, **kwargs):
+        replies = original(*args, **kwargs)  # Worker actually cancels first.
+        assert replies
+        deliveries.append(replies)
+        return [] if lose_every_reply or len(deliveries) == 1 else replies
+
+    monkeypatch.setattr(host.cluster.app.control, "cancel_consumer", lost_reply)
+    with pytest.raises(recovery.RecoveryRefused, match="acknowledgements"):
+        tool.start(transport_installation[-1])
+    status = "worker_stopped" if lose_every_reply else "failed_paused"
+    state = assert_transport_failure(transport_installation, status, plan.target)
+    assert "checkout" not in host.events
+    assert len(deliveries) == 2
+    host.cluster.assert_blocked(stopped=lose_every_reply)
+    if lose_every_reply:
+        before = state.read_bytes()
+        with pytest.raises(recovery.RecoveryRefused, match="operator"):
+            tool.resume(state)
+        assert state.read_bytes() == before
+    else:
+        # Only a new explicit operator call may proceed. Clear just the test's
+        # queued sentinel while paused so ordinary work does not block recovery.
+        assert host.cluster.client.delete(host.cluster.prefix + "scrape") == 1
+        monkeypatch.setattr(host.cluster.app.control, "cancel_consumer", original)
+        tool.resume(state)
+        assert json.loads(state.read_text())["status"] == "baseline_restored"
+        host.cluster.enqueue()
+        from tests.helpers.recovery_celery_fixture import eventually
+        eventually(host.cluster.ledger.exists, description="safe resumed sentinel")
+        assert json.loads(host.cluster.ledger.read_text()) == {
+            "head": plan.predecessor, "runtime": plan.predecessor,
+        }
+
+
+@pytest.mark.parametrize("change", ["restart", "join", "leave"])
+def test_real_worker_membership_or_reconnect_after_pause_blocks_checkout(
+    transport_installation, change,
+):
+    host, plan, tool, _, _, states = transport_installation
+    if change == "leave":
+        host.cluster.start("recovery-b@fixture")
+
+    def change_membership():
+        if change == "restart":
+            host.cluster.stop("recovery-a@fixture")
+            host.cluster.start("recovery-a@fixture")  # Rebinds scrape.
+        elif change == "join":
+            host.cluster.start("recovery-b@fixture")
+        else:
+            host.cluster.stop("recovery-b@fixture")
+    host.after_prepare = change_membership
+    with pytest.raises(recovery.RecoveryRefused):
+        tool.start(states)
+    status = "failed_paused" if change == "restart" else "worker_stopped"
+    state = assert_transport_failure(transport_installation, status, plan.target)
+    assert "checkout" not in host.events
+    host.cluster.assert_blocked(stopped=change != "restart")
+    if change != "restart":
+        with pytest.raises(recovery.RecoveryRefused, match="operator"):
+            tool.resume(state)
+
+
+@pytest.mark.parametrize("containment_reply_lost", [False, True])
+@pytest.mark.parametrize("enabled_workers", [1, 2])
+def test_real_partial_add_consumer_reply_never_claims_recovery(
+    transport_installation, monkeypatch, containment_reply_lost, enabled_workers,
+):
+    host, plan, tool, _, _, states = transport_installation
+    host.cluster.start("recovery-b@fixture")
+    control = host.cluster.app.control
+    add = control.add_consumer
+    cancel = control.cancel_consumer
+    additions = []
+    host.after_prepare = host.cluster.enqueue
+
+    def partial_add(queue, **kwargs):
+        # Exercise both partial command delivery and lost acknowledgement after
+        # both bindings changed. All returned acknowledgements are genuine.
+        kwargs["destination"] = kwargs["destination"][:enabled_workers]
+        replies = add(queue, **kwargs)
+        assert len(replies) == enabled_workers
+        from tests.helpers.recovery_celery_fixture import eventually
+        eventually(host.cluster.ledger.exists, description="sentinel during partial resume")
+        assert json.loads(host.cluster.ledger.read_text()) == {
+            "head": plan.predecessor, "runtime": plan.predecessor,
+        }
+        additions.append(replies[:1])
+        return replies[:1]
+
+    def cancel_after_partial_add(*args, **kwargs):
+        replies = cancel(*args, **kwargs)
+        return [] if additions and containment_reply_lost else replies
+
+    monkeypatch.setattr(control, "add_consumer", partial_add)
+    monkeypatch.setattr(control, "cancel_consumer", cancel_after_partial_add)
+    with pytest.raises(recovery.RecoveryRefused, match="acknowledgements"):
+        tool.start(states)
+    status = "worker_stopped" if containment_reply_lost else "failed_paused"
+    state = assert_transport_failure(transport_installation, status, plan.predecessor)
+    assert host.events.count("checkout") == 1
+    assert len(additions) == 1 and len(additions[0]) == 1
+    host.cluster.assert_blocked(stopped=containment_reply_lost)
+    if containment_reply_lost:
+        with pytest.raises(recovery.RecoveryRefused, match="operator"):
+            tool.resume(state)
+
+
+def test_real_broker_reconnect_preserves_pause_with_unrelated_scrape_waiting(
+    transport_installation,
+):
+    """A reconnect must not recreate the canceled scrape binding from defaults."""
+    from tests.helpers.recovery_celery_fixture import eventually
+
+    host, plan, tool, originals, evidence, states = transport_installation
+    process = host.cluster.processes["recovery-a@fixture"]
+    pid = process.pid
+    observed = []
+
+    def reconnect_with_pending_work():
+        # This hook is between pause and checkout, while HEAD is still target
+        # and the worker runtime is predecessor. Any start here is unsafe.
+        assert host.head() == plan.target
+        assert host.cluster.queues()["recovery-a@fixture"] == [
+            q for q in host.cluster.queues()["recovery-a@fixture"]
+            if q["name"] != "scrape"
+        ]
+        host.cluster.enqueue()
+        assert host.cluster.pending() == 1
+        host.cluster.reconnect()
+        assert process.pid == pid and process.poll() is None
+        queues = host.cluster.queues()
+        observed.append(queues)
+        assert queues and all(not any(q["name"] == "scrape" for q in qs)
+                              for qs in queues.values())
+        assert host.cluster.pending() == 1
+        assert not host.cluster.ledger.exists()
+
+    host.after_prepare = reconnect_with_pending_work
+    state = tool.start(states)
+    assert len(observed) == 1
+    assert json.loads(state.read_text())["status"] == "baseline_restored"
+    eventually(host.cluster.ledger.exists, description="sentinel after safe checkout")
+    assert json.loads(host.cluster.ledger.read_text()) == {
+        "head": plan.predecessor, "runtime": plan.predecessor,
+    }
+    assert host.cluster.pending() == 0
+    assert_originals(originals, evidence)

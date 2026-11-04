@@ -157,3 +157,4 @@
 - [HSU recovery source authority](hsu-recovery-source-authority.md) — null extraction is not proof of unpublished tuition; inspect inline/nested fees and preserve unknown campus facts for review.
 - [Git lazy-fetch backports](git-lazy-fetch-backports.md) — older distribution builds can honor lazy-fetch suppression; test transport denial independently of version numbers.
 - [Git stat-cache evidence](git-stat-cache-evidence.md) — byte-identical atomic restores can confuse metadata-only diff modes; require content comparison before declaring source dirty.
+- [Disposable worker reconnect tests](disposable-worker-reconnect-testing.md) — distinguish worker and observer sockets before injecting a real broker disconnect.
