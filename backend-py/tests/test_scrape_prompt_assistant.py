@@ -322,6 +322,9 @@ def research_fakes(monkeypatch):
                 "facts": [], "excerpts": [{"id": "q0", "text": "Official source"}]}
     monkeypatch.setattr(service, "chat_json", ai)
     monkeypatch.setattr(service, "inspect_source", source)
+    async def empty_catalogue(*args):
+        return {"courses": [], "sources": [], "available": False}
+    monkeypatch.setattr(service, "inspect_comparison", empty_catalogue)
     return calls
 
 
@@ -855,3 +858,148 @@ async def test_thread_links_to_matching_pending_review_not_approved_history(stor
         await db.commit()
         result = await get_assistant("source", db, {"id": 1})
     assert result["relatedReviews"] == [{"jobId": "fresh-review", "courseName": "BSc Music Technology", "status": "pending"}]
+
+
+async def named_inventory(store):
+    from app.models.course import Course
+    async with store() as db:
+        db.add(University(id=2, name="Different University", country="UK", city="Elsewhere"))
+        db.add(ScrapeRuntimeJob(runtime_job_id="other-review", university_id=1,
+                               job_type="scrape", status="completed"))
+        await db.flush()
+        db.add_all([
+            Course(id=20, university_id=1, name="Master of Counselling and Psychotherapy",
+                   course_website="https://www.example.edu/master", status="active", approval_status="approved"),
+            Course(id=21, university_id=2, name="Bachelor of Nursing",
+                   course_website="https://www.example.edu/wrong-university", status="active", approval_status="approved"),
+            ScrapedCourse(id=20, university_id=1, scrape_job_id="other-review", status="pending",
+                          course_name="Graduate Certificate of Counselling",
+                          course_website="https://www.example.edu/certificate"),
+            ScrapedCourse(id=21, university_id=1, scrape_job_id="source", status="pending",
+                          course_name="Graduate Diploma of Counselling",
+                          course_website="https://www.example.edu/diploma"),
+        ])
+        await db.commit()
+
+
+async def named_turn(store, prompt):
+    tid, turn = await prompt_thread(store, prompt)
+    await service.investigate(tid, turn)
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, tid)
+        assert thread.status == "ready", thread.error
+        assert (await db.get(ScrapedCourse, 1)).international_fee == 9790
+        return thread.messages[-1]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prompt,path", [
+    ("Check Master of Counselling and Psychotherapy fees", "master"),
+    ("Graduate Certificate of Counselling", "certificate"),
+    ("Check IELTS for Graduate Diploma of Counselling", "diploma"),
+])
+async def test_named_courses_resolve_across_this_university_inventory(store, monkeypatch, prompt, path):
+    import json
+    await named_inventory(store)
+    calls = research_fakes(monkeypatch)
+    reply = await named_turn(store, prompt)
+    data = json.loads(calls[-1]["user"])
+    assert data["requestedCourseUrls"] == [f"https://www.example.edu/{path}"]
+    assert all(row["id"] != 1 for row in data["sampledRows"])
+    assert reply["resolvedCourses"][0]["url"].endswith("/" + path)
+    assert not reply["actions"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("correction", [
+    "No, I meant Graduate Certificate of Counselling, not Graduate Diploma of Counselling",
+    "Not Graduate Diploma of Counselling, Graduate Certificate of Counselling",
+    "Graduate Certificate of Counselling",
+])
+async def test_name_corrections_and_title_only_followups_replace_old_target(store, monkeypatch, correction):
+    import json
+    await named_inventory(store)
+    calls = research_fakes(monkeypatch)
+    await named_turn(store, "https://www.example.edu/course check this course")
+    await named_turn(store, "Graduate Diploma of Counselling")
+    reply = await named_turn(store, correction)
+    assert reply["resolvedCourses"][0]["url"] == "https://www.example.edu/certificate"
+    assert json.loads(calls[-1]["user"])["requestedCourseUrls"] == ["https://www.example.edu/certificate"]
+    await named_turn(store, "Check it again")
+    assert json.loads(calls[-1]["user"])["requestedCourseUrls"] == ["https://www.example.edu/certificate"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("selection", ["2", "Graduate Certificate of Counselling"])
+async def test_ambiguous_subject_requires_choice_before_research(store, monkeypatch, selection):
+    import json
+    await named_inventory(store)
+    calls = research_fakes(monkeypatch)
+    first = await named_turn(store, "Check Counselling")
+    assert len(first["courseChoices"]) == 3
+    assert not first["actions"] and not first["sources"] and not calls
+    # A vague follow-up must not quietly choose the first option.
+    again = await named_turn(store, "do it")
+    assert again["courseChoices"] == first["courseChoices"]
+    assert not calls
+    reply = await named_turn(store, selection)
+    expected = first["courseChoices"][1]["url"] if selection == "2" else "https://www.example.edu/certificate"
+    assert reply["resolvedCourses"][0]["url"] == expected
+    assert json.loads(calls[-1]["user"])["requestedCourseUrls"] == [expected]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prompt", ["Bachelor of Nursing", "Master of Unknown Studies", "Quantum Computing"])
+async def test_unmatched_names_never_use_another_school_or_open_review(store, monkeypatch, prompt):
+    await named_inventory(store)
+    calls = research_fakes(monkeypatch)
+    reply = await named_turn(store, prompt)
+    assert "could not match" in reply["content"]
+    assert not reply["actions"] and not reply["sources"] and not calls
+    followup = await named_turn(store, "IELTS?")
+    assert "could not match" in followup["content"]
+    assert not followup["actions"] and not calls
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("verified", [True, False])
+async def test_names_can_resolve_from_verified_official_catalogue_only(store, monkeypatch, verified):
+    import json
+    calls = research_fakes(monkeypatch)
+    async def catalogue(*args):
+        return {"sources": [{"url": "https://www.example.edu", "status": "checked" if verified else "unverified"}],
+                "courses": [{"title": "Bachelor of Physics", "url": "https://www.example.edu/physics"},
+                            {"title": "Bachelor of Physics", "url": "https://attacker.example/physics"}]}
+    monkeypatch.setattr(service, "inspect_comparison", catalogue)
+    reply = await named_turn(store, "Bachelor of Physics")
+    if verified:
+        assert reply["resolvedCourses"] == [{"title": "Bachelor of Physics", "url": "https://www.example.edu/physics"}]
+        assert json.loads(calls[-1]["user"])["requestedCourseUrls"] == ["https://www.example.edu/physics"]
+    else:
+        assert not calls and "could not match" in reply["content"]
+    assert not reply["actions"]
+
+
+@pytest.mark.asyncio
+async def test_named_correction_keeps_confirmation_and_unrelated_rows_safe(store, monkeypatch):
+    await named_inventory(store)
+    research_fakes(monkeypatch)
+    reply = await named_turn(store, "Fix Graduate Certificate of Counselling IELTS")
+    action = reply["actions"][0]
+    assert action["kind"] == "review_courses" and action["state"] == "proposed"
+    assert action["_requestedUrls"] == ["https://www.example.edu/certificate"]
+    assert not action["_ids"]
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_selection_retains_original_request_without_autoconfirmation(store, monkeypatch):
+    await named_inventory(store)
+    research_fakes(monkeypatch)
+    choice = await named_turn(store, "Fix Counselling IELTS")
+    index = next(i for i, item in enumerate(choice["courseChoices"], 1) if item["url"].endswith("/certificate"))
+    clarification = await named_turn(store, "IELTS?")
+    assert clarification["courseChoices"] == choice["courseChoices"]
+    reply = await named_turn(store, str(index))
+    assert reply["actions"][0]["kind"] == "review_courses"
+    assert reply["actions"][0]["state"] == "proposed"
+    assert reply["actions"][0]["_requestedUrls"] == ["https://www.example.edu/certificate"]

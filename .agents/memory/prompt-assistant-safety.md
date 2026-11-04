@@ -51,6 +51,12 @@ Check the university's existing course records and other reviews before calling 
 
 An explicit course URL takes priority over the open review's course. Follow-up phrases such as “this course” and “add this” refer to that user-supplied course, not an unrelated sampled row. An approved record elsewhere is not a reason to refuse a fresh pending review.
 
+Course names have the same targeting priority. Resolve within the selected university, ask the user to choose when several awards match, and keep unresolved names unresolved rather than silently using an open-review row.
+
+**Why:** The user requires name-only requests and corrected course names to work without supplying a URL, while preserving source verification, confirmation and publication controls.
+
+**How to apply:** Retain the chosen course through follow-up questions; a vague reply to a clarification is not permission to select the first option or resume an older course.
+
 **Why:** The user corrected Counselling versus Criminology repeatedly, but the assistant kept answering about the open Criminology review and refusing to add Counselling because it was approved elsewhere.
 
 **How to apply:** Restrict source research and field-edit scope to the requested course. Run a URL-targeted fresh review for “add this”; retain eligibility checks and publication approval. Claim recovery only when the requested course is actually present in the resulting review.

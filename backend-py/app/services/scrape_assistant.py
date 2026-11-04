@@ -418,7 +418,34 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         "Review records loaded", status="completed",
         detail=f"{len(ctx['eligible_ids'])} unapproved review records; {ctx['job']['skipped'] or 0} recorded skips.",
     ))
-    recent_user_urls = requested_course_urls(prompt, messages, ctx["home"])
+    from app.services.assistant_course_names import resolve as resolve_name, clarification, positive_request
+    name_resolution = None
+    explicit_url = "https://" in positive_request(prompt)
+    if not explicit_url and not scope_boundary(prompt):
+        name_resolution = await resolve_name(
+            prompt, topic_messages, ctx, AsyncSessionLocal, inspect_comparison,
+        )
+    if name_resolution and name_resolution["state"] != "resolved":
+        await save_research_reply(thread_id, turn_id, run_id, {
+            "role": "assistant", "content": clarification(name_resolution),
+            "createdAt": now().isoformat(), "sources": [], "actions": [], "turnId": turn_id,
+            "courseChoices": name_resolution["choices"],
+            "courseChoiceIncomplete": name_resolution.get("incomplete", False),
+            "courseNameUnresolved": name_resolution["state"] == "unresolved",
+            "courseRequest": name_resolution.get("requestPrompt", prompt),
+        }, detail="Course name needs clarification. No course was selected or changed.")
+        return
+    recent_user_urls = (
+        [item["url"] for item in name_resolution["choices"]]
+        if name_resolution else requested_course_urls(
+            positive_request(prompt) if explicit_url else prompt, messages, ctx["home"])
+    )
+    if name_resolution:
+        # Resolved target identity takes precedence over stale assistant prose.
+        history = history[-1:] if name_resolution.get("inherited") else []
+        review_wide = False
+        if name_resolution.get("requestPrompt"):
+            prompt = name_resolution["requestPrompt"] + "\nSelected course: " + name_resolution["choices"][0]["title"]
     source_prompt = prompt + " " + " ".join(recent_user_urls[:3])
     if review_wide:
         source_prompt = topic_messages[0]["content"] + " " + source_prompt
@@ -658,7 +685,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             }
             names = ", ".join(source["title"] for source in selected)
             result["answer"] = (
-                f"You want {names} added to review. I will use the course URL you supplied, not replace "
+                f"You want {names} added to review. I will use the requested course's official URL, not replace "
                 "the different course in the open review. "
                 + ("An existing course record does not prevent a fresh source check. " if recorded_urls else "")
                 + "Confirm the action below to fetch the requested course into a new pending review. "
@@ -708,6 +735,23 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             "Select unrecorded candidates below to check into pending review, or confirm fresh catalogue discovery "
             "for the university's configured full scraping flow. Nothing has been changed or published."
         )
+    if name_resolution:
+        reply["resolvedCourses"] = name_resolution["choices"]
+    if messages[-1].get("autoRun") and reply.get("actions"):
+        reply["content"] = reply["content"].replace(
+            "Confirm the action below to fetch", "I will automatically fetch"
+        ).replace(
+            "Select unrecorded candidates below to check into pending review, or confirm fresh catalogue discovery "
+            "for the university's configured full scraping flow. Nothing has been changed or published.",
+            "I will run catalogue discovery automatically and report its results here. Nothing will be published automatically."
+        )
+    reply["content"] += "\n\n" + coverage["summary"]
+    await save_research_reply(thread_id, turn_id, run_id, reply,
+                              detail=f"{len(citations)} verified source excerpts. No course changes applied.")
+
+
+async def save_research_reply(thread_id, turn_id, run_id, reply, *, detail):
+    """Clarifications and researched answers use the same durable owner fence."""
     async with AsyncSessionLocal() as db:
         thread = (await db.execute(select(ScrapeAssistantThread).where(
             ScrapeAssistantThread.id == thread_id,
@@ -719,19 +763,9 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             return
         items = [dict(item) for item in thread.activity]
         finish_running(items)
-        items.append(event("Answer ready", status="completed",
-                           detail=f"{len(citations)} verified source excerpts. No course changes applied."))
+        items.append(event("Answer ready", status="completed", detail=detail))
         thread.activity = items[-40:]
         reply["activity"] = public_activity(thread.activity)
-        if messages[-1].get("autoRun") and reply.get("actions"):
-            reply["content"] = reply["content"].replace(
-                "Confirm the action below to fetch", "I will automatically fetch"
-            ).replace(
-                "Select unrecorded candidates below to check into pending review, or confirm fresh catalogue discovery "
-                "for the university's configured full scraping flow. Nothing has been changed or published.",
-                "I will run catalogue discovery automatically and report its results here. Nothing will be published automatically."
-            )
-        reply["content"] += "\n\n" + coverage["summary"]
-        thread.messages, thread.status = (messages + [reply])[-20:], "ready"
+        thread.messages, thread.status = (list(thread.messages) + [reply])[-20:], "ready"
         thread.phase, thread.error, thread.updated_at = "Investigation ready — no changes applied", None, now()
         await db.commit()
