@@ -16,7 +16,7 @@ export { safeSourceUrl };
 export type AssistantSource = { url: string; title: string; excerpt: string; page?: number; quoteId?: string };
 export type AssistantAction = {
   id: string;
-  kind: "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic";
+  kind: "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course";
   label: string;
   courseCount: number;
   fields: string[];

@@ -1207,6 +1207,14 @@ async def stage_course(
         )
         # Leave defaults; row still gets saved.
 
+    # CRICOS is Australian-only. Absence is uncertainty, never domestic-only
+    # evidence; keep the row in review rather than rejecting or auto-publishing.
+    from app.models import University
+    from app.services.scraper.registration_review import flag_registration_review
+    _provider = await db.get(University, university_id)
+    if _provider:
+        flag_registration_review(sc, _provider.country, payload)
+
     # ----- Bug D: persist field evidence -----
     # Atomicity contract: evidence rows must commit alongside the parent
     # ScrapedCourse, or neither commits. A partial write (parent row staged,

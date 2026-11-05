@@ -53,7 +53,7 @@ async def seed_thread(store):
             id="eligibility", job_id="source", actor_id=77, turn_id="turn", run_id="owner",
             status="researching", phase="", activity=[], messages=[{
                 "role": "user", "content": "remove all domestic only courses",
-                "autoRun": True,
+                "autoRun": True, "turnId": "turn", "createdAt": service.now().isoformat(),
             }],
         ))
         await db.commit()

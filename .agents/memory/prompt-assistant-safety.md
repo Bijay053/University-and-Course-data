@@ -14,7 +14,15 @@ The user said: “do not ask for review and run do it and give me result” and 
 
 **Why:** The user explicitly removed the extra confirmation step for the scrape assistant.
 
-**How to apply:** Automatically dispatch supported research, discovery and pending-record corrections, report actual outcomes in chat, and avoid asking the user to select or run routine operations. Honor explicit read-only requests. Publishing, deletion and production deployment remain outside automatic pending-record work.
+**How to apply:** Automatically fix pending records with clear evidence, using soft exclude with an audit log and undo. Ask for confirmation for published records, bulk changes over 10 rows, or unclear evidence. Honor explicit read-only requests. Permanent deletion and production deployment remain outside automatic pending-record work.
+
+## Eligibility policy
+
+A missing CRICOS code means “eligibility unverified”, not automatic rejection. Apply CRICOS checks only to Australian providers. Domestic prices alongside international prices are not exclusion evidence; eligibility must apply to the course itself.
+
+**Why:** The user explicitly settled these rules to avoid excluding valid international courses.
+
+**How to apply:** Keep uncertain records pending and distinguish course-level restrictions from audience-specific fee labels.
 
 ## Grounding
 Official PDF research must remain separate from HTML field extraction and numeric writes.

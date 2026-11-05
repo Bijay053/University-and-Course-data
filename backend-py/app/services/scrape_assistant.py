@@ -396,6 +396,10 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
     from app.services.scraper.config.context import set_uni_config
     set_uni_config(ctx["config"])
     prompt = messages[-1]["content"]
+    from app.services.assistant_review_commands import handle_read_or_rule
+    from app.services import scrape_assistant as this_service
+    if await handle_read_or_rule(this_service, thread_id, turn_id, run_id, ctx, prompt, messages):
+        return
     from app.services import assistant_eligibility
     if assistant_eligibility.requested(prompt):
         from app.services import scrape_assistant as this_service
@@ -502,7 +506,12 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                     "Opening official PDF" if urlsplit(url).path.lower().endswith(".pdf") else "Opening official page",
                     status="running", url=url, event_id=identifier,
                 ))
-                result = await asyncio.wait_for(inspect_source(url, ctx["home"]), timeout=min(12, remaining))
+                from app.services.assistant_source_cache import cached_source
+                result = await cached_source(
+                    this_service, thread_id, turn_id, run_id, url, ctx["home"],
+                    inspect_source, min(12, remaining),
+                    fresh=bool(re.search(r"\b(fresh|re-?scrape|re-?fetch)\b", prompt, re.I)),
+                )
             except TimeoutError:
                 result = {
                     "url": url, "verified": False,
@@ -774,7 +783,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             "for the university's configured full scraping flow. Nothing has been changed or published.",
             "I will run catalogue discovery automatically and report its results here. Nothing will be published automatically."
         )
-    reply["content"] += "\n\n" + coverage["summary"]
+    # Coverage remains available in the activity ledger; do not append the
+    # same IELTS disclaimer to unrelated answers.
     await save_research_reply(thread_id, turn_id, run_id, reply,
                               detail=f"{len(citations)} verified source excerpts. No course changes applied.")
 

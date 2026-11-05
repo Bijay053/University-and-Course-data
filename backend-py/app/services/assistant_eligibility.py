@@ -24,6 +24,9 @@ def scope(prompt, samples):
     """A named example must not shrink an explicit request to check others."""
     if re.search(r"\b(all|every|other|others|rest|these|those)\b", prompt, re.I):
         return samples
+    ids = {int(value) for value in re.findall(r"\b(?:row|record)\s*#?\s*(\d+)\b", prompt, re.I)}
+    if ids:
+        return [r for r in samples if r["id"] in ids]
     urls = re.findall(r"https://[^\s)]+", prompt)
     if urls:
         return [r for r in samples if (r["url"] or "").rstrip("/") in
@@ -83,10 +86,19 @@ async def run(service, thread_id, turn_id, run_id, ctx, prompt):
         "Checking domestic-only eligibility", status="running",
         detail=f"Checking all {len(rows)} requested pending records against their official pages.",
     ))
-    results = {}
+    from app.models.scrape_assistant import ScrapeAssistantThread
+    async with service.AsyncSessionLocal() as db:
+        thread = await db.get(ScrapeAssistantThread, thread_id)
+        cached = {}
+        for message in thread.messages:
+            cached.update(message.get("_eligibilityChecks", {}))
+    results = {r["id"]: tuple(cached[str(r["id"])]["result"]) for r in rows
+               if str(r["id"]) in cached and
+               cached[str(r["id"])]["version"] == ctx["versions"][str(r["id"])]}
     queue = asyncio.Queue()
     for row in rows:
-        queue.put_nowait(row)
+        if row["id"] not in results:
+            queue.put_nowait(row)
     # Leave time for a fenced transaction inside the assistant's overall budget.
     deadline = time.monotonic() + 48
 
@@ -100,6 +112,25 @@ async def run(service, thread_id, turn_id, run_id, ctx, prompt):
                 results[row["id"]] = (quote, "checked")
             except Exception:
                 results[row["id"]] = (None, "unavailable")
+            async with service.AsyncSessionLocal() as db:
+                owner = (await db.execute(select(ScrapeAssistantThread).where(
+                    ScrapeAssistantThread.id == thread_id,
+                    ScrapeAssistantThread.turn_id == turn_id,
+                    ScrapeAssistantThread.run_id == run_id,
+                    ScrapeAssistantThread.status == "researching",
+                ).with_for_update())).scalar_one_or_none()
+                if owner is None:
+                    return
+                from copy import deepcopy
+                messages = deepcopy(owner.messages)
+                request = next(m for m in reversed(messages) if m["role"] == "user")
+                request.setdefault("_eligibilityChecks", {})[str(row["id"])] = {
+                    "version": ctx["versions"][str(row["id"])],
+                    "result": results[row["id"]],
+                }
+                owner.messages = messages
+                owner.updated_at = service.now()
+                await db.commit()
             await service.record_activity(thread_id, turn_id, run_id, service.event(
                 "Eligibility page checked", status="completed",
                 url=row["url"], detail=f"{row['name']}: " + (
@@ -109,10 +140,22 @@ async def run(service, thread_id, turn_id, run_id, ctx, prompt):
             ))
 
     await asyncio.gather(*(worker() for _ in range(min(4, len(rows)))))
+    if len(results) < len(rows):
+        async with service.AsyncSessionLocal() as db:
+            owner = (await db.execute(select(ScrapeAssistantThread).where(
+                ScrapeAssistantThread.id == thread_id, ScrapeAssistantThread.turn_id == turn_id,
+                ScrapeAssistantThread.run_id == run_id,
+                ScrapeAssistantThread.status == "researching",
+            ).with_for_update())).scalar_one_or_none()
+            if owner:
+                owner.status, owner.run_id = "queued", None
+                owner.phase = f"Continuing eligibility checks: {len(results)}/{len(rows)}"
+                await db.commit()
+        return
     await persist(service, thread_id, turn_id, run_id, ctx, rows, results)
 
 
-async def persist(service, thread_id, turn_id, run_id, ctx, rows, results):
+async def persist(service, thread_id, turn_id, run_id, ctx, rows, results, *, confirmed=False):
     from app.models import ScrapedCourse, ScrapeFeedback
     from app.models.scrape_assistant import ScrapeAssistantThread
     from app.models.user import User
@@ -134,7 +177,9 @@ async def persist(service, thread_id, turn_id, run_id, ctx, rows, results):
         ))
         request = next((m for m in reversed(thread.messages) if m["role"] == "user"), {})
         allowed = allowed and bool(request.get("autoRun")) and requested(request.get("content", ""))
-        excluded, details, sources = [], [], []
+        bulk = sum(bool(quote) for quote, _ in results.values()) > 10 and not confirmed
+        allowed = allowed and not bulk
+        excluded, details, sources, undo = [], [], [], []
         ids = [r["id"] for r in rows]
         locked = (await db.execute(select(ScrapedCourse).where(
             ScrapedCourse.id.in_(ids),
@@ -151,9 +196,22 @@ async def persist(service, thread_id, turn_id, run_id, ctx, rows, results):
             if state != "checked":
                 message = f"Retained: source {state}."
             if quote and allowed and unchanged:
+                undo.append({"id": row.id, "status": row.status,
+                             "reason": row.rejection_reason,
+                             "reviewedAt": row.reviewed_at.isoformat() if row.reviewed_at else None})
                 row.status = "rejected"
                 row.rejection_reason = f"domestic_only: {quote} Source: {candidate['url']}"
                 row.reviewed_at = service.now()
+                undo[-1]["excludedVersion"] = service.row_version(row)
+                undo[-1]["excludedReason"] = row.rejection_reason
+                undo[-1]["excludedAt"] = row.reviewed_at.isoformat()
+                import json
+                from app.models.audit import CourseAuditLog
+                db.add(CourseAuditLog(
+                    scraped_course_id=row.id, field_key="status", action="assistant_exclude",
+                    old_value=json.dumps(undo[-1]), new_value=json.dumps({"status": "rejected"}),
+                    reason=row.rejection_reason, actor=str(thread.actor_id),
+                ))
                 db.add(ScrapeFeedback(
                     university_id=row.university_id, scraped_course_id=row.id,
                     course_name=row.course_name, field_key="eligibility",
@@ -163,7 +221,8 @@ async def persist(service, thread_id, turn_id, run_id, ctx, rows, results):
                 message = "Excluded from pending approval: " + quote
                 sources.append({"url": candidate["url"], "title": candidate["name"], "quote": quote})
             elif quote:
-                message = "Retained: permission changed or the record was edited/approved during checking."
+                message = ("Confirmed domestic-only; awaiting confirmation of more than 10 exclusions."
+                           if bulk else "Retained: permission changed or the record was edited/approved during checking.")
             details.append({"url": candidate["url"], "status": "excluded" if candidate["id"] in excluded else "retained",
                             "message": candidate["name"] + " — " + message})
         await db.flush()
@@ -181,7 +240,8 @@ async def persist(service, thread_id, turn_id, run_id, ctx, rows, results):
                    "Retained records are not automatically verified as internationally eligible. "
                    "Nothing was permanently deleted or published.")
         if not allowed:
-            summary += " Changes were blocked because automatic execution or permission was unavailable."
+            summary += (" More than 10 exclusions require confirmation." if bulk else
+                        " Changes were blocked because automatic execution or permission was unavailable.")
         items = [dict(i) for i in thread.activity]
         service.finish_running(items)
         items.append(service.event("Eligibility results saved", status="completed", detail=summary))
@@ -190,10 +250,21 @@ async def persist(service, thread_id, turn_id, run_id, ctx, rows, results):
             "content": summary, "sources": sources, "activity": service.public_activity(items[-40:]),
             "actions": [{
                 "id": uuid.uuid4().hex, "kind": "exclude_domestic", "label": "Pending eligibility check",
-                "courseCount": len(rows), "fields": [], "state": "completed",
+                "courseCount": len(rows), "fields": [], "state": "proposed" if bulk else "completed",
                 "resultSummary": summary, "courseResults": details,
+                "requiresConfirmation": bulk, "_ctx": {
+                    "university_id": ctx["university_id"], "versions": ctx["versions"],
+                }, "_rows": rows, "_results": results, "_turnId": turn_id,
+                "_configVersion": ctx.get("config_version"), "_undo": undo,
             }],
         }
+        if undo:
+            reply["actions"].append({
+                "id": uuid.uuid4().hex, "kind": "undo_exclusion",
+                "label": "Undo these exclusions", "courseCount": len(undo),
+                "fields": [], "state": "proposed", "requiresConfirmation": True,
+                "_undo": undo, "_universityId": ctx["university_id"],
+            })
         thread.messages = (list(thread.messages) + [reply])[-20:]
         thread.activity = items[-40:]
         thread.status, thread.phase, thread.error = "ready", "Eligibility check finished", None

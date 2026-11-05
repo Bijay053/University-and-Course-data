@@ -62,7 +62,9 @@ def facts(html, url):
         return ""
     availability = line(r"Available to:")
     result = {"course_name": title, "_snippet": "\n".join(lines)[:6000],
-              "_domestic_only": "domestic" in availability.lower() and "international" not in availability.lower()}
+              "_domestic_only": bool(re.fullmatch(
+                  r"Available to:\s*Domestic(?: students)? only[.!]?",
+                  availability.strip(), re.I))}
     from app.services.scraper.extractors.degree_level import classify_degree_level, _academic_level_from_degree
     degree, _, _ = classify_degree_level(title)
     academic = _academic_level_from_degree(degree) if degree else None
@@ -150,6 +152,7 @@ def apply_authority(html, url, payload, evidence):
     if str(payload.get("course_location") or "").strip().lower() in {"on campus", "on-campus", "online", "blended"}:
         payload["course_location"] = None
     if values["_domestic_only"]:
+        payload["domestic_only"] = True
         payload["international_fee"] = None
         payload["fee_term"] = None
         payload["international_eligible"] = False

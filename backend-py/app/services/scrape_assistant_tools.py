@@ -173,9 +173,14 @@ async def inspect_source(url: str, home: str) -> dict:
         from app.services.scraper.extractors.fee import extract as extract_fee
         from app.services.scraper.extractors.english_test import extract as extract_english
         soup = BeautifulSoup(html, "html.parser")
+        # Keep source extraction on the original HTML, but remove website
+        # chrome and forms from the immutable text cited in chat.
         for node in soup.select("script,style,noscript"):
             node.decompose()
-        text = soup.get_text(" ", strip=True)
+        evidence_soup = BeautifulSoup(str(soup), "html.parser")
+        for node in evidence_soup.select("nav,footer,header,aside,form,select,[class*='related']"):
+            node.decompose()
+        text = evidence_soup.get_text(" ", strip=True)
         if len(text) < 150 or re.search(r"^(?:Just a moment|Access denied|Attention Required)", text, re.I):
             raise ValueError("The source returned a challenge or an empty page.")
         facts = []

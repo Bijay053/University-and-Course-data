@@ -11798,6 +11798,14 @@ async def extract_course(
     _apply_acap_campus(html or "", url, payload, evidence)
     from app.services.scraper.excelsia_source import apply_authority as _apply_excelsia
     _apply_excelsia(html or "", url, payload, evidence)
+    from app.services.assistant_eligibility import domestic_evidence
+    _domestic_quote = domestic_evidence(html or "", str(payload.get("course_name") or ""))
+    if _domestic_quote:
+        payload["domestic_only"] = True
+        payload["international_eligible"] = False
+        evidence.append({"field_key": "eligibility", "value": "domestic_only",
+                         "confidence": 1.0, "method": "course_owned_eligibility_label",
+                         "source_url": url, "snippet": _domestic_quote})
     if _fetch_host in {"excelsia.edu.au", "www.excelsia.edu.au"} and str(payload.get("course_name") or "").lower().strip() in {"excelsia.edu.au", "www.excelsia.edu.au"}:
         return {"url": url, "error": "unverified_course_title", "payload": {}, "evidence": [], "_perf": _perf_flags}
 

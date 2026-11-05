@@ -134,7 +134,8 @@ async def response(thread, db):
     if thread.status == "ready":
         current_start = max((index for index, message in enumerate(messages)
                              if message["role"] == "user"), default=0)
-        actions = [action for message in messages[current_start:] for action in message.get("actions", [])]
+        actions = [action for message in messages[current_start:] for action in message.get("actions", [])
+                   if action.get("kind") != "undo_exclusion"]
         if any(action["state"] in {"starting", "running"} for action in actions):
             live_phase = "Research complete — work is running. Results are not yet verified."
         elif actions and actions[-1]["state"] == "completed":
@@ -142,10 +143,15 @@ async def response(thread, db):
         elif actions and actions[-1]["state"] == "error":
             live_phase = "Confirmed work needs attention. See the action result above."
         elif actions and actions[-1]["state"] == "proposed":
-            automatic = any(message.get("autoRun") for message in messages[current_start:] if message["role"] == "user")
+            automatic = (not actions[-1].get("requiresConfirmation")
+                         and actions[-1].get("courseCount", 0) <= 10
+                         and any(message.get("autoRun") for message in messages[current_start:] if message["role"] == "user"))
             live_phase = ("Preparing automatic execution. No changes applied yet." if automatic
                           else "Action proposed. No changes applied.")
     for message in public:
+        for key in list(message):
+            if key.startswith("_"):
+                del message[key]
         for action in message.get("actions", []):
             for key in list(action):
                 if key.startswith("_"):
@@ -261,6 +267,78 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
         return await response(thread, db)  # Idempotent confirmation; never dispatch twice.
     if thread.status in service.ACTIVE:
         raise HTTPException(409, "Wait for the investigation to finish.")
+    if action["kind"] == "approve_course":
+        from app.permissions import user_has_permission
+        from app.routers.scrape import staged_approve
+        if not user_has_permission(actor, "staged.approve"):
+            raise HTTPException(403, "Missing permission: staged.approve")
+        if action["_turnId"] != thread.turn_id:
+            raise HTTPException(409, "Approval belongs to an earlier request.")
+        row = (await db.execute(select(ScrapedCourse).where(
+            ScrapedCourse.id == action["_ids"][0],
+            ScrapedCourse.scrape_job_id == job_id,
+            ScrapedCourse.university_id == job.university_id,
+        ).with_for_update())).scalar_one_or_none()
+        if not row or row.status not in service.REVIEW_STATUSES or service.row_version(row) != action["_versions"].get(str(row.id)):
+            raise HTTPException(409, "Course changed. Review it again before publishing.")
+        await staged_approve(row.id, db, actor, {})
+        action["state"] = "completed"
+        action["resultSummary"] = "Approved through the normal publication checks."
+        thread.messages = messages
+        await db.commit()
+        return await response(thread, db)
+    if action["kind"] == "undo_exclusion":
+        from datetime import datetime
+        from app.models import ScrapeFeedback
+        records = (await db.execute(select(ScrapedCourse).where(
+            ScrapedCourse.id.in_([r["id"] for r in action["_undo"]]),
+            ScrapedCourse.scrape_job_id == job_id,
+            ScrapedCourse.university_id == job.university_id,
+        ).order_by(ScrapedCourse.id).with_for_update())).scalars().all()
+        originals = {r["id"]: r for r in action["_undo"]}
+        if len(records) != len(originals) or any(
+            r.status != "rejected" or service.row_version(r) != originals[r.id]["excludedVersion"]
+            or r.rejection_reason != originals[r.id]["excludedReason"]
+            or not r.reviewed_at or r.reviewed_at.isoformat() != originals[r.id]["excludedAt"]
+            for r in records
+        ):
+            raise HTTPException(409, "A record changed since exclusion. Nothing was restored.")
+        for row in records:
+            old = originals[row.id]
+            feedback = (await db.execute(select(ScrapeFeedback).where(
+                ScrapeFeedback.scraped_course_id == row.id,
+                ScrapeFeedback.reason == old["excludedReason"],
+                ScrapeFeedback.issue_type == "manual_reject",
+            ))).scalars().all()
+            for item in feedback:
+                item.status = "resolved"
+            row.status, row.rejection_reason = old["status"], old["reason"]
+            row.reviewed_at = datetime.fromisoformat(old["reviewedAt"]) if old["reviewedAt"] else None
+            db.add(ScrapeFeedback(university_id=job.university_id, scraped_course_id=row.id,
+                                 course_name=row.course_name, issue_type="assistant_undo",
+                                 reason=f"Reviewer {actor['id']} restored assistant exclusion {action_id}",
+                                 status="resolved"))
+        action["state"] = "completed"
+        action["resultSummary"] = f"Restored {len(records)} pending records. Nothing was published."
+        thread.messages = messages
+        await db.commit()
+        return await response(thread, db)
+    if action["kind"] == "exclude_domestic":
+        if action.get("_turnId") != thread.turn_id:
+            raise HTTPException(409, "This proposal belongs to an older request. Check the current review again.")
+        from app.services.assistant_eligibility import persist
+        run_id = uuid.uuid4().hex
+        action["state"] = "superseded"
+        thread.messages = messages
+        thread.status, thread.run_id = "researching", run_id
+        turn_id, thread_id = thread.turn_id, thread.id
+        await db.commit()
+        await persist(service, thread_id, turn_id, run_id,
+                      action["_ctx"], action["_rows"],
+                      {int(k): tuple(v) for k, v in action["_results"].items()},
+                      confirmed=True)
+        await db.refresh(thread)
+        return await response(thread, db)
     uni = (await db.execute(select(University).where(University.id == job.university_id).with_for_update())).scalar_one()
     if service.fingerprint(uni.scrape_config or {}) != action.get("_configVersion"):
         raise HTTPException(409, "University settings changed. Ask the assistant to investigate again.")
