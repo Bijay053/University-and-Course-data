@@ -61,10 +61,15 @@ def facts(html, url):
             return " ".join(parts)
         return ""
     availability = line(r"Available to:")
+    intake_line = line(r"Intakes?\s*:")
     result = {"course_name": title, "_snippet": "\n".join(lines)[:6000],
               "_domestic_only": bool(re.fullmatch(
                   r"Available to:\s*Domestic(?: students)? only[.!]?",
                   availability.strip(), re.I))}
+    months = intake_months(intake_line)
+    if months:
+        result["intake_months"] = months
+        result["_intake_snippet"] = intake_line
     from app.services.scraper.extractors.degree_level import classify_degree_level, _academic_level_from_degree
     degree, _, _ = classify_degree_level(title)
     academic = _academic_level_from_degree(degree) if degree else None
@@ -145,7 +150,8 @@ def apply_authority(html, url, payload, evidence):
         payload.setdefault("extraction_method", {})[key] = "excelsia.course_facts"
         if value is None:
             continue
-        snippet = (values.get("_english_snippet") if key.startswith("ielts") else
+        snippet = (values.get("_intake_snippet") if key == "intake_months" else
+                   values.get("_english_snippet") if key.startswith("ielts") else
                    values.get("_fee_snippet") if key in {"international_fee", "fee_term", "currency"} else values["_snippet"])
         evidence.append({"field_key": key, "value": value, "confidence": 1.0,
                          "method": "excelsia.course_facts", "source_url": url, "snippet": snippet})
@@ -156,3 +162,13 @@ def apply_authority(html, url, payload, evidence):
         payload["international_fee"] = None
         payload["fee_term"] = None
         payload["international_eligible"] = False
+
+
+def intake_months(text):
+    """Canonical months only, never infer dates from an unlabelled page."""
+    import calendar
+    found = []
+    for month in list(calendar.month_name)[1:]:
+        if re.search(r"\b" + month[:3] + r"(?:" + month[3:] + r")?\b", text or "", re.I):
+            found.append(month)
+    return found

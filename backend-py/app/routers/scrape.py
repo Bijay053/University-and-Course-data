@@ -299,6 +299,11 @@ def _staged_row_to_dict(r) -> dict:
         d["eligibility_status"] = _dec.status
         d["eligibilityReason"] = _dec.reason
         d["eligibility_reason"] = _dec.reason
+        # Preserve the Australian registration review flag when recomputing
+        # generic completeness; a complete row is not proof of CRICOS.
+        if not r.cricos_code and (r.eligibility_reason or "").startswith("CRICOS registration unverified:"):
+            d["eligibilityStatus"] = d["eligibility_status"] = "unknown"
+            d["eligibilityReason"] = d["eligibility_reason"] = r.eligibility_reason
         d["autoPublishStatus"] = r.auto_publish_status  # not recomputed (needs DB)
         # Existing policy assessments can also contain an obsolete null-fee
         # completeness penalty. Reuse their conflict counts, never assume zero
@@ -3263,6 +3268,10 @@ async def re_extract_staged(
             ap = should_auto_publish(row)
             row.auto_publish_status = "ready" if ap.auto_publish else "review"
             row.decision_score = ap.score
+            from app.services.scraper.registration_review import flag_registration_review
+            provider = await db.get(University, row.university_id)
+            if provider:
+                flag_registration_review(row, provider.country, {})
         except Exception as exc:  # noqa: BLE001
             log.warning("re-extract: completeness scoring failed for sc %s: %s", sc_id, exc)
 
@@ -5437,6 +5446,10 @@ async def staged_fee_selection(
     sc.completeness = comp.score
     sc.eligibility_status = decision.status
     sc.eligibility_reason = decision.reason
+    from app.services.scraper.registration_review import flag_registration_review
+    provider = await db.get(University, sc.university_id)
+    if provider:
+        flag_registration_review(sc, provider.country, {})
     db.add(CourseAuditLog(
         scraped_course_id=sc.id, source_evidence_id=proof.id,
         field_key="international_fee", action="fee_option_selected",

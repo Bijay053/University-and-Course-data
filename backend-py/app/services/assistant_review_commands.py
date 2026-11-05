@@ -5,6 +5,28 @@ from app.models import ScrapedCourse, University
 
 
 async def handle_read_or_rule(service, thread_id, turn_id, run_id, ctx, prompt, messages):
+    from app.services.assistant_field_edits import handle_field_edit
+    if await handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt):
+        return True
+    reextract = bool(re.match(r"^\s*(?:please\s+)?(?:re-?scrape|re-?extract)\b", prompt, re.I))
+    if reextract:
+        from app.services.assistant_eligibility import scope
+        rows = scope(prompt, ctx["samples"])
+        action = service.action_proposal(
+            {"kind": "fix_fields", "fields": sorted(service.FIELDS)},
+            [r["id"] for r in rows],
+        ) if rows else None
+        if action:
+            action["_versions"] = ctx["versions"]
+            action["_configVersion"] = ctx.get("config_version")
+            action["requiresConfirmation"] = len(rows) > 10
+        await service.save_research_reply(thread_id, turn_id, run_id, {
+            "role": "assistant", "turnId": turn_id, "createdAt": service.now().isoformat(),
+            "content": ("Prepared source-backed re-extraction for the requested pending rows."
+                        if action else "Name a pending course, provide its row number, or request all pending rows."),
+            "sources": [], "actions": [action] if action else [],
+        }, detail="Scoped pending re-extraction prepared.")
+        return True
     approve = bool(re.match(r"^\s*(?:please\s+)?approve\b", prompt, re.I))
     if approve:
         from app.services.assistant_eligibility import scope

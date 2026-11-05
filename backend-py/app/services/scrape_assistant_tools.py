@@ -212,8 +212,17 @@ async def inspect_source(url: str, home: str) -> dict:
                 english_links.append(link)
             if fee_pdf and link not in fee_links:
                 fee_links.append(link)
+        from app.services.assistant_eligibility import domestic_evidence
+        headings = evidence_soup.find_all("h1")
+        eligibility_name = headings[0].get_text(" ", strip=True) if len(headings) == 1 else ""
+        from app.services.scraper.excelsia_source import facts as excelsia_facts
+        intake_facts = excelsia_facts(html, url)
         return {
             "url": url, "title": title[:200], "text": text[:24000], "_fullText": text,
+            "_eligibilityName": eligibility_name,
+            "_excelsiaIntake": {"name": intake_facts.get("course_name"), "months": intake_facts.get("intake_months"),
+                               "quote": intake_facts.get("_intake_snippet")},
+            "_eligibilityQuote": domestic_evidence(html, eligibility_name) if eligibility_name else None,
             "facts": facts, "excerpts": evidence_excerpts(text, facts), "verified": True,
             "englishLinks": english_links[:8], "feeLinks": fee_links[:8],
         }

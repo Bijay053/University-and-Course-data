@@ -103,6 +103,55 @@ def test_autorun_respects_threshold_and_publication():
     assert choose_action([{"kind": "fix_fields", "state": "proposed", "courseCount": 10}])
 
 
+@pytest.mark.asyncio
+async def test_explicit_rescrape_scopes_row_without_model(store):
+    await seed_thread(store)
+    ctx = await snapshot(store)
+    assert await handle_read_or_rule(service, "eligibility", "turn", "owner", ctx, "re-scrape row 1", [])
+    async with store() as db:
+        t = await db.get(ScrapeAssistantThread, "eligibility")
+        action = t.messages[-1]["actions"][0]
+        assert action["kind"] == "fix_fields"
+        assert action["_ids"] == [1]
+        assert set(action["fields"]) == service.FIELDS
+        assert action["_versions"] == ctx["versions"]
+
+
+@pytest.mark.asyncio
+async def test_eligibility_reuses_research_source(store, monkeypatch):
+    await seed_thread(store)
+    ctx = await snapshot(store)
+    row = ctx["samples"][0]
+    async def inspect(url, home):
+        return {"verified": True, "url": url, "text": "Official eligibility",
+                "_eligibilityName": row["name"],
+                "_eligibilityQuote": "Available to: Domestic students only"}
+    await cached_source(service, "eligibility", "turn", "owner", row["url"],
+                        "https://www.example.edu", inspect, 5)
+    async def forbidden(*args):
+        raise AssertionError("A second source read is forbidden")
+    from app.services import scrape_assistant_tools
+    monkeypatch.setattr(scrape_assistant_tools, "inspect_source", forbidden)
+    token = eligibility._source_context.set((service, "eligibility", "turn", "owner"))
+    try:
+        assert await eligibility.check_course(row, "https://www.example.edu") == "Available to: Domestic students only"
+    finally:
+        eligibility._source_context.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_review_projection_preserves_cricos_warning(store):
+    await seed_thread(store)
+    from app.routers.scrape import _staged_row_to_dict
+    async with store() as db:
+        row = await db.get(ScrapedCourse, 1)
+        row.cricos_code = None
+        row.eligibility_reason = "CRICOS registration unverified: no course code established."
+        data = _staged_row_to_dict(row)
+        assert data["eligibilityStatus"] == "unknown"
+        assert data["eligibilityReason"] == row.eligibility_reason
+
+
 @pytest.mark.parametrize("country,code,flagged", [
     ("Australia", None, True), ("AU", None, True),
     ("United Kingdom", None, False), ("New Zealand", None, False),

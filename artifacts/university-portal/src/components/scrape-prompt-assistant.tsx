@@ -549,7 +549,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             <div className="mx-auto max-w-lg py-4 text-center" data-testid="assistant-empty">
               <p className="text-[15px] font-semibold text-slate-900">What should I look into?</p>
               <p className="mt-1 text-[12.5px] text-slate-600">
-                Ask to fetch a specific official course into a fresh review, or correct international fee, IELTS overall and bands, duration and location. Existing approved courses can be checked again without replacing an unrelated review row. Other topics can be investigated but not auto-applied. Findings may be incomplete; verify sources.
+                Name an existing course to correct its fields without creating another course. Fees, IELTS, duration and location use source-backed re-extraction; Excelsia intake edits use the official course’s Intake line. Say “add this course” for a separate course-fetch request. Publishing and bulk changes over 10 records require confirmation.
               </p>
               <div className="mt-4 flex flex-col gap-2 text-left">
                 {EXAMPLES.map((ex, i) => (

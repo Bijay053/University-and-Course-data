@@ -25,6 +25,12 @@ A missing CRICOS code means “eligibility unverified”, not automatic rejectio
 **How to apply:** Keep uncertain records pending and distinguish course-level restrictions from audience-specific fee labels.
 
 ## Grounding
+Named existing-course commands such as “add intake Feb and July” edit fields; they must not create another pending course. Explicit “add this course” is a separate intent.
+
+**Why:** The user reported a live intake edit being misrouted to course recovery, leaving the intake empty.
+
+**How to apply:** Resolve existing pending identity first, retain source verification and audit requirements, and stop on ambiguous matches.
+
 Official PDF research must remain separate from HTML field extraction and numeric writes.
 
 **Why:** Flattened PDF tables lose the DOM ownership that HTML audience/fee guards rely on. Reusing a general PDF downloader can also bypass the assistant's stricter pinned-host transport. A readable official document proves its text, not that every amount or IELTS score applies to the requested course.

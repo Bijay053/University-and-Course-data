@@ -66,7 +66,7 @@ def row_version(row):
         "id", "status", "course_name", "course_website", "international_fee",
         "currency", "fee_term", "fee_year", "ielts_overall", "ielts_listening",
         "ielts_speaking", "ielts_reading", "ielts_writing", "duration",
-        "duration_term", "course_location",
+        "duration_term", "course_location", "intake_months",
     )})
 
 

@@ -1,5 +1,6 @@
 """Evidence-backed pending-only exclusions, committed with their chat receipt."""
 import asyncio
+from contextvars import ContextVar
 import re
 import time
 import uuid
@@ -63,8 +64,21 @@ def domestic_evidence(html, name):
     return None
 
 
+_source_context = ContextVar("eligibility_source_context", default=None)
+
+
 async def check_course(row, home):
     url = official_url(row["url"], home)
+    context = _source_context.get()
+    if context:
+        from app.services.assistant_source_cache import cached_source
+        from app.services.scrape_assistant_tools import inspect_source
+        source = await cached_source(*context, url, home, inspect_source, 12)
+        if not source.get("verified"):
+            raise ValueError("Official page was not verified")
+        if re.sub(r"\W+", "", source.get("_eligibilityName", "")).casefold() == re.sub(r"\W+", "", row["name"]).casefold():
+            return source.get("_eligibilityQuote")
+        return None
     raw = await asyncio.wait_for(public_request(url), timeout=12)
     if raw.lstrip().startswith(b"%PDF"):
         return None
@@ -105,6 +119,7 @@ async def run(service, thread_id, turn_id, run_id, ctx, prompt):
     async def worker():
         while not queue.empty() and time.monotonic() < deadline:
             row = queue.get_nowait()
+            token = _source_context.set((service, thread_id, turn_id, run_id))
             try:
                 quote = await asyncio.wait_for(
                     check_course(row, ctx["home"]), timeout=min(13, deadline - time.monotonic())
@@ -112,6 +127,8 @@ async def run(service, thread_id, turn_id, run_id, ctx, prompt):
                 results[row["id"]] = (quote, "checked")
             except Exception:
                 results[row["id"]] = (None, "unavailable")
+            finally:
+                _source_context.reset(token)
             async with service.AsyncSessionLocal() as db:
                 owner = (await db.execute(select(ScrapeAssistantThread).where(
                     ScrapeAssistantThread.id == thread_id,
