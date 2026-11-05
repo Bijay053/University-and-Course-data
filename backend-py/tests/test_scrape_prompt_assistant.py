@@ -668,12 +668,19 @@ async def test_review_wide_followup_passes_current_scope_not_stale_course_to_mod
 
 
 @pytest.mark.asyncio
-async def test_already_registered_course_does_not_trigger_unrelated_repair(store, monkeypatch):
+@pytest.mark.parametrize("record_kind",["published","pending"])
+async def test_already_registered_course_does_not_trigger_unrelated_repair(store, monkeypatch,record_kind):
     from app.models.course import Course
     url = "https://www.example.edu/already-approved"
     async with store() as db:
-        db.add(Course(id=17, university_id=1, name="Already approved degree", course_website=url,
-                      status="active", approval_status="approved"))
+        if record_kind=="published":
+            db.add(Course(id=17, university_id=1, name="Already approved degree", course_website=url,
+                          status="active", approval_status="approved"))
+        else:
+            db.add(ScrapeRuntimeJob(runtime_job_id="other-review",university_id=1,job_type="scrape",status="completed"))
+            await db.flush()
+            db.add(ScrapedCourse(id=17,university_id=1,scrape_job_id="other-review",status="pending",
+                                course_name="Already approved degree",course_website=url))
         await db.commit()
     research_fakes(monkeypatch)
     async def ai(**kwargs):
@@ -686,10 +693,7 @@ async def test_already_registered_course_does_not_trigger_unrelated_repair(store
     async with store() as db:
         result = await get_assistant("source", db, {"id": 1})
     assert result["status"] == "ready"
-    action = result["messages"][-1]["actions"][0]
-    assert action["kind"] == "review_courses" and action["courseCount"] == 1
-    assert action["state"] == "proposed" and action["fields"] == []
-    assert "existing course record does not prevent" in result["messages"][-1]["content"]
+    assert result["messages"][-1]["actions"]==[]
 
 
 @pytest.mark.asyncio
@@ -1105,14 +1109,12 @@ async def test_names_can_resolve_from_verified_official_catalogue_only(store, mo
 
 
 @pytest.mark.asyncio
-async def test_named_correction_keeps_confirmation_and_unrelated_rows_safe(store, monkeypatch):
+async def test_named_correction_never_reimports_existing_course(store, monkeypatch):
     await named_inventory(store)
     research_fakes(monkeypatch)
     reply = await named_turn(store, "Fix Graduate Certificate of Counselling IELTS")
-    action = reply["actions"][0]
-    assert action["kind"] == "review_courses" and action["state"] == "proposed"
-    assert action["_requestedUrls"] == ["https://www.example.edu/certificate"]
-    assert not action["_ids"]
+    assert not reply["actions"]
+    assert reply["resolvedCourses"][0]["url"]=="https://www.example.edu/certificate"
 
 
 @pytest.mark.asyncio
@@ -1124,6 +1126,5 @@ async def test_ambiguous_selection_retains_original_request_without_autoconfirma
     clarification = await named_turn(store, "IELTS?")
     assert clarification["courseChoices"] == choice["courseChoices"]
     reply = await named_turn(store, str(index))
-    assert reply["actions"][0]["kind"] == "review_courses"
-    assert reply["actions"][0]["state"] == "proposed"
-    assert reply["actions"][0]["_requestedUrls"] == ["https://www.example.edu/certificate"]
+    assert not reply["actions"]
+    assert reply["resolvedCourses"][0]["url"]=="https://www.example.edu/certificate"
