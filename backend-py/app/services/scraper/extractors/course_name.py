@@ -358,6 +358,16 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         return []
     soup = BeautifulSoup(html, "html.parser")
     candidates: list[tuple[str, str, float]] = []
+    from app.services.scraper.extractors.uk_course_facts import surrey_options
+    _surrey = surrey_options(html,url)
+    if _surrey:
+        from urllib.parse import parse_qs
+        selected=parse_qs(urlparse(url).query).get("surrey_option",[_surrey[0]["key"]])[0]
+        option=next((o for o in _surrey if o["key"]==selected),None)
+        if option is None:return []
+        name=option["course_name"]
+        return [ExtractionResult(field_key="course_name",value=name,normalized={"course_name":name},
+                                 confidence=1.0,method="course_name.surrey_option",snippet=option["source_text"])]
 
     # Lancashire hero-banner pre-pass: combines span.hero-banner__tag
     # ("MSc/PGDip/PGCert") + h1.hero-banner__title ("Midwifery") without
@@ -512,6 +522,14 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
                     cleaned = _cn_cleaned
             except Exception:
                 pass
+            if (urlparse(url).hostname or "").endswith(".ac.uk"):
+                from app.services.scraper.extractors.uk_course_facts import clean_uk_title
+                cleaned=clean_uk_title(cleaned)
+                award_pattern=r"\b(?:BSc|MSc|BEng|MEng|BAcc|BA|MA|LLB|LLM|MBA|MBBS|BMBS|PhD|MPhil|MRes|PGDip|PGCert|Bachelor|Master|Doctor)\b"
+                if not re.search(award_pattern,cleaned,re.I) and soup.title:
+                    titled=clean_uk_title(soup.title.get_text(" ",strip=True))
+                    if cleaned.casefold() in titled.casefold() and re.search(award_pattern,titled,re.I):
+                        cleaned=titled
             return [
                 ExtractionResult(
                     field_key="course_name",

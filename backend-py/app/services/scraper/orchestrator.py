@@ -1609,7 +1609,8 @@ async def _extract_only(
             seen_pdf_urls=seen_pdf_urls,
             discovery_title=name,
             ai_provider=ai_provider,
-            **({"html": link["_uel_html"]} if link.get("_uel_html") else {}),
+            **({"html": link.get("_uel_html") or link.get("_surrey_html")}
+               if link.get("_uel_html") or link.get("_surrey_html") else {}),
             **({"_uel_skip_preflight": True} if link.get("_uel_skip_preflight") else {}),
         )
     except ScrapedoAccountError:
@@ -6640,6 +6641,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             if (job.request_payload or {}).get("courseReport"):
                 links = links[:min(max_courses, _verification.max_courses)]
         try:
+            from app.services.scraper.extractors.uk_course_facts import expand_links as expand_surrey_links
+            if not _targeted_retry:
+                links = await expand_surrey_links(links, max_courses)
             links = await _expand_uel_course_links_for_run(
                 links, max_courses=max_courses, targeted_retry=_targeted_retry,
                 emit=emit, stop_flag=stop_flag,
