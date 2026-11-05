@@ -743,7 +743,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                 "or cannot be verified, the result will say so. Nothing has been added yet, and this action "
                 "does not create a duplicate published course or approve changes."
             )
-    if action and not citations:
+    if action and not citations and any(source.get("verified") for source in sources):
         raise ValueError("Corrections require at least one verified source excerpt.")
     if action:
         action["_versions"] = ctx["versions"]
@@ -787,6 +787,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         )
     if name_resolution:
         reply["resolvedCourses"] = name_resolution["choices"]
+    from app.services.assistant_source_gate import gate_unreachable_repair
+    reply = gate_unreachable_repair(reply, sources)
     if messages[-1].get("autoRun") and reply.get("actions"):
         reply["content"] = reply["content"].replace(
             "Confirm the action below to fetch", "I will automatically fetch"

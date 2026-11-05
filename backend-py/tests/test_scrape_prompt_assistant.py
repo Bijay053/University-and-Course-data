@@ -235,6 +235,9 @@ async def propose(db):
 @pytest.mark.asyncio
 async def test_confirm_reuses_guarded_fix_once_and_reports_persisted_completion(store, monkeypatch):
     from app.routers import scrape
+    async def reachable(url,home):
+        return {"verified":True,"url":url}
+    monkeypatch.setattr(service,"inspect_source",reachable)
     calls = []
     async def guarded_start(body, db, actor):
         calls.append(body)

@@ -58,6 +58,19 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt):
                      "ielts": "ielts_overall", "duration": "duration", "location": "course_location", "campus": "course_location"}
         if field in field_map:
             action = service.action_proposal({"kind": "fix_fields", "fields": [field_map[field]]}, [r["id"] for r in rows])
+            from app.services.assistant_source_gate import require_reachable_sources
+            from app.services.assistant_source_cache import cached_source
+            async def inspect(url,home):
+                return await cached_source(service,thread_id,turn_id,run_id,url,home,
+                                           service.inspect_source,12)
+            try:
+                await require_reachable_sources([r.get("url") for r in rows],ctx["home"],inspect)
+            except ValueError as exc:
+                await service.save_research_reply(thread_id,turn_id,run_id,{
+                    "role":"assistant","createdAt":service.now().isoformat(),
+                    "content":str(exc),"actions":[],"sources":[],
+                },detail="Source access failed; no bulk fix queued.")
+                return True
             action.update(_versions=ctx["versions"], _configVersion=ctx["config_version"],
                           requiresConfirmation=len(rows) > 10)
             await service.save_research_reply(thread_id, turn_id, run_id, {

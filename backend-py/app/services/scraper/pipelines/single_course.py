@@ -11842,6 +11842,8 @@ async def extract_course(
             "_perf": _perf_flags,
         }
 
+    from app.services.scraper.field_validation import validate_fields
+    payload, _ = validate_fields(payload, evidence)
     validate_payload_keys("single_course.extract_course", payload.keys())
     return {
         "url": url,

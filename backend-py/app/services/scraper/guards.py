@@ -1957,6 +1957,8 @@ def enforce_source_evidence(
     """
     if not isinstance(payload, dict):
         return ({}, [])
+    from app.services.scraper.field_validation import validate_fields
+    payload, invalid_fields = validate_fields(payload, evidence)
 
     # Build a quick index: field_key -> True if at least one evidence row
     # for it has both a source URL and a snippet.
@@ -1980,4 +1982,4 @@ def enforce_source_evidence(
         if field_key not in proven:
             cleaned[field_key] = None
             dropped.append(field_key)
-    return (cleaned, dropped)
+    return (cleaned, list(dict.fromkeys([*dropped, *invalid_fields])))
