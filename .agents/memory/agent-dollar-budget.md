@@ -2,7 +2,7 @@
 name: Agent dollar budget
 description: The approved cap and fail-closed accounting rules for the rebuilt scrape agent.
 ---
-The user approved a US$100 daily agent cap before production enablement. Account across users/workers, with an explicitly disclosed UTC-day reset.
+The user approved a US$100 daily agent cap before production enablement. Account across users/workers and reset at midnight Australia/Sydney, including daylight saving.
 
 **Why:** Concurrent workers and uncertain API failures must not bypass the monetary limit. A failed request can still be billable.
 

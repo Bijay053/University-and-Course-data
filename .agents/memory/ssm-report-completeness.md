@@ -8,3 +8,7 @@ AWS SSM command stdout can truncate at roughly 24 KB. Successful command executi
 **Why:** A production inventory and error-log report exceeded the output allowance; the returned JSON was incomplete despite successful execution.
 
 **How to apply:** Filter to necessary fields, page large reports, or gzip/base64 small bounded reports and validate decoding and row counts. Never approve a bulk change or declare an inventory complete using truncated output. Keep credentials and unrelated private data out of reports.
+
+Large reviewed plans can also exceed SSM's command-document input limit (97 KB). Compress the approved JSON before transport and decode it remotely without changing its scope.
+
+**Why:** Detailed field snapshots can exceed the input allowance even when a script and its result are small. A rejected transport request is not a database execution.

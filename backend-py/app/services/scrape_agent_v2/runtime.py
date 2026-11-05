@@ -91,7 +91,7 @@ async def investigate(service, thread_id, turn_id, run_id):
     except SpendLimit as exc:
         await service.save_research_reply(thread_id,turn_id,run_id,{
             "role":"assistant","turnId":turn_id,"createdAt":service.now().isoformat(),
-            "content":str(exc)+" No further model calls or actions were run. Earlier completed changes remain in the audit log. Daily limits reset at midnight UTC.",
+            "content":str(exc)+" No further model calls or actions were run. Earlier completed changes remain in the audit log. Daily limits reset at midnight Australia/Sydney, including daylight-saving changes.",
             "actions":[],"sources":[],
         },detail="Dollar-budget stop; no automatic retry.",phase="Agent stopped — spending safeguard")
     finally:

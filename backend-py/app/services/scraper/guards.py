@@ -1073,6 +1073,9 @@ def should_stage_course(
     just before the DB write in ``stage_course``) so Bug B and C have settled
     payloads to inspect.
     """
+    from app.services.scraper.extractors.course_name import is_domain_only_name
+    if is_domain_only_name(payload.get("course_name") or course_name):
+        return False,"invalid_course_name_domain"
     # ── Global international-audience policy ─────────────────────────────────
     # Online-only programmes must never enter the international review queue.
     # This is intentionally not configurable per university: old YAML and
@@ -1957,6 +1960,8 @@ def enforce_source_evidence(
     """
     if not isinstance(payload, dict):
         return ({}, [])
+    from app.services.scraper.field_validation import validate_fields
+    payload, invalid_fields = validate_fields(payload, evidence)
 
     # Build a quick index: field_key -> True if at least one evidence row
     # for it has both a source URL and a snippet.
@@ -1980,4 +1985,4 @@ def enforce_source_evidence(
         if field_key not in proven:
             cleaned[field_key] = None
             dropped.append(field_key)
-    return (cleaned, dropped)
+    return (cleaned, list(dict.fromkeys([*dropped, *invalid_fields])))

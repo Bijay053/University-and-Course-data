@@ -1,4 +1,15 @@
-## Latest workspace checkpoint — 2026-11-05
+## Latest verified changes — 2026-11-05
+
+- Production data: all six requested pending rows now have February/July intake evidence from their own official brochure sections. Both domain-only names were corrected. Changes were audited and read back, with version-fenced undo receipts retained. These were targeted maintenance repairs, not activation of the rebuilt agent.
+- Graduate Diploma of Business Administration was initially omitted by text-only web extraction. Native PDF text and visual inspection of course-guide page 9 established its own February/July intake.
+- The owner-approved consolidation has now been applied in production: 19 duplicates soft-excluded across ten groups, 29 audit records, and 451 evidence copies preserving originals. Pending records decreased from 71 to 52. All fourteen conflicting groups and published records were verified unchanged. Source-job history remains intact; this does not implement the consolidated provider UI.
+- Four database-backed consolidation tests pass: merge/undo, stale proposal rejection, conflict rejection, and later-edit protection for undo. No model was involved in this deterministic maintenance operation.
+- Workspace code: Sydney-midnight budget boundaries (DST-aware), including legacy UTC-ledger accounting; domain-only name rejection in extraction and final staging.
+- Tests: 62 focused budget/name/repair tests passed; expanded name/staging suite 166 passed; real-model/live-registry test passed through the updated budget boundary. Counts overlap and must not be summed.
+- Partner lists have been received and preserved. Final golden selection and team approval are still pending.
+- No AWS code release or new-agent activation occurred. Consolidated provider UI, global policy flows, persistent self-repair rules, complete scenario coverage and signed-in browser verification are not claimed complete.
+
+## Earlier workspace checkpoint — 2026-11-05
 
 - User approved USD100/day. Dollar reservations are serialized across workers; unknown usage retains reservations; cost-bound overruns freeze subsequent calls. Stops now produce a chat response without automatic retry. Reset is midnight UTC.
 - Owner allowlist is implemented, but neither global activation nor production-user activation has been performed.

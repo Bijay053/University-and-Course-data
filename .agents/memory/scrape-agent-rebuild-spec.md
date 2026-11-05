@@ -16,6 +16,8 @@ Auto-fix pending records with clear evidence and reversible audited writes. Publ
 
 The final golden set must be selected from the user's partner universities and priority recruitment courses, weighted towards Australia, then UK, USA and Canada. Each course requires verified eligibility, tuition/basis/currency/year, intakes, duration, English tests and academic requirements. Include at least two domestic-only, per-credit, season/term-intake and multi-campus cases, plus genuine conflicts. Incomplete candidates must not enter the final set. Export research for the team; only team approval grants golden status. Report accuracy from actual agent outputs after approval.
 
+The owner supplied the partner roster on 2026-11-05: research/partner-universities-user-supplied.txt preserves the pasted list and points to the UK attachment. Do not ask for the list again. Keep campus/country identities and verify aliases before deduplicating names.
+
 **Why:** The user replaced the initial broad research selection with partner-focused, team-approved ground truth.
 
 **How to apply:** The partner list and golden set do not block building the other stages. Keep the team on the legacy pipeline until the user approves. Pilot access must be per user, only for the owner's account, after the signed-in UI and dollar-budget protections work. Never describe a targeted test pass as complete production acceptance.

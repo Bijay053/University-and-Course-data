@@ -139,6 +139,23 @@ async def public_request(url: str, *, method="GET", body=None, params=None, user
         transport=transport, follow_redirects=False, trust_env=False, timeout=httpx.Timeout(9, connect=4),
         headers={"User-Agent": user_agent or "StudyInfoCentre-SourceVerifier/1.0"},
     ) as client:
+        if method == "GET" and value.path != "/robots.txt":
+            from urllib.robotparser import RobotFileParser
+            robots_url=value._replace(path="/robots.txt",query="",fragment="").geturl()
+            async with client.stream("GET",robots_url) as rules:
+                if rules.status_code not in (200,404,410):
+                    raise SourceReadError(f"robots.txt could not be verified (HTTP {rules.status_code}); source access stopped without bypassing protection.")
+                if rules.status_code==200:
+                    raw_rules=bytearray()
+                    async for part in rules.aiter_bytes():
+                        raw_rules.extend(part)
+                        if len(raw_rules)>256_000:raise SourceReadError("robots.txt exceeds the safe size limit.")
+                    robots_text=raw_rules.decode("utf-8",errors="replace")
+                    if "<html" in robots_text.lower():
+                        raise SourceReadError("robots.txt returned an HTML page or protection challenge; source access stopped.")
+                    parser=RobotFileParser();parser.parse(robots_text.splitlines())
+                    if not parser.can_fetch(user_agent or "StudyInfoCentre-SourceVerifier/1.0",url):
+                        raise SourceReadError("robots.txt disallows this source; no browser or proxy bypass was attempted.")
         async with client.stream(method, url, json=body if method == "POST" else None, params=params or None) as response:
             if response.is_redirect:
                 target = official_url(urljoin(url, response.headers.get("location", "")), url)
@@ -146,7 +163,10 @@ async def public_request(url: str, *, method="GET", body=None, params=None, user
                 if target == url:
                     raise ValueError("Source redirect could not be verified.")
                 raise SourceReadError("Source redirects; provide its final official URL.")
-            response.raise_for_status()
+            if response.status_code in (401,403,429):
+                raise SourceReadError(f"Official source refused access (HTTP {response.status_code}); no bot-protection bypass was attempted.")
+            if response.status_code>=400:
+                raise SourceReadError(f"Official source returned HTTP {response.status_code}.")
             chunks = bytearray()
             async for chunk in response.aiter_bytes():
                 chunks.extend(chunk)

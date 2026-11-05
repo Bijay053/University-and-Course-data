@@ -1,0 +1,22 @@
+[
+  {
+    "id": 56026,
+    "before": {
+      "intake_months": null
+    },
+    "after": {
+      "intake_months": [
+        "February",
+        "July"
+      ]
+    },
+    "evidence": {
+      "intake_months": {
+        "url": "https://excelsia.edu.au/wp-content/uploads/Course-Guide-Generic.pdf#page=9",
+        "quote": "Graduate Diploma of Business Administration\nCourse duration: 1 year full-time\n2 years part-time (domestic students only)\nIntake: February and July\nCredit points: 48"
+      }
+    },
+    "auditId": 11,
+    "postVersion": "73f04d85a01581952ffefab1e987548d5e2e4743496f1985219ab3fe623209a2"
+  }
+]

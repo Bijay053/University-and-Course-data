@@ -1,0 +1,22 @@
+{
+  "universityId": 110,
+  "importsPaused": true,
+  "threadsUpdated": 2,
+  "intakeRow": 56026,
+  "before": {
+    "intake_months": [
+      "February",
+      "July"
+    ],
+    "intake_days": null,
+    "scrape_warnings": [
+      "confidence_low:0",
+      "confidence_low"
+    ],
+    "proofIds": [
+      1044364
+    ]
+  },
+  "intakeAuditId": 175,
+  "intakeMonths": []
+}

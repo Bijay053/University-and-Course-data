@@ -154,6 +154,29 @@ async def test_evidence_backed_score_write_verifies_numeric_database_value(store
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("field,value,prompt",[
+    ("course_name","BAcc (Hons) Accounting","fix the course name on row 1"),
+    ("duration","4","fix duration on row 1"),
+])
+async def test_single_row_name_and_duration_edits(store,field,value,prompt):
+    from app.models.evidence import ScrapedFieldEvidence
+    await seed_thread(store)
+    ctx=await snapshot(store)
+    ctx["home"]=ctx["samples"][0]["url"]
+    async with store() as db:
+        proof=ScrapedFieldEvidence(scraped_course_id=1,field_key=field,
+            normalized_value=value,source_url=ctx["home"],snippet=f"{field}: {value}",
+            confidence=1,selected=True,validation_status="verified",extraction_method="test_review")
+        db.add(proof);await db.commit();proof_id=proof.id
+    tools=DataTools(service,"eligibility","turn","owner",ctx,prompt)
+    result=await tools.execute("edit_field",{"row_id":1,"field":field,"evidence_id":proof_id},"edit-one")
+    assert result["changed"],result
+    async with store() as db:
+        actual=getattr(await db.get(ScrapedCourse,1),field)
+        assert actual==(value if field=="course_name" else float(value))
+
+
+@pytest.mark.asyncio
 async def test_concurrent_intake_edit_is_preserved(store):
     await seed_thread(store)
     ctx=await snapshot(store)

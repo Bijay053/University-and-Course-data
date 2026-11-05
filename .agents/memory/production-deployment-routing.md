@@ -3,6 +3,17 @@ name: Production deployment routing
 description: Non-obvious routing constraints for deploying this project to its external AWS host.
 ---
 
+For GitHub publication, prefer the connected GitHub App API when native Git is
+rewritten to a legacy REST connection and refuses Git credentials.
+
+**Why:** The native Git rewrite can fail even while the installed GitHub App
+connection is healthy. Stored personal tokens may also be stale.
+
+**How to apply:** Use the connected App's Git database API for reviewed blobs,
+trees, commits and refs. Compare the resulting tree hash to the locally tested
+tree before release. Do not overwrite newer main changes to publish a narrow
+release branch.
+
 Treat a failed release after checkout but before service restart as a partial
 release, not as a same-revision redeployment.
 

@@ -3,6 +3,14 @@ name: LSBU render and delivery evidence
 description: Why LSBU extraction needs a constrained browser fallback and course-owned online labels.
 ---
 
+## Current access policy
+
+For LSBU, respect robots.txt and do not bypass bot protection. A blocked robots.txt or protection challenge is a stop condition, not permission to use a rendered proxy or challenge-solving browser. Ordinary headless rendering is appropriate only for permitted JavaScript content, not to overcome access denial.
+
+**Why:** The user explicitly required this boundary after bulk location repair was suggested despite zero verified official pages. Historical proxy observations below are not authorization to bypass protection.
+
+**How to apply:** Stop source-dependent assistant repairs when no sampled official source is usable. Report the access problem and preserve unverified values rather than inventing locations or claiming a job was queued.
+
 LSBU course pages are accessible through a rendered proxy, while direct requests hit bot protection. On these large rendered pages, the separate per-course browser pass added no missing fields in the observed scrape and consumed the per-course deadline. Keep that pass disabled unless a fresh source comparison proves it supplies an essential field.
 
 **Why:** A large LSBU scrape ended with many per-course timeouts, and the browser passes visible in its log filled nothing. Page-wide study-mode rules also classified campus courses as Online, causing erroneous online-only skips. Broadly disabling Online detection would create the opposite error.

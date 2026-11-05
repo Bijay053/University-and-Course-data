@@ -287,3 +287,73 @@ mtime_ms = 1793852383686
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/32f35acb-8497-4676-8ee3-04a890480059/c8ded88a-842d-4ff8-af7d-fe23591962a7"
 storage_version_token = "1793852788144126"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "RZEuas11CWDGz25uFx3pA"
+uri = "file://reports/excelsia-consolidation-proposal.html"
+type = "html"
+title = "Excelsia consolidation proposal"
+description = "Exact retained and duplicate row IDs, source links, and field conflicts. Proposal only; no duplicate rows have been excluded."
+logical_id = "c0b01f3a-ed25-47d5-b85d-c5b9b988e702"
+content_hash = "sha256:243b531ebb372360f301534323e7dfb20139e596e22aa63d27843f9b4733a467"
+size = 22187
+mtime_ms = 1793856113692
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/c0b01f3a-ed25-47d5-b85d-c5b9b988e702/54a731d3-4da4-4c9c-afa1-9325114126f1"
+storage_version_token = "1793856401140815"
+content_type = "text/html"
+
+[[outputs]]
+id = "IHtwcBGAHEuvW4aVbtZnB"
+uri = "file://reports/excelsia-consolidation-completed.html"
+type = "html"
+title = "Completed Excelsia consolidation"
+description = "Production result: retained rows, 19 soft exclusions, audit records, verification and deployment status."
+logical_id = "6b81b2ac-d976-49d8-8dda-7fd286c8f594"
+content_hash = "sha256:f7fadc895c460ef32743ea191a3f69422934d1d0f72e3af2c0befbac3daf40c4"
+size = 2505
+mtime_ms = 1793857756031
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/6b81b2ac-d976-49d8-8dda-7fd286c8f594/7972634e-f271-4239-8daa-3586ea2743dc"
+storage_version_token = "1793857758822726"
+content_type = "text/html"
+
+[[outputs]]
+id = "dmIKNSr9ekIUzlrBKyN3k"
+uri = "file://reports/uws-corrections-preview.html"
+type = "html"
+title = "UWS pending-course correction preview"
+description = "All 131 pending rows, proposed field changes, official source links and campus restrictions. Not applied yet."
+logical_id = "90d75a75-321b-40a9-9f31-a80b2e5d90ad"
+content_hash = "sha256:b3bd6201a7ef3a0f47f284953fab6428ee603716e0ff6cad881af31c01ea17b9"
+size = 48704
+mtime_ms = 1793858339855
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/90d75a75-321b-40a9-9f31-a80b2e5d90ad/a3701caf-3e1d-477f-b5c0-b06d01ecbc46"
+storage_version_token = "1793859151427459"
+content_type = "text/html"
+
+[[outputs]]
+id = "Kzw2JGFnxUlGjulNLiaah"
+uri = "file://reports/excelsia-remaining-proposal.html"
+type = "html"
+title = "Excelsia: remaining consolidation proposal"
+description = "Current 52 rows; candidate primary and keep/exclude decisions for each group, with the four eligibility conflicts separated. No further exclusions applied."
+logical_id = "6e65f0d3-ff06-4eba-a13d-431afd0486eb"
+content_hash = "sha256:029cca4450d37461e4ccfea8e7ce5d1cc225c52d834a67c846e9e469dee7ec25"
+size = 19758
+mtime_ms = 1793862057929
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/6e65f0d3-ff06-4eba-a13d-431afd0486eb/2129d542-1120-4079-8323-f9623c42d4ef"
+storage_version_token = "1793862290078889"
+content_type = "text/html"
+
+[[outputs]]
+id = "OGxqqtov-Uz_kzhRawwFp"
+uri = "file://reports/lsbu-invalid-location-proposal.csv"
+type = "table"
+title = "LSBU invalid locations — proposed cleanup"
+description = "156 pending rows, including 85 in the 229-row review. Original values and proposed unverified values are listed. No course records have been changed."
+logical_id = "d64884e1-450d-4fb4-8739-b05ab4a36c60"
+content_hash = "sha256:f629a4e4eda51c3b48cf70370f65325f722da1fbddffe04bb5d73d460f1120d4"
+size = 35246
+mtime_ms = 1793863834283
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/d64884e1-450d-4fb4-8739-b05ab4a36c60/a773b1a5-80a7-4148-9b54-895840fac520"
+storage_version_token = "1793863885028638"
+content_type = "text/csv"

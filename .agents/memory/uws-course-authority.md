@@ -3,6 +3,12 @@ name: UWS catalogue and admission authority
 description: UWS mixed UG/PG discovery, audience-owned tuition, and taught versus research English requirements.
 ---
 
+UWS separates the award from the course H1 and labels duration as “Duration & study mode”. Start dates are campus-owned and can restrict entry to years 2/3.
+
+**Why:** Bare H1 extraction dropped awards, and generic parsing missed full-time durations. A shared page may describe multiple awards or a longer sandwich pathway; those must not be silently combined into one qualification.
+
+**How to apply:** Combine a single explicit award with its title, retain standard versus alternative duration evidence, and keep each campus's dates and entry restrictions together. Do not import an existing course again merely because the user says “fix this” from a different review.
+
 Use the official mixed undergraduate/postgraduate course catalogue, and verify coverage after all university filters, not just the provider response.
 
 **Why:** UWS's postgraduate finder is dynamic. An older undergraduate-only onboarding configuration explicitly blocked the entire postgraduate path, so a successful complete API response still lost every master's course. Subject-only headings also omit the award without being category pages.

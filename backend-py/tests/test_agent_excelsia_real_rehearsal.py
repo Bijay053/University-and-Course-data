@@ -112,3 +112,34 @@ async def test_real_model_official_cricos_tool(store):
         assert all(not r.get("changed") for r in receipts)
     finally:
         await client.close()
+
+
+@pytest.mark.asyncio
+async def test_real_model_single_row_name_edit(store):
+    from app.models.evidence import ScrapedFieldEvidence
+    await seed_thread(store)
+    ctx=await snapshot(store)
+    ctx["home"]=ctx["samples"][0]["url"]
+    async with store() as db:
+        await db.run_sync(lambda s:AgentSpend.__table__.create(s.connection(),checkfirst=True))
+        proof=ScrapedFieldEvidence(scraped_course_id=1,field_key="course_name",
+            normalized_value="BAcc (Hons) Accounting",source_url=ctx["home"],
+            snippet="Award BAcc (Hons). Course Accounting.",confidence=1,
+            selected=True,validation_status="verified",extraction_method="isolated_test_fixture")
+        db.add(proof);await db.commit();proof_id=proof.id
+    prompt=f"Fix the course name on existing pending row 1 using verified evidence {proof_id}. Use edit_field, field course_name. Do not fetch or add a course."
+    tools=DataTools(service,"eligibility","turn","owner",ctx,prompt)
+    client=_client()
+    async def model(messages,schemas):
+        return await complete(client,messages,schemas,spend_context=(store,settings,"name-edit-rehearsal"))
+    async def checkpoint(*args): pass
+    try:
+        result=await run_loop([{"role":"system","content":SYSTEM},{"role":"user","content":prompt}],
+                             tools,model,checkpoint,max_rounds=5)
+        async with store() as db:
+            assert (await db.get(ScrapedCourse,1)).course_name=="BAcc (Hons) Accounting"
+        (Path(__file__).resolve().parents[2]/"reports/agent-name-edit-real-model.json").write_text(
+            json.dumps({"realModel":True,"isolatedFixture":True,"productionWrites":0,
+                        "storedNameVerified":True,"answer":result["answer"]},indent=2))
+    finally:
+        await client.close()

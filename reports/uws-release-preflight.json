@@ -1,0 +1,6 @@
+{
+  "revision": "3a8734b4e93a0e398fa517bd58edda1565d6c507",
+  "dirty": "M backend-py/scraper_config/unis/canterbury_1759.yaml\n M backend-py/scraper_config/unis/hope_2221.yaml\n M backend-py/scraper_config/unis/law_1902.yaml\n M backend-py/scraper_config/unis/londonmet.yaml\n M backend-py/scraper_config/unis/mdx.yaml\n M backend-py/scraper_config/unis/port_2174.yaml\n?? backend-py/.release.env\n?? backend-py/scraper_config/unis/aston_100.yaml\n?? backend-py/scraper_config/unis/brighton_94.yaml\n?? backend-py/scraper_config/unis/brocku_105.yaml\n?? backend-py/scraper_config/unis/capilanou_107.yaml\n?? backend-py/scraper_config/unis/cbu_106.yaml\n?? backend-py/scraper_config/unis/crandallu_108.yaml\n?? backend-py/scraper_config/unis/cumbria_95.yaml\n?? backend-py/scraper_config/unis/essex_103.yaml\n?? backend-py/scraper_config/unis/lincoln_97.yaml\n?? backend-py/scraper_config/unis/northumbria_96.yaml\n?? backend-py/scraper_config/unis/www2_104.yaml\n?? runtime-proofs/",
+  "main": "b9fb1fc8238d8927db68d08ccb43e333b1007318\trefs/heads/main",
+  "services": "active\nactive\nactive\n"
+}

@@ -8,7 +8,7 @@
       "changed": false,
       "status": "registration_matched",
       "source": "https://data.gov.au/data/api/3/action/datastore_search?resource_id=48cacf69-2082-415e-9595-f17d0c3a4af0&limit=10&filters=%7B%22CRICOS+Course+Code%22%3A+%22078241E%22%7D",
-      "checkedAt": "2026-11-05T04:55:16.272165+00:00",
+      "checkedAt": "2026-11-05T05:22:44.382119+00:00",
       "matches": [
         {
           "CRICOS Provider Code": "00001K",
@@ -22,5 +22,5 @@
       "feeAuthority": false
     }
   ],
-  "answer": "CRICOS registration for row 1 matches the official register:\n\n- Provider: Canberra Institute of Technology (`00001K`)\n- Course: ACT Year 12 Certificate\n- CRICOS code: `078241E`\n- Register status: not expired\n\nNo data was changed, and I did not assess current course availability."
+  "answer": "CRICOS registration for row 1 matched the official register:\n\n- Provider: Canberra Institute of Technology (`00001K`)\n- Course: ACT Year 12 Certificate\n- CRICOS code: `078241E`\n- Register status: not expired\n\nNo data was changed, and no availability was inferred."
 }

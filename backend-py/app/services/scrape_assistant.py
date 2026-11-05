@@ -70,6 +70,16 @@ def row_version(row):
     )})
 
 
+def wants_new_course_review(prompt: str) -> bool:
+    """A correction request never becomes an import merely due to review scope."""
+    if re.search(r"\b(?:do not|don't|dont|never|stop)\s+(?:\w+\s+){0,2}(?:add|recover|import|fetch|rescrape|reextract|fix|correct|update|verify|recheck|refresh)\b", prompt, re.I):
+        return False
+    if (re.search(r"\badd\b.*\b(?:intakes?|location|duration|name|fee|ielts)\b", prompt,re.I)
+            and not re.search(r"\badd\s+(?:this\s+|the\s+)?courses?\b",prompt,re.I)):
+        return False
+    return bool(re.search(r"\b(?:add|recover|import|re-?scrape|re-?extract|fetch)\b",prompt,re.I))
+
+
 def action_proposal(data: dict, eligible_ids: list[int]) -> dict | None:
     if not data:
         return None
@@ -690,10 +700,14 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
     if not isinstance(result, dict) or not isinstance(result.get("answer"), str):
         raise ValueError("Invalid assistant response.")
     verified = {source["url"]: source for source in sources if source.get("verified")}
-    wants_review = bool(re.search(r"\b(?:add|recover|import|re-?scrape|re-?extract|fetch)\b", prompt, re.I))
+    wants_review = wants_new_course_review(prompt)
     current_urls = {item.get("url", "").rstrip("/") for item in ctx["samples"]}
-    outside_current_review = recent_user_urls and not any(value.rstrip("/") in current_urls for value in recent_user_urls)
-    if outside_current_review and re.search(r"\b(?:fix|correct|update|verify|recheck|refresh)\b", prompt, re.I):
+    known_urls = current_urls | {item.get("url", "").rstrip("/") for item in
+        inventory["registeredCourses"] + inventory["otherReviews"]}
+    # A genuinely unrecorded course may need retrieval. Existing records in
+    # another review are still existing records, not permission to import again.
+    if (recent_user_urls and not any(value.rstrip("/") in known_urls for value in recent_user_urls)
+            and re.search(r"\b(?:fix|correct|update|verify|recheck|refresh)\b",prompt,re.I)):
         wants_review = True
     if re.search(r"\b(?:do not|don't|dont|never|stop)\s+(?:\w+\s+){0,2}(?:add|recover|import|fetch|rescrape|reextract|fix|correct|update|verify|recheck|refresh)\b", prompt, re.I):
         wants_review = False
@@ -751,7 +765,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                 "or cannot be verified, the result will say so. Nothing has been added yet, and this action "
                 "does not create a duplicate published course or approve changes."
             )
-    if action and not citations:
+    if action and not citations and any(source.get("verified") for source in sources):
         raise ValueError("Corrections require at least one verified source excerpt.")
     if action:
         action["_versions"] = ctx["versions"]
@@ -795,6 +809,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         )
     if name_resolution:
         reply["resolvedCourses"] = name_resolution["choices"]
+    from app.services.assistant_source_gate import gate_unreachable_repair
+    reply = gate_unreachable_repair(reply, sources)
     if messages[-1].get("autoRun") and reply.get("actions"):
         reply["content"] = reply["content"].replace(
             "Confirm the action below to fetch", "I will automatically fetch"

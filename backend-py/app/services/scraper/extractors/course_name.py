@@ -216,10 +216,16 @@ def _smart_case(text: str) -> str:
     return "".join(out)
 
 
+def is_domain_only_name(raw: str) -> bool:
+    return bool(re.fullmatch(r"(?:https?://)?(?:[a-z0-9-]+\.)+[a-z]{2,}/?",str(raw or "").strip(),re.I))
+
+
 def _clean(raw: str) -> str | None:
     if not raw:
         return None
     txt = re.sub(r"\s+", " ", raw).strip()
+    if is_domain_only_name(txt):
+        return None
     # Issue 3a: strip AQF code prefix (e.g. "SIT40521 - ", "BSB60120 : ",
     # "SIS30321 Certificate…") before any other processing.
     txt = _AQF_PREFIX_RE.sub("", txt).strip()
@@ -250,7 +256,7 @@ def _clean(raw: str) -> str | None:
         if new == txt:
             break
         txt = new
-    if not txt or len(txt) < 3 or len(txt) > 200:
+    if not txt or len(txt) < 3 or len(txt) > 200 or is_domain_only_name(txt):
         return None
     # Slug like "bachelor-of-business" → "Bachelor of Business". Done before
     # ``_smart_case`` so the prepositions/acronym rules apply uniformly.

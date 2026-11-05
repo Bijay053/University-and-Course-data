@@ -1,7 +1,8 @@
-"""Global UTC-day USD cap with PostgreSQL-serialized reservations across workers."""
+"""Global Sydney-day USD cap with PostgreSQL-serialized reservations across workers."""
 import json
 import uuid
 from datetime import datetime,timezone
+from zoneinfo import ZoneInfo
 from decimal import Decimal,ROUND_UP
 from sqlalchemy import select,func,text
 from app.models.agent_spend import AgentSpend
@@ -9,6 +10,10 @@ from app.models.agent_spend import AgentSpend
 
 class SpendLimit(ValueError):
     pass
+
+
+def budget_day(now=None):
+    return (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Australia/Sydney")).date()
 
 
 def rates(settings):
@@ -37,7 +42,7 @@ async def reserve(factory,settings,thread_id,model,payload):
     # covers protocol overhead; opaque reasoning state is included in payload.
     upper_input=len(json.dumps(payload,ensure_ascii=False,default=str).encode("utf-8"))+8192
     amount=estimate(upper_input,4096,price_in,price_out)
-    day=datetime.now(timezone.utc).date()
+    day=budget_day()
     receipt=uuid.uuid4().hex
     async with factory() as db:
         await db.execute(text("SELECT pg_advisory_xact_lock(807126418)"))
@@ -45,7 +50,10 @@ async def reserve(factory,settings,thread_id,model,payload):
             AgentSpend.status=="over_reservation").limit(1))).scalar_one_or_none()
         if unsafe:
             raise SpendLimit("Agent stopped: a prior cost-bound overrun needs accounting review before more calls.")
-        used=(await db.execute(select(func.coalesce(func.sum(AgentSpend.charged_usd),0)).where(AgentSpend.day==day))).scalar_one()
+        # Derive the local date from timestamps so pre-switch UTC ledger rows
+        # cannot create a second allowance during the timezone transition.
+        local_day=func.date(func.timezone("Australia/Sydney",AgentSpend.created_at))
+        used=(await db.execute(select(func.coalesce(func.sum(AgentSpend.charged_usd),0)).where(local_day==day))).scalar_one()
         if used+amount>cap:
             raise SpendLimit(f"Agent stopped: daily USD budget reached. Reserved/spent ${used:.4f}; next call reserves ${amount:.4f}; daily cap ${cap:.2f}.")
         db.add(AgentSpend(id=receipt,day=day,thread_id=thread_id,model=model,

@@ -1,0 +1,127 @@
+{
+  "applied": [
+    {
+      "id": 56026,
+      "before": {
+        "course_name": "Excelsia.edu.au"
+      },
+      "after": {
+        "course_name": "Graduate Diploma of Business Administration"
+      },
+      "evidence": {
+        "course_name": {
+          "url": "https://excelsia.edu.au/study/business/graduate-diploma-of-business-administration/",
+          "quote": "Graduate Diploma of Business Administration"
+        }
+      },
+      "auditId": 5,
+      "postVersion": "73f04d85a01581952ffefab1e987548d5e2e4743496f1985219ab3fe623209a2"
+    },
+    {
+      "id": 56042,
+      "before": {
+        "intake_months": null,
+        "course_name": "Excelsia.edu.au"
+      },
+      "after": {
+        "intake_months": [
+          "February",
+          "July"
+        ],
+        "course_name": "Graduate Certificate in Aged Care"
+      },
+      "evidence": {
+        "intake_months": {
+          "url": "https://excelsia.edu.au/aged-care-brochure",
+          "quote": "#### Graduate Certificate in AGED CARE\n\nBy 2060, the federal government \nestimates the number of Australians \nover the age of 75 will rise to four \nmillion. As the demand for aged care \nservices increases, so too does stronger \ngovernance and leadership within \nthe sector as identified by the Royal \nCommission. In the Graduate Certificate \nin Aged Care, students will gain the \nknowledge to develop their skills that \ncan be applied to leadership and \nmanagement roles within residential \nand community-based agencies.\n\n| Course duration: | 6 months full-time 1 year part-time |\n| --- | --- |\n| Intake: | February and July |"
+        },
+        "course_name": {
+          "url": "https://excelsia.edu.au/study/social-work/graduate-certificate-in-aged-care/",
+          "quote": "Graduate Certificate in Aged Care"
+        }
+      },
+      "auditId": 6,
+      "postVersion": "c1f693c15bc4b22c0d11b4629c6af82f6c2f4d88c9f97c03c8cd2cd7b134afb6"
+    },
+    {
+      "id": 56052,
+      "before": {
+        "intake_months": null
+      },
+      "after": {
+        "intake_months": [
+          "February",
+          "July"
+        ]
+      },
+      "evidence": {
+        "intake_months": {
+          "url": "https://excelsia.edu.au/wp-content/uploads/Course-Guide-Generic.pdf",
+          "quote": "#### Bachelor of Business (Accounting)\n\n**Course duration:** 3 years full-time\n6 years part-time (domestic students only)\n\n**Intake:** February and July"
+        }
+      },
+      "auditId": 7,
+      "postVersion": "abbd15ede0c9bb406a878f0088afb1373998bd66241cd3dec82f73ba13fcd1d3"
+    },
+    {
+      "id": 56053,
+      "before": {
+        "intake_months": null
+      },
+      "after": {
+        "intake_months": [
+          "February",
+          "July"
+        ]
+      },
+      "evidence": {
+        "intake_months": {
+          "url": "https://excelsia.edu.au/wp-content/uploads/Course-Guide-Generic.pdf",
+          "quote": "#### Master of Professional Accounting\n\n**Course duration:** 2 years full-time\n4 years part-time (domestic students only)\n\n**Intake:** February and July"
+        }
+      },
+      "auditId": 8,
+      "postVersion": "05a0ebe99050a638651d809911ccc111ece2a70fcf4675383a38196d49e07844"
+    },
+    {
+      "id": 56063,
+      "before": {
+        "intake_months": null
+      },
+      "after": {
+        "intake_months": [
+          "February",
+          "July"
+        ]
+      },
+      "evidence": {
+        "intake_months": {
+          "url": "https://excelsia.edu.au/wp-content/uploads/Course-Guide-Generic.pdf",
+          "quote": "#### Graduate Certificate in Disability\n\n**Course duration:** 6 months full-time\n1 year part-time (domestic students only)\n\n**Intake:** February and July"
+        }
+      },
+      "auditId": 9,
+      "postVersion": "cdc459a5b462db719643f0635f4e7c4d0f3655a11527e1380b7f876d3898a3a3"
+    },
+    {
+      "id": 56073,
+      "before": {
+        "intake_months": null
+      },
+      "after": {
+        "intake_months": [
+          "February",
+          "July"
+        ]
+      },
+      "evidence": {
+        "intake_months": {
+          "url": "https://excelsia.edu.au/wp-content/uploads/Course-Guide-Generic.pdf",
+          "quote": "#### Master of Educational Leadership\n\n**Course duration:** 1 year full-time\n2\u20134 years part-time (domestic students only)\n\n**Intake:** February and July"
+        }
+      },
+      "auditId": 10,
+      "postVersion": "441b03b3ce0f7bfa5967b66249a1f79e4815d835c8b88adcaf3f87b2b5b9db40"
+    }
+  ]
+}

@@ -1,0 +1,934 @@
+{
+  "receipts": [
+    {
+      "id": 56121,
+      "auditId": 41,
+      "changes": {}
+    },
+    {
+      "id": 56122,
+      "auditId": 42,
+      "changes": {
+        "duration": 3.0
+      }
+    },
+    {
+      "id": 56123,
+      "auditId": 43,
+      "changes": {}
+    },
+    {
+      "id": 56124,
+      "auditId": 44,
+      "changes": {}
+    },
+    {
+      "id": 56125,
+      "auditId": 45,
+      "changes": {}
+    },
+    {
+      "id": 56126,
+      "auditId": 46,
+      "changes": {}
+    },
+    {
+      "id": 56127,
+      "auditId": 47,
+      "changes": {}
+    },
+    {
+      "id": 56128,
+      "auditId": 48,
+      "changes": {}
+    },
+    {
+      "id": 56129,
+      "auditId": 49,
+      "changes": {
+        "duration": 4.0
+      }
+    },
+    {
+      "id": 56130,
+      "auditId": 50,
+      "changes": {
+        "course_name": "BSc (Hons) Applied Bioscience",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56131,
+      "auditId": 51,
+      "changes": {
+        "course_name": "BSc (Hons) Applied Bioscience & Zoology",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56132,
+      "auditId": 52,
+      "changes": {
+        "course_name": "BSc (Hons) Applied Bioscience with Forensic Investigation",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56133,
+      "auditId": 53,
+      "changes": {}
+    },
+    {
+      "id": 56134,
+      "auditId": 54,
+      "changes": {}
+    },
+    {
+      "id": 56135,
+      "auditId": 55,
+      "changes": {}
+    },
+    {
+      "id": 56136,
+      "auditId": 56,
+      "changes": {
+        "course_name": "BSc (Hons) Biomedical Science / Applied Biomedical Science",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56137,
+      "auditId": 57,
+      "changes": {
+        "duration": 1.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56138,
+      "auditId": 58,
+      "changes": {
+        "duration": 1.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56139,
+      "auditId": 59,
+      "changes": {
+        "course_name": "BA (Hons) Business and Project Management (Graduate Apprenticeship)",
+        "duration": 4.0
+      }
+    },
+    {
+      "id": 56140,
+      "auditId": 60,
+      "changes": {
+        "course_name": "BA (Hons) Business and Sustainability (New College Lanarkshire)"
+      }
+    },
+    {
+      "id": 56141,
+      "auditId": 61,
+      "changes": {
+        "course_name": "BA (Hons) Business Management (Graduate Apprenticeship)",
+        "duration": 4.0
+      }
+    },
+    {
+      "id": 56142,
+      "auditId": 62,
+      "changes": {
+        "course_name": "BA (Hons) Business with Finance"
+      }
+    },
+    {
+      "id": 56143,
+      "auditId": 63,
+      "changes": {
+        "course_name": "BA (Hons) Business with HRM"
+      }
+    },
+    {
+      "id": 56144,
+      "auditId": 64,
+      "changes": {
+        "course_name": "BA (Hons) Business with Marketing"
+      }
+    },
+    {
+      "id": 56145,
+      "auditId": 65,
+      "changes": {
+        "course_name": "PgDip Career Guidance & Development"
+      }
+    },
+    {
+      "id": 56146,
+      "auditId": 66,
+      "changes": {
+        "course_name": "BSc (Hons) Chemistry (Year 3 Entry)",
+        "duration": 2.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56147,
+      "auditId": 67,
+      "changes": {
+        "course_name": "BSc (Hons) Chemistry with Education (Year 2 Entry)",
+        "duration": 2.0
+      }
+    },
+    {
+      "id": 56148,
+      "auditId": 68,
+      "changes": {
+        "course_name": "BA (Hons) Childhood Studies (2nd year entry)",
+        "duration": 3.0
+      }
+    },
+    {
+      "id": 56149,
+      "auditId": 69,
+      "changes": {
+        "course_name": "BEng (Hons) Civil Engineering",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56150,
+      "auditId": 70,
+      "changes": {
+        "course_name": "BEng (Hons) Civil Engineering (Graduate Apprenticeship)",
+        "duration": 4.0
+      }
+    },
+    {
+      "id": 56151,
+      "auditId": 71,
+      "changes": {}
+    },
+    {
+      "id": 56152,
+      "auditId": 72,
+      "changes": {
+        "course_name": "BSc (Hons) Collaborative Health and Social Care",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56153,
+      "auditId": 73,
+      "changes": {
+        "course_name": "BSc (Hons) Collaborative Health and Social Care (New College Lanarkshire Campus)",
+        "duration": 3.0
+      }
+    },
+    {
+      "id": 56154,
+      "auditId": 74,
+      "changes": {
+        "course_name": "BA (Hons) Commercial Music",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56155,
+      "auditId": 75,
+      "changes": {
+        "course_name": "BA (Hons) Community Education",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56156,
+      "auditId": 76,
+      "changes": {
+        "course_name": "BSc (Hons) Computer Animation Arts",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56157,
+      "auditId": 77,
+      "changes": {
+        "course_name": "BSc (Hons) Computer Games Development",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56158,
+      "auditId": 78,
+      "changes": {
+        "course_name": "BSc (Hons) Computer Networking",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56159,
+      "auditId": 79,
+      "changes": {
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56160,
+      "auditId": 80,
+      "changes": {
+        "course_name": "BA (Hons) Creative Practice (Dumfries & Galloway College)"
+      }
+    },
+    {
+      "id": 56161,
+      "auditId": 81,
+      "changes": {
+        "course_name": "BSc (Hons) Criminal Justice and Forensic Science",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56162,
+      "auditId": 82,
+      "changes": {
+        "course_name": "BA (Hons) Criminology & Criminal Justice/Criminology & Criminal Justice (Policing)",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56163,
+      "auditId": 83,
+      "changes": {}
+    },
+    {
+      "id": 56164,
+      "auditId": 84,
+      "changes": {
+        "course_name": "BA (Hons) Criminology and Psychology"
+      }
+    },
+    {
+      "id": 56165,
+      "auditId": 85,
+      "changes": {}
+    },
+    {
+      "id": 56166,
+      "auditId": 86,
+      "changes": {
+        "course_name": "BEng (Hons) Cyber Security"
+      }
+    },
+    {
+      "id": 56167,
+      "auditId": 87,
+      "changes": {
+        "course_name": "BEng Cyber Security (New College Lanarkshire Campus)",
+        "duration": 2.0
+      }
+    },
+    {
+      "id": 56168,
+      "auditId": 88,
+      "changes": {
+        "course_name": "BSc (Hons) Data Science and Artificial Intelligence"
+      }
+    },
+    {
+      "id": 56169,
+      "auditId": 89,
+      "changes": {
+        "course_name": "BSc (Hons) Data, AI and Software Engineering (Graduate Apprenticeship)",
+        "duration": 4.0
+      }
+    },
+    {
+      "id": 56170,
+      "auditId": 90,
+      "changes": {
+        "duration": 3.0
+      }
+    },
+    {
+      "id": 56171,
+      "auditId": 91,
+      "changes": {
+        "duration": 1.0
+      }
+    },
+    {
+      "id": 56172,
+      "auditId": 92,
+      "changes": {}
+    },
+    {
+      "id": 56173,
+      "auditId": 93,
+      "changes": {
+        "course_name": "Doctor of Business Administration (DBA) , Master of Research (MRes), Postgraduate Diploma in Research Methods (PG Dip), Postgraduate Certificate in Research Methods (PG Cert) Doctor of Business Administration (DBA)"
+      }
+    },
+    {
+      "id": 56174,
+      "auditId": 94,
+      "changes": {
+        "course_name": "BA (Hons) Drama",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56175,
+      "auditId": 95,
+      "changes": {
+        "course_name": "BA Early Learning and Childcare (Graduate Apprenticeship)"
+      }
+    },
+    {
+      "id": 56176,
+      "auditId": 96,
+      "changes": {
+        "course_name": "MEd Educational Studies (Full-time)"
+      }
+    },
+    {
+      "id": 56177,
+      "auditId": 97,
+      "changes": {
+        "course_name": "BEng (Hons) Engineering Design & Manufacture (Graduate Apprenticeship)",
+        "duration": 4.0
+      }
+    },
+    {
+      "id": 56178,
+      "auditId": 98,
+      "changes": {
+        "course_name": "BEng (Hons) Engineering Management (4th year entry)",
+        "duration": 1.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56179,
+      "auditId": 99,
+      "changes": {
+        "course_name": "BA (Hons) English Language"
+      }
+    },
+    {
+      "id": 56180,
+      "auditId": 100,
+      "changes": {
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56181,
+      "auditId": 101,
+      "changes": {
+        "course_name": "BA (Hons) Events & Tourism Management"
+      }
+    },
+    {
+      "id": 56182,
+      "auditId": 102,
+      "changes": {
+        "course_name": "BA (Hons) Filmmaking & Screen Writing",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56183,
+      "auditId": 103,
+      "changes": {
+        "course_name": "MSc Finance & Accounting with CIMA"
+      }
+    },
+    {
+      "id": 56184,
+      "auditId": 104,
+      "changes": {}
+    },
+    {
+      "id": 56185,
+      "auditId": 105,
+      "changes": {
+        "course_name": "BSc (Hons) Forensic Science",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56186,
+      "auditId": 106,
+      "changes": {
+        "course_name": "BA (Hons) Graphic Arts & Moving Image"
+      }
+    },
+    {
+      "id": 56187,
+      "auditId": 107,
+      "changes": {}
+    },
+    {
+      "id": 56188,
+      "auditId": 108,
+      "changes": {}
+    },
+    {
+      "id": 56189,
+      "auditId": 109,
+      "changes": {}
+    },
+    {
+      "id": 56190,
+      "auditId": 110,
+      "changes": {}
+    },
+    {
+      "id": 56191,
+      "auditId": 111,
+      "changes": {}
+    },
+    {
+      "id": 56192,
+      "auditId": 112,
+      "changes": {}
+    },
+    {
+      "id": 56193,
+      "auditId": 113,
+      "changes": {
+        "course_name": "BA (Hons) International Business (with pathways)"
+      }
+    },
+    {
+      "id": 56194,
+      "auditId": 114,
+      "changes": {}
+    },
+    {
+      "id": 56195,
+      "auditId": 115,
+      "changes": {}
+    },
+    {
+      "id": 56196,
+      "auditId": 116,
+      "changes": {
+        "course_name": "BA (Hons) Law",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56197,
+      "auditId": 117,
+      "changes": {}
+    },
+    {
+      "id": 56198,
+      "auditId": 118,
+      "changes": {
+        "course_name": "MBA Master of Business Administration (MBA)"
+      }
+    },
+    {
+      "id": 56199,
+      "auditId": 119,
+      "changes": {
+        "course_name": "MBA Master of Business Administration (MBA) with Banking & Finance"
+      }
+    },
+    {
+      "id": 56200,
+      "auditId": 120,
+      "changes": {
+        "course_name": "MBA Master of Business Administration (MBA) with Digital Marketing"
+      }
+    },
+    {
+      "id": 56201,
+      "auditId": 121,
+      "changes": {
+        "course_name": "MBA Master of Business Administration (MBA) with Leadership"
+      }
+    },
+    {
+      "id": 56202,
+      "auditId": 122,
+      "changes": {
+        "course_name": "MBA Master of Business Administration (MBA) with Logistics and Supply Chain Management"
+      }
+    },
+    {
+      "id": 56203,
+      "auditId": 123,
+      "changes": {
+        "course_name": "MPA Master of Public Administration"
+      }
+    },
+    {
+      "id": 56204,
+      "auditId": 124,
+      "changes": {
+        "course_name": "MPH Master of Public Health"
+      }
+    },
+    {
+      "id": 56205,
+      "auditId": 125,
+      "changes": {
+        "course_name": "Master of Research (MRes); Postgraduate Diploma in Research Methods (PG Dip); Postgraduate Certificate in Research Methods (PG Cert) Master of Research (MRes)"
+      }
+    },
+    {
+      "id": 56206,
+      "auditId": 126,
+      "changes": {
+        "course_name": "Certificate of Higher Education Maternity Care Assistant"
+      }
+    },
+    {
+      "id": 56207,
+      "auditId": 127,
+      "changes": {
+        "course_name": "BSc (Hons) Mathematics (Year 3 Entry)",
+        "duration": 2.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56208,
+      "auditId": 128,
+      "changes": {
+        "course_name": "BSc (Hons) Mathematics with Education (Year 3 Entry)",
+        "duration": 2.0
+      }
+    },
+    {
+      "id": 56209,
+      "auditId": 129,
+      "changes": {}
+    },
+    {
+      "id": 56210,
+      "auditId": 130,
+      "changes": {
+        "duration": 3.0
+      }
+    },
+    {
+      "id": 56211,
+      "auditId": 131,
+      "changes": {
+        "duration": 3.0
+      }
+    },
+    {
+      "id": 56212,
+      "auditId": 132,
+      "changes": {
+        "course_name": "BSc (Hons) Music Technology",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56213,
+      "auditId": 133,
+      "changes": {
+        "course_name": "BSc (Hons) Nursing Studies (3rd year entry)",
+        "duration": 2.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56214,
+      "auditId": 134,
+      "changes": {
+        "course_name": "MSc One Health: Environment, Animal and Human Disease",
+        "duration": 1.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56215,
+      "auditId": 135,
+      "changes": {}
+    },
+    {
+      "id": 56216,
+      "auditId": 136,
+      "changes": {}
+    },
+    {
+      "id": 56217,
+      "auditId": 137,
+      "changes": {
+        "course_name": "BA (Hons) Performance",
+        "duration": 4.0
+      }
+    },
+    {
+      "id": 56218,
+      "auditId": 138,
+      "changes": {}
+    },
+    {
+      "id": 56219,
+      "auditId": 139,
+      "changes": {
+        "course_name": "PGDE (Primary)",
+        "duration": 9.0,
+        "duration_term": "Month"
+      }
+    },
+    {
+      "id": 56220,
+      "auditId": 140,
+      "changes": {
+        "course_name": "PGDE (Secondary)",
+        "duration": 9.0,
+        "duration_term": "Month"
+      }
+    },
+    {
+      "id": 56221,
+      "auditId": 141,
+      "changes": {
+        "course_name": "BSc (Hons) Physics (Year 3 Entry)",
+        "duration": 2.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56222,
+      "auditId": 142,
+      "changes": {
+        "course_name": "BSc (Hons) Physics with Education  (Year 3 Entry)",
+        "duration": 2.0
+      }
+    },
+    {
+      "id": 56223,
+      "auditId": 143,
+      "changes": {
+        "course_name": "BSc (Hons) Physics with Nuclear Technology (Year 3 Entry)",
+        "duration": 2.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56224,
+      "auditId": 144,
+      "changes": {
+        "course_name": "MSc Policy Analysis & Global Governance"
+      }
+    },
+    {
+      "id": 56225,
+      "auditId": 145,
+      "changes": {
+        "duration": 1.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56226,
+      "auditId": 146,
+      "changes": {
+        "course_name": "Certificate in Higher Education Preparing for Healthcare Studies",
+        "duration": 1.0
+      }
+    },
+    {
+      "id": 56227,
+      "auditId": 147,
+      "changes": {
+        "course_name": "PgCert, PgDip and MProf Professional Practice",
+        "duration": 1.5,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56228,
+      "auditId": 148,
+      "changes": {
+        "duration": 1.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56229,
+      "auditId": 149,
+      "changes": {}
+    },
+    {
+      "id": 56230,
+      "auditId": 150,
+      "changes": {}
+    },
+    {
+      "id": 56231,
+      "auditId": 151,
+      "changes": {
+        "course_name": "LLB (Hons) Scots Law"
+      }
+    },
+    {
+      "id": 56232,
+      "auditId": 152,
+      "changes": {
+        "course_name": "BA (Hons) Social Sciences",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56233,
+      "auditId": 153,
+      "changes": {
+        "course_name": "BA Social Sciences (New College Lanarkshire)"
+      }
+    },
+    {
+      "id": 56234,
+      "auditId": 154,
+      "changes": {}
+    },
+    {
+      "id": 56235,
+      "auditId": 155,
+      "changes": {
+        "course_name": "BA (Hons) Social Work"
+      }
+    },
+    {
+      "id": 56236,
+      "auditId": 156,
+      "changes": {
+        "course_name": "BA (Hons) Social Work (Graduate Apprenticeship)"
+      }
+    },
+    {
+      "id": 56237,
+      "auditId": 157,
+      "changes": {}
+    },
+    {
+      "id": 56238,
+      "auditId": 158,
+      "changes": {}
+    },
+    {
+      "id": 56239,
+      "auditId": 159,
+      "changes": {
+        "course_name": "BSc (Hons) Sport & Exercise Science / Sport & Exercise Science (Physical Activity & Health)",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56240,
+      "auditId": 160,
+      "changes": {
+        "course_name": "PgCert, PgDip, MSc Sport and Exercise"
+      }
+    },
+    {
+      "id": 56241,
+      "auditId": 161,
+      "changes": {
+        "duration": 4.0
+      }
+    },
+    {
+      "id": 56242,
+      "auditId": 162,
+      "changes": {
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56243,
+      "auditId": 163,
+      "changes": {
+        "course_name": "BSc (Hons) Sport Development"
+      }
+    },
+    {
+      "id": 56244,
+      "auditId": 164,
+      "changes": {}
+    },
+    {
+      "id": 56245,
+      "auditId": 165,
+      "changes": {}
+    },
+    {
+      "id": 56246,
+      "auditId": 166,
+      "changes": {}
+    },
+    {
+      "id": 56247,
+      "auditId": 167,
+      "changes": {}
+    },
+    {
+      "id": 56248,
+      "auditId": 168,
+      "changes": {
+        "duration": 4.0
+      }
+    },
+    {
+      "id": 56249,
+      "auditId": 169,
+      "changes": {
+        "course_name": "BA (Hons) TV, Radio & Podcast Production",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56250,
+      "auditId": 170,
+      "changes": {
+        "course_name": "BSc (Hons) Web & Mobile Development",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    },
+    {
+      "id": 56381,
+      "auditId": 171,
+      "changes": {
+        "course_name": "BAcc (Hons) Accounting",
+        "duration": 4.0,
+        "duration_term": "Year"
+      }
+    }
+  ],
+  "undone": false
+}
