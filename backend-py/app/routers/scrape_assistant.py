@@ -278,6 +278,18 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
         return await response(thread, db)  # Idempotent confirmation; never dispatch twice.
     if thread.status in service.ACTIVE:
         raise HTTPException(409, "Wait for the investigation to finish.")
+    if action["kind"] == "staff_edit":
+        if action.get("_turnId") != thread.turn_id:
+            raise HTTPException(409, "This staff preview belongs to an older request")
+        from app.services.assistant_staff_edits import apply as apply_staff_edit
+        try:
+            await apply_staff_edit(service, db, action, job.university_id, actor["id"], confirmed=True)
+        except ValueError as exc:
+            await db.rollback()
+            raise HTTPException(409, str(exc))
+        thread.messages = messages
+        await db.commit()
+        return await response(thread, db)
     if action["kind"] in {"staff_location","undo_staff_location"}:
         if action["kind"]=="staff_location" and action.get("_turnId")!=thread.turn_id:
             raise HTTPException(409,"This location preview belongs to an older request")

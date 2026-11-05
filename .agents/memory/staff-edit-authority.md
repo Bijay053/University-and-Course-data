@@ -1,0 +1,21 @@
+---
+name: Staff edit authority
+description: Explicit staff values are a separate authority from official source verification.
+---
+Use staff-provided provenance for literal values supplied in chat, without fetching pages to pretend those values are independently verified. Keep contradictory selected official evidence as a review blocker.
+
+**Why:** Staff corrections and source-backed recovery are different requests. Requiring a page to repeat a staff value prevents legitimate corrections; labelling it verified invents evidence.
+
+**How to apply:** Preserve atomic amount/unit bundles, provider scoping and confirmation boundaries. A repeat applies the most recent edit, including when its field differs from earlier messages. An unsupported intervening edit must block reuse of older values. Related published records belong in stale-preview fences, not just the parent course timestamp.
+
+Bare numbered rows refer to pending review records; published IDs require an explicit published selector.
+
+**Why:** Pending and published IDs are independent namespaces and can collide within one provider.
+
+**How to apply:** Apply record-kind filtering before numeric matching. Month-only edits must not reopen closed intakes or discard dates.
+
+Do not reuse research-wide targeting for writes.
+
+**Why:** Research helpers can interpret “others” as broad scope, including inside “leave others unchanged.”
+
+**How to apply:** Resolve explicit row IDs before names and URLs; ambiguous provider-wide exclusions must fail closed.

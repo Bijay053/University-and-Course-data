@@ -16,7 +16,7 @@ export { safeSourceUrl };
 export type AssistantSource = { url: string; title: string; excerpt: string; page?: number; quoteId?: string };
 export type AssistantAction = {
   id: string;
-  kind: "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location";
+  kind: "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit";
   label: string;
   courseCount: number;
   publishedCount?: number;
@@ -491,7 +491,8 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
           </details>
           {a.state === "proposed" && (
             <Button size="sm" variant="outline" className="mt-2 h-8 border-amber-300 text-[12px]" disabled={disabled || actionBusy}
-              onClick={() => void runAction(a)} data-testid={`button-run-action-${a.id}`}>
+              onClick={() => a.kind === "staff_edit" || a.kind === "staff_location" || a.kind === "undo_staff_location"
+                ? openConfirm(a) : void runAction(a)} data-testid={`button-run-action-${a.id}`}>
               Run now
             </Button>
           )}
@@ -734,8 +735,8 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                 <p>
                   {confirming?.kind === "undo_staff_location"
                     ? "This restores the prior audited locations and provenance. It refuses to overwrite later edits. No page fetch or discovery runs."
-                    : confirming?.kind === "staff_location"
-                    ? "This saves the supplied location on the exact records listed in the chat, with staff-provided provenance and an audit log. It does not fetch pages or run catalogue discovery."
+                    : confirming?.kind === "staff_location" || confirming?.kind === "staff_edit"
+                    ? "This saves the supplied values on the exact records listed in the chat, with staff-provided provenance and an audit log. It does not independently verify them, fetch pages or run catalogue discovery."
                     : confirming?.kind === "repair_catalogue"
                     ? "This starts a bounded scraper repair for this job's catalogue."
                     : confirming?.kind === "recover_catalogue"
@@ -745,7 +746,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                     : confirming?.kind === "review_courses"
                     ? "This fetches the requested official course URLs into a fresh pending review. It does not rename the course in the current review or duplicate a published course."
                     : "This re-extracts the listed fields for staged review courses."}
-                  {confirming?.kind === "staff_location" || confirming?.kind === "undo_staff_location" ? ` It changes ${confirming.courseCount} listed records, including ${confirming.publishedCount ?? 0} published records.`
+                  {confirming?.kind === "staff_location" || confirming?.kind === "undo_staff_location" || confirming?.kind === "staff_edit" ? ` It changes ${confirming.courseCount} listed records, including ${confirming.publishedCount ?? 0} published records.`
                     : confirming?.kind === "scan_catalogue" ? " Results land in review data only."
                     : confirming?.kind === "recover_catalogue" ? ` It checks ${selectedUrls.length} selected link${selectedUrls.length === 1 ? "" : "s"}; results land in review data only.`
                     : ` It affects ${confirming?.courseCount} course${confirming?.courseCount === 1 ? "" : "s"} in review data only.`}

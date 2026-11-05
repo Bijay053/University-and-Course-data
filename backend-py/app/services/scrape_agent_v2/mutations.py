@@ -104,6 +104,9 @@ async def mutate(tools, db, actor, name, args, call_id, *, commit=True, fee_bund
         if not last:
             return denied("No reversible change exists in this conversation")
         row=(await db.execute(base.where(ScrapedCourse.id==last.scraped_course_id).with_for_update())).scalar_one()
+        if last.field_key == "staff_values" and last.reason.startswith("staff-provided:"):
+            from .staff import undo_staff
+            return await undo_staff(tools, db, actor, row, last, action)
         old,new=json.loads(last.old_value),json.loads(last.new_value)
         if not isinstance(old,dict):
             old,new={last.field_key:old},{last.field_key:new}

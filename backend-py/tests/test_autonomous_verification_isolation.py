@@ -504,6 +504,11 @@ def staging(monkeypatch):
 
 
 class StageDB:
+    async def get(self, model, ident):
+        # This staging fixture has no provider record; registration review is
+        # tested independently with provider-specific fixtures.
+        return None
+
     def __init__(self):
         self.existing = [
             SimpleNamespace(id=i, status=status, pte_overall=79, course_name="Bachelor of Business")

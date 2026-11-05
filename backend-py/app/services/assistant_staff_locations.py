@@ -134,11 +134,17 @@ def undo_proposal(action):
 
 
 async def handle(service,thread_id,turn_id,run_id,ctx,prompt,messages):
-    parsed=location_request(prompt,messages)
-    if not parsed:
+    from app.services.assistant_staff_values import parse
+    request = parse(prompt, messages)
+    if request and (request.error or set(request.values) != {"course_location"}):
+        from app.services.assistant_staff_edits import handle as staff_edits
+        return await staff_edits(service, thread_id, turn_id, run_id, ctx, prompt, messages)
+    if request:
+        parsed = request.values["course_location"], request.all_courses
+    else:
         return False
     value,all_courses=parsed
-    from app.services.assistant_eligibility import scope
+    from app.services.assistant_staff_values import staff_scope
     from app.models.scrape_assistant import ScrapeAssistantThread
     async with service.AsyncSessionLocal() as db:
         thread=(await db.execute(select(ScrapeAssistantThread).where(
@@ -156,13 +162,16 @@ async def handle(service,thread_id,turn_id,run_id,ctx,prompt,messages):
         targets=[]
         held=[]
         for kind,model in (("pending",ScrapedCourse),("published",Course)):
+            from app.services.assistant_staff_values import record_kind
+            if not all_courses and record_kind(prompt) not in {None, kind}:
+                continue
             query=select(model).where(model.university_id==ctx["university_id"])
             query=query.where(model.status.in_(service.REVIEW_STATUSES)) if kind=="pending" else query.where(model.status=="active")
             for row in (await db.execute(query.order_by(model.id))).scalars():
                 name=row.course_name if kind=="pending" else row.name
                 if re.search(r"https?://|\.edu\b",name or "",re.I):
                     held.append(str(row.id));continue
-                if not all_courses and not scope(prompt,[{"id":row.id,"name":name,"url":row.course_website}]):
+                if not staff_scope(prompt,[{"id":row.id,"name":name,"url":row.course_website}], all_courses=all_courses):
                     continue
                 if row.course_location==value:
                     continue

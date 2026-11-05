@@ -69,6 +69,7 @@
 - [INTI duration badge authority](inti-duration-authority.md) — use the current programme’s top facts badge; related product cards repeat other courses’ durations and corrupt generic extraction.
 - [AI extraction is fill-only](ai-extraction-fill-only.md) — across all universities, deterministic static extraction owns populated values; AI is requested only for remaining gaps.
 - [Prompt assistant scope and grounding](prompt-assistant-safety.md) — scraping/reviews only; automatic pending corrections, separate publication approval and immutable source excerpts.
+- [Staff edit authority](staff-edit-authority.md) — literal values are staff-provided, not verified; repeats follow the latest field and published child rows participate in preview fences.
 - [Scrape agent rebuild specification](scrape-agent-rebuild-spec.md) — governing PDFs, ordered stages, live acceptance and evidence-backed release gates.
 - [Live catalogue removal safety](live-catalogue-removal-safety.md) — never auto-hide courses solely because they are absent from one approved scrape; removals need explicit audited review.
 - [Protected catalogue onboarding](protected-catalogue-onboarding.md) — commit probe state before task publish; reject engagement APIs/200 shells; preserve pagination queries and exact retries.

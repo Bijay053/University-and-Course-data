@@ -61,6 +61,8 @@ class DataTools:
         definition("edit_intakes", "Apply ONLY intake months explicitly supplied by the user for one named pending row. Does not establish official verification.",
                    {"row_id": {"type":"integer"}, "months": {"type":"array","items":{"type":"string"}}},
                    ["row_id","months"]),
+        definition("edit_staff_values", "Apply explicit user-supplied values to a pending row with staff-provided provenance. Values are parsed server-side; no page evidence or network calls.",
+                   {"row_id":{"type":"integer"}}, ["row_id"]),
     ]
 
     def __init__(self, service, thread_id, turn_id, run_id, ctx, prompt):
@@ -101,6 +103,13 @@ class DataTools:
             if not actor or not actor.is_active or not user_has_permission(_payload_for(actor,_perm_keys(actor)), "scraping.trigger"):
                 raise ValueError("Permission denied")
             base = select(ScrapedCourse).where(ScrapedCourse.university_id == self.ctx["university_id"])
+            if name in {"edit_staff_values", "edit_intakes"}:
+                from .staff import edit_staff
+                return await edit_staff(self, db, thread, actor, args, call_id)
+            from app.services.assistant_staff_values import parse as staff_request
+            supplied = staff_request(self.prompt, thread.messages)
+            if supplied and name in {"fetch_page", "read_pdf", "render_page", "click_tab", "search_site", "start_batch_check", "edit_field", "bulk_edit"}:
+                return {"ok":False, "changed":False, "reason":"Explicit staff values must use staff-provided editing without source research"}
             if name in {"save_rule","remove_rule"}:
                 from .rules import change_rule
                 return await change_rule(self,db,actor,remove=name=="remove_rule")
@@ -165,44 +174,4 @@ class DataTools:
                     CourseAuditLog.scraped_course_id == row.id).order_by(CourseAuditLog.id.desc()).limit(100))).scalars().all()
                 return {"ok":True,"entries":[{"id":a.id,"field":a.field_key,"old":a.old_value,
                     "new":a.new_value,"actor":a.actor,"at":a.created_at,"reason":a.reason} for a in audits]}
-            # Only literal user-authored intake edits exist in this first tool
-            # version. The model cannot supply authority via web/tool content.
-            from app.services.assistant_field_edits import edit_field
-            from app.services.assistant_eligibility import scope
-            from app.services.scraper.excelsia_source import intake_months
-            from app.services.scrape_assistant_autorun import execution_requested
-            expected = intake_months(self.prompt)
-            if (edit_field(self.prompt) not in {"intake","intakes"} or not execution_requested(self.prompt)
-                    or not expected or args["months"] != expected
-                    or not scope(self.prompt,[{"id":row.id,"name":row.course_name,"url":row.course_website}])):
-                raise ValueError("Tool arguments were not authorized by the user's literal intake instruction")
-            if row.status not in self.service.REVIEW_STATUSES:
-                return {"ok":False,"requiresConfirmation":True,"changed":False,"reason":"Not a pending row"}
-            if len(scope(self.prompt,self.ctx["samples"])) > 10:
-                return {"ok":False,"requiresConfirmation":True,"changed":False,
-                        "reason":"The requested batch exceeds 10 rows; no partial batch applied"}
-            from .mutations import exceeds_turn_budget
-            if await exceeds_turn_budget(db,self,[row.id]):
-                return {"ok":False,"requiresConfirmation":True,"changed":False,
-                        "reason":"More than ten changed rows in this request require confirmation"}
-            action = f"agent_v2:{self.thread_id}:{self.turn_id}:{call_id}"
-            receipt = (await db.execute(select(CourseAuditLog).where(
-                CourseAuditLog.action == action, CourseAuditLog.scraped_course_id == row.id))).scalar_one_or_none()
-            if not receipt:
-                before = row.intake_months
-                if before == expected:
-                    return {"ok":True,"changed":False,"row":self.serialize(row),"reason":"Already matches"}
-                if self.ctx["versions"].get(str(row.id)) != self.service.row_version(row):
-                    return {"ok":False,"changed":False,"requiresReview":True,"reason":"Row changed since it was read"}
-                row.intake_months = expected
-                db.add(CourseAuditLog(scraped_course_id=row.id,field_key="intake_months",action=action,
-                    old_value=json.dumps(before),new_value=json.dumps(expected),actor=str(actor.id),
-                    reason="Explicit user-supplied intake correction; not independently verified: "+self.prompt))
-                await db.flush()
-                await db.refresh(row)
-                if row.intake_months != expected:
-                    raise ValueError("Write read-back failed")
-                await db.commit()
-                self.ctx["versions"][str(row.id)]=self.service.row_version(row)
-            return {"ok":True,"changed":receipt is None,"row":self.serialize(row),
-                    "provenance":"user_instruction","officialVerification":"unverified"}
+            raise ValueError("Unsupported data tool")

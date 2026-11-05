@@ -200,6 +200,22 @@ describe("ScrapePromptAssistant", () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
   });
 
+  it("explains staff provenance and published records before confirmation", async () => {
+    const thread: AssistantThread = { ...empty, status: "ready", messages: [
+      { role: "assistant", content: "Tuition preview", createdAt: "2024-01-01T00:00:00Z",
+        actions: [{ id: "staff1", kind: "staff_edit", label: "Apply staff values", courseCount: 2,
+          publishedCount: 1, fields: ["international_fee"], state: "proposed" }] },
+    ] };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json(thread));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    fireEvent.click(await screen.findByTestId("button-run-action-staff1"));
+    const dialog = await screen.findByTestId("dialog-confirm-action");
+    expect(dialog.textContent).toContain("staff-provided provenance");
+    expect(dialog.textContent).toContain("including 1 published records");
+    expect(dialog.textContent).toContain("does not independently verify");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("clears the prior user's history immediately and refetches when identity changes", async () => {
     let resolveSecond: (r: Response) => void = () => {};
     const fetchMock = vi.spyOn(globalThis, "fetch")
