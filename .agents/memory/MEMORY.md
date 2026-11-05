@@ -1,3 +1,4 @@
+- [Agent dollar budget](agent-dollar-budget.md) — approved US$100/day; reserve before calls, retain uncertain spend, and stop on pricing/accounting uncertainty.
 - [Public course toolkit](public-course-toolkit.md) — visitors can search and view fees without signing in; keep administration and pending records private.
 - [ACAP course availability](acap-course-availability.md) — marked online/campus restrictions are not whole-course exclusions; verify research and repair use usable live transport.
 - [Excelsia course facts](excelsia-course-facts.md) — prefer verified static pages; keep own-award facts, international prices, fee periods and IELTS evidence aligned.
@@ -68,6 +69,7 @@
 - [INTI duration badge authority](inti-duration-authority.md) — use the current programme’s top facts badge; related product cards repeat other courses’ durations and corrupt generic extraction.
 - [AI extraction is fill-only](ai-extraction-fill-only.md) — across all universities, deterministic static extraction owns populated values; AI is requested only for remaining gaps.
 - [Prompt assistant scope and grounding](prompt-assistant-safety.md) — scraping/reviews only; automatic pending corrections, separate publication approval and immutable source excerpts.
+- [Scrape agent rebuild specification](scrape-agent-rebuild-spec.md) — governing PDFs, ordered stages, live acceptance and evidence-backed release gates.
 - [Live catalogue removal safety](live-catalogue-removal-safety.md) — never auto-hide courses solely because they are absent from one approved scrape; removals need explicit audited review.
 - [Protected catalogue onboarding](protected-catalogue-onboarding.md) — commit probe state before task publish; reject engagement APIs/200 shells; preserve pagination queries and exact retries.
 - [Audience-scoped study mode](audience-scoped-study-mode.md) — international Location/Delivery is authoritative; Online must block synthetic campus defaults.
@@ -140,3 +142,4 @@
 - [Git stat-cache evidence](git-stat-cache-evidence.md) — byte-identical atomic restores can confuse metadata-only diff modes; require content comparison before declaring source dirty.
 - [Database CA loading](database-ca-loading.md) — explicitly load configured CA bundles; OpenSSL default paths may silently ignore a missing file.
 - [Legacy repair scope](legacy-repair-scope.md) — hardening connections must not turn a targeted repair into a full upgrade or bypass local-only restrictions.
+- [SSM report completeness](ssm-report-completeness.md) — command stdout can truncate large production inventories; compress or page results before making bulk-edit decisions.

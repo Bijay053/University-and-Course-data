@@ -5,6 +5,9 @@ from app.models import ScrapedCourse, University
 
 
 async def handle_read_or_rule(service, thread_id, turn_id, run_id, ctx, prompt, messages):
+    from app.services.assistant_staff_locations import handle as staff_locations
+    if await staff_locations(service,thread_id,turn_id,run_id,ctx,prompt,messages):
+        return True
     from app.services.assistant_field_edits import handle_field_edit
     if await handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt):
         return True
@@ -51,7 +54,7 @@ async def handle_read_or_rule(service, thread_id, turn_id, run_id, ctx, prompt, 
         }, detail="Publication requires explicit confirmation.")
         return True
     status_question = bool(re.search(
-        r"\b(is|was|has|have|how many|show|list)\b.*\b(removed|excluded|rejected|pending|approved|published)\b",
+        r"\b(is|was|has|have|how many|why|show|list)\b.*\b(removed|excluded|rejected|pending|unapproved|approved|published)\b",
         prompt, re.I,
     )) and not re.search(r"\b(remove|exclude|reject|approve|fix|rescrape)\b", prompt, re.I)
     rule = bool(re.search(r"\b(we don.t need|never include|always exclude|remember|standing rule)\b", prompt, re.I)
@@ -107,6 +110,13 @@ async def handle_read_or_rule(service, thread_id, turn_id, run_id, ctx, prompt, 
                                 + (f". {r.rejection_reason}" if r.rejection_reason else "")
                                 for r in selected)
             content += "\nChecked the review database only; this is not the university website's publication status."
+        elif re.search(r"\b(how many|count|total)\b",prompt,re.I):
+            from app.services.review_counts import pending_counts
+            async with service.AsyncSessionLocal() as db:
+                totals=await pending_counts(db,ctx["university_id"],ctx["job"]["id"])
+            content=(f"Provider total: {totals['providerPendingRows']} pending rows across all reviews. "
+                     f"This job: {totals['thisJobPendingRows']} pending rows. "
+                     "These are database rows, not unique course groups or filtered screen results. No website was fetched.")
         elif re.search(r"\b(this|it|that)\b", prompt, re.I):
             content = "I could not identify the record from the saved action. Provide its row number or course name. No website was fetched."
         else:

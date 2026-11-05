@@ -265,9 +265,23 @@ async def investigate(thread_id: str, turn_id: str):
     run_id = uuid.uuid4().hex
     if not await claim(thread_id, turn_id, run_id):
         return
+    v2 = False
     try:
         async with asyncio.timeout(RESEARCH_TIMEOUT):
-            await _investigate(thread_id, turn_id, run_id)
+            from app.config import settings
+            async with AsyncSessionLocal() as db:
+                claimed_thread=await db.get(ScrapeAssistantThread,thread_id)
+                requested=next(m for m in reversed(claimed_thread.messages) if m["role"]=="user")
+                v2=requested.get("_engine")=="v2" or "_agentV2" in requested
+            if v2:
+                from app.services.scrape_agent_v2.access import enabled_for
+                if not enabled_for(settings, claimed_thread.actor_id):
+                    raise ValueError("The new agent is disabled; unfinished work will not fall back to another engine")
+                from app.services.scrape_agent_v2.runtime import investigate as investigate_v2
+                from app.services import scrape_assistant as service
+                await investigate_v2(service, thread_id, turn_id, run_id)
+            else:
+                await _investigate(thread_id, turn_id, run_id)
         await run_automatic_action(thread_id, turn_id)
     except asyncio.CancelledError:
         async with AsyncSessionLocal() as db:
@@ -284,11 +298,17 @@ async def investigate(thread_id: str, turn_id: str):
                 thread.phase, thread.updated_at = "Reconnecting research after a service restart", now()
             await db.commit()
         raise
-    except Exception:
+    except Exception as exc:
+        if v2 and isinstance(exc,TimeoutError):
+            from app.services.scrape_agent_v2.continuation import enqueue
+            await enqueue(thread_id,turn_id,run_id)
+            return
+        failure = ("The agent stopped before completing this request. Any completed edits remain in the audit log; review the tool receipts."
+                   if v2 else "No corrections were applied. Try again or provide an official course URL.")
         try:
             await record_activity(thread_id, turn_id, run_id, event(
                 "Investigation stopped", status="error",
-                detail="No corrections were applied. Try again or provide an official course URL.",
+                detail=failure,
             ), phase="Investigation stopped")
         except ValueError:
             return
@@ -299,7 +319,7 @@ async def investigate(thread_id: str, turn_id: str):
                 ScrapeAssistantThread.run_id == run_id,
                 ScrapeAssistantThread.status == "researching",
             ).values(status="error", phase="Investigation stopped",
-                     error="The assistant could not complete a verified investigation. No corrections were applied. Try again or provide an official course URL.",
+                     error=failure if v2 else "The assistant could not complete a verified investigation. No corrections were applied. Try again or provide an official course URL.",
                      updated_at=now()))
             await db.commit()
 
@@ -789,7 +809,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                               detail=f"{len(citations)} verified source excerpts. No course changes applied.")
 
 
-async def save_research_reply(thread_id, turn_id, run_id, reply, *, detail):
+async def save_research_reply(thread_id, turn_id, run_id, reply, *, detail, phase="Investigation ready — no changes applied"):
     """Clarifications and researched answers use the same durable owner fence."""
     async with AsyncSessionLocal() as db:
         thread = (await db.execute(select(ScrapeAssistantThread).where(
@@ -806,5 +826,5 @@ async def save_research_reply(thread_id, turn_id, run_id, reply, *, detail):
         thread.activity = items[-40:]
         reply["activity"] = public_activity(thread.activity)
         thread.messages, thread.status = (list(thread.messages) + [reply])[-20:], "ready"
-        thread.phase, thread.error, thread.updated_at = "Investigation ready — no changes applied", None, now()
+        thread.phase, thread.error, thread.updated_at = phase, None, now()
         await db.commit()

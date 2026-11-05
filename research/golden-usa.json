@@ -1,0 +1,134 @@
+{
+  "courses": [
+    {
+      "id": "usa-neu-ms-applied-behavior-analysis",
+      "country": "USA",
+      "name": "MS Applied Behavior Analysis",
+      "fields": {
+        "tuition": {"value": "$1,475", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Applied Behavior Analysis | $1,475 |", "year": "2026-2027", "basis": "per credit hour; tuition, not total degree cost"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null},
+        "english_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": "CPS policy cannot be transferred to this program"}
+      }
+    },
+    {
+      "id": "usa-neu-ms-applied-psychology-online",
+      "country": "USA",
+      "name": "MS Applied Psychology (Online)",
+      "fields": {
+        "tuition": {"value": "$1,061", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Applied Psychology (Online) | $1,061 |", "year": "2026-2027", "basis": "per credit hour; tuition, not total degree cost"},
+        "study_mode": {"value": "Online", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Applied Psychology (Online) | $1,061 |", "year": "2026-2027", "basis": "explicit program row qualifier"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null}
+      }
+    },
+    {
+      "id": "usa-neu-ms-nursing-online",
+      "country": "USA",
+      "name": "MS Nursing (Online)",
+      "fields": {
+        "tuition": {"value": "$1,061", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Nursing (Online) | $1,061 |", "year": "2026-2027", "basis": "per credit hour; tuition, not total degree cost"},
+        "study_mode": {"value": "Online", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Nursing (Online) | $1,061 |", "year": "2026-2027", "basis": "explicit program row qualifier"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null}
+      }
+    },
+    {
+      "id": "usa-neu-ms-speech-language-pathology",
+      "country": "USA",
+      "name": "MS Speech-Language Pathology",
+      "fields": {
+        "tuition": {"value": "$1,995", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Speech-Language Pathology | $1,995 |", "year": "2026-2027", "basis": "per credit hour; tuition, not total degree cost"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null}
+      }
+    },
+    {
+      "id": "usa-neu-ms-bioinformatics",
+      "country": "USA",
+      "name": "MS Bioinformatics",
+      "fields": {
+        "tuition": {"value": "$1,986", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Bioinformatics | $1,986 |", "year": "2026-2027", "basis": "per credit hour; tuition, not total degree cost"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null}
+      }
+    },
+    {
+      "id": "usa-neu-ms-biotechnology",
+      "country": "USA",
+      "name": "MS Biotechnology",
+      "fields": {
+        "tuition": {"value": "$1,986", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Biotechnology | $1,986 |", "year": "2026-2027", "basis": "per credit hour; tuition, not total degree cost"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null}
+      }
+    },
+    {
+      "id": "usa-neu-ms-environmental-science-policy",
+      "country": "USA",
+      "name": "MS Environmental Science and Policy",
+      "fields": {
+        "tuition": {"value": "$1,941", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Environmental Science and Policy | $1,941 |", "year": "2026-2027", "basis": "per credit hour; tuition, not total degree cost"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null}
+      }
+    },
+    {
+      "id": "usa-neu-ms-marine-biology",
+      "country": "USA",
+      "name": "MS Marine Biology",
+      "fields": {
+        "tuition": {"value": "$1,702", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Marine Biology | $1,702 |", "year": "2026-2027", "basis": "per credit hour; tuition, not total degree cost"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null}
+      }
+    },
+    {
+      "id": "usa-neu-ms-criminology-criminal-justice",
+      "country": "USA",
+      "name": "MS Criminology and Criminal Justice",
+      "fields": {
+        "tuition": {"value": "$1,115", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Criminology and Criminal Justice | $1,115 |", "year": "2026-2027", "basis": "per credit hour; tuition, not total degree cost"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null}
+      }
+    },
+    {
+      "id": "usa-neu-ms-economics",
+      "country": "USA",
+      "name": "MS Economics",
+      "fields": {
+        "tuition": {"value": "$1,636", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| MS Economics | $1,636 |", "year": "2026-2027", "basis": "per credit hour; tuition, not total degree cost"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null}
+      }
+    },
+    {
+      "id": "usa-neu-ms-artificial-intelligence",
+      "country": "USA",
+      "name": "Artificial Intelligence, MS",
+      "fields": {
+        "tuition": {"value": "$1,922", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "**Artificial Intelligence, MS**\n\n| **College Delivering Course** | **Cost per Credit** |\n| --- | --- |\n| College of Engineering | $1,922 |\n| Khoury College of Computer Sciences | $1,922 |", "year": "2026-2027", "basis": "per credit, by college delivering course; both listed colleges have same rate; not degree total"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null}
+      }
+    },
+    {
+      "id": "usa-neu-ms-extended-realities",
+      "country": "USA",
+      "name": "Extended Realities, MS",
+      "fields": {
+        "tuition": {"value": "$2,110", "status": "verified", "source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "**Extended Realities, MS**\n\n| **College Delivering Course** | **Cost per Credit** |\n| --- | --- |\n| Bouvé College of Health Sciences | $2,110 |\n| College of Arts, Media and Design | $2,110 |\n| College of Engineering | $2,110 |\n| College of Social Sciences and Humanities | $2,110 |\n| D’Amore-McKim School of Business | $2,110 |\n| Khoury College of Computer Sciences | $2,110 |", "year": "2026-2027", "basis": "per credit, by college delivering course; all six listed colleges have same rate; not degree total"},
+        "credit_requirements": {"value": null, "status": "unverified", "source_url": null, "snippet": null, "year": null, "basis": null}
+      }
+    }
+  ],
+  "gaps": [
+    {"field": "coverage", "detail": "Twelve distinct named graduate degree candidates, all Northeastern University. This is not twelve universities. No portal extraction or human-approval labels used."},
+    {"field": "as_of", "detail": "Research checked 2026-11-05 UTC. Northeastern source heading: '2026-2027 Tuition and Fees'. Publication/update date not stated.", "contextual_evidence": [{"source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "### **2026-2027 Tuition and Fees**"}]},
+    {"field": "currency", "detail": "Original '$' symbol preserved in tuition values. Explicit ISO currency code was not established by the returned page excerpts; no currency conversion performed."},
+    {"field": "audience", "detail": "General graduate tuition schedule, not an explicitly international-only schedule. International-specific applicability remains unverified for each course. Canadian campus fees link elsewhere. Online programs must not be treated as evidence of F-1 visa eligibility."},
+    {"field": "credits_and_total_cost", "detail": "Required degree credits, total degree tuition, ancillary fees and international insurance costs remain unverified. Per-credit figures are not annual or full-degree prices.", "contextual_evidence": [{"source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| **Graduate Program** | **Cost per Credit Hour** |"}, {"source_url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "snippet": "| Graduate Program | Cost per Credit Hour |"}]},
+    {"field": "english_requirements", "detail": "Fetched College of Professional Studies English policy is not applicable evidence for degrees in other colleges; no English minima transferred to these twelve candidates."},
+    {"field": "other_course_fields", "detail": "Campuses, duration, intakes, entry qualifications and English requirements are unverified unless separately represented by a verified field. No seasonal intake conversions performed."},
+    {"field": "source_context", "detail": "Official note: 'Please note, courses taken outside of your home college may be billed at the per credit rate of the college offering the course.' Program labels and college context must be retained."},
+    {"field": "year_mixing", "detail": "Finance page contains both current and archived tables. An initial fetch summary incorrectly pulled MS Exercise Science from 2025-2026 and gave a different Health Informatics rate. Targeted exact-row queries corrected these; neither is included among candidates. This is a retrieval-summary error, not a claimed contradiction between official policies."},
+    {"field": "blocked_source", "detail": "Northeastern catalog URL fetch failed HTTP 429. No bypass was attempted. Its search snippet is supplemental only; all candidate values rely on the separately surfaced student-finance page."}
+  ],
+  "sources": [
+    {"title": "Northeastern University Student Financial Services — Tuition and Fees", "url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/", "publication_date": null, "academic_year": "2026-2027", "accessed": "2026-11-05", "tier": 1, "path": "research/sources/golden-usa-04-northeastern-student-finance.md", "use": "Fetched official multi-program table; sole tuition evidence for twelve candidates"},
+    {"title": "Fairleigh Dickinson University — International Tuition and Fees", "url": "https://www.fdu.edu/admissions/international/tuition-fees", "publication_date": null, "academic_year": "2026-2027", "accessed": "2026-11-05", "tier": 1, "path": "research/sources/golden-usa-02-fdu-international-tuition.md", "use": "Fetched institutional annual estimate; not course-level evidence"},
+    {"title": "Northeastern University College of Professional Studies — English Language Requirements", "url": "https://cps.northeastern.edu/admissions-aid/international-admissions/applications/english-language-requirements", "publication_date": null, "accessed": "2026-11-05", "tier": 1, "path": "research/sources/golden-usa-03-northeastern-cps-english.md", "use": "Fetched college-specific policy; not assigned to these twelve degrees"},
+    {"title": "Northeastern University Academic Catalog — Tuition and Fees", "url": "https://catalog.northeastern.edu/graduate/expenses/tuition-fees/", "publication_date": null, "academic_year": "2026-2027", "accessed": "2026-11-05", "tier": 1, "path": "research/sources/golden-usa-snippets.md", "use": "Snippet only; fetch HTTP 429; no candidate verification"},
+    {"title": "University of Illinois Springfield — Fall 2026 Tuition", "url": "https://www.uis.edu/registrar/tuition-fees/fall-2026-tuition", "publication_date": null, "academic_year": "Fall 2026", "accessed": "2026-11-05", "tier": 1, "path": "research/sources/golden-usa-snippets.md", "use": "Snippet only; flags graduate differential structure; no numeric candidate verification"}
+  ]
+}

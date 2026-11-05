@@ -1,0 +1,206 @@
+{
+  "courses": [
+    {
+      "id": "tricky-excelsia-graduate-certificate-christian-leadership",
+      "country": "Australia",
+      "name": "Graduate Certificate in Christian Leadership",
+      "fields": {
+        "course_name": {
+          "value": "Graduate Certificate in Christian Leadership",
+          "status": "verified",
+          "source_url": "https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership",
+          "snippet": "Graduate Certificate in Christian Leadership",
+          "year": null,
+          "basis": "Official course page; observed 2026-11-05"
+        },
+        "audience": {
+          "value": "Domestic students only",
+          "status": "verified",
+          "source_url": "https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership",
+          "snippet": "Available to: Domestic students only",
+          "year": null,
+          "basis": "Eligibility restriction, not international availability"
+        },
+        "duration": {
+          "value": "1 semester full-time/up to 2 years part-time",
+          "status": "verified",
+          "source_url": "https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership",
+          "snippet": "1 semester full-time/up to 2 years part-time",
+          "year": null,
+          "basis": "Separate full-time and part-time durations"
+        },
+        "delivery": {
+          "value": "Online and face-to-face",
+          "status": "verified",
+          "source_url": "https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership",
+          "snippet": "Online and face-to-face",
+          "year": null,
+          "basis": "Delivery mode; no campus inferred"
+        },
+        "intake": {
+          "value": ["February", "July"],
+          "status": "verified",
+          "source_url": "https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership",
+          "snippet": "February and July",
+          "year": null,
+          "basis": "Months explicitly stated"
+        },
+        "tuition": {
+          "value": {"amount": 9100, "currency_symbol": "$", "currency_code": null, "audience": "Domestic only", "fee_basis": null},
+          "status": "verified",
+          "source_url": "https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership",
+          "snippet": "$9,100 (Domestic only)",
+          "year": null,
+          "basis": "Quoted amount only, as of 2026-11-05; currency code, fee period and tuition year not stated"
+        },
+        "ielts": {
+          "value": {"overall": 6.5, "minimum_each_band": 6.0},
+          "status": "verified",
+          "source_url": "https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership",
+          "snippet": "IELTS: 6.5 with no band less than 6.0",
+          "year": null,
+          "basis": "Published course English requirement; does not imply international eligibility"
+        },
+        "pte_academic": {
+          "value": {"overall": 58, "minimum_each_score": 51},
+          "status": "verified",
+          "source_url": "https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership",
+          "snippet": "PTE Academic: 58 with no score less than 51",
+          "year": null,
+          "basis": "Published course English requirement"
+        },
+        "campus": {
+          "value": null,
+          "status": "unverified",
+          "source_url": "https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership",
+          "snippet": null,
+          "year": null,
+          "basis": "No explicit course campus identified"
+        }
+      }
+    },
+    {
+      "id": "tricky-william-carey-master-biomedical-sciences",
+      "country": "United States",
+      "name": "Master of Biomedical Sciences (MBS)",
+      "fields": {
+        "course_name": {
+          "value": "Master of Biomedical Sciences (MBS)",
+          "status": "verified",
+          "source_url": "https://www.wmcarey.edu/office/business/tuition",
+          "snippet": "| Master of Biomedical Sciences (MBS) | |",
+          "year": "2026-2027",
+          "basis": "Named program within official multi-program tuition table"
+        },
+        "tuition": {
+          "value": {"amount": 24500, "currency_symbol": "$", "currency_code": null, "fee_basis": "per year", "audience": null, "credit_hours": 33},
+          "status": "verified",
+          "source_url": "https://www.wmcarey.edu/office/business/tuition",
+          "snippet": "| Master of Biomedical Sciences (MBS) |  |\n| Tuition (33 credit hours) | $24,500(per year) |",
+          "year": "2026-2027",
+          "basis": "Contiguous program and tuition rows; explicit annual exception to per-credit graduate rates, observed 2026-11-05. Academic-year section heading is recorded separately in context_evidence.",
+          "context_evidence": {
+            "snippet": "## 2026 - 2027 Tuition & Fees",
+            "source_url": "https://www.wmcarey.edu/office/business/tuition",
+            "source_path": "research/sources/golden-tricky-02-carey-tuition.md",
+            "basis": "Section heading at saved source line 20; quoted program and tuition rows at lines 91-92, before the next academic-year heading"
+          }
+        },
+        "previous_year_tuition": {
+          "value": {"amount": 24000, "currency_symbol": "$", "currency_code": null, "fee_basis": null, "audience": null, "credit_hours": 33},
+          "status": "verified",
+          "source_url": "https://www.wmcarey.edu/office/business/tuition",
+          "snippet": "| Master of Biomedical Sciences (MBS) |  |\n| Tuition (33 credit hours) | $24,000 |",
+          "year": "2025-2026",
+          "basis": "Contiguous program and tuition rows in prior-year section on same live page; no annual basis inferred from newer section. Academic-year section heading is recorded separately in context_evidence.",
+          "context_evidence": {
+            "snippet": "## 2025 - 2026 Tuition & Fees",
+            "source_url": "https://www.wmcarey.edu/office/business/tuition",
+            "source_path": "research/sources/golden-tricky-02-carey-tuition.md",
+            "basis": "Section heading at saved source line 127; quoted program and tuition rows at lines 195-196"
+          }
+        },
+        "intake": {
+          "value": null,
+          "status": "unverified",
+          "source_url": "https://www.wmcarey.edu/office/business/tuition",
+          "snippet": null,
+          "year": null,
+          "basis": "Tuition page does not establish program intake"
+        },
+        "ielts": {
+          "value": null,
+          "status": "unverified",
+          "source_url": "https://www.wmcarey.edu/office/business/tuition",
+          "snippet": null,
+          "year": null,
+          "basis": "Tuition page does not establish program English requirements"
+        }
+      }
+    }
+  ],
+  "gaps": [
+    "Supplemental candidates only: two named courses, not a complete 50-course benchmark or manual human approvals.",
+    "No genuine same-course IELTS numerical conflict found. Excelsia repeats the same 6.5 overall / 6.0 bands requirement consistently; domestic-only eligibility plus English testing is not itself a contradiction.",
+    "Excelsia tuition currency code, fee period and tuition academic year remain unverified. Footer copyright 2026 is not a publication or fee-year date.",
+    "William Carey graduate per-credit rows are fee categories, not independently verified formal course names: Masters Tuition $495; Nursing Masters Tuition $515; Occupational Therapy Masters Tuition $640; Specialist in Education Tuition $495, each per credit hour for 2026-2027. They were not padded into named-course candidates.",
+    "William Carey price search included November 2026 and current academic year before fetching. Figures are observed 2026-11-05 and subject to change; no separate dated price announcement established.",
+    "MacEwan fetched calendar identifies 2027-2028 although search snippet advertised 2026-2027. Use fetched edition; do not assign general deadlines to individual programs.",
+    "MacEwan explicitly labels Fall (September) and Winter (January); months are source wording, not inferred conversions. Its international May 1 Fall date is an application deadline, not a course start date.",
+    "No fetched named program with a Fall-only intake established. General official Fall-intake evidence saved separately.",
+    "Currency symbols retained literally; USD and AUD not asserted without explicit source wording.",
+    "Publication dates unavailable for sources. Academic editions and observation dates are recorded separately; age beyond 18 months cannot be assessed from copyright or search crawl dates."
+  ],
+  "sources": [
+    {
+      "url": "https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership",
+      "title": "Graduate Certificate in Christian Leadership",
+      "publication_date": null,
+      "observed_date": "2026-11-05",
+      "tier": "Tier 1 (official academic institution)",
+      "path": "research/sources/golden-tricky-01-excelsia-christian-leadership.md"
+    },
+    {
+      "url": "https://www.wmcarey.edu/office/business/tuition",
+      "title": "Tuition & Fees | William Carey University",
+      "publication_date": null,
+      "academic_years": ["2026-2027", "2025-2026"],
+      "observed_date": "2026-11-05",
+      "tier": "Tier 1 (official academic institution)",
+      "path": "research/sources/golden-tricky-02-carey-tuition.md"
+    },
+    {
+      "url": "https://calendar.macewan.ca/admissions/general-information/",
+      "title": "General Admissions Information | MacEwan University Academic Catalog",
+      "publication_date": null,
+      "academic_edition": "2027-2028",
+      "observed_date": "2026-11-05",
+      "tier": "Tier 1 (official academic institution)",
+      "path": "research/sources/golden-tricky-03-macewan-admissions.md"
+    },
+    {
+      "url": "https://www.liverpool.ac.uk/international/applying/entry-requirements/english-language-requirements/international-english-language-tests",
+      "title": "International English language tests | International students | University of Liverpool",
+      "publication_date": null,
+      "observed_date": "2026-11-05",
+      "tier": "Tier 1 (official academic institution; search snippet only)",
+      "path": "research/sources/golden-tricky-snippets.md"
+    },
+    {
+      "url": "https://www.bradford.ac.uk/international/entry-requirements",
+      "title": "English language requirements - International students - University of Bradford",
+      "publication_date": null,
+      "observed_date": "2026-11-05",
+      "tier": "Tier 1 (official academic institution; search snippet only)",
+      "path": "research/sources/golden-tricky-snippets.md"
+    },
+    {
+      "url": "https://www.macewan.ca/apply-enrol/admissions/dates-deadlines",
+      "title": "Dates & Deadlines - MacEwan University",
+      "publication_date": null,
+      "observed_date": "2026-11-05",
+      "tier": "Tier 1 (official academic institution; search snippet only)",
+      "path": "research/sources/golden-tricky-snippets.md"
+    }
+  ]
+}

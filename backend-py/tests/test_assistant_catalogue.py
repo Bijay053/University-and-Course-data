@@ -48,6 +48,8 @@ async def test_html_scan_is_bounded_partial_and_never_accepts_external_course_li
         calls.append(url)
         if "page2" in url:
             raise ValueError("blocked")
+        if "/courses/bachelor-new" in url:
+            return b"<main><h1>Bachelor of New Studies</h1><p>Duration: 3 years</p></main>"
         return (f"<html><title>Course catalogue</title><main>{'Official programme descriptions. '*8}"
                 f'<a href="/courses/bachelor-new">Bachelor of New Studies</a>'
                 f'<a href="/news/bachelor-of-community-services-launched">Bachelor of Community Services launched</a>'

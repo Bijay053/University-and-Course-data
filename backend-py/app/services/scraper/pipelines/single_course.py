@@ -3667,6 +3667,12 @@ async def extract_course(
             "evidence": [],
         }
 
+    # Browser/JSON sources can contain UTF-16 surrogate code units. Preserve
+    # valid pairs and replace lone units before downstream UTF-8 parsers.
+    from app.services.scraper.unicode_text import scalar_text
+    if html is not None:
+        html = scalar_text(html)
+
     # If UEL's preflight failed but its ordinary browser transport recovered,
     # check the recovered raw source before generic extraction. A newly found
     # multi-route page must not turn into a single undifferentiated record.

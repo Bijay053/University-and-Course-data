@@ -16,9 +16,10 @@ export { safeSourceUrl };
 export type AssistantSource = { url: string; title: string; excerpt: string; page?: number; quoteId?: string };
 export type AssistantAction = {
   id: string;
-  kind: "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course";
+  kind: "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location";
   label: string;
   courseCount: number;
+  publishedCount?: number;
   fields: string[];
   state: "proposed" | "starting" | "running" | "completed" | "error" | "superseded";
   resultSummary?: string;
@@ -64,6 +65,7 @@ export type AssistantThread = {
   startedAt?: string | null;
   updatedAt?: string | null;
   relatedReviews?: AssistantRelatedReview[];
+  reviewCounts?: { providerPendingRows: number; thisJobPendingRows: number; pendingByJob: {jobId: string; pendingRows: number}[] };
 };
 
 export type ScrapePromptAssistantProps = {
@@ -545,11 +547,17 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             </div>
           )}
 
+          {thread?.reviewCounts && (
+            <div className="mb-3 text-xs text-muted-foreground" data-testid="assistant-review-counts">
+              Provider total: {thread.reviewCounts.providerPendingRows} pending rows across all reviews.
+              {" "}This job: {thread.reviewCounts.thisJobPendingRows} pending rows.
+            </div>
+          )}
           {thread && !hasConversation && (
             <div className="mx-auto max-w-lg py-4 text-center" data-testid="assistant-empty">
               <p className="text-[15px] font-semibold text-slate-900">What should I look into?</p>
               <p className="mt-1 text-[12.5px] text-slate-600">
-                Name an existing course to correct its fields without creating another course. Fees, IELTS, duration and location use source-backed re-extraction; Excelsia intake edits use the official course’s Intake line. Say “add this course” for a separate course-fetch request. Publishing and bulk changes over 10 records require confirmation.
+                Name an existing course to edit its fields without creating another course. Location values you supply are saved as staff-provided, not as verified website facts. “Add this in all courses” repeats the last location edit across this provider without discovery. Published records and changes over 10 rows require confirmation.
               </p>
               <div className="mt-4 flex flex-col gap-2 text-left">
                 {EXAMPLES.map((ex, i) => (
@@ -724,7 +732,11 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm">
                 <p>
-                  {confirming?.kind === "repair_catalogue"
+                  {confirming?.kind === "undo_staff_location"
+                    ? "This restores the prior audited locations and provenance. It refuses to overwrite later edits. No page fetch or discovery runs."
+                    : confirming?.kind === "staff_location"
+                    ? "This saves the supplied location on the exact records listed in the chat, with staff-provided provenance and an audit log. It does not fetch pages or run catalogue discovery."
+                    : confirming?.kind === "repair_catalogue"
                     ? "This starts a bounded scraper repair for this job's catalogue."
                     : confirming?.kind === "recover_catalogue"
                     ? "This checks the selected not-recorded catalogue links and scrapes any that pass the usual eligibility checks into review data. Some may turn out not to be eligible courses."
@@ -733,7 +745,8 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                     : confirming?.kind === "review_courses"
                     ? "This fetches the requested official course URLs into a fresh pending review. It does not rename the course in the current review or duplicate a published course."
                     : "This re-extracts the listed fields for staged review courses."}
-                  {confirming?.kind === "scan_catalogue" ? " Results land in review data only."
+                  {confirming?.kind === "staff_location" || confirming?.kind === "undo_staff_location" ? ` It changes ${confirming.courseCount} listed records, including ${confirming.publishedCount ?? 0} published records.`
+                    : confirming?.kind === "scan_catalogue" ? " Results land in review data only."
                     : confirming?.kind === "recover_catalogue" ? ` It checks ${selectedUrls.length} selected link${selectedUrls.length === 1 ? "" : "s"}; results land in review data only.`
                     : ` It affects ${confirming?.courseCount} course${confirming?.courseCount === 1 ? "" : "s"} in review data only.`}
                 </p>

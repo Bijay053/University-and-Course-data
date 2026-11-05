@@ -46,6 +46,14 @@ def _normalise_db_url(raw: str) -> str:
 
 
 class Settings(BaseSettings):
+    scrape_agent_v2_enabled: bool = False
+    scrape_agent_v2_user_ids: str = ""
+    scrape_agent_v2_daily_usd: float = 100
+    # Standard pricing verified against OpenAI's model page. Budgeting also
+    # includes long-context and cache-write surcharges in spend.py.
+    scrape_agent_v2_input_usd_per_million: float = 2
+    scrape_agent_v2_output_usd_per_million: float = 12
+    scrape_agent_v2_priced_model: str = "gpt-5.6-terra"
     model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore", case_sensitive=False)
 
     database_url: str = Field(

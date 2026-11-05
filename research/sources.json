@@ -1,0 +1,270 @@
+{
+  "source-001": {
+    "title": "2026 Undergraduate International Student Tuition Fees",
+    "url": "https://www.westernsydney.edu.au/content/dam/digital/pdf/international/ug-intl-fees-2026.pdf",
+    "publication_date": null,
+    "fee_year": 2026,
+    "as_of": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-australia-01-western-sydney-2026.md",
+    "evidence_type": "fetched official multi-course table",
+    "fee_basis_excerpt": "#Annual fees indicated is based on 80 credit points for any program that is 80 credit points or more unless otherwise indicated International students will be subject to a variable fee regime; i.e. enrolled students will be required to pay fees during their program based on the approved fee for each calendar year."
+  },
+  "source-002": {
+    "title": "Higher Education International 2026 - Tuition Fee",
+    "url": "https://www.cdu.edu.au/files/2025-08/2026-he-international-annual-tuition-fees.pdf",
+    "publication_date": null,
+    "search_only_version_date": "2026-06-30 Version 9.0",
+    "fee_year": 2026,
+    "as_of": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-australia-02-cdu-2026.md",
+    "evidence_type": "fetched official multi-course table",
+    "header_excerpt": "| CRICOS Code | Course Code | Course Title | 2026 |"
+  },
+  "source-003": {
+    "title": "The University of Melbourne Tuition Fees 2026: Tuition fee tables for international students",
+    "url": "https://study.unimelb.edu.au/__data/assets/pdf_file/0018/493011/2026IntFeeMayUpdate.pdf",
+    "publication_date": "2026-05-11",
+    "fee_year": 2026,
+    "as_of": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-australia-04-melbourne-tuition-2026.md",
+    "evidence_type": "fetched official multi-course table",
+    "publication_excerpt": "Published on 11 May 2026",
+    "header_excerpt": "| Course Type | Course Name | Course Code | Total course load(EFTSL) | CRICOS code | 2026 International course fee($AUD/EFTSL) | Fee in 2026 for 1x12.5 credit point subject | Estimated fee Year 1($AUD) | Indicative total course fee($AUD) |",
+    "fee_basis_excerpt": "The course fees in Table 3 set out the basis for calculating your tuition fees showing the fee for each 100 credit points (1  EFTSL) of study in that course",
+    "total_fee_caveat_excerpt": "The indicative total course fee assumes a full-time study load over the duration shown, commencing in Semester 1 2026, with an estimate of annual fee increases over the duration of the course, based on the maximum annual course tuition increase specified in the Student Loans, Fees and Charges Policy (MPF 1325)."
+  },
+  "source-004": {
+    "title": "International Costs of Tuition | Western Sydney University",
+    "url": "https://www.westernsydney.edu.au/international/applying/fees-and-costs/cost-of-tuition",
+    "publication_date": null,
+    "as_of": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-australia-snippets.md",
+    "evidence_type": "saved search snippet only; context, not course-field verification"
+  },
+  "source-005": {
+    "title": "Higher Education fees | Charles Darwin University",
+    "url": "https://www.cdu.edu.au/current-students/student-admin/fees-payments/higher-education-fees",
+    "publication_date": null,
+    "as_of": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-australia-snippets.md",
+    "evidence_type": "saved search snippet only; context, not course-field verification"
+  },
+  "source-006": {
+    "title": "404 : Page not found | Error",
+    "url": "https://students.unimelb.edu.au/__data/assets/pdf_file/0020/5423033/2026-International-Course-Tuition-Fees-OF_20260807.pdf",
+    "publication_date": null,
+    "as_of": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-australia-03-melbourne-2026.md",
+    "evidence_type": "fetched error page; excluded as evidence"
+  },
+  "source-007": {
+    "title": "Master's and PhD program tuition Spring 2026 - International Students | Finance | University of Waterloo",
+    "url": "https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international",
+    "publication_date": null,
+    "period": "Spring 2026",
+    "accessed": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-canada-02-waterloo-spring-2026.md",
+    "evidence_type": "fetched official page"
+  },
+  "source-008": {
+    "title": "Instructional Fees for International Students | University of Alberta",
+    "url": "https://www.ualberta.ca/en/graduate-studies/fees-funding/tuition-fees/instructional-fees-international.html",
+    "publication_date": null,
+    "period": "2026-27",
+    "accessed": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-canada-01-alberta-international-fees.md",
+    "evidence_type": "fetched official page; supplemental"
+  },
+  "source-009": {
+    "title": "Tuition, Fees and Cost of Living | University of Guelph",
+    "url": "https://graduatestudies.uoguelph.ca/future/cost",
+    "publication_date": null,
+    "period": "2026-27 and 2027-28 table",
+    "accessed": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-canada-03-guelph-cost.md",
+    "evidence_type": "fetched official page; supplemental"
+  },
+  "source-010": {
+    "title": "Tuition - Future graduate students | University of Saskatchewan",
+    "url": "https://grad.usask.ca/funding/tuition.php",
+    "publication_date": null,
+    "period": "September 1, 2026\u2013August 31, 2027",
+    "accessed": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-canada-snippets.md",
+    "evidence_type": "search snippet only"
+  },
+  "source-011": {
+    "title": "English Language Test | Graduate School at UBC",
+    "url": "https://www.grad.ubc.ca/prospective-students/application-admission/english-language-test",
+    "publication_date": null,
+    "period": null,
+    "accessed": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-canada-snippets.md",
+    "evidence_type": "search snippet only"
+  },
+  "source-012": {
+    "url": "https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership",
+    "title": "Graduate Certificate in Christian Leadership",
+    "publication_date": null,
+    "observed_date": "2026-11-05",
+    "tier": "Tier 1 (official academic institution)",
+    "path": "research/sources/golden-tricky-01-excelsia-christian-leadership.md"
+  },
+  "source-013": {
+    "url": "https://www.wmcarey.edu/office/business/tuition",
+    "title": "Tuition & Fees | William Carey University",
+    "publication_date": null,
+    "academic_years": [
+      "2026-2027",
+      "2025-2026"
+    ],
+    "observed_date": "2026-11-05",
+    "tier": "Tier 1 (official academic institution)",
+    "path": "research/sources/golden-tricky-02-carey-tuition.md"
+  },
+  "source-014": {
+    "url": "https://calendar.macewan.ca/admissions/general-information/",
+    "title": "General Admissions Information | MacEwan University Academic Catalog",
+    "publication_date": null,
+    "academic_edition": "2027-2028",
+    "observed_date": "2026-11-05",
+    "tier": "Tier 1 (official academic institution)",
+    "path": "research/sources/golden-tricky-03-macewan-admissions.md"
+  },
+  "source-015": {
+    "url": "https://www.liverpool.ac.uk/international/applying/entry-requirements/english-language-requirements/international-english-language-tests",
+    "title": "International English language tests | International students | University of Liverpool",
+    "publication_date": null,
+    "observed_date": "2026-11-05",
+    "tier": "Tier 1 (official academic institution; search snippet only)",
+    "path": "research/sources/golden-tricky-snippets.md"
+  },
+  "source-016": {
+    "url": "https://www.bradford.ac.uk/international/entry-requirements",
+    "title": "English language requirements - International students - University of Bradford",
+    "publication_date": null,
+    "observed_date": "2026-11-05",
+    "tier": "Tier 1 (official academic institution; search snippet only)",
+    "path": "research/sources/golden-tricky-snippets.md"
+  },
+  "source-017": {
+    "url": "https://www.macewan.ca/apply-enrol/admissions/dates-deadlines",
+    "title": "Dates & Deadlines - MacEwan University",
+    "publication_date": null,
+    "observed_date": "2026-11-05",
+    "tier": "Tier 1 (official academic institution; search snippet only)",
+    "path": "research/sources/golden-tricky-snippets.md"
+  },
+  "source-018": {
+    "id": "uk-source-01",
+    "title": "2026/27 Fee Levels \u2014 LSE",
+    "url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf",
+    "publication_date": "Last Updated: October 2025",
+    "tier": 1,
+    "accessed": "2026-11-05",
+    "path": "research/sources/golden-uk-01-lse-fees-2026.md",
+    "evidence_type": "fetched official fee table",
+    "fee_basis_excerpt": "The fees quoted are for one year of study in 2026/27 only, unless stated otherwise.",
+    "fee_caveat_excerpt": "Fees are paid in each academic year for which you are enrolled and normally rise each year, unless stated otherwise."
+  },
+  "source-019": {
+    "id": "uk-source-02",
+    "title": "MSc Supply Chain Logistics Management 2026 \u2014 University of Warwick",
+    "url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/courses-2026/supply-chain-logistics-management/",
+    "publication_date": null,
+    "tier": 1,
+    "accessed": "2026-11-05",
+    "path": "research/sources/golden-uk-02-warwick-supply-chain.md",
+    "evidence_type": "fetched official course page"
+  },
+  "source-020": {
+    "id": "uk-source-03",
+    "title": "English Requirements | WMG Masters | University of Warwick",
+    "url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/how-to-apply/english/",
+    "publication_date": null,
+    "tier": 1,
+    "accessed": "2026-11-05",
+    "path": "research/sources/golden-uk-03-warwick-english.md",
+    "evidence_type": "fetched official admissions page"
+  },
+  "source-021": {
+    "id": "uk-source-04",
+    "title": "Tuition Fees \u2014 WMG University of Warwick",
+    "url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/information-for-offer-holders/beforeyouarrive/fees/",
+    "publication_date": null,
+    "tier": 1,
+    "accessed": "2026-11-05",
+    "path": "research/sources/golden-uk-snippets.md",
+    "evidence_type": "search snippet only; supplemental cross-reference"
+  },
+  "source-022": {
+    "id": "uk-source-05",
+    "title": "MSc course structure | WMG | University of Warwick",
+    "url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/structure/",
+    "publication_date": null,
+    "tier": 1,
+    "accessed": "2026-11-05",
+    "path": "research/sources/golden-uk-snippets.md",
+    "evidence_type": "search snippet only; general 2027 context"
+  },
+  "source-023": {
+    "title": "Northeastern University Student Financial Services \u2014 Tuition and Fees",
+    "url": "https://studentfinance.northeastern.edu/billing-payments/tuition-and-fees/",
+    "publication_date": null,
+    "academic_year": "2026-2027",
+    "accessed": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-usa-04-northeastern-student-finance.md",
+    "use": "Fetched official multi-program table; sole tuition evidence for twelve candidates"
+  },
+  "source-024": {
+    "title": "Fairleigh Dickinson University \u2014 International Tuition and Fees",
+    "url": "https://www.fdu.edu/admissions/international/tuition-fees",
+    "publication_date": null,
+    "academic_year": "2026-2027",
+    "accessed": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-usa-02-fdu-international-tuition.md",
+    "use": "Fetched institutional annual estimate; not course-level evidence"
+  },
+  "source-025": {
+    "title": "Northeastern University College of Professional Studies \u2014 English Language Requirements",
+    "url": "https://cps.northeastern.edu/admissions-aid/international-admissions/applications/english-language-requirements",
+    "publication_date": null,
+    "accessed": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-usa-03-northeastern-cps-english.md",
+    "use": "Fetched college-specific policy; not assigned to these twelve degrees"
+  },
+  "source-026": {
+    "title": "Northeastern University Academic Catalog \u2014 Tuition and Fees",
+    "url": "https://catalog.northeastern.edu/graduate/expenses/tuition-fees/",
+    "publication_date": null,
+    "academic_year": "2026-2027",
+    "accessed": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-usa-snippets.md",
+    "use": "Snippet only; fetch HTTP 429; no candidate verification"
+  },
+  "source-027": {
+    "title": "University of Illinois Springfield \u2014 Fall 2026 Tuition",
+    "url": "https://www.uis.edu/registrar/tuition-fees/fall-2026-tuition",
+    "publication_date": null,
+    "academic_year": "Fall 2026",
+    "accessed": "2026-11-05",
+    "tier": 1,
+    "path": "research/sources/golden-usa-snippets.md",
+    "use": "Snippet only; flags graduate differential structure; no numeric candidate verification"
+  }
+}

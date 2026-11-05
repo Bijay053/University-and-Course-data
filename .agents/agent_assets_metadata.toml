@@ -231,3 +231,59 @@ mtime_ms = 1793686914360
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/9919ccf7-fc12-476e-88c9-567eca785d17/13676921-ec58-4cbc-9180-642fb35af051"
 storage_version_token = "1793686940003686"
 content_type = "text/csv"
+
+[[outputs]]
+id = "Hm85mVL3tTz_6X2u8cUmb"
+uri = "file://research/notes.md"
+type = "text"
+title = "Independent course benchmark research"
+description = "Official-source evidence collection; candidates are not yet passing benchmark results."
+logical_id = "34c68ab8-d68e-4186-b921-33121cbfea8a"
+content_hash = "sha256:c4ae1ac6d685a3b50d7f4193dc44faaf6dd0a3b7336276b2614ead438625e655"
+size = 1815
+mtime_ms = 1793848394591
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/34c68ab8-d68e-4186-b921-33121cbfea8a/c2ebb0c0-9d53-4b9b-89ad-414391a0f806"
+storage_version_token = "1793848417191245"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "7O7andJixlJnXhqYO32Q1"
+uri = "file://reports/scrape-agent-rebuild-progress.md"
+type = "text"
+title = "Rebuild checkpoint — not release-ready"
+description = "Implemented foundations, 85-test results, live Excelsia baseline, and the remaining specification gaps."
+logical_id = "3fdedce3-e116-48a4-8ddd-ffdfdf99bc22"
+content_hash = "sha256:3e344467454e08b1d4d82eef8e5fc1d971eb9f6a2324565485e61c7a888b6881"
+size = 4471
+mtime_ms = 1793849088059
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/3fdedce3-e116-48a4-8ddd-ffdfdf99bc22/2675a0a8-8b94-4f3e-b851-892d62352707"
+storage_version_token = "1793849421233203"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "cZUWipMy_NZXGhiEMLspK"
+uri = "file://reports/excelsia-staff-location-preview.html"
+type = "html"
+title = "Excelsia: 42-row location preview and all 14 errors"
+description = "Exact pending rows, every failed URL and recorded error, six separate discovery 404s, and deployment status. No production course data changed."
+logical_id = "1747a552-ee85-40f1-bfe3-cc3046ebfdec"
+content_hash = "sha256:84b27437412d2a117318c9f5cad52850d2e03e998e6ccf5a5cca5eb90cfe1173"
+size = 12008
+mtime_ms = 1793850924548
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/1747a552-ee85-40f1-bfe3-cc3046ebfdec/fba7e657-4ebb-4c7b-a297-ef6907f9e958"
+storage_version_token = "1793851098657306"
+content_type = "text/html"
+
+[[outputs]]
+id = "emLiUMxzehmBHozSB6TAA"
+uri = "file://reports/golden-candidates-team-review.xlsx"
+type = "table"
+title = "52 research candidates for team review"
+description = "Unapproved research inventory with 239 field-evidence entries, missing-field flags and manual approval columns. Not the final partner-selected golden set."
+logical_id = "32f35acb-8497-4676-8ee3-04a890480059"
+content_hash = "sha256:242108eace3107d9ac95d286e6c6d63b9f6da54ce1c6e9c32492a6d49bbbcb3c"
+size = 31350
+mtime_ms = 1793852383686
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/32f35acb-8497-4676-8ee3-04a890480059/c8ded88a-842d-4ff8-af7d-fe23591962a7"
+storage_version_token = "1793852788144126"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

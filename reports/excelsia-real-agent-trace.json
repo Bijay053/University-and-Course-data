@@ -1,0 +1,24 @@
+{
+  "tokens": 1061,
+  "trace": [
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "call_1diNWZ69FzmncksDR7LX2B4P",
+          "type": "function",
+          "function": {
+            "name": "start_batch_check",
+            "arguments": "{\"row_ids\":[56052,56026,56053,56063,56073,56042]}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_1diNWZ69FzmncksDR7LX2B4P",
+      "content": "{\"ok\": true, \"changed\": false, \"checked\": 6, \"total\": 6, \"rows\": [{\"id\": 56026, \"sourceStatus\": \"checked\", \"evidenceIds\": [], \"version\": \"d2d77937330a2dc6566e218f0e1c91416e9d00f6fe78aebae72688ffaa192caa\", \"intakeMissing\": true}, {\"id\": 56042, \"sourceStatus\": \"checked\", \"evidenceIds\": [], \"version\": \"e517ef49edf134ad6b575ab09246485f11677312b810a4fb17b6d7020a6d43be\", \"intakeMissing\": true}, {\"id\": 56052, \"sourceStatus\": \"checked\", \"evidenceIds\": [], \"version\": \"8e4fffdbfbacab7323fcc644f905f4716049bb2433a261a14be5db8fdd856206\", \"intakeMissing\": true}, {\"id\": 56053, \"sourceStatus\": \"checked\", \"evidenceIds\": [], \"version\": \"849c3eb93a2943fbad0555799bb26800a505ee752882a95c14adeb9bffef8184\", \"intakeMissing\": true}, {\"id\": 56063, \"sourceStatus\": \"checked\", \"evidenceIds\": [], \"version\": \"090bc4d84c2ed83dd0d6f2ddb592335213aae90164daf0c1a5bc852a7f6efec9\", \"intakeMissing\": true}, {\"id\": 56073, \"sourceStatus\": \"checked\", \"evidenceIds\": [], \"version\": \"8d0d20afc1c6cc8411d6c73ccecfecfa67a79a4b592c84038990c70a2c4f71d6\", \"intakeMissing\": true}], \"note\": \"Source checks are complete; use guarded writes for supported corrections.\"}"
+    }
+  ]
+}

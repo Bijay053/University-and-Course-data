@@ -13,7 +13,8 @@ def owned(url):
 def facts(html, url):
     if not owned(url):
         return {}
-    soup = BeautifulSoup(html, "lxml")
+    from app.services.scraper.unicode_text import scalar_text
+    soup = BeautifulSoup(scalar_text(html), "lxml")
     # Elementor often splits one labelled fact across inline spans.
     for node in soup.select("h1, h2, h3, p, .elementor-heading-title"):
         value = node.get_text(" ", strip=True)

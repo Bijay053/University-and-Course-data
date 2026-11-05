@@ -1,0 +1,12 @@
+{
+  "source": "Staff-reported live Excelsia scenarios",
+  "requirements": [
+    {"id":"STAFF001","label":"Explicit staff location is saved without page evidence","test":"test_staff_location_saved_without_page_evidence"},
+    {"id":"STAFF002","label":"Provider-wide follow-up retains the latest location edit without discovery","test":"test_staff_value_and_followup_are_field_edits"},
+    {"id":"STAFF003","label":"More than ten pending rows require a preview and confirmation","test":"test_more_than_ten_rows_preview_then_confirm"},
+    {"id":"STAFF004","label":"Published records always require confirmation","test":"test_published_rows_require_confirmation_even_for_one_course"},
+    {"id":"STAFF005","label":"Contradicting official location is reported rather than overwritten","test":"test_official_conflict_does_not_overwrite_location"},
+    {"id":"STAFF006","label":"News and degree-title-only links are not course records","test":"test_degree_title_needs_owned_course_structure"},
+    {"id":"STAFF007","label":"Malformed source Unicode cannot crash the XPath parser","test":"test_unicode_pairs_survive_and_lone_surrogates_do_not_crash_xpath"}
+  ]
+}

@@ -1,0 +1,154 @@
+{
+  "courses": [
+    {
+      "id": "uk-lse-accounting-data-analytics-2026",
+      "country": "UK",
+      "name": "MSc in Accounting and Data Analytics",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£43,000", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Accounting and Data Analytics | £43,000 | £43,000 |  |  |", "header_evidence": "| A | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£43,000", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Accounting and Data Analytics | £43,000 | £43,000 |  |  |", "header_evidence": "| A | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-lse-accounting-finance-2026",
+      "country": "UK",
+      "name": "MSc in Accounting and Finance",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£43,000", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Accounting and Finance | £43,000 | £43,000 | £21,500 | £21,500 |", "header_evidence": "| A | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£43,000", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Accounting and Finance | £43,000 | £43,000 | £21,500 | £21,500 |", "header_evidence": "| A | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-lse-accounting-organisations-institutions-2026",
+      "country": "UK",
+      "name": "MSc in Accounting, Organisations and Institutions",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£39,900", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Accounting, Organisations and Institutions | £39,900 | £39,900 |  |  |", "header_evidence": "| A | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£39,900", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Accounting, Organisations and Institutions | £39,900 | £39,900 |  |  |", "header_evidence": "| A | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-lse-anthropology-development-2026",
+      "country": "UK",
+      "name": "MSc in Anthropology and Development",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£30,400", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Anthropology and Development | £18,300 | £30,400 | £9,150 | £15,200 |", "header_evidence": "| A | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£18,300", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Anthropology and Development | £18,300 | £30,400 | £9,150 | £15,200 |", "header_evidence": "| A | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-lse-applied-social-data-science-2026",
+      "country": "UK",
+      "name": "MSc in Applied Social Data Science",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£39,900", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Applied Social Data Science | £39,900 | £39,900 | £19,950 | £19,950 |", "header_evidence": "| A | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£39,900", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Applied Social Data Science | £39,900 | £39,900 | £19,950 | £19,950 |", "header_evidence": "| A | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-lse-behavioural-science-2026",
+      "country": "UK",
+      "name": "MSc in Behavioural Science",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£30,400", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Behavioural Science | £28,900 | £30,400 | £14,450 | £15,200 |", "header_evidence": "| B | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£28,900", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Behavioural Science | £28,900 | £30,400 | £14,450 | £15,200 |", "header_evidence": "| B | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-lse-china-comparative-perspective-2026",
+      "country": "UK",
+      "name": "MSc in China in Comparative Perspective",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£30,400", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in China in Comparative Perspective | £18,300 | £30,400 | £9,150 | £15,200 |", "header_evidence": "| C | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£18,300", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in China in Comparative Perspective | £18,300 | £30,400 | £9,150 | £15,200 |", "header_evidence": "| C | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-lse-city-design-social-science-2026",
+      "country": "UK",
+      "name": "MSc in City Design and Social Science",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£32,500", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in City Design and Social Science | £22,000 | £32,500 | £11,000 | £16,250 |", "header_evidence": "| C | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£22,000", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in City Design and Social Science | £22,000 | £32,500 | £11,000 | £16,250 |", "header_evidence": "| C | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-lse-culture-conflict-global-europe-2026",
+      "country": "UK",
+      "name": "MSc in Culture and Conflict in a Global Europe",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£30,400", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Culture and Conflict in a Global Europe | £28,900 | £30,400 | £14,450 | £15,200 |", "header_evidence": "| C | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£28,900", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Culture and Conflict in a Global Europe | £28,900 | £30,400 | £14,450 | £15,200 |", "header_evidence": "| C | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-lse-culture-justice-environment-2026",
+      "country": "UK",
+      "name": "MSc in Culture, Justice and Environment",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£30,400", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Culture, Justice and Environment | £18,300 | £30,400 | £9,150 | £15,200 |", "header_evidence": "| C | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£18,300", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Culture, Justice and Environment | £18,300 | £30,400 | £9,150 | £15,200 |", "header_evidence": "| C | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-lse-culture-society-2026",
+      "country": "UK",
+      "name": "MSc in Culture and Society",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£30,400", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Culture and Society | £18,300 | £30,400 | £9,150 | £15,200 |", "header_evidence": "| C | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£18,300", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Culture and Society | £18,300 | £30,400 | £9,150 | £15,200 |", "header_evidence": "| C | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-lse-data-science-2026",
+      "country": "UK",
+      "name": "MSc in Data Science",
+      "institution": "London School of Economics and Political Science",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£39,900", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Data Science | £39,900 | £39,900 | £19,950 | £19,950 |", "header_evidence": "| D | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Overseas", "study_mode": "Full time"},
+        "home_tuition_fee": {"value": "£39,900", "status": "verified", "source_url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "snippet": "| MSc in Data Science | £39,900 | £39,900 | £19,950 | £19,950 |", "header_evidence": "| D | Full time Home | Full time Overseas | Part time Home | Part time Overseas |", "year": "2026/27", "basis": "one year of study", "currency": "GBP", "audience": "Home", "study_mode": "Full time"}
+      }
+    },
+    {
+      "id": "uk-warwick-supply-chain-logistics-management-2026",
+      "country": "UK",
+      "name": "MSc Supply Chain and Logistics Management",
+      "institution": "University of Warwick",
+      "fields": {
+        "overseas_tuition_fee": {"value": "£37,460", "status": "verified", "source_url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/courses-2026/supply-chain-logistics-management/", "snippet": "- **Overseas students:** £37,460", "header_evidence": "For 2026 entry, the tuition fees are as follows:", "year": "2026 entry", "basis": "not explicitly stated; not inferred annual or full-course", "currency": "GBP", "audience": "Overseas students"},
+        "home_tuition_fee": {"value": "£13,040", "status": "verified", "source_url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/courses-2026/supply-chain-logistics-management/", "snippet": "For 2026 entry, the tuition fees are as follows:\n- **Home students:** £13,040", "year": "2026 entry", "basis": "not explicitly stated; not inferred annual or full-course", "currency": "GBP", "audience": "Home students"},
+        "intake": {"value": "28 September 2026", "status": "verified", "source_url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/courses-2026/supply-chain-logistics-management/", "snippet": "**Start date:**\n\n28 September 2026", "year": "2026 entry", "basis": "explicit start date; no season conversion"},
+        "duration": {"value": "12 months", "status": "verified", "source_url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/courses-2026/supply-chain-logistics-management/", "snippet": "**Duration:** 12 months, full-time", "year": "2026 entry", "basis": "full-time"},
+        "study_mode": {"value": "full-time", "status": "verified", "source_url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/courses-2026/supply-chain-logistics-management/", "snippet": "**Duration:** 12 months, full-time", "year": "2026 entry", "basis": "course duration label"},
+        "ielts_overall": {"value": "6.5", "status": "verified", "source_url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/courses-2026/supply-chain-logistics-management/", "snippet": "If you are taking an IELTS test, we require a score of 6.5 (with no less than 6.0 in any one component).", "year": "2026 entry", "basis": "IELTS test"},
+        "ielts_minimum_each_component": {"value": "6.0", "status": "verified", "source_url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/courses-2026/supply-chain-logistics-management/", "snippet": "If you are taking an IELTS test, we require a score of 6.5 (with no less than 6.0 in any one component).", "year": "2026 entry", "basis": "minimum in any one component"}
+      }
+    }
+  ],
+  "gaps": [
+    {"scope": "all candidates", "detail": "Evidence observed 2026-11-05. Research candidates only; not portal-extracted values or manual human approvals."},
+    {"scope": "12 LSE candidates", "status": "unverified", "fields": ["duration", "intake", "IELTS", "campus"], "detail": "The fetched fee table does not verify these fields; no durations inferred from annual tuition or part-time pricing."},
+    {"scope": "Warwick candidate", "status": "unverified", "fields": ["campus", "tuition_fee_annual_or_full_course_basis"], "detail": "The fetched course explicitly states 2026-entry prices but does not explicitly label annual versus whole-course fee basis."},
+    {"scope": "LSE publication metadata", "detail": "Fetched PDF says Last Updated: October 2025, although its filename includes 29July26; publication chronology not independently resolved."},
+    {"scope": "source breadth", "detail": "Thirteen candidates cover two institutions. Three official pages fetched, two additional official URLs preserved only as snippets; snippet-only sources do not verify candidate fields."},
+    {"scope": "current entry years", "detail": "2026-entry evidence is historical cohort evidence as of 2026-11-05, not a claim of 2027-entry pricing. Generic Warwick structure search snippet discusses 2027."}
+  ],
+  "sources": [
+    {"id": "uk-source-01", "title": "2026/27 Fee Levels — LSE", "url": "https://info.lse.ac.uk/staff/divisions/Planning-Division/Assets/Documents/Table-of-Fees-2026-27-and-PGR-structure-combined-29July26.pdf", "publication_date": "Last Updated: October 2025", "tier": 1, "accessed": "2026-11-05", "path": "research/sources/golden-uk-01-lse-fees-2026.md", "evidence_type": "fetched official fee table", "fee_basis_excerpt": "The fees quoted are for one year of study in 2026/27 only, unless stated otherwise.", "fee_caveat_excerpt": "Fees are paid in each academic year for which you are enrolled and normally rise each year, unless stated otherwise."},
+    {"id": "uk-source-02", "title": "MSc Supply Chain Logistics Management 2026 — University of Warwick", "url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/courses-2026/supply-chain-logistics-management/", "publication_date": null, "tier": 1, "accessed": "2026-11-05", "path": "research/sources/golden-uk-02-warwick-supply-chain.md", "evidence_type": "fetched official course page"},
+    {"id": "uk-source-03", "title": "English Requirements | WMG Masters | University of Warwick", "url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/how-to-apply/english/", "publication_date": null, "tier": 1, "accessed": "2026-11-05", "path": "research/sources/golden-uk-03-warwick-english.md", "evidence_type": "fetched official admissions page"},
+    {"id": "uk-source-04", "title": "Tuition Fees — WMG University of Warwick", "url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/information-for-offer-holders/beforeyouarrive/fees/", "publication_date": null, "tier": 1, "accessed": "2026-11-05", "path": "research/sources/golden-uk-snippets.md", "evidence_type": "search snippet only; supplemental cross-reference"},
+    {"id": "uk-source-05", "title": "MSc course structure | WMG | University of Warwick", "url": "https://warwick.ac.uk/fac/sci/wmg/study/masters-degrees/structure/", "publication_date": null, "tier": 1, "accessed": "2026-11-05", "path": "research/sources/golden-uk-snippets.md", "evidence_type": "search snippet only; general 2027 context"}
+  ]
+}

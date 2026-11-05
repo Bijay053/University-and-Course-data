@@ -1,0 +1,10 @@
+{
+  "realModel": true,
+  "response": "READY",
+  "tokens": 18,
+  "ledgerState": "settled",
+  "reservedUSD": "0.06986950",
+  "conservativeChargedUSD": "0.00009250",
+  "capUSD": 100.0,
+  "productionWrites": 0
+}

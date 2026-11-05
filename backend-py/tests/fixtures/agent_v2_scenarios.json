@@ -1,0 +1,870 @@
+{
+  "source": "University Scraping Scenarios, Nov 5 2026",
+  "requirements": [
+    {
+      "id": "S001",
+      "kind": "scenario",
+      "page": 1,
+      "label": "Course explicitly domestic-only",
+      "cells": [
+        "Australia: \"Available to: Domestic students only\" (e.g. Excelsia Grad Cert in Christian Leadership)",
+        "Skip at scrape time with reason \"domestic-only\". Never stage for review."
+      ]
+    },
+    {
+      "id": "S002",
+      "kind": "scenario",
+      "page": 1,
+      "label": "Domestic fee shown alongside international fee",
+      "cells": [
+        "Page lists \"Domestic: A$9,100 / International: A$24,000\"",
+        "Do NOT reject. Store the international fee only."
+      ]
+    },
+    {
+      "id": "S003",
+      "kind": "scenario",
+      "page": 1,
+      "label": "No visa registration code on page",
+      "cells": [
+        "Australian course with no CRICOS code listed",
+        "Mark \"eligibility unverified\" and check the official CRICOS register. Reject only if the register confirms it isn't listed."
+      ]
+    },
+    {
+      "id": "S004",
+      "kind": "scenario",
+      "page": 1,
+      "label": "Home-fee-only course",
+      "cells": [
+        "UK: degree apprenticeships or courses open to \"home students only\"",
+        "Skip as not internationally eligible."
+      ]
+    },
+    {
+      "id": "S005",
+      "kind": "scenario",
+      "page": 1,
+      "label": "Online-only delivery",
+      "cells": [
+        "Course delivered 100% online",
+        "Flag: usually not eligible for a student visa. Store delivery mode and mark for review."
+      ]
+    },
+    {
+      "id": "S006",
+      "kind": "scenario",
+      "page": 2,
+      "label": "Part-time only",
+      "cells": [
+        "UK and Australian student visas generally need full-time study",
+        "Flag as \"not visa-eligible\" unless a full-time option exists."
+      ]
+    },
+    {
+      "id": "S007",
+      "kind": "scenario",
+      "page": 2,
+      "label": "Eligibility stated on a separate international page",
+      "cells": [
+        "Course page silent; \"International students\" page lists eligible courses",
+        "Follow the link and use the international page as evidence."
+      ]
+    },
+    {
+      "id": "S008",
+      "kind": "scenario",
+      "page": 2,
+      "label": "Eligibility differs by campus",
+      "cells": [
+        "Course runs on two campuses but only one is CRICOS-registered",
+        "Create one record per eligible campus. Skip the ineligible campus."
+      ]
+    },
+    {
+      "id": "S009",
+      "kind": "scenario",
+      "page": 2,
+      "label": "EU/EEA-only course or fee",
+      "cells": [
+        "Ireland or Netherlands course open only to EU applicants, or EU fee shown",
+        "Store the non-EU fee. Skip if non-EU students can't apply."
+      ]
+    },
+    {
+      "id": "S010",
+      "kind": "scenario",
+      "page": 2,
+      "label": "Visa-ready institution check",
+      "cells": [
+        "US school must be SEVP- certified to issue I-20s; Canada needs a DLI number",
+        "Store the code if shown. Mark \"unverified\" if missing."
+      ]
+    },
+    {
+      "id": "S011",
+      "kind": "scenario",
+      "page": 2,
+      "label": "Annual fee",
+      "cells": [
+        "UK: \"International fee: \u00a322,500 per year\"",
+        "Store as annual. Calculate full course = annual \u00d7 duration."
+      ]
+    },
+    {
+      "id": "S012",
+      "kind": "scenario",
+      "page": 2,
+      "label": "Full course fee",
+      "cells": [
+        "Australia: \"A$44,600 full course\"",
+        "Store as full course. Calculate annual equivalent."
+      ]
+    },
+    {
+      "id": "S013",
+      "kind": "scenario",
+      "page": 2,
+      "label": "Per credit or per unit fee",
+      "cells": [
+        "US: \"$1,450 per credit hour\"; Australia: \"A$3,800 per 10- credit-point unit\"",
+        "Store the rate. Calculate the annual fee only if the standard full-time load is stated. Otherwise mark \"estimate\"."
+      ]
+    },
+    {
+      "id": "S014",
+      "kind": "scenario",
+      "page": 3,
+      "label": "Per semester or per term fee",
+      "cells": [
+        "Canada or Malaysia: fee per semester or term",
+        "Convert to annual using the number of terms per year stated on the page."
+      ]
+    },
+    {
+      "id": "S015",
+      "kind": "scenario",
+      "page": 3,
+      "label": "Fee for a future year",
+      "cells": [
+        "\"2027 indicative fees\" shown in late 2026",
+        "Store the year the fee applies to. Prefer the fee for the next intake."
+      ]
+    },
+    {
+      "id": "S016",
+      "kind": "scenario",
+      "page": 3,
+      "label": "Fee is \"indicative\" or \"subject to change\"",
+      "cells": [
+        "Common on Australian and UK pages",
+        "Store with an \"indicative\" flag. Don't treat it as final."
+      ]
+    },
+    {
+      "id": "S017",
+      "kind": "scenario",
+      "page": 3,
+      "label": "Fee only in a PDF schedule",
+      "cells": [
+        "Separate \"International fee schedule 2027\" PDF",
+        "Read the PDF and match the course by name and code."
+      ]
+    },
+    {
+      "id": "S018",
+      "kind": "scenario",
+      "page": 3,
+      "label": "Scholarship mixed into fee",
+      "cells": [
+        "\"A$30,000 (A$24,000 after 20% scholarship)\"",
+        "Store the gross fee. Store the scholarship separately."
+      ]
+    },
+    {
+      "id": "S019",
+      "kind": "scenario",
+      "page": 3,
+      "label": "US in-state vs out-of- state vs international",
+      "cells": [
+        "Public US universities list three rates",
+        "Store the international (or out-of-state if no separate international rate) fee only."
+      ]
+    },
+    {
+      "id": "S020",
+      "kind": "scenario",
+      "page": 3,
+      "label": "Tuition-free but fees apply",
+      "cells": [
+        "Germany: no tuition at most public universities, but a semester contribution applies; some states charge non-EU students",
+        "Store tuition = 0 and the semester fee separately. Check the state's non-EU tuition rule."
+      ]
+    },
+    {
+      "id": "S021",
+      "kind": "scenario",
+      "page": 3,
+      "label": "Wrong currency assumed",
+      "cells": [
+        "Malaysian page in MYR, Irish page in EUR",
+        "Always store the currency code. Never convert without a stated rate and date."
+      ]
+    },
+    {
+      "id": "S022",
+      "kind": "scenario",
+      "page": 3,
+      "label": "Fee missing from course page",
+      "cells": [
+        "Fee sits on a central \"fees\" page",
+        "Search the site's fee page. If still missing, mark \"fee unverified\"."
+      ]
+    },
+    {
+      "id": "S023",
+      "kind": "scenario",
+      "page": 4,
+      "label": "Intake in a details block",
+      "cells": [
+        "Excelsia: \"Intake: February and July\"",
+        "Parse into [Feb, Jul]. This is the field the current extractor missed."
+      ]
+    },
+    {
+      "id": "S024",
+      "kind": "scenario",
+      "page": 4,
+      "label": "Intake named by season or semester",
+      "cells": [
+        "US \"Fall / Spring\"; Germany \"Winter semester / Summer semester\"",
+        "Map to months (Fall = Aug/Sep, Spring = Jan; Winter = Oct, Summer = Apr). Keep the original wording too."
+      ]
+    },
+    {
+      "id": "S025",
+      "kind": "scenario",
+      "page": 4,
+      "label": "Intake named by term",
+      "cells": [
+        "Australia \"Trimester 1, 2, 3\"; Canada \"Fall, Winter, Summer\"",
+        "Map to months using the university's own academic calendar."
+      ]
+    },
+    {
+      "id": "S026",
+      "kind": "scenario",
+      "page": 4,
+      "label": "Intake differs for international students",
+      "cells": [
+        "\"Domestic: Feb, Jul, Nov. International: Feb, Jul only\"",
+        "Store the international intakes only."
+      ]
+    },
+    {
+      "id": "S027",
+      "kind": "scenario",
+      "page": 4,
+      "label": "Intake differs by campus",
+      "cells": [
+        "Sydney campus Feb/Jul, Melbourne campus Feb only",
+        "Store intakes per campus record."
+      ]
+    },
+    {
+      "id": "S028",
+      "kind": "scenario",
+      "page": 4,
+      "label": "Intake closed or full",
+      "cells": [
+        "\"Applications for July 2027 are closed\"",
+        "Store the intake with status \"closed\". Don't delete it."
+      ]
+    },
+    {
+      "id": "S029",
+      "kind": "scenario",
+      "page": 4,
+      "label": "Duration with options",
+      "cells": [
+        "\"1.5 years full-time / 3 years part-time\"",
+        "Store the full-time duration as the main value."
+      ]
+    },
+    {
+      "id": "S030",
+      "kind": "scenario",
+      "page": 4,
+      "label": "Duration depends on prior study",
+      "cells": [
+        "\"1\u20132 years depending on your background\"",
+        "Store the range (min, max). Note the condition."
+      ]
+    },
+    {
+      "id": "S031",
+      "kind": "scenario",
+      "page": 4,
+      "label": "Duration in credits only",
+      "cells": [
+        "\"240 credit points\" or \"120 ECTS\"",
+        "Convert only if the page states the full-time load. Otherwise mark \"unverified\"."
+      ]
+    },
+    {
+      "id": "S032",
+      "kind": "scenario",
+      "page": 4,
+      "label": "Course includes work placement or co-op",
+      "cells": [
+        "Canada co-op adds a term; UK \"with placement year\" adds 1 year",
+        "Store as a separate variant with its own duration."
+      ]
+    },
+    {
+      "id": "S033",
+      "kind": "scenario",
+      "page": 5,
+      "label": "IELTS with band minimum",
+      "cells": [
+        "\"IELTS 6.5 with no band less than 6.0\"",
+        "Store overall = 6.5, minimum band = 6.0."
+      ]
+    },
+    {
+      "id": "S034",
+      "kind": "scenario",
+      "page": 5,
+      "label": "Band-specific minimums",
+      "cells": [
+        "\"IELTS 7.0, writing 7.0, other bands 6.5\"",
+        "Store per-band values, not just the lowest."
+      ]
+    },
+    {
+      "id": "S035",
+      "kind": "scenario",
+      "page": 5,
+      "label": "Requirement on a faculty or band page",
+      "cells": [
+        "Course says \"English Band B\"; a separate page defines Band B scores",
+        "Follow the link and resolve Band B to actual scores."
+      ]
+    },
+    {
+      "id": "S036",
+      "kind": "scenario",
+      "page": 5,
+      "label": "Multiple tests accepted",
+      "cells": [
+        "IELTS, TOEFL iBT, PTE Academic, Cambridge, Duolingo",
+        "Store each accepted test and score. Don't assume a test is accepted if it isn't listed."
+      ]
+    },
+    {
+      "id": "S037",
+      "kind": "scenario",
+      "page": 5,
+      "label": "Test variant required",
+      "cells": [
+        "UK may require \"IELTS for UKVI\" for some courses",
+        "Store the variant. Flag if it differs from standard IELTS Academic."
+      ]
+    },
+    {
+      "id": "S038",
+      "kind": "scenario",
+      "page": 5,
+      "label": "Course page and international page disagree",
+      "cells": [
+        "Course page says IELTS 6.5; English requirements page says 7.0",
+        "Flag as a conflict for review. Don't pick one silently."
+      ]
+    },
+    {
+      "id": "S039",
+      "kind": "scenario",
+      "page": 5,
+      "label": "Generic site-wide requirement only",
+      "cells": [
+        "\"All postgraduate courses: IELTS 6.5\"",
+        "Use it, but mark source as \"general, not course-specific\"."
+      ]
+    },
+    {
+      "id": "S040",
+      "kind": "scenario",
+      "page": 5,
+      "label": "Academic requirement by country",
+      "cells": [
+        "UK and Australian sites list entry rules per country (e.g. Nepal, Bangladesh, Sri Lanka)",
+        "Store the requirement for SIC's source markets. Note which country page it came from."
+      ]
+    },
+    {
+      "id": "S041",
+      "kind": "scenario",
+      "page": 5,
+      "label": "Academic requirement too vague",
+      "cells": [
+        "\"A recognised bachelor's degree or equivalent\"",
+        "Store as-is. Mark \"academic requirement unverified\" (as in the Master of Counselling row)."
+      ]
+    },
+    {
+      "id": "S042",
+      "kind": "scenario",
+      "page": 5,
+      "label": "Prerequisites or portfolio",
+      "cells": [
+        "Specific subjects, work experience, interview or portfolio required",
+        "Store as additional requirements, separate from English and academic."
+      ]
+    },
+    {
+      "id": "S043",
+      "kind": "scenario",
+      "page": 6,
+      "label": "Same course already in database",
+      "cells": [
+        "Re-scrape of Master of Counselling",
+        "Update the existing record. Never create a duplicate."
+      ]
+    },
+    {
+      "id": "S044",
+      "kind": "scenario",
+      "page": 6,
+      "label": "Similar names, different courses",
+      "cells": [
+        "\"Master of IT\" vs \"Master of IT (Advanced)\"",
+        "Treat as separate courses. Match on course code or CRICOS code, not name alone."
+      ]
+    },
+    {
+      "id": "S045",
+      "kind": "scenario",
+      "page": 6,
+      "label": "Course with specialisations",
+      "cells": [
+        "MBA with majors in Finance, Marketing, HR",
+        "One course record with majors listed, unless each major has its own code."
+      ]
+    },
+    {
+      "id": "S046",
+      "kind": "scenario",
+      "page": 6,
+      "label": "Double or combined degree",
+      "cells": [
+        "\"Bachelor of Commerce / Bachelor of Laws\"",
+        "Store as its own course. Don't merge into either single degree."
+      ]
+    },
+    {
+      "id": "S047",
+      "kind": "scenario",
+      "page": 6,
+      "label": "Honours or placement variant",
+      "cells": [
+        "UK \"BSc Computing\" vs \"BSc Computing with Placement Year\"",
+        "Separate records with separate duration and fee."
+      ]
+    },
+    {
+      "id": "S048",
+      "kind": "scenario",
+      "page": 6,
+      "label": "Pathway or packaged offer",
+      "cells": [
+        "Diploma + Bachelor package; foundation programme",
+        "Store the pathway as a separate course and link it to the destination degree."
+      ]
+    },
+    {
+      "id": "S049",
+      "kind": "scenario",
+      "page": 6,
+      "label": "Course discontinued",
+      "cells": [
+        "\"No longer taking new enrolments\" or page removed (404)",
+        "Mark existing record \"discontinued\". Don't delete; flag published records for review."
+      ]
+    },
+    {
+      "id": "S050",
+      "kind": "scenario",
+      "page": 6,
+      "label": "Course renamed",
+      "cells": [
+        "Old URL redirects to a new course name",
+        "Update the name, keep history, and note the redirect."
+      ]
+    },
+    {
+      "id": "S051",
+      "kind": "scenario",
+      "page": 6,
+      "label": "Same course at multiple campuses",
+      "cells": [
+        "Sydney and Melbourne with different fees or intakes",
+        "One record per campus when fees, intakes or eligibility differ."
+      ]
+    },
+    {
+      "id": "S052",
+      "kind": "scenario",
+      "page": 6,
+      "label": "Course offered via partner provider",
+      "cells": [
+        "Delivered by a private college on behalf of a university",
+        "Store both the awarding university and the delivering provider."
+      ]
+    },
+    {
+      "id": "S053",
+      "kind": "scenario",
+      "page": 7,
+      "label": "Content loaded by JavaScript",
+      "cells": [
+        "Fees or intakes appear only after the page script runs, or after clicking a \"International\" toggle",
+        "Use a headless browser. Click the international toggle before reading."
+      ]
+    },
+    {
+      "id": "S054",
+      "kind": "scenario",
+      "page": 7,
+      "label": "Content in tabs or accordions",
+      "cells": [
+        "\"Entry requirements\" hidden in a collapsed section",
+        "Expand all sections, or read the full page HTML."
+      ]
+    },
+    {
+      "id": "S055",
+      "kind": "scenario",
+      "page": 7,
+      "label": "Data only in PDF",
+      "cells": [
+        "Course guide, fee schedule or brochure PDF",
+        "Download and parse the PDF. Record the PDF URL and page as evidence."
+      ]
+    },
+    {
+      "id": "S056",
+      "kind": "scenario",
+      "page": 7,
+      "label": "Bot protection or rate limiting",
+      "cells": [
+        "Cloudflare challenge, 403 or 429 errors",
+        "Slow down and retry later. Never bypass a CAPTCHA. Mark \"source unavailable\" and report it."
+      ]
+    },
+    {
+      "id": "S057",
+      "kind": "scenario",
+      "page": 7,
+      "label": "Pagination or filters on course list",
+      "cells": [
+        "Course finder shows 20 per page or uses infinite scroll",
+        "Follow all pages until the full list is collected. Report the total count."
+      ]
+    },
+    {
+      "id": "S058",
+      "kind": "scenario",
+      "page": 7,
+      "label": "Page in another language",
+      "cells": [
+        "Germany, Netherlands, Japan or Malaysia pages partly in local language",
+        "Prefer the official English version. If none, translate and keep the original snippet as evidence."
+      ]
+    },
+    {
+      "id": "S059",
+      "kind": "scenario",
+      "page": 7,
+      "label": "Broken link or 404",
+      "cells": [
+        "Course URL no longer works",
+        "Search the site for the course. If not found, mark \"possibly discontinued\"."
+      ]
+    },
+    {
+      "id": "S060",
+      "kind": "scenario",
+      "page": 7,
+      "label": "Redirect to generic page",
+      "cells": [
+        "Course URL redirects to the faculty homepage",
+        "Treat as not found. Don't extract data from the generic page."
+      ]
+    },
+    {
+      "id": "S061",
+      "kind": "scenario",
+      "page": 7,
+      "label": "Navigation and form noise",
+      "cells": [
+        "Menus, enquiry forms and dropdown course lists (as in the Excelsia excerpts)",
+        "Extract from the main content area only. Trim evidence to the relevant lines."
+      ]
+    },
+    {
+      "id": "S062",
+      "kind": "scenario",
+      "page": 8,
+      "label": "Two sources conflict",
+      "cells": [
+        "Course page says Feb/Jul; PDF guide says Feb only",
+        "Prefer the most recent official source. Flag the conflict with both snippets."
+      ]
+    },
+    {
+      "id": "S063",
+      "kind": "scenario",
+      "page": 8,
+      "label": "Stale data",
+      "cells": [
+        "Page last updated in 2024; fees for 2025 shown",
+        "Store the year. Flag as possibly out of date."
+      ]
+    },
+    {
+      "id": "S064",
+      "kind": "scenario",
+      "page": 8,
+      "label": "Same page fetched repeatedly",
+      "cells": [
+        "Agent re-reads the same URL on every chat message",
+        "Cache pages for the session. Re-fetch only when asked or when the cache is old."
+      ]
+    },
+    {
+      "id": "S065",
+      "kind": "scenario",
+      "page": 8,
+      "label": "\"Master of Counselling add intake Feb and July\"",
+      "cells": [
+        "Edit the intake field on the existing row. No page fetch needed if the user gives the value. No new course record."
+      ]
+    },
+    {
+      "id": "S066",
+      "kind": "scenario",
+      "page": 8,
+      "label": "\"Is this course removed?\"",
+      "cells": [
+        "Answer from the database instantly: row status, when and by whom it was excluded. No web fetch."
+      ]
+    },
+    {
+      "id": "S067",
+      "kind": "scenario",
+      "page": 8,
+      "label": "\"We don't need domestic-only courses\"",
+      "cells": [
+        "Save as a standing rule. Apply it now to all pending rows and report what was excluded."
+      ]
+    },
+    {
+      "id": "S068",
+      "kind": "scenario",
+      "page": 8,
+      "label": "\"Remove this course and check others as well\"",
+      "cells": [
+        "Exclude the named course, check every pending row in the batch, report the full list."
+      ]
+    },
+    {
+      "id": "S069",
+      "kind": "scenario",
+      "page": 8,
+      "label": "\"Fix the IELTS for all Excelsia courses\"",
+      "cells": [
+        "Check each course's official page, update where evidence is clear, list conflicts for review."
+      ]
+    },
+    {
+      "id": "S070",
+      "kind": "scenario",
+      "page": 8,
+      "label": "\"Why is this course flagged?\"",
+      "cells": [
+        "Explain the flag in one or two lines with the evidence."
+      ]
+    },
+    {
+      "id": "S071",
+      "kind": "scenario",
+      "page": 8,
+      "label": "\"Undo that\"",
+      "cells": [
+        "Reverse the last change from the audit log and confirm."
+      ]
+    },
+    {
+      "id": "S072",
+      "kind": "scenario",
+      "page": 9,
+      "label": "\"Re-scrape this course\"",
+      "cells": [
+        "Fetch the latest page, show what changed (old vs new), apply clear changes to the pending row."
+      ]
+    },
+    {
+      "id": "S073",
+      "kind": "scenario",
+      "page": 9,
+      "label": "\"Approve all verified courses\"",
+      "cells": [
+        "Published-record change: list the courses and ask for confirmation first."
+      ]
+    },
+    {
+      "id": "S074",
+      "kind": "scenario",
+      "page": 9,
+      "label": "\"Which courses have no intake?\"",
+      "cells": [
+        "Database query only. Return the list with row links."
+      ]
+    },
+    {
+      "id": "S075",
+      "kind": "scenario",
+      "page": 9,
+      "label": "\"Add University of X courses\"",
+      "cells": [
+        "Start a new scrape job for that provider, apply all standing rules, report counts when done."
+      ]
+    },
+    {
+      "id": "S076",
+      "kind": "scenario",
+      "page": 9,
+      "label": "\"Show me what changed today\"",
+      "cells": [
+        "Return today's audit log: row, field, old value, new value, who made the change."
+      ]
+    },
+    {
+      "id": "C001",
+      "kind": "country",
+      "page": 9,
+      "label": "Australia",
+      "cells": [
+        "CRICOS course code",
+        "Feb, Jul (some Nov or trimesters)",
+        "Annual or full course",
+        "AUD",
+        "Watch \"domestic only\" labels and campus-specific CRICOS codes"
+      ]
+    },
+    {
+      "id": "C002",
+      "kind": "country",
+      "page": 9,
+      "label": "UK",
+      "cells": [
+        "Licensed student sponsor (issues CAS)",
+        "Sep, Jan (some May)",
+        "Annual",
+        "GBP",
+        "Home vs international fee status; some courses need IELTS for UKVI"
+      ]
+    },
+    {
+      "id": "C003",
+      "kind": "country",
+      "page": 9,
+      "label": "USA",
+      "cells": [
+        "SEVP-certified school (issues I-20)",
+        "Fall (Aug/Sep), Spring (Jan)",
+        "Annual or per credit hour",
+        "USD",
+        "In-state, out-of-state and international rates"
+      ]
+    },
+    {
+      "id": "C004",
+      "kind": "country",
+      "page": 9,
+      "label": "Canada",
+      "cells": [
+        "Designated Learning Institution (DLI) number",
+        "Sep, Jan, May",
+        "Annual or per term",
+        "CAD",
+        "Co-op terms change duration"
+      ]
+    },
+    {
+      "id": "C005",
+      "kind": "country",
+      "page": 10,
+      "label": "New Zealand",
+      "cells": [
+        "Institution signed up to the international student Code of Practice",
+        "Feb, Jul",
+        "Annual",
+        "NZD",
+        "Similar page layouts to Australia"
+      ]
+    },
+    {
+      "id": "C006",
+      "kind": "country",
+      "page": 10,
+      "label": "Ireland",
+      "cells": [
+        "Programme on the eligible programmes list for student permission",
+        "Sep (some Jan)",
+        "Annual",
+        "EUR",
+        "EU vs non-EU fees"
+      ]
+    },
+    {
+      "id": "C007",
+      "kind": "country",
+      "page": 10,
+      "label": "Germany",
+      "cells": [
+        "Recognised public or private institution",
+        "Winter (Oct), Summer (Apr)",
+        "Per semester",
+        "EUR",
+        "Often no tuition at public universities, but a semester contribution; some states charge non- EU students; pages may be in German"
+      ]
+    },
+    {
+      "id": "C008",
+      "kind": "country",
+      "page": 10,
+      "label": "Netherlands",
+      "cells": [
+        "Institution with recognised sponsor status",
+        "Sep (some Feb)",
+        "Annual",
+        "EUR",
+        "EU statutory fee vs non-EU institutional fee"
+      ]
+    },
+    {
+      "id": "C009",
+      "kind": "country",
+      "page": 10,
+      "label": "Malaysia",
+      "cells": [
+        "Approval for international students via EMGS",
+        "Several per year, varies by university",
+        "Per semester or full programme",
+        "MYR",
+        "Intakes vary widely by institution"
+      ]
+    }
+  ]
+}
