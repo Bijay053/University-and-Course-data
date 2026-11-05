@@ -10,7 +10,7 @@ The user chose “Scraping and course reviews” for the prompt assistant and sa
 
 **How to apply:** Reuse the existing OpenAI connection and guarded scraper/review operations. New chat requests authorize supported pending-only work automatically; never let generated numbers bypass deterministic source authority or publication approval.
 
-The user said: “do not ask for review and run do it and give me result” and “i do not want manual work.”
+The user said: “do not ask for review and run do it and give me result” and “i do not want manual work.” When reviewing a brief that proposed confirmation before every change, they explicitly chose “Automatically fix pending records.”
 
 **Why:** The user explicitly removed the extra confirmation step for the scrape assistant.
 
