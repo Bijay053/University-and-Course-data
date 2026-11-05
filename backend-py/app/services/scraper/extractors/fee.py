@@ -286,7 +286,7 @@ _SALARY_CTX = re.compile(
 _INTL_CTX = re.compile(
     r"\b(international(?!\s+(?:partners?|partnerships?|placements?|exchanges?|"
     r"collaborations?|relations|business|travel|experiences?|opportunities)\b)"
-    r"|overseas|non[-\s]?resident|out[-\s]?of[-\s]?(?:state|country)|foreign)\b",
+    r"|overseas|non[-\s]?(?:uk|resident)|out[-\s]?of[-\s]?(?:state|country)|foreign)\b",
     re.IGNORECASE,
 )
 _TUITION_CTX = re.compile(r"\b(tuition|fee|fees|cost\s+of\s+study)\b", re.IGNORECASE)
@@ -404,17 +404,17 @@ _CSP_DOMESTIC_CTX = re.compile(
 # markers so pages that print domestic and international rows side-by-side can
 # assign each amount to the nearest audience label rather than rejecting both.
 _DOMESTIC_FEE_LABEL_CTX = re.compile(
-    r"\b(?:domestic|home|local|uk)\s+(?:students?\s+)?"
+    r"\b(?:domestic|home|local|(?<!non-)(?<!non )uk)\s+(?:students?\s+)?"
     r"(?:indicative\s+|total\s+|annual\s+)*(?:tuition\s+)?fees?\b"
     r"|\b(?:indicative\s+|total\s+|annual\s+)*(?:tuition\s+|course\s+|program(?:me)?\s+)"
-    r"fees?\s+for\s+(?:domestic|home|local|uk)\s+students?\b",
+    r"fees?\s+for\s+(?:domestic|home|local|(?<!non-)(?<!non )uk)\s+students?\b",
     re.IGNORECASE,
 )
 _INTERNATIONAL_FEE_LABEL_CTX = re.compile(
-    r"\b(?:international|overseas|non[-\s]?resident)\s+(?:students?\s+)?"
+    r"\b(?:international|overseas|non[-\s]?(?:uk|resident))\s+(?:students?\s+)?"
     r"(?:indicative\s+|total\s+|annual\s+)*(?:tuition\s+)?fees?\b"
     r"|\b(?:indicative\s+|total\s+|annual\s+)*(?:tuition\s+|course\s+|program(?:me)?\s+)"
-    r"fees?\s+for\s+(?:international|overseas|non[-\s]?resident)\s+students?\b",
+    r"fees?\s+for\s+(?:international|overseas|non[-\s]?(?:uk|resident))\s+students?\b",
     re.IGNORECASE,
 )
 
@@ -2707,6 +2707,16 @@ def _from_otago_polytechnic_international_fee(
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
+    from app.services.scraper.extractors.uk_course_facts import surrey_options
+    from urllib.parse import parse_qs, urlsplit
+    options=surrey_options(html,url)
+    if options:
+        selected=parse_qs(urlsplit(url).query).get("surrey_option",[options[0]["key"]])[0]
+        option=next((o for o in options if o["key"]==selected),{})
+        if "international_fee" not in option:return []
+        return [ExtractionResult(field_key="international_fee",value=option["international_fee"],
+            normalized={k:option[k] for k in ("international_fee","currency","fee_term","fee_year")},
+            confidence=1.0,method="fee.surrey_option",snippet=option["source_text"])]
     from app.services.scraper.extractors.uws_facts import course_fee as uws_course_fee
     uws_known, uws_fee = uws_course_fee(html, url)
     if uws_known:

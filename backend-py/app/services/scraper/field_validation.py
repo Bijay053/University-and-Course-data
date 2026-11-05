@@ -8,7 +8,8 @@ def invalid_location(value):
     return bool(len(s)>180 or len(s.split())>18 or not re.search(r"[^\W\d_]",s,re.UNICODE) or
         (len(s.split())>=5 and re.search(r"\b(?:is|are|will|must|should|has|have)\b",s,re.I)) or
         re.search(r"https?://|/stream|[£$€]|\b(?:tuition|fees?|amount|subject to|payable|payment|refund|scholarship|during the|please|students must|you will|is available|terms and conditions)\b",s,re.I)
-        or s.casefold() in {"on campus","on-campus","online","campus","location","during the","and","or"}
+        or s.casefold() in {"on campus","on-campus","online","campus","location","during the","and","or",
+                           "apply now","see fees","learn more","find out more","open days","enquire now"}
         or re.search(r"[<>={}]",s))
 
 def numeric(value):
@@ -36,7 +37,8 @@ def validate_fields(payload,evidence=None):
     for field,limit in [("ielts_overall",9),("ielts_listening",9),("ielts_reading",9),
                         ("ielts_writing",9),("ielts_speaking",9),("pte_overall",90),("toefl_overall",120)]:
         value=cleaned.get(field)
-        if value is not None and (not numeric(value) or not 0<=float(value)<=limit):
+        minimum=4 if field.startswith("ielts_") else 0
+        if value is not None and (not numeric(value) or not minimum<=float(value)<=limit):
             invalid[field]="score outside the supported test range"
     if invalid:
         warnings=list(cleaned.get("scrape_warnings") or [])

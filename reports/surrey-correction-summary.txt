@@ -1,0 +1,39 @@
+{
+  "totalRows": 226,
+  "ready": 221,
+  "currentReview": 176,
+  "currentReady": 173,
+  "distinctFullTimeOptions": 631,
+  "held": [
+    {
+      "id": 55430,
+      "name": "Nutritional Medicine MSc \u2014 2027 Entry",
+      "reason": "No full-time option identified"
+    },
+    {
+      "id": 55476,
+      "name": "Higher and Professional Education MA \u2014 2027 Entry",
+      "reason": "No full-time option identified"
+    },
+    {
+      "id": 56446,
+      "name": "Clinical Psychology Psychd",
+      "reason": "No verified overseas tuition for this option"
+    },
+    {
+      "id": 56557,
+      "name": "Physician Associate Studies Pgdip \u2014 2027 Entry",
+      "reason": "No full-time option identified"
+    },
+    {
+      "id": 56565,
+      "name": "Medical Sciences (Gateway to Graduate Medicine) BSc (Hons) \u2014 2027 Entry",
+      "reason": "No verified overseas tuition for this option"
+    }
+  ]
+}
+{"id": 56330, "before": {"course_name": "Accounting and Finance BSc (Hons) — 2027 Entry", "international_fee": null, "currency": "GBP", "fee_term": "Annual", "fee_year": 2027, "duration": "3.00", "duration_term": "Year", "course_location": "Stag Hill", "intake_months": ["September"]}, "proposed": {"course_name": "Accounting and Finance BSc (Hons)", "international_fee": 24600.0, "currency": "GBP", "fee_term": "Annual", "fee_year": 2027, "duration": 3.0, "duration_term": "Year", "course_location": "Stag Hill", "intake_months": ["September"]}}
+{"id": 56332, "before": {"course_name": "Aerospace Engineering Beng (Hons) Or MEng — 2027 Entry", "international_fee": null, "currency": "GBP", "fee_term": "Annual", "fee_year": 2027, "duration": "15.00", "duration_term": "Month", "course_location": "Stag Hill", "intake_months": ["September"]}, "proposed": {"course_name": "Aerospace Engineering BEng (Hons)", "international_fee": 28100.0, "currency": "GBP", "fee_term": "Annual", "fee_year": 2027, "duration": 3.0, "duration_term": "Year", "course_location": "Stag Hill", "intake_months": ["September"]}}
+{"id": 56348, "before": {"course_name": "Medicine (Graduate Entry) Bmbs — 2027 Entry", "international_fee": null, "currency": "GBP", "fee_term": "Annual", "fee_year": 2027, "duration": "4.00", "duration_term": "Year", "course_location": "Kate Granger Building", "intake_months": ["September"]}, "proposed": {"course_name": "Medicine (Graduate Entry) BMBS", "international_fee": 50300.0, "currency": "GBP", "fee_term": "Annual", "fee_year": 2027, "duration": 4.0, "duration_term": "Year", "course_location": "Kate Granger Building", "intake_months": ["September"]}}
+{"id": 56334, "before": {"course_name": "Biochemistry BSc (Hons) Or Msci (Hons) — 2027 Entry", "international_fee": null, "currency": "GBP", "fee_term": "Annual", "fee_year": 2027, "duration": "15.00", "duration_term": "Month", "course_location": "Stag Hill", "intake_months": ["September"]}, "proposed": {"course_name": "Biochemistry BSc (Hons)", "international_fee": 28100.0, "currency": "GBP", "fee_term": "Annual", "fee_year": 2027, "duration": 3.0, "duration_term": "Year", "course_location": "Stag Hill", "intake_months": ["September"]}}
+{"id": 56571, "before": {"course_name": "Computer Science BSc (Hons) Or MEng — 2027 Entry", "international_fee": null, "currency": "GBP", "fee_term": "Annual", "fee_year": 2027, "duration": "3.00", "duration_term": "Year", "course_location": "Stag Hill", "intake_months": ["September"]}, "proposed": {"course_name": "Computer Science BSc (Hons)", "international_fee": 28100.0, "currency": "GBP", "fee_term": "Annual", "fee_year": 2027, "duration": 3.0, "duration_term": "Year", "course_location": "Stag Hill", "intake_months": ["September"]}}

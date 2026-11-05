@@ -3672,6 +3672,8 @@ async def extract_course(
     from app.services.scraper.unicode_text import scalar_text
     if html is not None:
         html = scalar_text(html)
+        from app.services.scraper.extractors.uk_course_facts import scope_option_html
+        html = scope_option_html(html,url)
 
     # If UEL's preflight failed but its ordinary browser transport recovered,
     # check the recovered raw source before generic extraction. A newly found
@@ -11800,6 +11802,8 @@ async def extract_course(
     _apply_lsbu_fee(html or "", url, payload, evidence)
     from app.services.scraper.extractors.uws_facts import apply_course_authority as _apply_uws
     _apply_uws(html or "", url, payload, evidence)
+    from app.services.scraper.extractors.uk_course_facts import apply_authority as _apply_surrey
+    _apply_surrey(html or "", url, payload, evidence)
     from app.services.scraper.acap_source import apply_campus_authority as _apply_acap_campus
     _apply_acap_campus(html or "", url, payload, evidence)
     from app.services.scraper.excelsia_source import apply_authority as _apply_excelsia

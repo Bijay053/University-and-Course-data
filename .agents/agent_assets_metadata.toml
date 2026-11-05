@@ -357,3 +357,73 @@ mtime_ms = 1793863834283
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/d64884e1-450d-4fb4-8739-b05ab4a36c60/a773b1a5-80a7-4148-9b54-895840fac520"
 storage_version_token = "1793863885028638"
 content_type = "text/csv"
+
+[[outputs]]
+id = "coda0-GtGbsXK2qKoF-TJ"
+uri = "file://reports/lsbu-cleanup-completed.csv"
+type = "table"
+title = "LSBU cleanup completed — 156 audited changes"
+description = "Each cleared pending location, its original value, and its audit ID. No replacement locations or published records were changed."
+logical_id = "acf85618-97eb-417a-b12d-f86486ceacbf"
+content_hash = "sha256:d2257c9d4be1b46e5289b378ecb696bd347a147717cad6c0f968863737667d9e"
+size = 15671
+mtime_ms = 1793869354579
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/acf85618-97eb-417a-b12d-f86486ceacbf/6b7a8115-a06e-476e-ac9b-49f9b1c4f8de"
+storage_version_token = "1793869363718501"
+content_type = "text/csv"
+
+[[outputs]]
+id = "e_2ABByqxh2TmQbvIjg-p"
+uri = "file://reports/surrey-before-after-proposal.csv"
+type = "table"
+title = "Surrey: pending-row correction proposal"
+description = "All 226 pending rows, with existing and proposed values, held cases and official source URLs. No production records have been changed."
+logical_id = "c9cffe2c-2876-477c-ba2c-b1f788c0167a"
+content_hash = "sha256:f42099f3d0892867736c54a00cfdde86b563cfacac6fbc21fcbf390459a49e6a"
+size = 79321
+mtime_ms = 1793871134783
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/c9cffe2c-2876-477c-ba2c-b1f788c0167a/27df68ee-afd6-4542-b731-37e878cd4c79"
+storage_version_token = "1793871411064143"
+content_type = "text/csv"
+
+[[outputs]]
+id = "0CPz5mWLKGMSzeWjcsUFL"
+uri = "file://reports/surrey-option-proposal.csv"
+type = "table"
+title = "Surrey: course-option proposal"
+description = "631 distinct full-time option candidates, including existing standard options—not 631 new courses. Includes fees, schedules, durations, campuses and start dates."
+logical_id = "c839dfa7-2315-4d48-bc12-78260025f451"
+content_hash = "sha256:af57f09d2bccaa1b62ab94b98eb109b22dcaaa22ffa940f9f3216679ee6abc39"
+size = 149693
+mtime_ms = 1793871134799
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/c839dfa7-2315-4d48-bc12-78260025f451/71535ea8-1f06-4d4b-b60c-50eaae55d5e6"
+storage_version_token = "1793871412813343"
+content_type = "text/csv"
+
+[[outputs]]
+id = "Fig18yN0Tq5D57nKmwEN0"
+uri = "file://reports/surrey-applied-corrections.csv"
+type = "table"
+title = "Surrey corrections applied in AWS"
+description = "Verified changes to 221 pending rows, including corrected values and audit IDs. Five held rows were left unchanged."
+logical_id = "f4d8373d-5abf-4155-ae52-6989490b2991"
+content_hash = "sha256:ed2a30dfcbfcd87a913b9f6e646ca2a36cfaf73bf813790e8ea87d076bbd40ea"
+size = 32215
+mtime_ms = 1793877643788
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/f4d8373d-5abf-4155-ae52-6989490b2991/f73d2b91-c989-433a-904b-92b905a56b40"
+storage_version_token = "1793877659930575"
+content_type = "text/csv"
+
+[[outputs]]
+id = "Sh2bwxunOKS8YwzgcOIo_"
+uri = "file://reports/surrey-option-recovery-results.csv"
+type = "table"
+title = "Surrey option recovery results"
+description = "405 staged options, 218 already-recorded options skipped, and eight held options with their reasons and source URLs."
+logical_id = "c4584df6-e0bf-4b5f-a61e-8cd6cbd07801"
+content_hash = "sha256:d6eb5788a87623630e6135645a390396369d21125c264a58a14d946ef2f08c29"
+size = 107699
+mtime_ms = 1793878175391
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/c4584df6-e0bf-4b5f-a61e-8cd6cbd07801/6ab76069-fcb1-47a6-945b-154e52ebc74e"
+storage_version_token = "1793878242945621"
+content_type = "text/csv"

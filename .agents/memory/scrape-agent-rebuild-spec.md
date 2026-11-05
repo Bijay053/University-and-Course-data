@@ -4,6 +4,12 @@ description: Governing user-supplied specifications, release criteria and automa
 ---
 Use the user's Scrape Agent Rebuild Brief and University Scraping Scenarios PDFs in attached_assets (filenames ending 1793843491960 and 1793843496913) as the full rebuild specification.
 
+The updated scenario reference is attached_assets/University_Scraping_Scenarios_1793862368871.docx. Its sections 9–11 add field-label variations, name cleaning, validation and page traps. The user requires every row to become a behavioural test and extractor fixes to apply across providers, not just the reported universities.
+
+**Why:** The user supplied this updated document after the UWS, LSBU and Surrey live bugs.
+
+**How to apply:** Cover the updated rows as well as the original scenarios. Do not count a document inventory or a test-name mapping as a passing behavioural test.
+
 **Why:** The user explicitly replaced the fixed-pipeline approach with a real tool-calling agent, and requires every scenario row to be an automated test.
 
 **How to apply:** Follow brief section 8 in order: tool loop; evidence/schema/guardrails; web/cache; rules/jobs/extractor repair; golden/scenario/security tests; monitoring/traces/cost limits. Begin with the live Excelsia acceptance baseline. Report each stage's tests and workspace-versus-production status honestly.

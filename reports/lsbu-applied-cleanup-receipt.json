@@ -1,0 +1,2075 @@
+{
+  "verified": true,
+  "changed": 156,
+  "rows": [
+    {
+      "id": 51204,
+      "name": "PhD Computer Science and Informatics",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "fee_section_detected_fee_blank"
+        ],
+        "proofIds": [
+          962222
+        ]
+      },
+      "after": null,
+      "auditId": 177
+    },
+    {
+      "id": 54063,
+      "name": "Marketing with Advertising BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1006026
+        ]
+      },
+      "after": null,
+      "auditId": 178
+    },
+    {
+      "id": 54079,
+      "name": "Computer Science BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1006246
+        ]
+      },
+      "after": null,
+      "auditId": 179
+    },
+    {
+      "id": 54082,
+      "name": "Information Technology BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1006288
+        ]
+      },
+      "after": null,
+      "auditId": 180
+    },
+    {
+      "id": 54142,
+      "name": "Food Sciences PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1007103
+        ]
+      },
+      "after": null,
+      "auditId": 181
+    },
+    {
+      "id": 54162,
+      "name": "Digital Marketing BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1007381
+        ]
+      },
+      "after": null,
+      "auditId": 182
+    },
+    {
+      "id": 54165,
+      "name": "Advanced Mechanical and Design Engineering MSc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1007422
+        ]
+      },
+      "after": null,
+      "auditId": 183
+    },
+    {
+      "id": 54252,
+      "name": "Film and Television Practice - BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1008594
+        ]
+      },
+      "after": null,
+      "auditId": 184
+    },
+    {
+      "id": 54393,
+      "name": "Digital Marketing BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1011006
+        ]
+      },
+      "after": null,
+      "auditId": 185
+    },
+    {
+      "id": 54395,
+      "name": "Urban and Environmental Planning BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1011034
+        ]
+      },
+      "after": null,
+      "auditId": 186
+    },
+    {
+      "id": 54407,
+      "name": "Construction Management BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1011198
+        ]
+      },
+      "after": null,
+      "auditId": 187
+    },
+    {
+      "id": 54412,
+      "name": "Economics BSc (Hons) (with Foundation Year) (Bsc Hons Economics With Foundation Year)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1011265
+        ]
+      },
+      "after": null,
+      "auditId": 188
+    },
+    {
+      "id": 54500,
+      "name": "Building Services Engineering Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1012480
+        ]
+      },
+      "after": null,
+      "auditId": 189
+    },
+    {
+      "id": 54608,
+      "name": "Accounting and Finance PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1013829
+        ]
+      },
+      "after": null,
+      "auditId": 190
+    },
+    {
+      "id": 54621,
+      "name": "Game Design and Development - BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1014004
+        ]
+      },
+      "after": null,
+      "auditId": 191
+    },
+    {
+      "id": 54636,
+      "name": "Biomedical Science BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1014210
+        ]
+      },
+      "after": null,
+      "auditId": 192
+    },
+    {
+      "id": 54638,
+      "name": "Computer Science with Artificial Intelligence BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1014238
+        ]
+      },
+      "after": null,
+      "auditId": 193
+    },
+    {
+      "id": 54640,
+      "name": "Computer Science (Data Engineering) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1014266
+        ]
+      },
+      "after": null,
+      "auditId": 194
+    },
+    {
+      "id": 54641,
+      "name": "Criminology BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1014280
+        ]
+      },
+      "after": null,
+      "auditId": 195
+    },
+    {
+      "id": 54895,
+      "name": "Economics BSc (Hons) (with Foundation Year) (Bsc Hons Economics With Placement With Foundation Year)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1017455
+        ]
+      },
+      "after": null,
+      "auditId": 196
+    },
+    {
+      "id": 54906,
+      "name": "Quantity Surveying BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1017602
+        ]
+      },
+      "after": null,
+      "auditId": 197
+    },
+    {
+      "id": 54926,
+      "name": "PhD Construction Management and Economics",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1017880
+        ]
+      },
+      "after": null,
+      "auditId": 198
+    },
+    {
+      "id": 54934,
+      "name": "Economics BSc (Hons) (with Foundation Year) (Economics Bsc Hons With Placement With Foundation Year)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1017999
+        ]
+      },
+      "after": null,
+      "auditId": 199
+    },
+    {
+      "id": 55097,
+      "name": "Marketing with Advertising BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1020064
+        ]
+      },
+      "after": null,
+      "auditId": 200
+    },
+    {
+      "id": 55102,
+      "name": "Beng (Hons) / MEng Mechanical Engineering",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1020130
+        ]
+      },
+      "after": null,
+      "auditId": 201
+    },
+    {
+      "id": 55167,
+      "name": "Psychology PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1020925
+        ]
+      },
+      "after": null,
+      "auditId": 202
+    },
+    {
+      "id": 55170,
+      "name": "Msc/pgdip Real Estate",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1020965
+        ]
+      },
+      "after": null,
+      "auditId": 203
+    },
+    {
+      "id": 55178,
+      "name": "Game Design and Development - BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021075
+        ]
+      },
+      "after": null,
+      "auditId": 204
+    },
+    {
+      "id": 55179,
+      "name": "Architecture BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021089
+        ]
+      },
+      "after": null,
+      "auditId": 205
+    },
+    {
+      "id": 55185,
+      "name": "Education BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021161
+        ]
+      },
+      "after": null,
+      "auditId": 206
+    },
+    {
+      "id": 55187,
+      "name": "Film and Television Practice - BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021189
+        ]
+      },
+      "after": null,
+      "auditId": 207
+    },
+    {
+      "id": 55188,
+      "name": "Media Production BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021203
+        ]
+      },
+      "after": null,
+      "auditId": 208
+    },
+    {
+      "id": 55189,
+      "name": "Urban and Environmental Planning BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021217
+        ]
+      },
+      "after": null,
+      "auditId": 209
+    },
+    {
+      "id": 55190,
+      "name": "Chemical Engineering Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021231
+        ]
+      },
+      "after": null,
+      "auditId": 210
+    },
+    {
+      "id": 55191,
+      "name": "Civil Engineering Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021245
+        ]
+      },
+      "after": null,
+      "auditId": 211
+    },
+    {
+      "id": 55192,
+      "name": "Electrical and Electronic Engineering Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021259
+        ]
+      },
+      "after": null,
+      "auditId": 212
+    },
+    {
+      "id": 55194,
+      "name": "Biomedical Science BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021287
+        ]
+      },
+      "after": null,
+      "auditId": 213
+    },
+    {
+      "id": 55195,
+      "name": "Building Surveying BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021301
+        ]
+      },
+      "after": null,
+      "auditId": 214
+    },
+    {
+      "id": 55196,
+      "name": "Computer Science BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021315
+        ]
+      },
+      "after": null,
+      "auditId": 215
+    },
+    {
+      "id": 55197,
+      "name": "Information Technology BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021329
+        ]
+      },
+      "after": null,
+      "auditId": 216
+    },
+    {
+      "id": 55198,
+      "name": "Construction Management BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021343
+        ]
+      },
+      "after": null,
+      "auditId": 217
+    },
+    {
+      "id": 55201,
+      "name": "Criminology with Psychology BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021383
+        ]
+      },
+      "after": null,
+      "auditId": 218
+    },
+    {
+      "id": 55203,
+      "name": "Economics (Business Strategy Pathway) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "english_section_detected_scores_blank",
+          "confidence_warn:65"
+        ],
+        "proofIds": [
+          1021411
+        ]
+      },
+      "after": null,
+      "auditId": 219
+    },
+    {
+      "id": 55204,
+      "name": "Economics BSc (Hons) (Finance Pathway)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "english_section_detected_scores_blank",
+          "confidence_warn:65"
+        ],
+        "proofIds": [
+          1021422
+        ]
+      },
+      "after": null,
+      "auditId": 220
+    },
+    {
+      "id": 55206,
+      "name": "Forensic Sciences BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021445
+        ]
+      },
+      "after": null,
+      "auditId": 221
+    },
+    {
+      "id": 55208,
+      "name": "Occupational Therapy BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021473
+        ]
+      },
+      "after": null,
+      "auditId": 222
+    },
+    {
+      "id": 55213,
+      "name": "Psychology (Forensic Pyschology) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021543
+        ]
+      },
+      "after": null,
+      "auditId": 223
+    },
+    {
+      "id": 55214,
+      "name": "Quantity Surveying BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021557
+        ]
+      },
+      "after": null,
+      "auditId": 224
+    },
+    {
+      "id": 55216,
+      "name": "Social Work MA",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021585
+        ]
+      },
+      "after": null,
+      "auditId": 225
+    },
+    {
+      "id": 55217,
+      "name": "Beng (Hons) / MEng Mechanical Engineering",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1021599
+        ]
+      },
+      "after": null,
+      "auditId": 226
+    },
+    {
+      "id": 55263,
+      "name": "Accounting and Finance BSc (Hons) (Main Pathway)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "english_section_detected_scores_blank",
+          "confidence_warn:65"
+        ],
+        "proofIds": [
+          1022190
+        ]
+      },
+      "after": null,
+      "auditId": 227
+    },
+    {
+      "id": 55491,
+      "name": "Architectural Technology BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1024972
+        ]
+      },
+      "after": null,
+      "auditId": 228
+    },
+    {
+      "id": 55540,
+      "name": "Film and Television Practice - BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1025641
+        ]
+      },
+      "after": null,
+      "auditId": 229
+    },
+    {
+      "id": 55546,
+      "name": "PhD Construction Management and Economics",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1025723
+        ]
+      },
+      "after": null,
+      "auditId": 230
+    },
+    {
+      "id": 55714,
+      "name": "Urban and Environmental Planning BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1029292
+        ]
+      },
+      "after": null,
+      "auditId": 231
+    },
+    {
+      "id": 55715,
+      "name": "Law LLB (Hons) (with Foundation Year)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1029306
+        ]
+      },
+      "after": null,
+      "auditId": 232
+    },
+    {
+      "id": 55743,
+      "name": "Quantity Surveying BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1029662
+        ]
+      },
+      "after": null,
+      "auditId": 233
+    },
+    {
+      "id": 55747,
+      "name": "Construction Management BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1029719
+        ]
+      },
+      "after": null,
+      "auditId": 234
+    },
+    {
+      "id": 55752,
+      "name": "Computer Science with Foundation Year BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1029787
+        ]
+      },
+      "after": null,
+      "auditId": 235
+    },
+    {
+      "id": 55755,
+      "name": "Chemical Engineering Beng (with Foundation Year) (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1029829
+        ]
+      },
+      "after": null,
+      "auditId": 236
+    },
+    {
+      "id": 55758,
+      "name": "Economics BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1029871
+        ]
+      },
+      "after": null,
+      "auditId": 237
+    },
+    {
+      "id": 55761,
+      "name": "Computer Science (Data Engineering) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1029910
+        ]
+      },
+      "after": null,
+      "auditId": 238
+    },
+    {
+      "id": 55772,
+      "name": "Psychology PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1030059
+        ]
+      },
+      "after": null,
+      "auditId": 239
+    },
+    {
+      "id": 55774,
+      "name": "Digital Marketing BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1030085
+        ]
+      },
+      "after": null,
+      "auditId": 240
+    },
+    {
+      "id": 55780,
+      "name": "Msc/pgdip Real Estate",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1030169
+        ]
+      },
+      "after": null,
+      "auditId": 241
+    },
+    {
+      "id": 55786,
+      "name": "Education (Top Up) BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1030251
+        ]
+      },
+      "after": null,
+      "auditId": 242
+    },
+    {
+      "id": 55788,
+      "name": "Food Sciences PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1030279
+        ]
+      },
+      "after": null,
+      "auditId": 243
+    },
+    {
+      "id": 55800,
+      "name": "Criminology BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1030448
+        ]
+      },
+      "after": null,
+      "auditId": 244
+    },
+    {
+      "id": 55805,
+      "name": "Accounting and Finance PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1030516
+        ]
+      },
+      "after": null,
+      "auditId": 245
+    },
+    {
+      "id": 55948,
+      "name": "Economics BSc (Hons) (with Foundation Year)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1033480
+        ]
+      },
+      "after": null,
+      "auditId": 246
+    },
+    {
+      "id": 55967,
+      "name": "Architectural Technology with Foundation Year BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1033723
+        ]
+      },
+      "after": null,
+      "auditId": 247
+    },
+    {
+      "id": 56251,
+      "name": "Health and Social Care (Foundation Year)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1038991
+        ]
+      },
+      "after": null,
+      "auditId": 248
+    },
+    {
+      "id": 56254,
+      "name": "Law LLB (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039032
+        ]
+      },
+      "after": null,
+      "auditId": 249
+    },
+    {
+      "id": 56255,
+      "name": "Data Science MSc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039046
+        ]
+      },
+      "after": null,
+      "auditId": 250
+    },
+    {
+      "id": 56257,
+      "name": "General Engineering Mres",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039074
+        ]
+      },
+      "after": null,
+      "auditId": 251
+    },
+    {
+      "id": 56262,
+      "name": "Economics BSc (Hons) (Finance Pathway)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "english_section_detected_scores_blank",
+          "confidence_warn:65"
+        ],
+        "proofIds": [
+          1039135
+        ]
+      },
+      "after": null,
+      "auditId": 252
+    },
+    {
+      "id": 56263,
+      "name": "BSc (Hons) Pharmaceutical Science",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039146
+        ]
+      },
+      "after": null,
+      "auditId": 253
+    },
+    {
+      "id": 56264,
+      "name": "Architecture BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039161
+        ]
+      },
+      "after": null,
+      "auditId": 254
+    },
+    {
+      "id": 56266,
+      "name": "Accounting and Finance BSc (Hons) (Main Pathway)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "english_section_detected_scores_blank",
+          "confidence_warn:65"
+        ],
+        "proofIds": [
+          1039190
+        ]
+      },
+      "after": null,
+      "auditId": 255
+    },
+    {
+      "id": 56268,
+      "name": "Information Technology BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039214
+        ]
+      },
+      "after": null,
+      "auditId": 256
+    },
+    {
+      "id": 56269,
+      "name": "PhD Mechanical Engineering",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039228
+        ]
+      },
+      "after": null,
+      "auditId": 257
+    },
+    {
+      "id": 56270,
+      "name": "Urban Design and Planning MA",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039242
+        ]
+      },
+      "after": null,
+      "auditId": 258
+    },
+    {
+      "id": 56271,
+      "name": "International Marketing MSc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039256
+        ]
+      },
+      "after": null,
+      "auditId": 259
+    },
+    {
+      "id": 56272,
+      "name": "Town and Country Planning Pgdip; MA",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039271
+        ]
+      },
+      "after": null,
+      "auditId": 260
+    },
+    {
+      "id": 56279,
+      "name": "Psychology (Forensic Pyschology) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039369
+        ]
+      },
+      "after": null,
+      "auditId": 261
+    },
+    {
+      "id": 56281,
+      "name": "Electronic and Computer Systems Engineering (with Foundation Year) Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039394
+        ]
+      },
+      "after": null,
+      "auditId": 262
+    },
+    {
+      "id": 56283,
+      "name": "Accounting and Finance Certhe",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "suspicious_duration",
+          "confidence_warn:70"
+        ],
+        "proofIds": [
+          1039422
+        ]
+      },
+      "after": null,
+      "auditId": 263
+    },
+    {
+      "id": 56285,
+      "name": "Computer Science (Top-up) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039447
+        ]
+      },
+      "after": null,
+      "auditId": 264
+    },
+    {
+      "id": 56287,
+      "name": "Engineering Product Design MSc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039475
+        ]
+      },
+      "after": null,
+      "auditId": 265
+    },
+    {
+      "id": 56288,
+      "name": "Acting for Stage and Screen BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039489
+        ]
+      },
+      "after": null,
+      "auditId": 266
+    },
+    {
+      "id": 56292,
+      "name": "MSc Computer Science (Conversion)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039540
+        ]
+      },
+      "after": null,
+      "auditId": 267
+    },
+    {
+      "id": 56301,
+      "name": "Advanced Chemical Engineering MSc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039661
+        ]
+      },
+      "after": null,
+      "auditId": 268
+    },
+    {
+      "id": 56302,
+      "name": "Engineering and the Built Environment -PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039675
+        ]
+      },
+      "after": null,
+      "auditId": 269
+    },
+    {
+      "id": 56303,
+      "name": "Advanced Building Services Engineering MSc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039689
+        ]
+      },
+      "after": null,
+      "auditId": 270
+    },
+    {
+      "id": 56306,
+      "name": "Civil Engineering Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039732
+        ]
+      },
+      "after": null,
+      "auditId": 271
+    },
+    {
+      "id": 56310,
+      "name": "Game Design and Development - BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039789
+        ]
+      },
+      "after": null,
+      "auditId": 272
+    },
+    {
+      "id": 56311,
+      "name": "Advanced Mechanical and Design Engineering MSc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039803
+        ]
+      },
+      "after": null,
+      "auditId": 273
+    },
+    {
+      "id": 56312,
+      "name": "MSc Construction Project Management",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039817
+        ]
+      },
+      "after": null,
+      "auditId": 274
+    },
+    {
+      "id": 56313,
+      "name": "Arts and Creative Industries PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039832
+        ]
+      },
+      "after": null,
+      "auditId": 275
+    },
+    {
+      "id": 56314,
+      "name": "Information Technology (Top-up) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039846
+        ]
+      },
+      "after": null,
+      "auditId": 276
+    },
+    {
+      "id": 56315,
+      "name": "Accounting and Finance MSc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039860
+        ]
+      },
+      "after": null,
+      "auditId": 277
+    },
+    {
+      "id": 56321,
+      "name": "Computer System Engineering (Top-up) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1039938
+        ]
+      },
+      "after": null,
+      "auditId": 278
+    },
+    {
+      "id": 56463,
+      "name": "Beng (Hons) / MEng Mechanical Engineering",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1041897
+        ]
+      },
+      "after": null,
+      "auditId": 279
+    },
+    {
+      "id": 56465,
+      "name": "PhD Production and Manufacturing Engineering",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1041925
+        ]
+      },
+      "after": null,
+      "auditId": 280
+    },
+    {
+      "id": 56466,
+      "name": "Forensic Sciences with Foundation Year BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1041939
+        ]
+      },
+      "after": null,
+      "auditId": 281
+    },
+    {
+      "id": 56467,
+      "name": "Commercial Management (Quantity Surveying) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1041953
+        ]
+      },
+      "after": null,
+      "auditId": 282
+    },
+    {
+      "id": 56472,
+      "name": "Civil Engineering with Foundation Year Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042017
+        ]
+      },
+      "after": null,
+      "auditId": 283
+    },
+    {
+      "id": 56476,
+      "name": "Building Services Engineering Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042070
+        ]
+      },
+      "after": null,
+      "auditId": 284
+    },
+    {
+      "id": 56482,
+      "name": "Pgcert Professional Practice Part 3",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042146
+        ]
+      },
+      "after": null,
+      "auditId": 285
+    },
+    {
+      "id": 56483,
+      "name": "Occupational Therapy BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042160
+        ]
+      },
+      "after": null,
+      "auditId": 286
+    },
+    {
+      "id": 56484,
+      "name": "Applied Artificial Intelligence MSc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042174
+        ]
+      },
+      "after": null,
+      "auditId": 287
+    },
+    {
+      "id": 56486,
+      "name": "Product Design and Technology BSc (Hons) / Mdes",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042199
+        ]
+      },
+      "after": null,
+      "auditId": 288
+    },
+    {
+      "id": 56488,
+      "name": "Mechanical Engineering with Foundation Year (Beng Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042228
+        ]
+      },
+      "after": null,
+      "auditId": 289
+    },
+    {
+      "id": 56489,
+      "name": "Computer Science (Cyber Security) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042242
+        ]
+      },
+      "after": null,
+      "auditId": 290
+    },
+    {
+      "id": 56491,
+      "name": "Law PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042267
+        ]
+      },
+      "after": null,
+      "auditId": 291
+    },
+    {
+      "id": 56493,
+      "name": "Chiropractic (Integrated Masters)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042294
+        ]
+      },
+      "after": null,
+      "auditId": 292
+    },
+    {
+      "id": 56494,
+      "name": "Construction Certhe",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "suspicious_duration",
+          "confidence_warn:70"
+        ],
+        "proofIds": [
+          1042308
+        ]
+      },
+      "after": null,
+      "auditId": 293
+    },
+    {
+      "id": 56500,
+      "name": "Education PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042388
+        ]
+      },
+      "after": null,
+      "auditId": 294
+    },
+    {
+      "id": 56502,
+      "name": "Engineering (Mechanical Engineering) Hnc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "[FEE skip] course='Engineering (Mechanical Engineering) Hnc' \u2014 only bucket match available (row='Undergraduate', fee=16440.0); fee left blank to avoid wrong data",
+          "fee_section_detected_fee_blank",
+          "suspicious_duration",
+          "confidence_warn:70"
+        ],
+        "proofIds": [
+          1042416
+        ]
+      },
+      "after": null,
+      "auditId": 295
+    },
+    {
+      "id": 56503,
+      "name": "Computer Science BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042428
+        ]
+      },
+      "after": null,
+      "auditId": 296
+    },
+    {
+      "id": 56505,
+      "name": "Social Work MA",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042456
+        ]
+      },
+      "after": null,
+      "auditId": 297
+    },
+    {
+      "id": 56506,
+      "name": "Biomedical Science BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042470
+        ]
+      },
+      "after": null,
+      "auditId": 298
+    },
+    {
+      "id": 56507,
+      "name": "March Architecture",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042484
+        ]
+      },
+      "after": null,
+      "auditId": 299
+    },
+    {
+      "id": 56508,
+      "name": "Marketing with Advertising BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042498
+        ]
+      },
+      "after": null,
+      "auditId": 300
+    },
+    {
+      "id": 56512,
+      "name": "Economics BSc (Hons) (Top-up)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042551
+        ]
+      },
+      "after": null,
+      "auditId": 301
+    },
+    {
+      "id": 56513,
+      "name": "Education BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042565
+        ]
+      },
+      "after": null,
+      "auditId": 302
+    },
+    {
+      "id": 56516,
+      "name": "MSc Cyber Security",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042609
+        ]
+      },
+      "after": null,
+      "auditId": 303
+    },
+    {
+      "id": 56518,
+      "name": "Human Sciences PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042637
+        ]
+      },
+      "after": null,
+      "auditId": 304
+    },
+    {
+      "id": 56519,
+      "name": "Food Sciences Mres",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042651
+        ]
+      },
+      "after": null,
+      "auditId": 305
+    },
+    {
+      "id": 56520,
+      "name": "Radiographic Reporting (Chest) Pgcert",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042666
+        ]
+      },
+      "after": null,
+      "auditId": 306
+    },
+    {
+      "id": 56522,
+      "name": "Social Sciences PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042693
+        ]
+      },
+      "after": null,
+      "auditId": 307
+    },
+    {
+      "id": 56525,
+      "name": "Education (Work-based) BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042732
+        ]
+      },
+      "after": null,
+      "auditId": 308
+    },
+    {
+      "id": 56529,
+      "name": "Msc/pgdip Building Surveying",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042789
+        ]
+      },
+      "after": null,
+      "auditId": 309
+    },
+    {
+      "id": 56530,
+      "name": "Quantity Surveying Msc/pgdip",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042804
+        ]
+      },
+      "after": null,
+      "auditId": 310
+    },
+    {
+      "id": 56532,
+      "name": "General Engineering PhD",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042832
+        ]
+      },
+      "after": null,
+      "auditId": 311
+    },
+    {
+      "id": 56533,
+      "name": "Electrical and Electronic Engineering (with Foundation Year) Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1042846
+        ]
+      },
+      "after": null,
+      "auditId": 312
+    },
+    {
+      "id": 56597,
+      "name": "Information Technology (with Foundation Year) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1043737
+        ]
+      },
+      "after": null,
+      "auditId": 313
+    },
+    {
+      "id": 56598,
+      "name": "Electrical and Electronic Engineering Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1043751
+        ]
+      },
+      "after": null,
+      "auditId": 314
+    },
+    {
+      "id": 56599,
+      "name": "Electronic and Computer Systems Engineering Beng (Hons)",
+      "before": {
+        "course_location": "during the",
+        "scrape_warnings": null,
+        "proofIds": [
+          1043765
+        ]
+      },
+      "after": null,
+      "auditId": 315
+    },
+    {
+      "id": 56605,
+      "name": "Mechanical Engineering and Design (Top Up) Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1043836
+        ]
+      },
+      "after": null,
+      "auditId": 316
+    },
+    {
+      "id": 56606,
+      "name": "Architecture with Foundation Year BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1043850
+        ]
+      },
+      "after": null,
+      "auditId": 317
+    },
+    {
+      "id": 56607,
+      "name": "Criminology BSc (Hons) (with Foundation Year)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1043864
+        ]
+      },
+      "after": null,
+      "auditId": 318
+    },
+    {
+      "id": 56612,
+      "name": "Digital Marketing BSc (Hons) (with Foundation Year)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1043927
+        ]
+      },
+      "after": null,
+      "auditId": 319
+    },
+    {
+      "id": 56623,
+      "name": "Accounting and Finance (with Foundation Year) - BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1044069
+        ]
+      },
+      "after": null,
+      "auditId": 320
+    },
+    {
+      "id": 56627,
+      "name": "Occupational Therapy (Pre-registration Mode) Pgdip/msc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1044121
+        ]
+      },
+      "after": null,
+      "auditId": 321
+    },
+    {
+      "id": 56633,
+      "name": "Computer Science with Artificial Intelligence BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1044199
+        ]
+      },
+      "after": null,
+      "auditId": 322
+    },
+    {
+      "id": 56638,
+      "name": "Economics (Business Strategy Pathway) BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "english_section_detected_scores_blank",
+          "confidence_warn:65"
+        ],
+        "proofIds": [
+          1044259
+        ]
+      },
+      "after": null,
+      "auditId": 323
+    },
+    {
+      "id": 56645,
+      "name": "Marketing with Advertising BSc (with Foundation Year)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1044339
+        ]
+      },
+      "after": null,
+      "auditId": 324
+    },
+    {
+      "id": 56647,
+      "name": "Chemical Engineering Beng (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1044367
+        ]
+      },
+      "after": null,
+      "auditId": 325
+    },
+    {
+      "id": 56648,
+      "name": "Creative Media Production (Game Development) Hnc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "[FEE skip] course='Creative Media Production (Game Development) Hnc' \u2014 only bucket match available (row='Undergraduate', fee=16440.0); fee left blank to avoid wrong data",
+          "fee_section_detected_fee_blank",
+          "suspicious_duration",
+          "confidence_warn:70"
+        ],
+        "proofIds": [
+          1044381
+        ]
+      },
+      "after": null,
+      "auditId": 326
+    },
+    {
+      "id": 56649,
+      "name": "Human Sciences Mres",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1044392
+        ]
+      },
+      "after": null,
+      "auditId": 327
+    },
+    {
+      "id": 56651,
+      "name": "Media Production BA (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1044418
+        ]
+      },
+      "after": null,
+      "auditId": 328
+    },
+    {
+      "id": 56652,
+      "name": "Civil Engineering Certhe",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1044432
+        ]
+      },
+      "after": null,
+      "auditId": 329
+    },
+    {
+      "id": 56654,
+      "name": "Applied Science (Biology) Higher National Certificate Hnc",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": [
+          "[FEE skip] course='Applied Science (Biology) Higher National Certificate Hnc' \u2014 only bucket match available (row='Undergraduate', fee=16440.0); fee left blank to avoid wrong data",
+          "fee_section_detected_fee_blank",
+          "suspicious_duration",
+          "confidence_warn:70"
+        ],
+        "proofIds": [
+          1044461
+        ]
+      },
+      "after": null,
+      "auditId": 330
+    },
+    {
+      "id": 56655,
+      "name": "Chemical Engineering MEng",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1044473
+        ]
+      },
+      "after": null,
+      "auditId": 331
+    },
+    {
+      "id": 56656,
+      "name": "Criminology with Psychology BSc (Hons)",
+      "before": {
+        "course_location": "/stream: * The full amount is subject to",
+        "scrape_warnings": null,
+        "proofIds": [
+          1044487
+        ]
+      },
+      "after": null,
+      "auditId": 332
+    }
+  ]
+}

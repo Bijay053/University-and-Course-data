@@ -3,6 +3,18 @@ name: Surrey catalogue and English authority
 description: Source interpretation for Surrey discovery and English requirements.
 ---
 
+Surrey's course-option panels own their award, attendance, duration, price and start date. Overseas, international and non-UK are international-audience labels, not domestic fee labels. Preserve separate option identities and placement/foundation schedules instead of flattening the page.
+
+**Why:** The generic fee repair repeatedly missed nested overseas prices, while page-wide titles retained entry-year boilerplate. Research entry dates and academic fee years are not interchangeable; an academic-year heading alone does not prove annual billing.
+
+**How to apply:** Pair each option's labelled facts, keep fee year separate from start year, and require an explicit annual/standard-year billing label. Preserve a missing fee year as unverified rather than infer it from an intake. Suspended recruitment and absent overseas prices remain unresolved, not guessed.
+
+Additional option records must not inherit English or academic requirements from the standard option without evidence that those requirements cover the selected route.
+
+**Why:** Placement, foundation and other award routes share a source page but can have different admissions requirements. A verified price and duration do not verify the rest of the record.
+
+**How to apply:** Keep newly recovered options pending, retain only their supported fields, and leave remaining requirements unverified until their applicability is established.
+
 Treat Surrey's central international English-language page as a conversion
 reference, not a university-wide admission requirement. Course pages own the
 required IELTS scores; missing course scores must remain unresolved rather than
