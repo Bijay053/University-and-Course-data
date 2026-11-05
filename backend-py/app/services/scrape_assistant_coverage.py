@@ -15,7 +15,6 @@ def research_coverage(rows, sources):
         items.append({"id": row["id"], "name": row["name"], "url": row.get("url"), "pageStatus": state})
     summary = (
         f"Course-page coverage: {counts['checked']}/{counts['total']} read successfully, "
-        f"{counts['failed']} unavailable, {counts['unchecked']} not checked. "
-        "Reading a page does not by itself verify its IELTS requirements or change stored values."
+        f"{counts['failed']} unavailable, {counts['unchecked']} not checked."
     )
     return {**counts, "rows": items, "summary": summary}

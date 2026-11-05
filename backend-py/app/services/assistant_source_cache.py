@@ -12,7 +12,7 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
             if thread:
                 for message in reversed(thread.messages):
                     result = message.get("_sourceChecks", {}).get(url)
-                    if result and result.get("verified"):
+                    if result and result.get("verified") and result.get("_sourceScopeVersion") == 2:
                         return result
     result = await asyncio.wait_for(inspect(url, home), timeout=timeout)
     if result.get("verified"):
@@ -26,6 +26,7 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                 request = next(m for m in reversed(messages) if m["role"] == "user")
                 # Keep cited text, not a second unbounded copy of the whole page.
                 saved = {k: v for k, v in result.items() if k != "_fullText"}
+                saved["_sourceScopeVersion"] = 2
                 saved["_fullText"] = result.get("text", "") + "\n" + "\n".join(
                     item.get("text", "") for item in result.get("excerpts", [])
                 )

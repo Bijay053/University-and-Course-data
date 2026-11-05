@@ -34,6 +34,26 @@ def test_owned_intake_line_not_related_or_navigation():
 
 
 @pytest.mark.asyncio
+async def test_citation_text_excludes_nonsemantic_navigation(monkeypatch):
+    from app.services import scrape_assistant_tools as tools
+    html = page().replace("<main>", '<div class="site-container"><ul class="mobile-menu-bar"><li>Navigation garbage International Students Alumni</li></ul></div><main>')
+    async def request(url):
+        return html.encode()
+    monkeypatch.setattr(tools, "public_request", request)
+    result = await tools.inspect_source(URL, "https://excelsia.edu.au")
+    assert result["verified"]
+    assert "Navigation garbage" not in result["text"]
+    assert "Bachelor of Business" in result["text"]
+
+
+def test_coverage_has_counts_without_repeated_ielts_footer():
+    from app.services.scrape_assistant_coverage import research_coverage
+    result = research_coverage([{"id":1,"name":"Example","url":URL}],[{"url":URL,"verified":True}])
+    assert "1/1" in result["summary"]
+    assert "IELTS" not in result["summary"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("verified,readonly", [(True,False),(False,False),(True,True)])
 async def test_in_place_intake_edit_never_creates_course(store, monkeypatch, verified, readonly):
     await seed_thread(store)

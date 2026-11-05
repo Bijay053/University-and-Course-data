@@ -178,9 +178,10 @@ async def inspect_source(url: str, home: str) -> dict:
         for node in soup.select("script,style,noscript"):
             node.decompose()
         evidence_soup = BeautifulSoup(str(soup), "html.parser")
-        for node in evidence_soup.select("nav,footer,header,aside,form,select,[class*='related']"):
+        for node in evidence_soup.select("nav,footer,header,aside,form,select,[class*='related'],[role='navigation'],.elementor-location-header,.elementor-location-footer,.mobile-menu-bar-div,.elementor-nav-menu"):
             node.decompose()
-        text = evidence_soup.get_text(" ", strip=True)
+        evidence_root = evidence_soup.find("main") or evidence_soup.find("article") or evidence_soup
+        text = evidence_root.get_text(" ", strip=True)
         if len(text) < 150 or re.search(r"^(?:Just a moment|Access denied|Attention Required)", text, re.I):
             raise ValueError("The source returned a challenge or an empty page.")
         facts = []

@@ -25,6 +25,12 @@ A missing CRICOS code means “eligibility unverified”, not automatic rejectio
 **How to apply:** Keep uncertain records pending and distinguish course-level restrictions from audience-specific fee labels.
 
 ## Grounding
+Conversation source caches need invalidation when citation ownership or text-cleaning rules change.
+
+**Why:** Corrected extraction code can otherwise keep serving previously cached navigation-heavy evidence.
+
+**How to apply:** Version cached source representations and refresh incompatible entries once; reuse compatible sources normally.
+
 Named existing-course commands such as “add intake Feb and July” edit fields; they must not create another pending course. Explicit “add this course” is a separate intent.
 
 **Why:** The user reported a live intake edit being misrouted to course recovery, leaving the intake empty.
