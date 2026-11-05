@@ -92,6 +92,7 @@ async def quarantine_reextracted_online_course(
     row: ScrapedCourse,
     *,
     source_url: str,
+    domestic_only: bool = False,
 ) -> bool:
     """Audit an online-only rediscovery without touching a published course.
 
@@ -101,7 +102,7 @@ async def quarantine_reextracted_online_course(
     """
     from app.models import CourseAuditLog, ScrapeFeedback
 
-    if row.status == "rejected" and row.rejection_reason == "online_only":
+    if row.status == "rejected" and row.rejection_reason in {"online_only", "domestic_only"}:
         return False  # already quarantined and audited
 
     protected = row.course_id is not None or row.status not in {"pending", "review"}
@@ -110,8 +111,10 @@ async def quarantine_reextracted_online_course(
         "course retained for manual reconciliation"
         if protected else
         "Online-only delivery confirmed on re-extraction; staged course "
-        "removed from approval queue"
+        "retained for visa-eligibility review"
     )
+    if domestic_only and not protected:
+        reason = "Explicit domestic-only admission confirmed on re-extraction; excluded from international review."
     existing = await db.scalar(
         select(ScrapeFeedback.id).where(
             ScrapeFeedback.scraped_course_id == row.id,
@@ -120,6 +123,11 @@ async def quarantine_reextracted_online_course(
             ScrapeFeedback.status == "active",
         ).limit(1)
     )
+    if (existing is not None and not protected and not domestic_only
+            and row.status == "pending" and row.auto_publish_status == "review"
+            and row.eligibility_status == "unverified" and row.study_mode == "Online"
+            and row.international_fee is None and row.course_location is None):
+        return False  # Same restriction already audited; do not create repeat changes.
     if existing is None:
         db.add(ScrapeFeedback(
             university_id=row.university_id,
@@ -137,7 +145,7 @@ async def quarantine_reextracted_online_course(
     db.add(CourseAuditLog(
         scraped_course_id=row.id,
         field_key="online_only",
-        action="staged_online_only_quarantine",
+        action="staged_domestic_only_exclusion" if domestic_only else "staged_online_only_review",
         old_value=json.dumps({
             "status": row.status,
             "international_fee": row.international_fee,
@@ -145,14 +153,14 @@ async def quarantine_reextracted_online_course(
             "course_location": row.course_location,
             "fee_variants": (row.extraction_method or {}).get("fee_variants"),
         }, default=str),
-        new_value=json.dumps({"status": "rejected", "source_url": source_url}),
+        new_value=json.dumps({"status": "rejected" if domestic_only else "pending", "source_url": source_url}),
         reason=reason,
         actor="system:reextract",
     ))
-    row.status = "rejected"
-    row.rejection_reason = "online_only"
+    row.status = "rejected" if domestic_only else "pending"
+    row.rejection_reason = "domestic_only" if domestic_only else None
     row.auto_publish_status = "review"
-    row.eligibility_status = "ineligible"
+    row.eligibility_status = "ineligible" if domestic_only else "unverified"
     row.eligibility_reason = reason
     row.decision_score = None
     row.pub_decision = None
@@ -165,7 +173,8 @@ async def quarantine_reextracted_online_course(
     ):
         setattr(row, key, None)
     row.on_campus_available = False
-    row.international_eligible = False
+    row.study_mode = "Online"
+    row.international_eligible = False if domestic_only else None
     methods = dict(row.extraction_method or {})
     for key in (
         "international_fee", "fee_term", "fee_year", "currency",
@@ -1310,6 +1319,8 @@ async def stage_course(
         # written in the same transaction as ScrapedCourse so an interrupted
         # continuation can reconstruct the row without re-fetching the page.
         from app.services.scraper.snapshot_save import persist_staged_row_backup
+        from app.services.scraper.delivery_review import apply_delivery_review
+        apply_delivery_review(sc, name, payload, source_url)
 
         from app.services.scraper.campus_fee_split import split_pending_course
         campus_split = await split_pending_course(db, sc)
@@ -1317,6 +1328,7 @@ async def stage_course(
         if campus_split["status"] == "split":
             for child_id in campus_split["courseIds"][1:]:
                 child = await db.get(ScrapedCourse, child_id)
+                apply_delivery_review(child, name, payload, source_url)
                 await persist_staged_row_backup(db, child, source_url=source_url)
         await db.commit()
     except Exception as exc:  # noqa: BLE001

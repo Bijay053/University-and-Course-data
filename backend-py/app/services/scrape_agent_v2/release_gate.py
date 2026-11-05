@@ -46,7 +46,7 @@ def evaluate(manifest,golden,observations,scenario_results,security_passed):
 
 def workspace_report():
     base=Path(__file__).resolve().parents[3]
-    manifest=json.loads((base/"tests/fixtures/agent_v2_scenarios.json").read_text())
+    manifest=json.loads((base/"tests/fixtures/agent_scenarios_updated.json").read_text())
     manifest["requirements"].extend(json.loads((base/"tests/fixtures/agent_staff_scenarios.json").read_text())["requirements"])
     report=base.parent/"reports/scrape-agent-benchmark.json"
     data=json.loads(report.read_text()) if report.exists() else {}

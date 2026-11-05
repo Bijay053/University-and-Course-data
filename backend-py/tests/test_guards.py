@@ -212,8 +212,8 @@ class TestShouldStageCourseOnlineOnly:
     def test_rejects_online_only_study_modes(self, study_mode: str) -> None:
         payload = {**self._BASE_PAYLOAD, "study_mode": study_mode}
         ok, reason = should_stage_course("Master of Business Administration", payload)
-        assert ok is False
-        assert reason == "online_only"
+        assert ok is True
+        assert reason == "accepted"
 
     @pytest.mark.parametrize(
         "study_mode",
@@ -243,8 +243,8 @@ class TestShouldStageCourseOnlineOnly:
             "course_location": None,
         }
         ok, reason = should_stage_course("Master of Psychological Practice", payload)
-        assert ok is False
-        assert reason == "online_only"
+        assert ok is True
+        assert reason == "accepted"
 
     def test_csu_master_project_management_rejected(self) -> None:
         payload = {
@@ -253,8 +253,8 @@ class TestShouldStageCourseOnlineOnly:
             "study_mode": "Online",
         }
         ok, reason = should_stage_course("Master of Project Management", payload)
-        assert ok is False
-        assert reason == "online_only"
+        assert ok is True
+        assert reason == "accepted"
 
     def test_online_only_checked_before_no_fee(self) -> None:
         """online_only rejection takes precedence over no_international_fee.
@@ -269,8 +269,8 @@ class TestShouldStageCourseOnlineOnly:
             "study_mode": "Online",
         }
         ok, reason = should_stage_course("Master of Networking Systems Administration", payload)
-        assert ok is False
-        assert reason == "online_only"
+        assert ok is True
+        assert reason == "accepted"
 
     def test_acap_mba_blended_with_physical_campus_stages(self) -> None:
         """ACAP MBA: after pipeline upgrades Online→Blended the guard must accept.
@@ -311,8 +311,8 @@ class TestShouldStageCourseOnlineOnly:
             "course_location": "Sydney, Melbourne, Brisbane, Adelaide, Perth",
         }
         ok, reason = should_stage_course("Master of Business Administration", payload)
-        assert ok is False
-        assert reason == "online_only"
+        assert ok is True
+        assert reason == "accepted"
 
     def test_blended_with_location_text_stages(self) -> None:
         """Blended mode with location_text stages correctly."""
@@ -341,8 +341,8 @@ class TestShouldStageCourseOnlineOnly:
             "location_text": "Sydney, Melbourne",
         }
         ok, reason = should_stage_course("Graduate Diploma of Business Administration", payload)
-        assert ok is False
-        assert reason == "online_only"
+        assert ok is True
+        assert reason == "accepted"
 
     def test_online_no_location_still_rejects(self) -> None:
         """Courses genuinely online-only (no course_location, no location_text) still rejected."""
@@ -354,8 +354,8 @@ class TestShouldStageCourseOnlineOnly:
             "location_text": None,
         }
         ok, reason = should_stage_course("Master of Data Science", payload)
-        assert ok is False
-        assert reason == "online_only"
+        assert ok is True
+        assert reason == "accepted"
 
 
 class TestFeeTableConfirmedNoInternational:
@@ -438,11 +438,11 @@ class TestUtasOnlineBlankLocation:
         ok, reason = should_stage_course(
             "Master of Education", payload, source_url=self._UTAS_URL
         )
-        assert ok is False, (
+        assert ok is True, (
             "UTAS course with course_location='' and location_text='Online' "
-            f"must be rejected as online_only, got reason={reason!r}"
+            f"must be retained for delivery review, got reason={reason!r}"
         )
-        assert reason == "online_only"
+        assert reason == "accepted"
 
     def test_utas_blank_both_locations_rejects(self) -> None:
         """UTAS course with no location evidence at all is also rejected."""
@@ -456,8 +456,8 @@ class TestUtasOnlineBlankLocation:
         ok, reason = should_stage_course(
             "Master of Education", payload, source_url=self._UTAS_URL
         )
-        assert ok is False
-        assert reason == "online_only"
+        assert ok is True
+        assert reason == "accepted"
 
     def test_utas_real_campus_stages(self) -> None:
         """UTAS course with a confirmed physical campus in course_location passes."""
@@ -741,8 +741,8 @@ class TestAcuOnlineUrlSlug:
             self._BASE_PAYLOAD,
             source_url="https://www.acu.edu.au/course/graduate-certificate-in-business-administration-online",
         )
-        assert ok is False
-        assert reason == "online_only"
+        assert ok is True
+        assert reason == "accepted"
 
     def test_rejects_online_url_slug_trailing_slash(self) -> None:
         ok, reason = should_stage_course(
@@ -750,8 +750,8 @@ class TestAcuOnlineUrlSlug:
             self._BASE_PAYLOAD,
             source_url="https://www.acu.edu.au/course/graduate-certificate-in-business-administration-online/",
         )
-        assert ok is False
-        assert reason == "online_only"
+        assert ok is True
+        assert reason == "accepted"
 
     def test_does_not_reject_non_online_slug(self) -> None:
         """Normal URL slug must NOT trigger online_only rejection."""

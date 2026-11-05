@@ -49,6 +49,6 @@ def validate_fields(payload,evidence=None):
         if "course_location" in invalid:cleaned["location_text"]=None
         cleaned["scrape_warnings"]=warnings
         for item in evidence or []:
-            if item.get("field_key") in invalid:
+            if isinstance(item, dict) and item.get("field_key") in invalid:
                 item["selected"]=False;item["validation_status"]="unverified"
     return cleaned,list(invalid)

@@ -223,7 +223,17 @@ def is_domain_only_name(raw: str) -> bool:
 def _clean(raw: str) -> str | None:
     if not raw:
         return None
-    txt = re.sub(r"\s+", " ", raw).strip()
+    from html import unescape
+    from .uk_course_facts import clean_uk_title
+    txt = re.sub(r"\s+", " ", unescape(raw)).strip()
+    # These are title decorations, not UK-specific course facts. Preserve
+    # legitimate variants such as Year 3 entry, top-up and foundation year.
+    txt = re.sub(r"\s*[—–-]\s*apply\s+now\s*$", "", txt, flags=re.I)
+    txt = clean_uk_title(txt)
+    txt = re.sub(
+        r"^[A-Z]{2,6}\d{2,6}\s+(?=(?:Bachelor|Master|Graduate|Postgraduate|Diploma|Certificate)\b)",
+        "", txt,
+    )
     if is_domain_only_name(txt):
         return None
     # Issue 3a: strip AQF code prefix (e.g. "SIT40521 - ", "BSB60120 : ",

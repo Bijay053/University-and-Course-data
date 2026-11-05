@@ -4118,12 +4118,12 @@ async def extract_course(
         if emit:
             await emit(
                 "status",
-                f"[ONLINE ONLY] {url} — Adelaide route or course metadata is all-online; skipping",
+                f"[ONLINE ONLY] {url} — retaining for eligibility review",
                 phase="extract",
-                kind="online_only_skip",
+                kind="online_only_review",
                 url=url,
             )
-        return {"url": url, "payload": payload, "evidence": evidence}
+        # Continue extracting facts; retain the delivery flag for review.
 
     # A bounded pending-review audit confirmed six additional host templates
     # where course-owned online/distance signals were overwritten by generic
@@ -4136,12 +4136,12 @@ async def extract_course(
         if emit:
             await emit(
                 "status",
-                f"[ONLINE ONLY] {url} — audited host template confirms all-online delivery; skipping",
+                f"[ONLINE ONLY] {url} — audited delivery retained for eligibility review",
                 phase="extract",
-                kind="online_only_skip",
+                kind="online_only_review",
                 url=url,
             )
-        return {"url": url, "payload": payload, "evidence": evidence}
+        # Continue extracting facts; retain the delivery flag for review.
 
     # Deakin's international-page location state is authoritative. Fail closed
     # before generic mode readers can mistake unrelated campus text for an
@@ -4152,12 +4152,12 @@ async def extract_course(
         if emit:
             await emit(
                 "status",
-                f"[ONLINE ONLY] {url} — Deakin banner tabs are all virtual; skipping",
+                f"[ONLINE ONLY] {url} — virtual delivery retained for eligibility review",
                 phase="extract",
-                kind="online_only_skip",
+                kind="online_only_review",
                 url=url,
             )
-        return {"url": url, "payload": payload, "evidence": evidence}
+        # Continue extracting facts; retain the delivery flag for review.
 
     # ── Part-time-only early exit ─────────────────────────────────────────────
     # Some universities (e.g. WLV) offer certain courses as Part-time only with
@@ -4169,16 +4169,16 @@ async def extract_course(
     # Reuses the existing domestic_only payload key so guards.py rejects with
     # reason "domestic_only"; parttime_only=True is set for metrics/logging.
     if _parttime_only_filter_enabled() and _is_parttime_only_page(html):
-        payload["domestic_only"] = True
+        payload["study_load"] = "Part Time"
         payload["parttime_only"] = True
         await emit(
             "status",
-            f"[PART-TIME ONLY] {url} — no full-time option found in course-length cell; skipping",
+            f"[PART-TIME ONLY] {url} — no full-time option found; retaining for eligibility review",
             phase="extract",
-            kind="parttime_only_skip",
+            kind="parttime_only_review",
             url=url,
         )
-        return {"url": url, "payload": payload, "evidence": evidence}
+        # A delivery restriction is not proof of domestic-only admission.
 
     # ── Not-currently-accepting / rested-program early exit ──────────────────
     # Newcastle (and similar): pages whose program status is "rested" or
@@ -4211,16 +4211,16 @@ async def extract_course(
     # existing domestic_only payload key so guards.py:394 rejects with
     # reason "domestic_only"; also sets online_only_uon=True for metrics.
     if _is_uon_online_only_page(html):
-        payload["domestic_only"] = True
+        payload["online_only"] = True
         payload["online_only_uon"] = True
         await emit(
             "status",
-            f"[ONLINE ONLY] {url} — Newcastle UON.Degree.Location=location_online; skipping",
+            f"[ONLINE ONLY] {url} — Newcastle delivery retained for eligibility review",
             phase="extract",
-            kind="online_only_skip",
+            kind="online_only_review",
             url=url,
         )
-        return {"url": url, "payload": payload, "evidence": evidence}
+        # Continue extracting facts for the flagged review.
 
     # UniSQ (unisq.edu.au) pure-online courses — primary Location <ul>
     # contains only Online/External/Distance with no physical campus.
@@ -4231,16 +4231,16 @@ async def extract_course(
         "unisq.edu.au" in (url or "").lower()
         and _is_unisq_online_only_page(html)
     ):
-        payload["domestic_only"] = True
+        payload["online_only"] = True
         payload["online_only_unisq"] = True
         await emit(
             "status",
-            f"[ONLINE ONLY] {url} — UniSQ primary Location list is all-virtual; skipping",
+            f"[ONLINE ONLY] {url} — UniSQ delivery retained for eligibility review",
             phase="extract",
-            kind="online_only_skip",
+            kind="online_only_review",
             url=url,
         )
-        return {"url": url, "payload": payload, "evidence": evidence}
+        # Continue extracting facts for the flagged review.
 
     # ── Broken-CMS-page short-circuit ─────────────────────────────────────────
     # Some universities (notably CQU's `?audience=INTERNATIONAL` rewrite on

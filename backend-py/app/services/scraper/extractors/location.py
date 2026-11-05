@@ -95,7 +95,8 @@ LOCATION_LABEL = re.compile(
     r"^\s*(?:campus(?:\s*locations?)?|location|locations|"
     r"start\s+dates?\s+(?:and\s+)?campus(?:es)?|"
     r"availability\s+(?:&|and)\s+campus(?:es)?|"
-    r"where\s+(?:can\s+)?(?:i|you)\s+study|delivery\s+location|"
+    r"where\s+(?:can\s+)?(?:i|you)\s+study|where\s+you['’]ll\s+study|"
+    r"study\s+location|delivery\s+location|venue|"
     r"available\s+at)\s*[*†^‡]?\s*:?\s*$",
     re.I,
 )

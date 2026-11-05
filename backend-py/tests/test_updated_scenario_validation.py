@@ -28,3 +28,19 @@ def test_ielts_outside_document_range_is_unverified(score):
 @pytest.mark.parametrize("score",[4,6.5,9])
 def test_valid_ielts_range_is_retained(score):
     assert validate_fields({"ielts_overall":score})[0]["ielts_overall"]==score
+
+
+def test_malformed_evidence_cannot_crash_or_bypass_field_validation():
+    invalid_proof = {"field_key": "course_location", "selected": True}
+    valid_proof = {"field_key": "ielts_overall", "selected": True}
+    evidence = [None, "malformed", 42, [], invalid_proof, valid_proof]
+    result, invalid = validate_fields(
+        {"course_location": "The full amount is subject to", "ielts_overall": 6.5},
+        evidence,
+    )
+    assert result["course_location"] is None
+    assert invalid == ["course_location"]
+    assert invalid_proof["selected"] is False
+    assert invalid_proof["validation_status"] == "unverified"
+    assert result["ielts_overall"] == 6.5
+    assert valid_proof["selected"] is True

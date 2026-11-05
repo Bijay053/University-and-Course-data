@@ -50,8 +50,8 @@
 - [Bond Elasticsearch discovery](bond-es-discovery.md) — the SPA finder has a search API; discovery must extract URLs from its nested array fields.
 - [Australian university discovery and extraction index](australian-university-lessons-index.md) — grouped pointers for catalogue transport, field authority, audience scope, and course-page structure.
 - [payload.get(key, default) None trap](payload-get-none-trap.md) — key present with None value → get() returns None not default; use `(payload.get(key) or "").strip()` always.
-- [Global international-audience filters](global-international-audience-filters.md) — confirmed domestic-only and online-only courses must not be staged, even under overrides.
-- [Global full-time eligibility](global-full-time-eligibility.md) — mixed/equivalent wording keeps the full-time route; explicit part-time-only wording wins; unresolved Part Time fails closed.
+- [Global international-audience filters](global-international-audience-filters.md) — exclude domestic-only; retain online-only and part-time-only for flagged review, never automatic publication.
+- [Global full-time eligibility](global-full-time-eligibility.md) — preserve mixed/full-time routes; part-time-only courses stay pending with visa warnings, never automatic publication.
 - [SSR courses with missing English](ssr-missing-english-browser-skip.md) — missing English must not force browser rescue on proven SSR sites; prefer central English evidence.
 - [Evidence dedup schema drift](evidence-dedup-schema-drift.md) — long-lived DBs may lack the model-declared evidence unique constraint; verify pg_indexes before named ON CONFLICT.
 - [Safe cross-site HTML compaction](safe-html-compaction.md) — preserve chrome text/order, never flatten structured descendants, and require per-university full-payload parity before opt-in.

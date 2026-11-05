@@ -722,6 +722,8 @@ def _select_intake_candidate(
 
 async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     from urllib.parse import urlparse as _up
+    from .label_boundaries import exclude_labelled_values, DEADLINE_LABEL, START_LABEL
+    html = exclude_labelled_values(html, DEADLINE_LABEL, START_LABEL)
     _host = (_up(url).netloc or "").lower()
     _is_uow = _host in _UOW_HOSTS
     _is_ecu = _host in _ECU_HOSTS
