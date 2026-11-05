@@ -396,6 +396,11 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
     from app.services.scraper.config.context import set_uni_config
     set_uni_config(ctx["config"])
     prompt = messages[-1]["content"]
+    from app.services import assistant_eligibility
+    if assistant_eligibility.requested(prompt):
+        from app.services import scrape_assistant as this_service
+        await assistant_eligibility.run(this_service, thread_id, turn_id, run_id, ctx, prompt)
+        return
     topic_messages = current_topic_messages(messages)
     review_wide = bool(topic_messages and scope_boundary(topic_messages[0]["content"]))
     # Old assistant replies may themselves contain the stale course reference.

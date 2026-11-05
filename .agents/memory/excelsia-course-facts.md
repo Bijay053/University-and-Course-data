@@ -20,3 +20,12 @@ Match the current H1, not SEO title suffixes or neighbouring awards. Elementor c
 **Why:** The user explicitly requires delivery modes to remain separate from course locations.
 
 **How to apply:** Remove bare delivery labels from location fields, preserving separately evidenced named campuses. Leave the location unknown rather than guessing a city.
+
+Excelsia's current course H1 can be in a hero outside main, with duplicate
+headings inside navigation. Eligibility labels remain inside main.
+
+**Why:** Restricting title identity to main missed the Christian Leadership
+course's explicit domestic-only label even though both were on the live page.
+
+**How to apply:** Remove navigation copies before matching the unique course
+heading; keep eligibility evidence scoped to course content, not related cards.

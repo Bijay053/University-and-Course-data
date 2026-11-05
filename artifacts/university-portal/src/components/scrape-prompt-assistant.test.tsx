@@ -134,6 +134,36 @@ describe("ScrapePromptAssistant", () => {
     expect(container.querySelector("img, b")).toBeNull();
   });
 
+  it("refreshes the review and renders saved domestic exclusions without a run button", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const saved: AssistantThread = { ...empty, status: "ready", messages: [{
+      role: "assistant", createdAt: "2024-01-01T00:00:00Z",
+      content: "Excluded 1 confirmed domestic-only record.",
+      actions: [{ id: "exclude-1", kind: "exclude_domestic", label: "Pending eligibility check",
+        state: "completed", courseCount: 2, fields: [],
+        resultSummary: "One excluded; one retained.",
+        courseResults: [
+          { url: "https://uni.edu/a", status: "excluded", message: "Course A — explicit domestic-only evidence." },
+          { url: "https://uni.edu/b", status: "retained", message: "Course B — source unavailable." },
+        ],
+      }],
+    }] };
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json({ ...empty, threadId: "eligibility-thread", status: "researching",
+        activity: [{ id: "eligibility-running", at: "2024-01-01T00:00:00Z",
+          label: "Checking eligibility", status: "running" }], messages: [] }))
+      .mockResolvedValue(json(saved));
+    const onChanged = vi.fn();
+    render(<ScrapePromptAssistant jobId="j1" onChanged={onChanged} />);
+    expect(await screen.findByTestId("activity-item-eligibility-running")).toBeTruthy();
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(await screen.findByText("One excluded; one retained.")).toBeTruthy();
+    expect(screen.getByText("Course B — source unavailable.")).toBeTruthy();
+    expect(screen.queryByTestId("button-run-action-exclude-1")).toBeNull();
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
   it("calls onChanged when an action errors after a batch started", async () => {
     const base = { id: "a2", kind: "fix_fields" as const, label: "Fix", courseCount: 2, fields: ["duration"] };
     const running: AssistantThread = { ...empty, status: "ready", messages: [

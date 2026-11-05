@@ -74,6 +74,17 @@ Topic changes end old course references. Review-wide requests, including “all 
 **How to apply:** Fence conversation history at the latest topic change, not just the last URL. Do not use old assistant wording as evidence of the user's current subject. Keep review-wide field corrections separate from missing-course catalogue comparisons.
 
 ## Conversation presentation
+An explicit request to remove domestic-only courses from a pending review
+authorizes evidence-backed exclusion, not merely a research answer. “Check
+others as well” includes the review cohort even when a named example appears.
+
+**Why:** The user rejected text-only explanations that acknowledged a
+domestic-only record but left it pending.
+
+**How to apply:** Preserve audit records, enforce pending-only and current-owner
+write fences, retain uncertain cases, and report saved results. This does not
+authorize deleting or unpublishing approved courses.
+
 Confirmed operations must be included in the next answer's context, with their requested URLs and verified results. Approval is not proof that source data is current; allow source-backed corrections through a fresh pending review.
 
 **Why:** The assistant could see conversation prose but not the executed action outcome, repeatedly refused an already-approved course, and left a “no changes applied” research footer above running or completed work.
