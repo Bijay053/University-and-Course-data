@@ -163,7 +163,98 @@ def course_english(html: str, url: str) -> tuple[bool, list[ExtractionResult]]:
     return False, []
 
 
+def course_details(html: str, url: str) -> dict:
+    """Course-owned banner facts; campus restrictions stay attached to intakes."""
+    if not is_course(url):
+        return {}
+    soup = BeautifulSoup(html or "", "html.parser")
+    facts = {}
+    for block in soup.select(".detail-item"):
+        label = block.select_one(".e-title")
+        if label:
+            value = label.find_next_sibling("p")
+            if value:
+                facts[label.get_text(" ", strip=True).casefold()] = value.get_text(" ", strip=True)
+    result = {}
+    heading = soup.select_one("h1")
+    award = facts.get("award", "")
+    result["award_choices"] = [s.strip() for s in award.split("/") if s.strip()]
+    if heading and award:
+        name = heading.get_text(" ", strip=True)
+        if name:
+            result["course_name"] = name if name.casefold().startswith(award.casefold()) else f"{award} {name}"
+    duration = facts.get("duration & study mode", "")
+    result["duration_source"] = duration
+    standard = re.sub(r"\b\d+(?:\.\d+)?\s*(?:years?|months?)\s*,?\s*full[-\s]time\s*\([^)]*(?:sandwich|placement)[^)]*\)", "", duration, flags=re.I)
+    matches = re.findall(r"\b(\d+(?:\.\d+)?)\s*(years?|months?)\s*,?\s*full[-\s]time\b", standard, re.I)
+    values={(float(n),"Year" if unit.lower().startswith("year") else "Month") for n,unit in matches}
+    if len(values)==1:
+        amount,unit=next(iter(values))
+        result.update(duration=amount,duration_term=unit)
+    starts = []
+    for item in soup.select(".starting-dates li"):
+        campus = item.select_one("span")
+        if not campus:
+            continue
+        text = item.get_text(" ", strip=True)
+        label = campus.get_text(" ", strip=True)
+        value = text.removeprefix(label).strip()
+        months = re.findall(r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b", value, re.I)
+        if months:
+            starts.append({"campus":label.rstrip(":").strip(),"months":list(dict.fromkeys(m.title() for m in months)),
+                           "restriction": " ".join(re.findall(r"\([^)]*\)",value)), "source_text":text})
+    if starts:
+        result["campus_intakes"] = starts
+    return result
+
+
 def apply_course_authority(html: str, url: str, payload: dict, evidence: list) -> None:
+    details = course_details(html,url)
+    if not details:
+        return
+    ambiguous_award = len(details.get("award_choices", [])) > 1
+    if ambiguous_award:
+        warnings = list(payload.get("scrape_warnings") or [])
+        note = "UWS award requires selection: " + " / ".join(details["award_choices"])
+        if note not in warnings:
+            warnings.append(note)
+        payload["scrape_warnings"] = warnings
+    if details.get("duration_source") and (
+        re.search(r"sandwich|placement|honours pathway", details["duration_source"],re.I)
+        or ("duration" not in details and "full" in details["duration_source"].lower())
+    ):
+        warnings = list(payload.get("scrape_warnings") or [])
+        note = "UWS duration and pathways: " + details["duration_source"]
+        if note not in warnings:
+            warnings.append(note)
+        payload["scrape_warnings"] = warnings
+    for key in ("course_name","duration","duration_term"):
+        if key in details and not ambiguous_award:
+            payload[key] = details[key]
+            evidence.append({"field_key":key,"value":details[key],"method":"uws.course_banner",
+                             "confidence":1.0,"source_url":url,
+                             "snippet":details.get("duration_source","") if key.startswith("duration") else str(details[key])})
+    if details.get("campus_intakes"):
+        starts = details["campus_intakes"]
+        location = str(payload.get("course_location") or "").strip().casefold()
+        locations = {s.strip() for s in location.split(",") if s.strip()}
+        matched = [s for s in starts if s["campus"].casefold() in locations]
+        # Never present a different campus's start as universally available.
+        candidates = matched if len(matched)==len(locations) and len({tuple(s["months"]) for s in matched})==1 else []
+        candidates = candidates or (starts if len(starts)==1 and not location else [])
+        if candidates:
+            months = list(dict.fromkeys(m for s in candidates for m in s["months"]))
+            if set(months)!=set(payload.get("intake_months") or []):
+                payload["intake_months"] = months
+        evidence.append({"field_key":"intake_months","value":payload.get("intake_months") if candidates else None,
+                         "method":"uws.campus_start_dates","confidence":1.0 if candidates else 0.0,"source_url":url,
+                         "snippet":"; ".join(s["source_text"] for s in starts)})
+        warnings = list(payload.get("scrape_warnings") or [])
+        note = "Campus-specific starts: " + "; ".join(s["source_text"] for s in starts)
+        if (not candidates or any(s["restriction"] for s in starts)
+                or re.search(r"\b20\d{2}\b",note)) and note not in warnings:
+            warnings.append(note)
+        payload["scrape_warnings"] = warnings
     known, fee = course_fee(html, url)
     if known:
         for item in evidence:
