@@ -23,6 +23,40 @@ Database = Annotated[AsyncSession, Depends(get_db)]
 Actor = Annotated[dict, Depends(require_permission("scraping.trigger"))]
 
 
+class ResumeImportsBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    consolidationComplete: StrictBool
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+@router.get("/jobs/{job_id}/assistant/import-status")
+async def assistant_import_status(job_id: str, db: Database, actor: Actor):
+    from app.services.assistant_import_pause import provider_for_job, status, live_owner
+    return status(await provider_for_job(db, job_id), await live_owner(db, actor))
+
+
+@router.post("/jobs/{job_id}/assistant/resume-imports")
+async def resume_assistant_imports(job_id: str, body: ResumeImportsBody, db: Database, actor: Actor):
+    from app.models import CourseAuditLog
+    from app.services.assistant_import_pause import provider_for_job, status, is_paused, live_owner
+    if not await live_owner(db, actor, lock=True):
+        raise HTTPException(403, "Only an owner administrator can resume provider imports.")
+    if body.consolidationComplete is not True or len(body.reason.strip()) < 10:
+        raise HTTPException(422, "Confirm consolidation is complete and record the review outcome.")
+    university = await provider_for_job(db, job_id, lock=True)
+    if is_paused(university):
+        config = dict(university.scrape_config or {})
+        config["assistant_imports_paused"] = False
+        university.scrape_config = config
+        db.add(CourseAuditLog(
+            field_key="assistant_imports_paused", action="assistant_imports_resumed",
+            old_value="true", new_value="false", actor=str(actor["id"]),
+            reason=f"University {university.id}; job {job_id}; consolidation confirmed complete: {body.reason.strip()}",
+        ))
+    await db.commit()
+    return status(university, True)
+
+
 class PromptBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     prompt: str = Field(min_length=1)
@@ -276,6 +310,11 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
         raise HTTPException(404, "Proposed action not found.")
     if action["state"] != "proposed":
         return await response(thread, db)  # Idempotent confirmation; never dispatch twice.
+    from app.services.assistant_import_pause import IMPORT_KINDS, PAUSE_REASON, provider_for_job, is_paused
+    if action["kind"] in IMPORT_KINDS:
+        university = await provider_for_job(db, job_id, lock=True)
+        if is_paused(university):
+            raise HTTPException(409, PAUSE_REASON)
     if thread.status in service.ACTIVE:
         raise HTTPException(409, "Wait for the investigation to finish.")
     if action["kind"] == "staff_edit":

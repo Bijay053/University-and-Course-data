@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { AssistantImportStatus } from "./assistant-import-status";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -215,6 +216,10 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
   // History is private per staff member: every cache is keyed by identity + job.
   const identity = user ? `${user.id ?? ""}:${user.email}` : null;
   const viewKey = identity ? `${identity}\u0000${jobId}` : null;
+  const [importState, setImportState] = useState<{key: string | null; paused: boolean | null} | null>(null);
+  const updateImportStatus = useCallback((paused: boolean | null) => setImportState({key: viewKey, paused}), [viewKey]);
+  const importsBlocked = importState?.key !== viewKey || importState?.paused !== false;
+  const isImport = (a: AssistantAction) => ["scan_catalogue", "recover_catalogue", "review_courses", "repair_catalogue"].includes(a.kind);
   const [stored, setStored] = useState<{ key: string; thread: AssistantThread } | null>(null);
   // Render-time guard: a thread from another identity/job is never shown, even for one frame.
   const thread = stored && stored.key === viewKey ? stored.thread : null;
@@ -490,10 +495,10 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             <div className="mt-1.5"><CodeBlock code={operationDetailsJson(a)} lang="json" testId={`code-operation-${a.id}`} /></div>
           </details>
           {a.state === "proposed" && (
-            <Button size="sm" variant="outline" className="mt-2 h-8 border-amber-300 text-[12px]" disabled={disabled || actionBusy}
+            <Button size="sm" variant="outline" className="mt-2 h-8 border-amber-300 text-[12px]" disabled={disabled || actionBusy || (isImport(a) && importsBlocked)}
               onClick={() => a.kind === "staff_edit" || a.kind === "staff_location" || a.kind === "undo_staff_location"
                 ? openConfirm(a) : void runAction(a)} data-testid={`button-run-action-${a.id}`}>
-              Run now
+              {isImport(a) && importsBlocked ? "Imports paused or status unavailable" : "Run now"}
             </Button>
           )}
         </div>
@@ -522,6 +527,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
           </span>
         )}
       </header>
+      {viewKey && <AssistantImportStatus key={viewKey} base={base} onStatus={updateImportStatus} />}
 
       <div className="relative">
         <div

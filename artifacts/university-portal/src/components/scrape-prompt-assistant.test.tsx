@@ -4,7 +4,17 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const auth = vi.hoisted(() => ({ user: { id: 1, email: "a@uni.test", name: "A", role: "staff" } as null | { id: number; email: string; name: string; role: string } }));
+const importHold = vi.hoisted(() => ({paused: false}));
 vi.mock("@/context/auth", () => ({ useAuth: () => ({ user: auth.user }) }));
+// Status transport has its own integration tests; keep these chat fixtures scoped
+// to conversation requests rather than consuming them with background polling.
+vi.mock("./assistant-import-status", async () => {
+  const { useEffect } = await import("react");
+  return { AssistantImportStatus: ({onStatus}: {onStatus: (paused: boolean) => void}) => {
+    useEffect(() => onStatus(importHold.paused), [onStatus]);
+    return null;
+  }};
+});
 
 import { ScrapePromptAssistant, type AssistantThread } from "./scrape-prompt-assistant";
 
@@ -17,9 +27,22 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   auth.user = { id: 1, email: "a@uni.test", name: "A", role: "staff" };
+  importHold.paused = false;
 });
 
 describe("ScrapePromptAssistant", () => {
+  it("disables imports during a hold without disabling pending field repairs", async () => {
+    importHold.paused = true;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(json({
+      ...empty, status: "ready", messages: [{role: "assistant", content: "Ready", createdAt: new Date().toISOString(), actions: [
+        {id: "held", kind: "scan_catalogue", state: "proposed", courseCount: 1, fields: []},
+        {id: "repair", kind: "fix_fields", state: "proposed", courseCount: 1, fields: ["duration"]},
+      ]}],
+    }));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    expect((await screen.findByTestId("button-run-action-held") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("button-run-action-repair") as HTMLButtonElement).disabled).toBe(false);
+  });
   it("shows partial recovery and each exclusion inline with the resulting review link", async () => {
     const messages = [
       "Verified in pending review.",

@@ -16,6 +16,19 @@ The user said: “do not ask for review and run do it and give me result” and 
 
 **How to apply:** Automatically fix pending records with clear evidence, using soft exclude with an audit log and undo. Ask for confirmation for published records, bulk changes over 10 rows, or unclear evidence. Honor explicit read-only requests. Permanent deletion and production deployment remain outside automatic pending-record work.
 
+## Provider consolidation holds
+
+An import pause must not prevent ordinary pending-field repairs. Excelsia must
+remain paused until its consolidation is reviewed and complete. Resume is an
+owner-administrator attestation, not an automated claim that duplicates are gone.
+
+**Why:** The owner required consolidation before allowing further assistant imports,
+after repeated fetches created duplicate pending reviews.
+
+**How to apply:** Require an explicit completion confirmation and review note before
+resuming. Keep an audit, do not launch old proposals on resume, and retain the
+normal publication and large-batch confirmation rules.
+
 ## Eligibility policy
 
 A missing CRICOS code means “eligibility unverified”, not automatic rejection. Apply CRICOS checks only to Australian providers. Domestic prices alongside international prices are not exclusion evidence; eligibility must apply to the course itself.

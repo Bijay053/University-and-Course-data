@@ -33,6 +33,10 @@ async def autorun(thread_id, turn_id):
             return
         messages = deepcopy(thread.messages)
         actions = messages[-1].get("actions", [])
+        from app.services.assistant_import_pause import provider_for_job, is_paused, IMPORT_KINDS
+        university = await provider_for_job(db, thread.job_id)
+        if is_paused(university):
+            actions = [a for a in actions if a.get("kind") not in IMPORT_KINDS]
         action = choose_action(actions)
         if not action:
             return
