@@ -231,3 +231,199 @@ mtime_ms = 1793686914360
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/9919ccf7-fc12-476e-88c9-567eca785d17/13676921-ec58-4cbc-9180-642fb35af051"
 storage_version_token = "1793686940003686"
 content_type = "text/csv"
+
+[[outputs]]
+id = "Hm85mVL3tTz_6X2u8cUmb"
+uri = "file://research/notes.md"
+type = "text"
+title = "Independent course benchmark research"
+description = "Official-source evidence collection; candidates are not yet passing benchmark results."
+logical_id = "34c68ab8-d68e-4186-b921-33121cbfea8a"
+content_hash = "sha256:c4ae1ac6d685a3b50d7f4193dc44faaf6dd0a3b7336276b2614ead438625e655"
+size = 1815
+mtime_ms = 1793848394591
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/34c68ab8-d68e-4186-b921-33121cbfea8a/c2ebb0c0-9d53-4b9b-89ad-414391a0f806"
+storage_version_token = "1793848417191245"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "7O7andJixlJnXhqYO32Q1"
+uri = "file://reports/scrape-agent-rebuild-progress.md"
+type = "text"
+title = "Rebuild checkpoint — not release-ready"
+description = "Implemented foundations, 85-test results, live Excelsia baseline, and the remaining specification gaps."
+logical_id = "3fdedce3-e116-48a4-8ddd-ffdfdf99bc22"
+content_hash = "sha256:3e344467454e08b1d4d82eef8e5fc1d971eb9f6a2324565485e61c7a888b6881"
+size = 4471
+mtime_ms = 1793849088059
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/3fdedce3-e116-48a4-8ddd-ffdfdf99bc22/2675a0a8-8b94-4f3e-b851-892d62352707"
+storage_version_token = "1793849421233203"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "cZUWipMy_NZXGhiEMLspK"
+uri = "file://reports/excelsia-staff-location-preview.html"
+type = "html"
+title = "Excelsia: 42-row location preview and all 14 errors"
+description = "Exact pending rows, every failed URL and recorded error, six separate discovery 404s, and deployment status. No production course data changed."
+logical_id = "1747a552-ee85-40f1-bfe3-cc3046ebfdec"
+content_hash = "sha256:84b27437412d2a117318c9f5cad52850d2e03e998e6ccf5a5cca5eb90cfe1173"
+size = 12008
+mtime_ms = 1793850924548
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/1747a552-ee85-40f1-bfe3-cc3046ebfdec/fba7e657-4ebb-4c7b-a297-ef6907f9e958"
+storage_version_token = "1793851098657306"
+content_type = "text/html"
+
+[[outputs]]
+id = "emLiUMxzehmBHozSB6TAA"
+uri = "file://reports/golden-candidates-team-review.xlsx"
+type = "table"
+title = "52 research candidates for team review"
+description = "Unapproved research inventory with 239 field-evidence entries, missing-field flags and manual approval columns. Not the final partner-selected golden set."
+logical_id = "32f35acb-8497-4676-8ee3-04a890480059"
+content_hash = "sha256:242108eace3107d9ac95d286e6c6d63b9f6da54ce1c6e9c32492a6d49bbbcb3c"
+size = 31350
+mtime_ms = 1793852383686
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/32f35acb-8497-4676-8ee3-04a890480059/c8ded88a-842d-4ff8-af7d-fe23591962a7"
+storage_version_token = "1793852788144126"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "RZEuas11CWDGz25uFx3pA"
+uri = "file://reports/excelsia-consolidation-proposal.html"
+type = "html"
+title = "Excelsia consolidation proposal"
+description = "Exact retained and duplicate row IDs, source links, and field conflicts. Proposal only; no duplicate rows have been excluded."
+logical_id = "c0b01f3a-ed25-47d5-b85d-c5b9b988e702"
+content_hash = "sha256:243b531ebb372360f301534323e7dfb20139e596e22aa63d27843f9b4733a467"
+size = 22187
+mtime_ms = 1793856113692
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/c0b01f3a-ed25-47d5-b85d-c5b9b988e702/54a731d3-4da4-4c9c-afa1-9325114126f1"
+storage_version_token = "1793856401140815"
+content_type = "text/html"
+
+[[outputs]]
+id = "IHtwcBGAHEuvW4aVbtZnB"
+uri = "file://reports/excelsia-consolidation-completed.html"
+type = "html"
+title = "Completed Excelsia consolidation"
+description = "Production result: retained rows, 19 soft exclusions, audit records, verification and deployment status."
+logical_id = "6b81b2ac-d976-49d8-8dda-7fd286c8f594"
+content_hash = "sha256:f7fadc895c460ef32743ea191a3f69422934d1d0f72e3af2c0befbac3daf40c4"
+size = 2505
+mtime_ms = 1793857756031
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/6b81b2ac-d976-49d8-8dda-7fd286c8f594/7972634e-f271-4239-8daa-3586ea2743dc"
+storage_version_token = "1793857758822726"
+content_type = "text/html"
+
+[[outputs]]
+id = "dmIKNSr9ekIUzlrBKyN3k"
+uri = "file://reports/uws-corrections-preview.html"
+type = "html"
+title = "UWS pending-course correction preview"
+description = "All 131 pending rows, proposed field changes, official source links and campus restrictions. Not applied yet."
+logical_id = "90d75a75-321b-40a9-9f31-a80b2e5d90ad"
+content_hash = "sha256:b3bd6201a7ef3a0f47f284953fab6428ee603716e0ff6cad881af31c01ea17b9"
+size = 48704
+mtime_ms = 1793858339855
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/90d75a75-321b-40a9-9f31-a80b2e5d90ad/a3701caf-3e1d-477f-b5c0-b06d01ecbc46"
+storage_version_token = "1793859151427459"
+content_type = "text/html"
+
+[[outputs]]
+id = "Kzw2JGFnxUlGjulNLiaah"
+uri = "file://reports/excelsia-remaining-proposal.html"
+type = "html"
+title = "Excelsia: remaining consolidation proposal"
+description = "Current 52 rows; candidate primary and keep/exclude decisions for each group, with the four eligibility conflicts separated. No further exclusions applied."
+logical_id = "6e65f0d3-ff06-4eba-a13d-431afd0486eb"
+content_hash = "sha256:029cca4450d37461e4ccfea8e7ce5d1cc225c52d834a67c846e9e469dee7ec25"
+size = 19758
+mtime_ms = 1793862057929
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/6e65f0d3-ff06-4eba-a13d-431afd0486eb/2129d542-1120-4079-8323-f9623c42d4ef"
+storage_version_token = "1793862290078889"
+content_type = "text/html"
+
+[[outputs]]
+id = "OGxqqtov-Uz_kzhRawwFp"
+uri = "file://reports/lsbu-invalid-location-proposal.csv"
+type = "table"
+title = "LSBU invalid locations — proposed cleanup"
+description = "156 pending rows, including 85 in the 229-row review. Original values and proposed unverified values are listed. No course records have been changed."
+logical_id = "d64884e1-450d-4fb4-8739-b05ab4a36c60"
+content_hash = "sha256:f629a4e4eda51c3b48cf70370f65325f722da1fbddffe04bb5d73d460f1120d4"
+size = 35246
+mtime_ms = 1793863834283
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/d64884e1-450d-4fb4-8739-b05ab4a36c60/a773b1a5-80a7-4148-9b54-895840fac520"
+storage_version_token = "1793863885028638"
+content_type = "text/csv"
+
+[[outputs]]
+id = "coda0-GtGbsXK2qKoF-TJ"
+uri = "file://reports/lsbu-cleanup-completed.csv"
+type = "table"
+title = "LSBU cleanup completed — 156 audited changes"
+description = "Each cleared pending location, its original value, and its audit ID. No replacement locations or published records were changed."
+logical_id = "acf85618-97eb-417a-b12d-f86486ceacbf"
+content_hash = "sha256:d2257c9d4be1b46e5289b378ecb696bd347a147717cad6c0f968863737667d9e"
+size = 15671
+mtime_ms = 1793869354579
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/acf85618-97eb-417a-b12d-f86486ceacbf/6b7a8115-a06e-476e-ac9b-49f9b1c4f8de"
+storage_version_token = "1793869363718501"
+content_type = "text/csv"
+
+[[outputs]]
+id = "e_2ABByqxh2TmQbvIjg-p"
+uri = "file://reports/surrey-before-after-proposal.csv"
+type = "table"
+title = "Surrey: pending-row correction proposal"
+description = "All 226 pending rows, with existing and proposed values, held cases and official source URLs. No production records have been changed."
+logical_id = "c9cffe2c-2876-477c-ba2c-b1f788c0167a"
+content_hash = "sha256:f42099f3d0892867736c54a00cfdde86b563cfacac6fbc21fcbf390459a49e6a"
+size = 79321
+mtime_ms = 1793871134783
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/c9cffe2c-2876-477c-ba2c-b1f788c0167a/27df68ee-afd6-4542-b731-37e878cd4c79"
+storage_version_token = "1793871411064143"
+content_type = "text/csv"
+
+[[outputs]]
+id = "0CPz5mWLKGMSzeWjcsUFL"
+uri = "file://reports/surrey-option-proposal.csv"
+type = "table"
+title = "Surrey: course-option proposal"
+description = "631 distinct full-time option candidates, including existing standard options—not 631 new courses. Includes fees, schedules, durations, campuses and start dates."
+logical_id = "c839dfa7-2315-4d48-bc12-78260025f451"
+content_hash = "sha256:af57f09d2bccaa1b62ab94b98eb109b22dcaaa22ffa940f9f3216679ee6abc39"
+size = 149693
+mtime_ms = 1793871134799
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/c839dfa7-2315-4d48-bc12-78260025f451/71535ea8-1f06-4d4b-b60c-50eaae55d5e6"
+storage_version_token = "1793871412813343"
+content_type = "text/csv"
+
+[[outputs]]
+id = "Fig18yN0Tq5D57nKmwEN0"
+uri = "file://reports/surrey-applied-corrections.csv"
+type = "table"
+title = "Surrey corrections applied in AWS"
+description = "Verified changes to 221 pending rows, including corrected values and audit IDs. Five held rows were left unchanged."
+logical_id = "f4d8373d-5abf-4155-ae52-6989490b2991"
+content_hash = "sha256:ed2a30dfcbfcd87a913b9f6e646ca2a36cfaf73bf813790e8ea87d076bbd40ea"
+size = 32215
+mtime_ms = 1793877643788
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/f4d8373d-5abf-4155-ae52-6989490b2991/f73d2b91-c989-433a-904b-92b905a56b40"
+storage_version_token = "1793877659930575"
+content_type = "text/csv"
+
+[[outputs]]
+id = "Sh2bwxunOKS8YwzgcOIo_"
+uri = "file://reports/surrey-option-recovery-results.csv"
+type = "table"
+title = "Surrey option recovery results"
+description = "405 staged options, 218 already-recorded options skipped, and eight held options with their reasons and source URLs."
+logical_id = "c4584df6-e0bf-4b5f-a61e-8cd6cbd07801"
+content_hash = "sha256:d6eb5788a87623630e6135645a390396369d21125c264a58a14d946ef2f08c29"
+size = 107699
+mtime_ms = 1793878175391
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/c4584df6-e0bf-4b5f-a61e-8cd6cbd07801/6ab76069-fcb1-47a6-945b-154e52ebc74e"
+storage_version_token = "1793878242945621"
+content_type = "text/csv"

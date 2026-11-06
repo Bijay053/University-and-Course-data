@@ -2928,9 +2928,11 @@ async def re_extract_staged(
                     retry_merge_fields.update({"study_mode", "delivery_mode"})
 
         if online_only_found:
+            domestic_only_found = bool(raw_pass_payload.get("domestic_only"))
             try:
                 quarantined = await quarantine_reextracted_online_course(
                     db, row, source_url=out.get("url") or url,
+                    domestic_only=domestic_only_found,
                 )
                 await db.commit()
             except Exception as exc:  # noqa: BLE001
@@ -2941,10 +2943,16 @@ async def re_extract_staged(
                 continue
             results.append({
                 "id": sc_id, "ok": True,
-                "outcome": "rejected_online_only" if quarantined else "protected_published_course",
+                "outcome": (
+                    ("rejected_domestic_only" if domestic_only_found else "retained_online_only_review")
+                    if quarantined or (row.course_id is None and row.status == "pending")
+                    else "protected_published_course"
+                ),
                 "reason": (
-                    "Online-only staged row quarantined; fee and campus cleared"
-                    if quarantined else
+                    ("Explicit domestic-only row excluded from international review"
+                     if domestic_only_found else
+                     "Online-only row retained pending eligibility review; stale fee and campus cleared")
+                    if quarantined or (row.course_id is None and row.status == "pending") else
                     "Published/approved course unchanged; manual reconciliation required"
                 ),
                 "made_progress": quarantined,

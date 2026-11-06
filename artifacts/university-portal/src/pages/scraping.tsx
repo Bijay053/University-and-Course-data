@@ -3983,7 +3983,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                     {logicalGroups.length} course groups
                   </Badge>
                   <Badge variant="outline" data-testid="text-review-entry-count">
-                    {stagedCourses.length} pending entries
+                    {stagedCourses.length} pending entries in this review
                   </Badge>
                   <span className="text-xs text-muted-foreground">Campus-specific rows stay separate for approval and evidence.</span>
                   {selectedUniversityName && (

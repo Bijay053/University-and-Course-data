@@ -92,7 +92,7 @@ async def test_part_time_options_are_not_expanded_as_full_time():
     html=page().replace("<dt>Full time</dt>","<dt>Part time</dt>")
     async def fetch(url):return html
     result=await expand_links([{"url":URL}],10,fetch)
-    assert len(result)==1
+    assert len(result)==3
     payload={}
     apply_authority(html,URL,payload,[])
     assert payload["study_load"]=="Part Time"

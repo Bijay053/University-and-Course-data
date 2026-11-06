@@ -24,8 +24,11 @@ from tests.test_hsu_facts import hsu_postgres  # noqa: F401 -- owned private clu
 
 BACKEND = Path(__file__).resolve().parents[1]
 ENDPOINT = "/api/scrape/jobs/source/assistant"
+# Exercise the source-research lifecycle, not the immediate refusal path for
+# negated field-edit instructions. The database write-denial triggers below
+# still enforce read-only behavior independently of this wording.
 PROMPT = {"prompt": "Only check the international fee at https://www.example.edu/course. "
-                    "Do not change or publish any data."}
+                    "Read-only research; never publish any data."}
 
 
 async def eventually(check, timeout=20):

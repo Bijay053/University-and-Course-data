@@ -145,7 +145,7 @@ async def test_reextract_quarantines_stale_campus_and_fee_without_deleting_revie
                     },
                     source_url=url,
                 )
-                assert gate_reason == "online_only"
+                assert gate_reason == ("domestic_only" if additional_exclusion == "domestic_only" else "accepted")
 
             result = await re_extract_staged(
                 ReExtractBody(
@@ -153,11 +153,14 @@ async def test_reextract_quarantines_stale_campus_and_fee_without_deleting_revie
                     targetFields=["international_fee"],
                 ), db,
             )
-            assert result["results"][0]["outcome"] == "rejected_online_only"
+            domestic = bool(additional_exclusion and additional_exclusion.endswith("domestic_only"))
+            assert result["results"][0]["outcome"] == ("rejected_domestic_only" if domestic else "retained_online_only_review")
             assert len(calls) == 1  # No retry can reintroduce stale evidence.
             await db.refresh(row)
-            assert row.status == "rejected"
-            assert row.rejection_reason == "online_only"
+            assert row.status == ("rejected" if domestic else "pending")
+            assert row.rejection_reason == ("domestic_only" if domestic else None)
+            assert row.study_mode == "Online"
+            assert row.eligibility_status == ("ineligible" if domestic else "unverified")
             assert row.course_id is None
             assert row.auto_publish_status != "ready"
             assert row.international_fee is None
@@ -181,7 +184,7 @@ async def test_reextract_quarantines_stale_campus_and_fee_without_deleting_revie
             assert feedback[0].preferred_value == url
             audits = (await db.execute(select(CourseAuditLog).where(
                 CourseAuditLog.scraped_course_id == row_id,
-                CourseAuditLog.action == "staged_online_only_quarantine",
+                CourseAuditLog.action == ("staged_domestic_only_exclusion" if domestic else "staged_online_only_review"),
             ))).scalars().all()
             assert len(audits) == 1
             assert '"international_fee": 19050' in audits[0].old_value

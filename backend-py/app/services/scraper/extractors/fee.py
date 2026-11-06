@@ -286,7 +286,7 @@ _SALARY_CTX = re.compile(
 _INTL_CTX = re.compile(
     r"\b(international(?!\s+(?:partners?|partnerships?|placements?|exchanges?|"
     r"collaborations?|relations|business|travel|experiences?|opportunities)\b)"
-    r"|overseas|non[-\s]?(?:uk|resident)|out[-\s]?of[-\s]?(?:state|country)|foreign)\b",
+    r"|overseas|non[-\s]?(?:uk|eu|eea|resident)|out[-\s]?of[-\s]?(?:state|country)|foreign)\b",
     re.IGNORECASE,
 )
 _TUITION_CTX = re.compile(r"\b(tuition|fee|fees|cost\s+of\s+study)\b", re.IGNORECASE)
@@ -411,10 +411,10 @@ _DOMESTIC_FEE_LABEL_CTX = re.compile(
     re.IGNORECASE,
 )
 _INTERNATIONAL_FEE_LABEL_CTX = re.compile(
-    r"\b(?:international|overseas|non[-\s]?(?:uk|resident))\s+(?:students?\s+)?"
+    r"\b(?:international|overseas|non[-\s]?(?:uk|eu|eea|resident))\s+(?:students?\s+)?"
     r"(?:indicative\s+|total\s+|annual\s+)*(?:tuition\s+)?fees?\b"
     r"|\b(?:indicative\s+|total\s+|annual\s+)*(?:tuition\s+|course\s+|program(?:me)?\s+)"
-    r"fees?\s+for\s+(?:international|overseas|non[-\s]?(?:uk|resident))\s+students?\b",
+    r"fees?\s+for\s+(?:international|overseas|non[-\s]?(?:uk|eu|eea|resident))\s+students?\b",
     re.IGNORECASE,
 )
 
@@ -2707,6 +2707,8 @@ def _from_otago_polytechnic_international_fee(
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
+    from .label_boundaries import exclude_labelled_values, DOMESTIC_FEE_LABEL, INTERNATIONAL
+    html = exclude_labelled_values(html, DOMESTIC_FEE_LABEL, INTERNATIONAL)
     from app.services.scraper.extractors.uk_course_facts import surrey_options
     from urllib.parse import parse_qs, urlsplit
     options=surrey_options(html,url)

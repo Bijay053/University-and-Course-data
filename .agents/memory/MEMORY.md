@@ -1,3 +1,4 @@
+- [Agent dollar budget](agent-dollar-budget.md) — approved US$100/day; reserve before calls, retain uncertain spend, and stop on pricing/accounting uncertainty.
 - [Public course toolkit](public-course-toolkit.md) — visitors can search and view fees without signing in; keep administration and pending records private.
 - [ACAP course availability](acap-course-availability.md) — marked online/campus restrictions are not whole-course exclusions; verify research and repair use usable live transport.
 - [Excelsia course facts](excelsia-course-facts.md) — prefer verified static pages; keep own-award facts, international prices, fee periods and IELTS evidence aligned.
@@ -49,8 +50,8 @@
 - [Bond Elasticsearch discovery](bond-es-discovery.md) — the SPA finder has a search API; discovery must extract URLs from its nested array fields.
 - [Australian university discovery and extraction index](australian-university-lessons-index.md) — grouped pointers for catalogue transport, field authority, audience scope, and course-page structure.
 - [payload.get(key, default) None trap](payload-get-none-trap.md) — key present with None value → get() returns None not default; use `(payload.get(key) or "").strip()` always.
-- [Global international-audience filters](global-international-audience-filters.md) — confirmed domestic-only and online-only courses must not be staged, even under overrides.
-- [Global full-time eligibility](global-full-time-eligibility.md) — mixed/equivalent wording keeps the full-time route; explicit part-time-only wording wins; unresolved Part Time fails closed.
+- [Global international-audience filters](global-international-audience-filters.md) — exclude domestic-only; retain online-only and part-time-only for flagged review, never automatic publication.
+- [Global full-time eligibility](global-full-time-eligibility.md) — preserve mixed/full-time routes; part-time-only courses stay pending with visa warnings, never automatic publication.
 - [SSR courses with missing English](ssr-missing-english-browser-skip.md) — missing English must not force browser rescue on proven SSR sites; prefer central English evidence.
 - [Evidence dedup schema drift](evidence-dedup-schema-drift.md) — long-lived DBs may lack the model-declared evidence unique constraint; verify pg_indexes before named ON CONFLICT.
 - [Safe cross-site HTML compaction](safe-html-compaction.md) — preserve chrome text/order, never flatten structured descendants, and require per-university full-payload parity before opt-in.
@@ -68,6 +69,8 @@
 - [INTI duration badge authority](inti-duration-authority.md) — use the current programme’s top facts badge; related product cards repeat other courses’ durations and corrupt generic extraction.
 - [AI extraction is fill-only](ai-extraction-fill-only.md) — across all universities, deterministic static extraction owns populated values; AI is requested only for remaining gaps.
 - [Prompt assistant scope and grounding](prompt-assistant-safety.md) — scraping/reviews only; automatic pending corrections, separate publication approval and immutable source excerpts.
+- [Staff edit authority](staff-edit-authority.md) — literal values are staff-provided, not verified; repeats follow the latest field and published child rows participate in preview fences.
+- [Scrape agent rebuild specification](scrape-agent-rebuild-spec.md) — governing PDFs, ordered stages, live acceptance and evidence-backed release gates.
 - [Live catalogue removal safety](live-catalogue-removal-safety.md) — never auto-hide courses solely because they are absent from one approved scrape; removals need explicit audited review.
 - [Protected catalogue onboarding](protected-catalogue-onboarding.md) — commit probe state before task publish; reject engagement APIs/200 shells; preserve pagination queries and exact retries.
 - [Audience-scoped study mode](audience-scoped-study-mode.md) — international Location/Delivery is authoritative; Online must block synthetic campus defaults.
@@ -140,3 +143,4 @@
 - [Git stat-cache evidence](git-stat-cache-evidence.md) — byte-identical atomic restores can confuse metadata-only diff modes; require content comparison before declaring source dirty.
 - [Database CA loading](database-ca-loading.md) — explicitly load configured CA bundles; OpenSSL default paths may silently ignore a missing file.
 - [Legacy repair scope](legacy-repair-scope.md) — hardening connections must not turn a targeted repair into a full upgrade or bypass local-only restrictions.
+- [SSM report completeness](ssm-report-completeness.md) — command stdout can truncate large production inventories; compress or page results before making bulk-edit decisions.

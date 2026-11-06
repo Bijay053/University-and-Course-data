@@ -5,6 +5,18 @@ description: Excelsia's live static transport, own-award panels, tuition basis a
 
 Prefer a verified live static course response over rendered-provider shells for Excelsia. A bare domain is not a course title.
 
+When course pages omit intakes, inspect the linked official brochures course by course. Do not apply February/July to all awards: the course guide includes a February-only award.
+
+**Why:** The user confirmed award-specific brochure evidence, not a provider-wide February/July rule. They explicitly requested that Graduate Diploma of Business Administration remain “intake unverified”; do not restore its previously assigned February/July values without resolving that instruction.
+
+**How to apply:** Check PDF columns visually when search results or the document structure indicate omitted content. Never borrow another award's intake or treat a general academic calendar as proof of every course's admission schedule.
+
+Keep Excelsia legacy-assistant automatic course imports and catalogue discovery paused until consolidation is complete. Existing-course field repairs should remain available.
+
+**Why:** The user requested this after repeated review imports increased pending rows without establishing distinct new courses.
+
+**How to apply:** Preserve the provider's operational pause through releases. Do not silently resume old proposed imports when consolidating records or switching assistant versions; obtain the user's consolidation confirmation first.
+
 **Why:** Rendered snapshots sometimes retained “Excelsia.edu.au” while the public source verifier obtained the real course page. Existing pending records consequently had no actual name or English requirements.
 
 **How to apply:** Accept static responses only with a recognizable course-owned fact panel; preserve fallback transport when verification fails. Reject a domain-only title rather than staging it.

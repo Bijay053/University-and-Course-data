@@ -1,0 +1,11 @@
+{
+  "robots": {
+    "status": 403,
+    "challenge": true,
+    "bytes": 5488
+  },
+  "cancelledProposals": [],
+  "queuedJobsCancelled": [],
+  "activeJobs": [],
+  "recentFixJobs": []
+}

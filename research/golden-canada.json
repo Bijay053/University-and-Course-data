@@ -1,0 +1,157 @@
+{
+  "courses": [
+    {
+      "id": "ca-waterloo-macc",
+      "country": "Canada",
+      "name": "Master of Accounting (MAcc)",
+      "fields": {
+        "institution": {"value":"University of Waterloo","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program tuition Spring 2026 - International Students | Finance | University of Waterloo","year":"Spring 2026","basis":"official page title"},
+        "international_tuition": {"value":25136.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| ART | Master of Accounting (MAcc) | - | $25,136.00 | $959.06 | - | Not offered part-time | Not offered part-time |","year":"Spring 2026","basis":"Full-time tuition assessed per term; excludes incidental fees"},
+        "currency": {"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience": {"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration": {"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes": {"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts": {"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    },
+    {
+      "id":"ca-waterloo-mdei","country":"Canada","name":"Master of Digital Experience Innovation (MDEI)",
+      "fields":{
+        "international_tuition":{"value":12866.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| ART | Master of Digital Experience Innovation (MDEI) | - | $12,866.00 | $45.71 | - | $6,433.00 | $45.71 |","year":"Spring 2026","basis":"Full-time tuition assessed per term; excludes incidental fees"},
+        "currency":{"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience":{"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    },
+    {
+      "id":"ca-waterloo-mpacs","country":"Canada","name":"Master of Peace & Conflict Studies (MPACS)",
+      "fields":{
+        "international_tuition":{"value":11490.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| ART | Master of Peace & Conflict Studies (MPACS) | - | $11,490.00 | $939.06 | - | $5,745.00 | $625.48 |","year":"Spring 2026","basis":"Full-time tuition assessed per term; excludes incidental fees"},
+        "currency":{"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience":{"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    },
+    {
+      "id":"ca-waterloo-mps","country":"Canada","name":"Master of Public Service (MPS)",
+      "fields":{
+        "international_tuition":{"value":14345.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| ART | Master of Public Service (MPS) | - | $14,345.00 | $939.06 | $836.00 | Not offered part-time | Not offered part-time |","year":"Spring 2026","basis":"Full-time tuition assessed per term; excludes incidental and co-op fees"},
+        "currency":{"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience":{"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    },
+    {
+      "id":"ca-waterloo-mtax","country":"Canada","name":"Master of Taxation (MTax)",
+      "fields":{
+        "international_tuition":{"value":6665.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| ART | Master of Taxation (MTax) | $6,665.00 | three or more courses in a term | $537.04 | - | less than three courses in a term | $517.04 |","year":"Spring 2026","basis":"Tuition assessed per course, not per term; excludes incidental fees"},
+        "currency":{"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience":{"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    },
+    {
+      "id":"ca-waterloo-march","country":"Canada","name":"Master of Architecture (MArch)",
+      "fields":{
+        "international_tuition":{"value":14508.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| ENG | Master of Architecture (MArch) | - | $14,508.00 | $912.80 | $836.00 | $7,254.00 | $591.44 |","year":"Spring 2026","basis":"Full-time tuition assessed per term; excludes incidental and co-op fees"},
+        "currency":{"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience":{"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    },
+    {
+      "id":"ca-waterloo-mcc","country":"Canada","name":"Master of Climate Change (MCC)",
+      "fields":{
+        "international_tuition":{"value":12072.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| ENV | Master of Climate Change (MCC) | - | $12,072.00 | $972.82 | - | $6,036.00 | $629.24 |","year":"Spring 2026","basis":"Full-time tuition assessed per term; excludes incidental fees"},
+        "currency":{"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience":{"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    },
+    {
+      "id":"ca-waterloo-mdp","country":"Canada","name":"Master of Development Practice (MDP)",
+      "fields":{
+        "international_tuition":{"value":14354.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| ENV | Master of Development Practice (MDP) | - | $14,354.00 | $972.82 | - | $7,177.00 | $629.24 |","year":"Spring 2026","basis":"Full-time tuition assessed per term; excludes incidental fees"},
+        "currency":{"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience":{"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    },
+    {
+      "id":"ca-waterloo-mhe","country":"Canada","name":"Master of Health Evaluation (MHE)",
+      "fields":{
+        "international_tuition":{"value":12428.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| HEA | Master of Health Evaluation (MHE) | - | $12,428.00 | $45.71 | - | $6,214.00 | $45.71 |","year":"Spring 2026","basis":"Full-time tuition assessed per term; excludes incidental fees"},
+        "currency":{"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience":{"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    },
+    {
+      "id":"ca-waterloo-mph","country":"Canada","name":"Master of Public Health (MPH)",
+      "fields":{
+        "international_tuition":{"value":12838.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| HEA | Master of Public Health (MPH) | - | $12,838.00 | $51.36 | - | $6,419.00 | $48.54 |","year":"Spring 2026","basis":"Full-time tuition assessed per term; excludes incidental fees"},
+        "currency":{"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience":{"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    },
+    {
+      "id":"ca-waterloo-msw","country":"Canada","name":"Master of Social Work (MSW)",
+      "fields":{
+        "international_tuition":{"value":13266.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| HEA | Master of Social Work (MSW) | - | $13,266.00 | $45.71 | - | $6,633.00 | $45.71 |","year":"Spring 2026","basis":"Full-time tuition assessed per term; excludes incidental fees"},
+        "currency":{"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience":{"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    },
+    {
+      "id":"ca-waterloo-mactsc","country":"Canada","name":"Master of Actuarial Science (MActSc)",
+      "fields":{
+        "international_tuition":{"value":18351.00,"status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"| MAT | Master of Actuarial Science (MActSc) | - | $18,351.00 | $939.06 | - | Not offered part-time | Not offered part-time |","year":"Spring 2026","basis":"Full-time tuition assessed per term; excludes incidental fees"},
+        "currency":{"value":"CAD","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"All amounts are shown in Canadian dollars.","year":"Spring 2026","basis":"currency, not converted"},
+        "audience":{"value":"International students","status":"verified","source_url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","snippet":"Master's and PhD program fees spring 2026 - International Students","year":"Spring 2026","basis":"fee schedule audience"},
+        "duration":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null},
+        "intakes":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":"Fee term is not an intake"},
+        "ielts":{"value":null,"status":"unverified","source_url":null,"snippet":null,"year":null,"basis":null}
+      }
+    }
+  ],
+  "gaps": [
+    "Evidence accessed 2026-11-05. Waterloo figures explicitly apply to Spring 2026, not a claim of current Fall 2026 fees.",
+    "All twelve candidates are distinct University of Waterloo degrees; geographic and institutional diversity is limited.",
+    "Duration, intake dates and IELTS thresholds remain unverified for all twelve candidates.",
+    "Table header evidence: | Faculty | Program Name | Tuition assessed per course | Full-time tuition assessed per term | Full-time incidental fees per term (including HST) | Co-op fee (for CEE-supported programs) | Part-time tuition assessed per term | Part-time incidental fees per term (including HST) |",
+    "No yearly or total-program tuition inferred. Taxation is per course; the other eleven recorded tuition amounts are full-time per term.",
+    "Alberta standard graduate fees cannot safely be assigned to specific degrees because non-standard exceptions are explicitly stated.",
+    "Guelph provides supplemental annual estimates with credit-billing caveats; these are not added to the twelve selected courses.",
+    "Publication/update dates were not established. Academic fee periods are not publication dates.",
+    "Saskatchewan and UBC are saved search-snippet leads only and support no verified candidate field."
+  ],
+  "sources": [
+    {"title":"Master's and PhD program tuition Spring 2026 - International Students | Finance | University of Waterloo","url":"https://uwaterloo.ca/finance/masters-and-phd-program-tuition-spring-2026-international","publication_date":null,"period":"Spring 2026","accessed":"2026-11-05","tier":1,"path":"research/sources/golden-canada-02-waterloo-spring-2026.md","evidence_type":"fetched official page"},
+    {"title":"Instructional Fees for International Students | University of Alberta","url":"https://www.ualberta.ca/en/graduate-studies/fees-funding/tuition-fees/instructional-fees-international.html","publication_date":null,"period":"2026-27","accessed":"2026-11-05","tier":1,"path":"research/sources/golden-canada-01-alberta-international-fees.md","evidence_type":"fetched official page; supplemental"},
+    {"title":"Tuition, Fees and Cost of Living | University of Guelph","url":"https://graduatestudies.uoguelph.ca/future/cost","publication_date":null,"period":"2026-27 and 2027-28 table","accessed":"2026-11-05","tier":1,"path":"research/sources/golden-canada-03-guelph-cost.md","evidence_type":"fetched official page; supplemental"},
+    {"title":"Tuition - Future graduate students | University of Saskatchewan","url":"https://grad.usask.ca/funding/tuition.php","publication_date":null,"period":"September 1, 2026–August 31, 2027","accessed":"2026-11-05","tier":1,"path":"research/sources/golden-canada-snippets.md","evidence_type":"search snippet only"},
+    {"title":"English Language Test | Graduate School at UBC","url":"https://www.grad.ubc.ca/prospective-students/application-admission/english-language-test","publication_date":null,"period":null,"accessed":"2026-11-05","tier":1,"path":"research/sources/golden-canada-snippets.md","evidence_type":"search snippet only"}
+  ]
+}

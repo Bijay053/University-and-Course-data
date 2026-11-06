@@ -127,7 +127,7 @@ def official_url(url: str, official_home: str) -> str:
     return value._replace(fragment="").geturl()
 
 
-async def public_request(url: str, *, method="GET", body=None, params=None) -> bytes:
+async def public_request(url: str, *, method="GET", body=None, params=None, user_agent=None) -> bytes:
     if method not in {"GET", "POST"}:
         raise ValueError("Unsupported research method.")
     value = urlsplit(url)
@@ -137,7 +137,7 @@ async def public_request(url: str, *, method="GET", body=None, params=None) -> b
     transport._pool._network_backend = PublicNetworkBackend()
     async with httpx.AsyncClient(
         transport=transport, follow_redirects=False, trust_env=False, timeout=httpx.Timeout(9, connect=4),
-        headers={"User-Agent": "StudyInfoCentre-SourceVerifier/1.0"},
+        headers={"User-Agent": user_agent or "StudyInfoCentre-SourceVerifier/1.0"},
     ) as client:
         if method == "GET" and value.path != "/robots.txt":
             from urllib.robotparser import RobotFileParser
@@ -154,7 +154,7 @@ async def public_request(url: str, *, method="GET", body=None, params=None) -> b
                     if "<html" in robots_text.lower():
                         raise SourceReadError("robots.txt returned an HTML page or protection challenge; source access stopped.")
                     parser=RobotFileParser();parser.parse(robots_text.splitlines())
-                    if not parser.can_fetch("StudyInfoCentre-SourceVerifier/1.0",url):
+                    if not parser.can_fetch(user_agent or "StudyInfoCentre-SourceVerifier/1.0",url):
                         raise SourceReadError("robots.txt disallows this source; no browser or proxy bypass was attempted.")
         async with client.stream(method, url, json=body if method == "POST" else None, params=params or None) as response:
             if response.is_redirect:
@@ -175,11 +175,11 @@ async def public_request(url: str, *, method="GET", body=None, params=None) -> b
             return bytes(chunks)
 
 
-async def inspect_source(url: str, home: str) -> dict:
+async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) -> dict:
     source_type = "pdf" if urlsplit(url).path.lower().endswith(".pdf") else "html"
     try:
         url = official_url(url, home)
-        raw = await asyncio.wait_for(public_request(url), timeout=12)
+        raw = raw_body if raw_body is not None else await asyncio.wait_for(public_request(url), timeout=12)
         if len(raw) > MAX_BYTES:
             raise SourceReadError("Source exceeds the safe research size limit.")
         if raw.lstrip().startswith(b"%PDF"):

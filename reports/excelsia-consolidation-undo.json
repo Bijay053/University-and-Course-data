@@ -1,0 +1,237 @@
+{
+  "mode": "undo",
+  "receipts": [
+    {
+      "id": 56050,
+      "auditId": 12,
+      "retainedId": 56050,
+      "status": "pending",
+      "filledFrom": {},
+      "copiedEvidence": 48
+    },
+    {
+      "id": 56076,
+      "auditId": 13,
+      "retainedId": 56050,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56097,
+      "auditId": 14,
+      "retainedId": 56050,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56052,
+      "auditId": 15,
+      "retainedId": 56052,
+      "status": "pending",
+      "filledFrom": {},
+      "copiedEvidence": 46
+    },
+    {
+      "id": 56078,
+      "auditId": 16,
+      "retainedId": 56052,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56099,
+      "auditId": 17,
+      "retainedId": 56052,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56053,
+      "auditId": 18,
+      "retainedId": 56053,
+      "status": "pending",
+      "filledFrom": {},
+      "copiedEvidence": 46
+    },
+    {
+      "id": 56079,
+      "auditId": 19,
+      "retainedId": 56053,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56100,
+      "auditId": 20,
+      "retainedId": 56053,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56055,
+      "auditId": 21,
+      "retainedId": 56055,
+      "status": "pending",
+      "filledFrom": {},
+      "copiedEvidence": 46
+    },
+    {
+      "id": 56081,
+      "auditId": 22,
+      "retainedId": 56055,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56102,
+      "auditId": 23,
+      "retainedId": 56055,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56056,
+      "auditId": 24,
+      "retainedId": 56056,
+      "status": "pending",
+      "filledFrom": {},
+      "copiedEvidence": 46
+    },
+    {
+      "id": 56082,
+      "auditId": 25,
+      "retainedId": 56056,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56103,
+      "auditId": 26,
+      "retainedId": 56056,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56057,
+      "auditId": 27,
+      "retainedId": 56057,
+      "status": "pending",
+      "filledFrom": {},
+      "copiedEvidence": 48
+    },
+    {
+      "id": 56083,
+      "auditId": 28,
+      "retainedId": 56057,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56104,
+      "auditId": 29,
+      "retainedId": 56057,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56058,
+      "auditId": 30,
+      "retainedId": 56058,
+      "status": "pending",
+      "filledFrom": {},
+      "copiedEvidence": 23
+    },
+    {
+      "id": 56084,
+      "auditId": 31,
+      "retainedId": 56058,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56059,
+      "auditId": 32,
+      "retainedId": 56059,
+      "status": "pending",
+      "filledFrom": {},
+      "copiedEvidence": 46
+    },
+    {
+      "id": 56085,
+      "auditId": 33,
+      "retainedId": 56059,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56105,
+      "auditId": 34,
+      "retainedId": 56059,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56063,
+      "auditId": 35,
+      "retainedId": 56063,
+      "status": "pending",
+      "filledFrom": {},
+      "copiedEvidence": 48
+    },
+    {
+      "id": 56088,
+      "auditId": 36,
+      "retainedId": 56063,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56109,
+      "auditId": 37,
+      "retainedId": 56063,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56074,
+      "auditId": 38,
+      "retainedId": 56074,
+      "status": "pending",
+      "filledFrom": {},
+      "copiedEvidence": 54
+    },
+    {
+      "id": 56092,
+      "auditId": 39,
+      "retainedId": 56074,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    },
+    {
+      "id": 56115,
+      "auditId": 40,
+      "retainedId": 56074,
+      "status": "rejected",
+      "filledFrom": {},
+      "copiedEvidence": 0
+    }
+  ]
+}

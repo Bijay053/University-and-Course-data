@@ -228,10 +228,10 @@ _SESSION_RE = re.compile(
 _INTAKE_LABEL_RE = re.compile(
     r"(?:intakes?|intake\s+(?:dates?|months?|periods?)|"
     r"next\s+(?:available\s+)?intakes?|available\s+intakes?|"
-    r"start\s+dates?|commencement(?:\s+dates?)?|"
-    r"course\s+(?:start\s+dates?|commencement|starts?)|"
+    r"start(?:ing)?\s+dates?|commencement(?:\s+dates?)?|"
+    r"course\s+(?:start(?:ing)?\s+dates?|commencement|starts?)|"
     r"study\s+(?:periods?|start)|class\s+starts?|"
-    r"applications?\s+(?:open|close|closing|opening\s+date)|"
+    r"teaching\s+periods?|terms?|semester\s+start|entry\s+months?|"
     r"entry\s+points?)"
     # Optional trailing campus parenthetical, e.g. "Start dates (Newcastle)",
     # "Start dates (Central Coast)", "Start dates (Sydney)".  Without this,
@@ -722,6 +722,8 @@ def _select_intake_candidate(
 
 async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     from urllib.parse import urlparse as _up
+    from .label_boundaries import exclude_labelled_values, DEADLINE_LABEL, START_LABEL
+    html = exclude_labelled_values(html, DEADLINE_LABEL, START_LABEL)
     _host = (_up(url).netloc or "").lower()
     _is_uow = _host in _UOW_HOSTS
     _is_ecu = _host in _ECU_HOSTS

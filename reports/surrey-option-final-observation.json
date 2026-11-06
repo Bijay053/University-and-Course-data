@@ -1,0 +1,3361 @@
+{
+  "unit": "Result=success\nActiveState=inactive\n",
+  "log": "  File \"/usr/lib/python3.12/subprocess.py\", line 571, in run\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['git', '-C', '/opt/university-portal', 'rev-parse', 'HEAD']' returned non-zero exit status 128.\nuni-surrey-option-recovery.service: Main process exited, code=exited, status=1/FAILURE\nuni-surrey-option-recovery.service: Failed with result 'exit-code'.\nStarted uni-surrey-option-recovery.service - /bin/bash /var/lib/university-portal/surrey-option-recovery/run.sh.\n    root : PWD=/opt/university-portal/backend-py ; USER=ubuntu ; COMMAND=/usr/bin/git -C /opt/university-portal rev-parse HEAD\npam_unix(sudo:session): session opened for user ubuntu(uid=1000) by (uid=0)\npam_unix(sudo:session): session closed for user ubuntu\n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\nuni-surrey-option-recovery.service: Deactivated successfully.\nuni-surrey-option-recovery.service: Consumed 7.484s CPU time, 69.1M memory peak, 0B memory swap peak.\n",
+  "receipt": {
+    "counts": {
+      "already_recorded": 218,
+      "staged": 405,
+      "held": 8
+    },
+    "rows": [
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/creative-writing-phd?surrey_option=option-2071646",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/creative-writing-phd?surrey_option=option-2071649",
+        "id": 56658,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/creative-writing-phd?surrey_option=option-2071658",
+        "id": 56659,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/creative-writing-phd?surrey_option=option-2071661",
+        "id": 56660,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/creative-writing-phd?surrey_option=option-2071670",
+        "id": 56661,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/creative-writing-phd?surrey_option=option-2071673",
+        "id": 56662,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/creative-writing-phd?surrey_option=option-2071682",
+        "id": 56663,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/creative-writing-phd?surrey_option=option-2071685",
+        "id": 56664,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/digital-media-arts-phd?surrey_option=option-2070902",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/digital-media-arts-phd?surrey_option=option-2070905",
+        "id": 56665,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/digital-media-arts-phd?surrey_option=option-2070914",
+        "id": 56666,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/digital-media-arts-phd?surrey_option=option-2070917",
+        "id": 56667,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/digital-media-arts-phd?surrey_option=option-2070926",
+        "id": 56668,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/digital-media-arts-phd?surrey_option=option-2070929",
+        "id": 56669,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/digital-media-arts-phd?surrey_option=option-2070938",
+        "id": 56670,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/digital-media-arts-phd?surrey_option=option-2070941",
+        "id": 56671,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/english-literature-phd?surrey_option=option-2072959",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/english-literature-phd?surrey_option=option-2072962",
+        "id": 56672,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/english-literature-phd?surrey_option=option-2072971",
+        "id": 56673,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/english-literature-phd?surrey_option=option-2072974",
+        "id": 56674,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/english-literature-phd?surrey_option=option-2072983",
+        "id": 56675,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/english-literature-phd?surrey_option=option-2072986",
+        "id": 56676,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/film-studies-phd?surrey_option=option-2071562",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/film-studies-phd?surrey_option=option-2071565",
+        "id": 56677,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/film-studies-phd?surrey_option=option-2071574",
+        "id": 56678,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/film-studies-phd?surrey_option=option-2071577",
+        "id": 56679,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/film-studies-phd?surrey_option=option-2071586",
+        "id": 56680,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/film-studies-phd?surrey_option=option-2071589",
+        "id": 56681,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/film-studies-phd?surrey_option=option-2071598",
+        "id": 56682,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/film-studies-phd?surrey_option=option-2071601",
+        "id": 56683,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/higher-education-phd?surrey_option=option-2071322",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/higher-education-phd?surrey_option=option-2071325",
+        "id": 56684,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/higher-education-phd?surrey_option=option-2071334",
+        "id": 56685,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/higher-education-phd?surrey_option=option-2071337",
+        "id": 56686,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/higher-education-phd?surrey_option=option-2071346",
+        "id": 56687,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/higher-education-phd?surrey_option=option-2071349",
+        "id": 56688,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/higher-education-phd?surrey_option=option-2071358",
+        "id": 56689,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/higher-education-phd?surrey_option=option-2071361",
+        "id": 56690,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/hospitality-tourism-transport-and-events-phd?surrey_option=option-2070698",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/hospitality-tourism-transport-and-events-phd?surrey_option=option-2070701",
+        "id": 56691,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/hospitality-tourism-transport-and-events-phd?surrey_option=option-2070710",
+        "id": 56692,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/hospitality-tourism-transport-and-events-phd?surrey_option=option-2070713",
+        "id": 56693,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/hospitality-tourism-transport-and-events-phd?surrey_option=option-2070722",
+        "id": 56694,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/hospitality-tourism-transport-and-events-phd?surrey_option=option-2070725",
+        "id": 56695,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/hospitality-tourism-transport-and-events-phd?surrey_option=option-2070734",
+        "id": 56696,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/hospitality-tourism-transport-and-events-phd?surrey_option=option-2070737",
+        "id": 56697,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/innovative-media-technology-phd?surrey_option=option-2070806",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/innovative-media-technology-phd?surrey_option=option-2070809",
+        "id": 56698,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/innovative-media-technology-phd?surrey_option=option-2070818",
+        "id": 56699,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/innovative-media-technology-phd?surrey_option=option-2070821",
+        "id": 56700,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/innovative-media-technology-phd?surrey_option=option-2070830",
+        "id": 56701,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/innovative-media-technology-phd?surrey_option=option-2070833",
+        "id": 56702,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/innovative-media-technology-phd?surrey_option=option-2070842",
+        "id": 56703,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/innovative-media-technology-phd?surrey_option=option-2070845",
+        "id": 56704,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/linguistics-phd?surrey_option=option-2071514",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/linguistics-phd?surrey_option=option-2071517",
+        "id": 56705,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/linguistics-phd?surrey_option=option-2071526",
+        "id": 56706,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/linguistics-phd?surrey_option=option-2071529",
+        "id": 56707,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/linguistics-phd?surrey_option=option-2071538",
+        "id": 56708,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/linguistics-phd?surrey_option=option-2071541",
+        "id": 56709,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/linguistics-phd?surrey_option=option-2071550",
+        "id": 56710,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/linguistics-phd?surrey_option=option-2071553",
+        "id": 56711,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/literary-and-cultural-studies-phd?surrey_option=option-2071442",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/literary-and-cultural-studies-phd?surrey_option=option-2071445",
+        "id": 56712,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/literary-and-cultural-studies-phd?surrey_option=option-2071454",
+        "id": 56713,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/literary-and-cultural-studies-phd?surrey_option=option-2071457",
+        "id": 56714,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/literary-and-cultural-studies-phd?surrey_option=option-2071466",
+        "id": 56715,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/literary-and-cultural-studies-phd?surrey_option=option-2071469",
+        "id": 56716,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/literary-and-cultural-studies-phd?surrey_option=option-2071478",
+        "id": 56717,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/literary-and-cultural-studies-phd?surrey_option=option-2071481",
+        "id": 56718,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/music-phd?surrey_option=option-2071694",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/music-phd?surrey_option=option-2071697",
+        "id": 56719,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/music-phd?surrey_option=option-2071706",
+        "id": 56720,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/music-phd?surrey_option=option-2071709",
+        "id": 56721,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/music-phd?surrey_option=option-2071718",
+        "id": 56722,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/music-phd?surrey_option=option-2071721",
+        "id": 56723,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/music-phd?surrey_option=option-2071730",
+        "id": 56724,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/music-phd?surrey_option=option-2071733",
+        "id": 56725,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/theatre-phd?surrey_option=option-2071742",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/theatre-phd?surrey_option=option-2071745",
+        "id": 56726,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/theatre-phd?surrey_option=option-2071754",
+        "id": 56727,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/theatre-phd?surrey_option=option-2071757",
+        "id": 56728,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/theatre-phd?surrey_option=option-2071766",
+        "id": 56729,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/theatre-phd?surrey_option=option-2071769",
+        "id": 56730,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/theatre-phd?surrey_option=option-2071778",
+        "id": 56731,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/theatre-phd?surrey_option=option-2071781",
+        "id": 56732,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/translation-and-interpreting-studies-phd?surrey_option=option-2071610",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/translation-and-interpreting-studies-phd?surrey_option=option-2071613",
+        "id": 56733,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/translation-and-interpreting-studies-phd?surrey_option=option-2071622",
+        "id": 56734,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/translation-and-interpreting-studies-phd?surrey_option=option-2071625",
+        "id": 56735,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/translation-and-interpreting-studies-phd?surrey_option=option-2071634",
+        "id": 56736,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/translation-and-interpreting-studies-phd?surrey_option=option-2071637",
+        "id": 56737,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/english-literature-and-french?surrey_option=option-2053175",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/english-literature-and-spanish?surrey_option=option-2053514",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/film-production-and-broadcast-engineering?surrey_option=option-2053745",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/film-production-and-broadcast-engineering?surrey_option=option-2053748",
+        "id": 56738,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/financial-mathematics?surrey_option=option-2053907",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/financial-mathematics?surrey_option=option-2053910",
+        "id": 56739,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/financial-mathematics?surrey_option=option-2053913",
+        "id": 56740,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/financial-mathematics?surrey_option=option-2053916",
+        "id": 56741,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/food-science-and-nutrition?surrey_option=option-2053787",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/food-science-and-nutrition?surrey_option=option-2053790",
+        "id": 56742,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/food-science-and-nutrition?surrey_option=option-2053793",
+        "id": 56743,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/food-science-and-nutrition?surrey_option=option-2053796",
+        "id": 56744,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/foundation-acting?surrey_option=option-2053313",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/foundation-musical-theatre?surrey_option=option-2053316",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/games-art?surrey_option=option-2053463",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/games-art?surrey_option=option-2053466",
+        "id": 56745,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/games-design?surrey_option=option-2053283",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/games-design?surrey_option=option-2053286",
+        "id": 56746,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-airline-and-airport-management?surrey_option=option-2053526",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-airline-and-airport-management?surrey_option=option-2053529",
+        "id": 56747,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-business-fheq-level-5-direct-entry?surrey_option=option-2053247",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-business-fheq-level-6-direct-entry?surrey_option=option-2053949",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-business-management?surrey_option=option-2053430",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-business-management?surrey_option=option-2053433",
+        "id": 56748,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-business-management?surrey_option=option-2053436",
+        "id": 56749,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-business-management?surrey_option=option-2053439",
+        "id": 56750,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-event-management?surrey_option=option-2053493",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-event-management?surrey_option=option-2053496",
+        "id": 56751,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-hospitality-management?surrey_option=option-2053505",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-hospitality-management?surrey_option=option-2053508",
+        "id": 56752,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-relations?surrey_option=option-2053367",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-relations?surrey_option=option-2053370",
+        "id": 56753,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-tourism-management?surrey_option=option-2053241",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-tourism-management?surrey_option=option-2053244",
+        "id": 56754,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law?surrey_option=option-2053385",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law?surrey_option=option-2053388",
+        "id": 56755,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law?surrey_option=option-2053391",
+        "id": 56756,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law?surrey_option=option-2053394",
+        "id": 56757,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-business?surrey_option=option-2058485",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-business?surrey_option=option-2058488",
+        "id": 56758,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-business?surrey_option=option-2058491",
+        "id": 56759,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-business?surrey_option=option-2058494",
+        "id": 56760,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-criminology?surrey_option=option-2053349",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-criminology?surrey_option=option-2053352",
+        "id": 56761,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-criminology?surrey_option=option-2053355",
+        "id": 56762,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-criminology?surrey_option=option-2053358",
+        "id": 56763,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-international-relations?surrey_option=option-2053337",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-international-relations?surrey_option=option-2053340",
+        "id": 56764,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-international-relations?surrey_option=option-2053343",
+        "id": 56765,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/law-international-relations?surrey_option=option-2053346",
+        "id": 56766,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mathematics?surrey_option=option-2053889",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mathematics?surrey_option=option-2053892",
+        "id": 56767,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mathematics?surrey_option=option-2053895",
+        "id": 56768,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mathematics?surrey_option=option-2053898",
+        "id": 56769,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mathematics?surrey_option=option-2053901",
+        "id": 56770,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mathematics?surrey_option=option-2053904",
+        "id": 56771,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mechanical-engineering?surrey_option=option-2053658",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mechanical-engineering?surrey_option=option-2053661",
+        "id": 56772,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mechanical-engineering?surrey_option=option-2053664",
+        "id": 56773,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mechanical-engineering?surrey_option=option-2053667",
+        "id": 56774,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mechanical-engineering?surrey_option=option-2053670",
+        "id": 56775,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/mechanical-engineering?surrey_option=option-2053673",
+        "id": 56776,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/media-and-communication?surrey_option=option-2053937",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/media-and-communication?surrey_option=option-2053940",
+        "id": 56777,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/medicinal-chemistry?surrey_option=option-2053109",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/medicinal-chemistry?surrey_option=option-2053112",
+        "id": 56778,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/medicinal-chemistry?surrey_option=option-2053115",
+        "id": 56779,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/medicinal-chemistry?surrey_option=option-2053118",
+        "id": 56780,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/theatre?surrey_option=option-2059997",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/advanced-geotechnical-engineering-msc?surrey_option=option-2067749",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/advanced-geotechnical-engineering-msc?surrey_option=option-2067752",
+        "id": 56781,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/advanced-geotechnical-engineering-msc?surrey_option=option-2067761",
+        "id": 56782,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/advanced-geotechnical-engineering-msc?surrey_option=option-2067764",
+        "id": 56783,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/bridge-engineering-msc?surrey_option=option-2067731",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/bridge-engineering-msc?surrey_option=option-2067740",
+        "id": 56784,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/civil-engineering-msc?surrey_option=option-2067512",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/civil-engineering-msc?surrey_option=option-2067515",
+        "id": 56785,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/civil-engineering-msc?surrey_option=option-2067524",
+        "id": 56786,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/civil-engineering-msc?surrey_option=option-2067527",
+        "id": 56787,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/corporate-environmental-management-msc?surrey_option=option-2067410",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/corporate-environmental-management-msc?surrey_option=option-2067413",
+        "id": 56788,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/corporate-environmental-management-msc?surrey_option=option-2067419",
+        "id": 56789,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/corporate-environmental-management-msc?surrey_option=option-2067422",
+        "id": 56790,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/structural-engineering-msc?surrey_option=option-2067284",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/structural-engineering-msc?surrey_option=option-2067287",
+        "id": 56791,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/structural-engineering-msc?surrey_option=option-2067296",
+        "id": 56792,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/structural-engineering-msc?surrey_option=option-2067299",
+        "id": 56793,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/ai-translation-and-interpreting-studies-msc?surrey_option=option-2067329",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/ai-translation-and-interpreting-studies-msc?surrey_option=option-2067332",
+        "id": 56794,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/infrastructure-engineering-and-management-msc?surrey_option=option-2067563",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/infrastructure-engineering-and-management-msc?surrey_option=option-2067566",
+        "id": 56795,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/infrastructure-engineering-and-management-msc?surrey_option=option-2067575",
+        "id": 56796,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/infrastructure-engineering-and-management-msc?surrey_option=option-2067578",
+        "id": 56797,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/accounting-and-finance?surrey_option=option-2053178",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/accounting-and-finance?surrey_option=option-2053181",
+        "id": 56798,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/accounting-and-finance?surrey_option=option-2053184",
+        "id": 56799,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/accounting-and-finance?surrey_option=option-2053187",
+        "id": 56800,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/actor-musician?surrey_option=option-2053442",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/aerospace-engineering?surrey_option=option-2053679",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/aerospace-engineering?surrey_option=option-2053682",
+        "id": 56801,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/aerospace-engineering?surrey_option=option-2053685",
+        "id": 56802,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/aerospace-engineering?surrey_option=option-2053688",
+        "id": 56803,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/aerospace-engineering?surrey_option=option-2053691",
+        "id": 56804,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/aerospace-engineering?surrey_option=option-2053694",
+        "id": 56805,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/applied-and-contemporary-theatre?surrey_option=option-2053586",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/applied-and-contemporary-theatre?surrey_option=option-2053589",
+        "id": 56806,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biochemistry?surrey_option=option-2053853",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biochemistry?surrey_option=option-2053856",
+        "id": 56807,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biochemistry?surrey_option=option-2053859",
+        "id": 56808,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biochemistry?surrey_option=option-2053862",
+        "id": 56809,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biochemistry?surrey_option=option-2053865",
+        "id": 56810,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biochemistry?surrey_option=option-2053868",
+        "id": 56811,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biological-sciences?surrey_option=option-2053250",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biological-sciences?surrey_option=option-2053253",
+        "id": 56812,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biological-sciences?surrey_option=option-2053256",
+        "id": 56813,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biological-sciences?surrey_option=option-2053259",
+        "id": 56814,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-science?surrey_option=option-2053223",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-science?surrey_option=option-2053226",
+        "id": 56815,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-science?surrey_option=option-2053229",
+        "id": 56816,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-science?surrey_option=option-2053232",
+        "id": 56817,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-science?surrey_option=option-2053235",
+        "id": 56818,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-science?surrey_option=option-2053238",
+        "id": 56819,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-economics-and-data-analytics?surrey_option=option-2053775",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-economics-and-data-analytics?surrey_option=option-2053778",
+        "id": 56820,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-economics-and-data-analytics?surrey_option=option-2053781",
+        "id": 56821,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-economics-and-data-analytics?surrey_option=option-2053784",
+        "id": 56822,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management?surrey_option=option-2053538",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management?surrey_option=option-2053541",
+        "id": 56823,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management?surrey_option=option-2053544",
+        "id": 56824,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management?surrey_option=option-2053547",
+        "id": 56825,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-and-modern-languages?surrey_option=option-2053289",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-and-modern-languages?surrey_option=option-2053292",
+        "id": 56826,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-business-analytics?surrey_option=option-2053871",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-business-analytics?surrey_option=option-2053874",
+        "id": 56827,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-business-analytics?surrey_option=option-2053877",
+        "id": 56828,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-business-analytics?surrey_option=option-2053880",
+        "id": 56829,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-human-resource-management?surrey_option=option-2053841",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-human-resource-management?surrey_option=option-2053844",
+        "id": 56830,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-human-resource-management?surrey_option=option-2053847",
+        "id": 56831,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-human-resource-management?surrey_option=option-2053850",
+        "id": 56832,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-marketing?surrey_option=option-2053829",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-marketing?surrey_option=option-2053832",
+        "id": 56833,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-marketing?surrey_option=option-2053835",
+        "id": 56834,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-marketing?surrey_option=option-2053838",
+        "id": 56835,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemical-engineering?surrey_option=option-2053715",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemical-engineering?surrey_option=option-2053718",
+        "id": 56836,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemical-engineering?surrey_option=option-2053721",
+        "id": 56837,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemical-engineering?surrey_option=option-2053724",
+        "id": 56838,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemical-engineering?surrey_option=option-2053727",
+        "id": 56839,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemical-engineering?surrey_option=option-2053730",
+        "id": 56840,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemistry?surrey_option=option-2053445",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemistry?surrey_option=option-2053448",
+        "id": 56841,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemistry?surrey_option=option-2053451",
+        "id": 56842,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemistry?surrey_option=option-2053454",
+        "id": 56843,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemistry?surrey_option=option-2053457",
+        "id": 56844,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemistry-forensic-investigation?surrey_option=option-2053616",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemistry-forensic-investigation?surrey_option=option-2053619",
+        "id": 56845,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemistry-forensic-investigation?surrey_option=option-2053622",
+        "id": 56846,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/chemistry-forensic-investigation?surrey_option=option-2053625",
+        "id": 56847,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science-and-artificial-intelligence?surrey_option=option-2053295",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science-and-artificial-intelligence?surrey_option=option-2053298",
+        "id": 56848,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science-and-artificial-intelligence?surrey_option=option-2053301",
+        "id": 56849,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science-and-artificial-intelligence?surrey_option=option-2053304",
+        "id": 56850,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/criminology?surrey_option=option-2053166",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/criminology?surrey_option=option-2053169",
+        "id": 56851,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/medicine-graduate-entry?surrey_option=option-2053193",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/midwifery-registered-midwife?surrey_option=option-2053460",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/modern-languages-french-and-spanish?surrey_option=option-2053190",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/music?surrey_option=option-2053580",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/music?surrey_option=option-2053583",
+        "id": null,
+        "status": "held",
+        "reason": "rejected: category_landing_page_missing_degree_qualifier"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/music-and-sound-recording-tonmeister?surrey_option=option-2053220",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/musical-theatre?surrey_option=option-2053214",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/nursing-studies-registered-nurse-adult-nursing?surrey_option=option-2053499",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/nursing-studies-registered-nurse-children-and-young-people-nursing?surrey_option=option-2053364",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/nursing-studies-registered-nurse-mental-health-nursing?surrey_option=option-2053502",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/nutrition?surrey_option=option-2053991",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/nutrition?surrey_option=option-2053994",
+        "id": 56852,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/nutrition?surrey_option=option-2053997",
+        "id": 56853,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/nutrition?surrey_option=option-2054000",
+        "id": 56854,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/nutrition-and-dietetics?surrey_option=option-2053532",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/nutrition-and-dietetics?surrey_option=option-2053535",
+        "id": 56855,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/paramedic-science?surrey_option=option-2053361",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/pharmaceutical-sciences?surrey_option=option-2053268",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/pharmaceutical-sciences?surrey_option=option-2053271",
+        "id": 56856,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/pharmaceutical-sciences?surrey_option=option-2053274",
+        "id": 56857,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/pharmaceutical-sciences?surrey_option=option-2053277",
+        "id": 56858,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/pharmaceutical-sciences?surrey_option=option-2053280",
+        "id": 56859,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics?surrey_option=option-2053973",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics?surrey_option=option-2053976",
+        "id": 56860,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics?surrey_option=option-2053979",
+        "id": 56861,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics?surrey_option=option-2053982",
+        "id": 56862,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics?surrey_option=option-2053985",
+        "id": 56863,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-astronomy?surrey_option=option-2053397",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-astronomy?surrey_option=option-2053400",
+        "id": 56864,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-astronomy?surrey_option=option-2053403",
+        "id": 56865,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-astronomy?surrey_option=option-2053406",
+        "id": 56866,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-astronomy?surrey_option=option-2053409",
+        "id": 56867,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-nuclear-astrophysics?surrey_option=option-2053958",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-nuclear-astrophysics?surrey_option=option-2053961",
+        "id": 56868,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-nuclear-astrophysics?surrey_option=option-2053964",
+        "id": 56869,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-nuclear-astrophysics?surrey_option=option-2053967",
+        "id": 56870,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-nuclear-astrophysics?surrey_option=option-2053970",
+        "id": 56871,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-quantum-computing?surrey_option=option-2053148",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-quantum-computing?surrey_option=option-2053151",
+        "id": 56872,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-quantum-computing?surrey_option=option-2053154",
+        "id": 56873,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-quantum-computing?surrey_option=option-2053157",
+        "id": 56874,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/physics-quantum-computing?surrey_option=option-2053160",
+        "id": 56875,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/politics?surrey_option=option-2060012",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/politics?surrey_option=option-2060015",
+        "id": 56876,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/politics-and-economics?surrey_option=option-2053412",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/politics-and-economics?surrey_option=option-2053415",
+        "id": 56877,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/politics-and-international-relations?surrey_option=option-2060018",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/politics-and-international-relations?surrey_option=option-2060021",
+        "id": 56878,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/politics-and-sociology?surrey_option=option-2053883",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/politics-and-sociology?surrey_option=option-2053886",
+        "id": 56879,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/psychology?surrey_option=option-2053751",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/psychology?surrey_option=option-2053754",
+        "id": 56880,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/psychology?surrey_option=option-2053757",
+        "id": 56881,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/psychology?surrey_option=option-2053760",
+        "id": 56882,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/sociology?surrey_option=option-2053142",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/sociology?surrey_option=option-2053145",
+        "id": 56883,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/spacecraft-engineering?surrey_option=option-2053805",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/spacecraft-engineering?surrey_option=option-2053808",
+        "id": 56884,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/spacecraft-engineering?surrey_option=option-2053811",
+        "id": 56885,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/spacecraft-engineering?surrey_option=option-2053814",
+        "id": 56886,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/spacecraft-engineering?surrey_option=option-2053817",
+        "id": 56887,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/spacecraft-engineering?surrey_option=option-2053820",
+        "id": 56888,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/sport-and-exercise-science?surrey_option=option-2053550",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/sport-and-exercise-science?surrey_option=option-2053553",
+        "id": 56889,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/sport-and-exercise-science?surrey_option=option-2053556",
+        "id": 56890,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/sport-and-exercise-science?surrey_option=option-2053559",
+        "id": 56891,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/theatre-production?surrey_option=option-2053988",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/veterinary-biosciences?surrey_option=option-2053733",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/veterinary-biosciences?surrey_option=option-2053736",
+        "id": 56892,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/veterinary-biosciences?surrey_option=option-2053739",
+        "id": 56893,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/veterinary-biosciences?surrey_option=option-2053742",
+        "id": 56894,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/veterinary-medicine-and-science?surrey_option=option-2053952",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/veterinary-medicine-and-science?surrey_option=option-2053955",
+        "id": null,
+        "status": "held",
+        "reason": "rejected: category_landing_page_missing_degree_qualifier"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/accounting-and-finance-msc?surrey_option=option-2067614",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/accounting-and-finance-msc?surrey_option=option-2067617",
+        "id": 56895,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/acting-ma?surrey_option=option-2067221",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/acting-mfa?surrey_option=option-2067830",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/ai-engineering-msc?surrey_option=option-2067889",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/ai-engineering-msc?surrey_option=option-2067892",
+        "id": 56896,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/air-transport-management-msc?surrey_option=option-2067656",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/applied-analytical-chemistry-msc?surrey_option=option-2067482",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/applied-analytical-chemistry-msc?surrey_option=option-2067488",
+        "id": 56897,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/applied-analytical-chemistry-msc?surrey_option=option-2067491",
+        "id": 56898,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/applied-quantum-computing-msc?surrey_option=option-2067605",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/artificial-intelligence-msc?surrey_option=option-2067542",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/artificial-intelligence-msc?surrey_option=option-2067548",
+        "id": 56899,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/artificial-intelligence-msc?surrey_option=option-2067551",
+        "id": 56900,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/astronautics-and-space-engineering-msc?surrey_option=option-2067497",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/astronautics-and-space-engineering-msc?surrey_option=option-2067503",
+        "id": 56901,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/banking-and-finance-msc?surrey_option=option-2067470",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/banking-and-finance-msc?surrey_option=option-2067473",
+        "id": 56902,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biotechnology-msc?surrey_option=option-2067383",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biotechnology-msc?surrey_option=option-2067386",
+        "id": 56903,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/business-analytics-msc?surrey_option=option-2067230",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/business-analytics-msc?surrey_option=option-2067233",
+        "id": 56904,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/business-psychology-msc?surrey_option=option-2076218",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/creative-writing-ma?surrey_option=option-2067428",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/cyber-security-msc?surrey_option=option-2067587",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/cyber-security-msc?surrey_option=option-2067590",
+        "id": 56905,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/cyber-security-msc?surrey_option=option-2067593",
+        "id": 56906,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/data-science-msc?surrey_option=option-2067275",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/data-science-msc?surrey_option=option-2067278",
+        "id": 56907,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/data-science-msc?surrey_option=option-2067281",
+        "id": 56908,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/data-science-conversion-msc?surrey_option=option-2067224",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/economics-msc?surrey_option=option-2067398",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/economics-mres?surrey_option=option-2067194",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/economics-and-finance-msc?surrey_option=option-2067359",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/electronic-engineering-msc?surrey_option=option-2067872",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/electronic-engineering-msc?surrey_option=option-2067878",
+        "id": 56909,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/english-literature-ma?surrey_option=option-2067854",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/environmental-psychology-msc?surrey_option=option-2067464",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/film-animation-and-digital-arts-ma?surrey_option=option-2067884",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/financial-data-science-msc?surrey_option=option-2067839",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/financial-data-science-msc?surrey_option=option-2067845",
+        "id": 56910,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/financial-data-science-msc?surrey_option=option-2067848",
+        "id": 56911,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/fintech-and-policy-msc?surrey_option=option-2067557",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/fintech-and-policy-msc?surrey_option=option-2067560",
+        "id": 56912,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/food-science-msc?surrey_option=option-2067479",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/health-psychology-msc?surrey_option=option-2067860",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/human-nutrition-msc?surrey_option=option-2067476",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/human-resources-management-msc?surrey_option=option-2067794",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-business-management-msc?surrey_option=option-2073595",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-business-management-msc?surrey_option=option-2073598",
+        "id": 56913,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-events-management-msc?surrey_option=option-2067692",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-events-management-msc?surrey_option=option-2067695",
+        "id": 56914,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-financial-management-msc?surrey_option=option-2067536",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-financial-management-msc?surrey_option=option-2067539",
+        "id": 56915,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-hotel-management-msc?surrey_option=option-2067662",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-hotel-management-msc?surrey_option=option-2067665",
+        "id": 56916,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-relations-msc?surrey_option=option-2067308",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-tourism-management-msc?surrey_option=option-2067686",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-tourism-management-msc?surrey_option=option-2067689",
+        "id": 56917,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/investment-management-msc?surrey_option=option-2067266",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/investment-management-msc?surrey_option=option-2067269",
+        "id": 56918,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/master-management-mim-msc?surrey_option=option-2067916",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/master-business-administration-mba?surrey_option=option-2067626",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/master-business-administration-mba?surrey_option=option-2067635",
+        "id": 56919,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/mathematics-msc?surrey_option=option-2067257",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/medical-physics-msc?surrey_option=option-2067650",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/music-mmus?surrey_option=option-2067371",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/musical-theatre-ma?surrey_option=option-2067599",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/musical-theatre-mfa?surrey_option=option-2067461",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/pharmaceutical-sciences-msc?surrey_option=option-2077507",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/pharmaceutical-sciences-msc?surrey_option=option-2077510",
+        "id": 56920,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/pharmaceutical-sciences-msc?surrey_option=option-2077516",
+        "id": 56921,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/pharmaceutical-sciences-msc?surrey_option=option-2077519",
+        "id": 56922,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/physics-msc?surrey_option=option-2067818",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/process-systems-engineering-msc?surrey_option=option-2067443",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/process-systems-engineering-msc?surrey_option=option-2067449",
+        "id": 56923,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/psychology-conversion-msc?surrey_option=option-2067824",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/public-affairs-msc?surrey_option=option-2067458",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/social-psychology-msc?surrey_option=option-2067377",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/stage-and-production-management-ma?surrey_option=option-2067455",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/strategic-hotel-management-msc?surrey_option=option-2067680",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/strategic-hotel-management-msc?surrey_option=option-2067683",
+        "id": 56924,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/strategic-marketing-msc?surrey_option=option-2067434",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/strategic-marketing-msc?surrey_option=option-2067437",
+        "id": 56925,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-development-msc?surrey_option=option-2067203",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-development-msc?surrey_option=option-2067206",
+        "id": 56926,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-development-msc?surrey_option=option-2067212",
+        "id": 56927,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-development-msc?surrey_option=option-2067215",
+        "id": 56928,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-energy-msc?surrey_option=option-2067800",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-energy-msc?surrey_option=option-2067803",
+        "id": 56929,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-energy-msc?surrey_option=option-2067809",
+        "id": 56930,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-energy-msc?surrey_option=option-2067812",
+        "id": 56931,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/translation-and-ai-ma?surrey_option=option-2067674",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/translation-interpreting-and-ai-ma?surrey_option=option-2067866",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/advanced-technology-institute-phd?surrey_option=option-2070626",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/advanced-technology-institute-phd?surrey_option=option-2070632",
+        "id": 56932,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/advanced-technology-institute-phd?surrey_option=option-2070638",
+        "id": 56933,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/advanced-technology-institute-phd?surrey_option=option-2070644",
+        "id": 56934,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/aerodynamic-and-environmental-flow-phd?surrey_option=option-2071298",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/aerodynamic-and-environmental-flow-phd?surrey_option=option-2071304",
+        "id": 56935,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/aerodynamic-and-environmental-flow-phd?surrey_option=option-2071310",
+        "id": 56936,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/aerodynamic-and-environmental-flow-phd?surrey_option=option-2071316",
+        "id": 56937,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/ai-enabled-digital-accessibility-ada-phd?surrey_option=option-2070794",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/ai-enabled-digital-accessibility-ada-phd?surrey_option=option-2070800",
+        "id": 56938,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/audio-engineering-phd?surrey_option=option-2073661",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/audio-engineering-phd?surrey_option=option-2073667",
+        "id": 56939,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/audio-engineering-phd?surrey_option=option-2073673",
+        "id": 56940,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/audio-engineering-phd?surrey_option=option-2073679",
+        "id": 56941,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/automotive-engineering-phd?surrey_option=option-2070950",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/automotive-engineering-phd?surrey_option=option-2070956",
+        "id": 56942,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/automotive-engineering-phd?surrey_option=option-2070962",
+        "id": 56943,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/automotive-engineering-phd?surrey_option=option-2070968",
+        "id": 56944,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biomedical-engineering-phd?surrey_option=option-2070854",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biomedical-engineering-phd?surrey_option=option-2070860",
+        "id": 56945,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biomedical-engineering-phd?surrey_option=option-2070866",
+        "id": 56946,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biomedical-engineering-phd?surrey_option=option-2070872",
+        "id": 56947,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biosciences-and-medicine-phd?surrey_option=option-2071274",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biosciences-and-medicine-phd?surrey_option=option-2071280",
+        "id": 56948,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biosciences-and-medicine-phd?surrey_option=option-2071286",
+        "id": 56949,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biosciences-and-medicine-phd?surrey_option=option-2071292",
+        "id": 56950,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biosciences-and-medicine-md?surrey_option=option-2071118",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biosciences-and-medicine-md?surrey_option=option-2071124",
+        "id": null,
+        "status": "held",
+        "reason": "rejected: category_landing_page_missing_degree_qualifier"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biosciences-and-medicine-md?surrey_option=option-2071130",
+        "id": null,
+        "status": "held",
+        "reason": "rejected: category_landing_page_missing_degree_qualifier"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/biosciences-and-medicine-md?surrey_option=option-2071136",
+        "id": null,
+        "status": "held",
+        "reason": "rejected: category_landing_page_missing_degree_qualifier"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/chemical-and-process-engineering-research-phd?surrey_option=option-2070974",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/chemical-and-process-engineering-research-phd?surrey_option=option-2070980",
+        "id": 56951,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/chemical-and-process-engineering-research-phd?surrey_option=option-2070986",
+        "id": 56952,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/chemical-and-process-engineering-research-phd?surrey_option=option-2070992",
+        "id": 56953,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/chemistry-phd?surrey_option=option-2070998",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/chemistry-phd?surrey_option=option-2071004",
+        "id": 56954,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/chemistry-phd?surrey_option=option-2071010",
+        "id": 56955,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/chemistry-phd?surrey_option=option-2071016",
+        "id": 56956,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/civil-and-environmental-engineering-phd?surrey_option=option-2071022",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/civil-and-environmental-engineering-phd?surrey_option=option-2071028",
+        "id": 56957,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/civil-and-environmental-engineering-phd?surrey_option=option-2071034",
+        "id": 56958,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/civil-and-environmental-engineering-phd?surrey_option=option-2071040",
+        "id": 56959,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/clinical-psychology-psychd?surrey_option=option-2061215",
+        "status": "held",
+        "reason": "No verified overseas amount or full-time route"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/computer-science-phd?surrey_option=option-2071046",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/computer-science-phd?surrey_option=option-2071052",
+        "id": 56960,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/computer-science-phd?surrey_option=option-2071058",
+        "id": 56961,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/computer-science-phd?surrey_option=option-2071064",
+        "id": 56962,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/economics-phd?surrey_option=option-2060885",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/engineering-materials-phd?surrey_option=option-2071070",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/engineering-materials-phd?surrey_option=option-2071076",
+        "id": 56963,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/engineering-materials-phd?surrey_option=option-2071082",
+        "id": 56964,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/engineering-materials-phd?surrey_option=option-2071088",
+        "id": 56965,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/environment-and-sustainability-phd?surrey_option=option-2071094",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/environment-and-sustainability-phd?surrey_option=option-2071100",
+        "id": 56966,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/environment-and-sustainability-phd?surrey_option=option-2071106",
+        "id": 56967,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/environment-and-sustainability-phd?surrey_option=option-2071112",
+        "id": 56968,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/information-and-communication-systems-phd?surrey_option=option-2070650",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/information-and-communication-systems-phd?surrey_option=option-2070656",
+        "id": 56969,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/information-and-communication-systems-phd?surrey_option=option-2070662",
+        "id": 56970,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/information-and-communication-systems-phd?surrey_option=option-2070668",
+        "id": 56971,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/law-phd?surrey_option=option-2071166",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/law-phd?surrey_option=option-2071172",
+        "id": 56972,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/management-and-business-phd?surrey_option=option-2071490",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/management-and-business-phd?surrey_option=option-2071496",
+        "id": 56973,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/management-and-business-phd?surrey_option=option-2071502",
+        "id": 56974,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/management-and-business-phd?surrey_option=option-2071508",
+        "id": 56975,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/mathematics-phd?surrey_option=option-2071178",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/mathematics-phd?surrey_option=option-2071184",
+        "id": 56976,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/mathematics-phd?surrey_option=option-2071190",
+        "id": 56977,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/mathematics-phd?surrey_option=option-2071196",
+        "id": 56978,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/micro-and-nanomaterials-and-technologies-engd?surrey_option=option-2061377",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/open-secure-communication-networks-phd?surrey_option=option-2060174",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/physics-phd?surrey_option=option-2071418",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/physics-phd?surrey_option=option-2071424",
+        "id": 56979,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/physics-phd?surrey_option=option-2071430",
+        "id": 56980,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/physics-phd?surrey_option=option-2071436",
+        "id": 56981,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/politics-phd?surrey_option=option-2071202",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/politics-phd?surrey_option=option-2071208",
+        "id": 56982,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/politics-phd?surrey_option=option-2071214",
+        "id": 56983,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/politics-phd?surrey_option=option-2071220",
+        "id": 56984,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/practitioner-doctorate-sustainability-phd-engd?surrey_option=option-2060264",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/psychology-phd?surrey_option=option-2071142",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/psychology-phd?surrey_option=option-2071148",
+        "id": 56985,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/psychology-phd?surrey_option=option-2071154",
+        "id": 56986,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/psychology-phd?surrey_option=option-2071160",
+        "id": 56987,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/quantum-biology-phd?surrey_option=option-2071370",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/quantum-biology-phd?surrey_option=option-2071373",
+        "id": 56988,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/quantum-biology-phd?surrey_option=option-2071376",
+        "id": 56989,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/quantum-biology-phd?surrey_option=option-2071379",
+        "id": 56990,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/robotics-and-autonomous-systems-phd?surrey_option=option-2070878",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/robotics-and-autonomous-systems-phd?surrey_option=option-2070884",
+        "id": 56991,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/robotics-and-autonomous-systems-phd?surrey_option=option-2070890",
+        "id": 56992,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/robotics-and-autonomous-systems-phd?surrey_option=option-2070896",
+        "id": 56993,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sociology-phd?surrey_option=option-2071226",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sociology-phd?surrey_option=option-2071232",
+        "id": 56994,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sociology-phd?surrey_option=option-2071238",
+        "id": 56995,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sociology-phd?surrey_option=option-2071244",
+        "id": 56996,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/space-engineering-phd?surrey_option=option-2070674",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/space-engineering-phd?surrey_option=option-2070680",
+        "id": 56997,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/space-engineering-phd?surrey_option=option-2070686",
+        "id": 56998,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/space-engineering-phd?surrey_option=option-2070692",
+        "id": 56999,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-energy-phd?surrey_option=option-2070746",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-energy-phd?surrey_option=option-2070752",
+        "id": 57000,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-energy-phd?surrey_option=option-2070758",
+        "id": 57001,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-energy-phd?surrey_option=option-2070764",
+        "id": 57002,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/veterinary-medicine-and-science-phd?surrey_option=option-2071250",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/veterinary-medicine-and-science-phd?surrey_option=option-2071256",
+        "id": 57003,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/veterinary-medicine-and-science-phd?surrey_option=option-2071262",
+        "id": 57004,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/veterinary-medicine-and-science-phd?surrey_option=option-2071268",
+        "id": 57005,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/vision-speech-and-signal-processing-phd?surrey_option=option-2070770",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/vision-speech-and-signal-processing-phd?surrey_option=option-2070776",
+        "id": 57006,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/vision-speech-and-signal-processing-phd?surrey_option=option-2070782",
+        "id": 57007,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/vision-speech-and-signal-processing-phd?surrey_option=option-2070788",
+        "id": 57008,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-accounting-finance-fheq-level-6-direct-entry?surrey_option=option-2053517",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/international-accounting-finance-fheq-level-5-direct-entry?surrey_option=option-2053676",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/professional-legal-practice-sqe-pathway-llm?surrey_option=option-2067173",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/global-communication-management-and-ai-msc?surrey_option=option-2077064",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/artificial-intelligence-conversion-msc?surrey_option=option-2067239",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/computer-vision-robotics-and-machine-learning-msc?surrey_option=option-2067776",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/computer-vision-robotics-and-machine-learning-msc?surrey_option=option-2067782",
+        "id": 57009,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/intelligent-communication-systems-and-networks-msc?surrey_option=option-2067698",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/intelligent-communication-systems-and-networks-msc?surrey_option=option-2067704",
+        "id": 57010,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/clinical-psychology-and-mental-health-msc?surrey_option=option-2067197",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/occupational-and-organizational-psychology-msc?surrey_option=option-2067602",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/criminology-cybercrime-and-cybersecurity-msc?surrey_option=option-2067644",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/entrepreneurship-innovation-management-msc?surrey_option=option-2067248",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/entrepreneurship-innovation-management-msc?surrey_option=option-2067251",
+        "id": 57011,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-relations-international-intervention-msc?surrey_option=option-2067347",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/satellite-communications-engineering-msc?surrey_option=option-2067719",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/economics-econometrics-and-big-data-msc?surrey_option=option-2067389",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/nuclear-science-and-radiation-protection-msc?surrey_option=option-2067392",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/psychology-game-design-and-digital-innovation-msc?surrey_option=option-2067353",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/sustainable-semiconductor-technologies-msc?surrey_option=option-2067788",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/operations-and-supply-chain-management-msc?surrey_option=option-2067922",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/postgraduate/international-human-resource-management-msc?surrey_option=option-2067913",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/medical-sciences-gateway-graduate-medicine?surrey_option=option-2066714",
+        "status": "held",
+        "reason": "No verified overseas amount or full-time route"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/acting?surrey_option=option-2053121",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/astronautics-and-space-engineering?surrey_option=option-2053124",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/astronautics-and-space-engineering?surrey_option=option-2053127",
+        "id": 57012,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/astronautics-and-space-engineering?surrey_option=option-2053130",
+        "id": 57013,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/astronautics-and-space-engineering?surrey_option=option-2053133",
+        "id": 57014,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/astronautics-and-space-engineering?surrey_option=option-2053136",
+        "id": 57015,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/astronautics-and-space-engineering?surrey_option=option-2053139",
+        "id": 57016,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-engineering?surrey_option=option-2053697",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-engineering?surrey_option=option-2053700",
+        "id": 57017,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-engineering?surrey_option=option-2053703",
+        "id": 57018,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-engineering?surrey_option=option-2053706",
+        "id": 57019,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-engineering?surrey_option=option-2053709",
+        "id": 57020,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/biomedical-engineering?surrey_option=option-2053712",
+        "id": 57021,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-entrepreneurship-and-innovation?surrey_option=option-2053373",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-entrepreneurship-and-innovation?surrey_option=option-2053376",
+        "id": 57022,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-entrepreneurship-and-innovation?surrey_option=option-2053379",
+        "id": 57023,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/business-management-entrepreneurship-and-innovation?surrey_option=option-2053382",
+        "id": 57024,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/civil-engineering?surrey_option=option-2053562",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/civil-engineering?surrey_option=option-2053565",
+        "id": 57025,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/civil-engineering?surrey_option=option-2053568",
+        "id": 57026,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/civil-engineering?surrey_option=option-2053571",
+        "id": 57027,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/civil-engineering?surrey_option=option-2053574",
+        "id": 57028,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/civil-engineering?surrey_option=option-2053577",
+        "id": 57029,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science?surrey_option=option-2076338",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science?surrey_option=option-2076341",
+        "id": 57030,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science?surrey_option=option-2076344",
+        "id": 57031,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science?surrey_option=option-2076347",
+        "id": 57032,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science?surrey_option=option-2076350",
+        "id": 57033,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science?surrey_option=option-2076353",
+        "id": 57034,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science-and-cyber-security?surrey_option=option-2053307",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/computer-science-and-cyber-security?surrey_option=option-2053310",
+        "id": 57035,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/creative-music-technology?surrey_option=option-2053592",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/creative-music-technology?surrey_option=option-2053595",
+        "id": null,
+        "status": "held",
+        "reason": "rejected: category_landing_page_missing_degree_qualifier"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/criminology-and-psychology?surrey_option=option-2053763",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/criminology-and-psychology?surrey_option=option-2053766",
+        "id": 57036,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/criminology-and-sociology?surrey_option=option-2053769",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/criminology-and-sociology?surrey_option=option-2053772",
+        "id": 57037,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/criminology-forensic-investigation?surrey_option=option-2053469",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/criminology-forensic-investigation?surrey_option=option-2053472",
+        "id": 57038,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/economics?surrey_option=option-2053646",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/economics?surrey_option=option-2053649",
+        "id": 57039,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/economics?surrey_option=option-2053652",
+        "id": 57040,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/economics?surrey_option=option-2053655",
+        "id": 57041,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/economics-and-finance?surrey_option=option-2053628",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/economics-and-finance?surrey_option=option-2053631",
+        "id": 57042,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/economics-and-finance?surrey_option=option-2053634",
+        "id": 57043,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/economics-and-finance?surrey_option=option-2053637",
+        "id": 57044,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/economics-and-mathematics?surrey_option=option-2053640",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/economics-and-mathematics?surrey_option=option-2053643",
+        "id": 57045,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electrical-and-electronic-engineering?surrey_option=option-2053598",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electrical-and-electronic-engineering?surrey_option=option-2053601",
+        "id": 57046,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electrical-and-electronic-engineering?surrey_option=option-2053604",
+        "id": 57047,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electrical-and-electronic-engineering?surrey_option=option-2053607",
+        "id": 57048,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electrical-and-electronic-engineering?surrey_option=option-2053610",
+        "id": 57049,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electrical-and-electronic-engineering?surrey_option=option-2053613",
+        "id": 57050,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering?surrey_option=option-2053196",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering?surrey_option=option-2053199",
+        "id": 57051,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering?surrey_option=option-2053202",
+        "id": 57052,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering?surrey_option=option-2053205",
+        "id": 57053,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering?surrey_option=option-2053208",
+        "id": 57054,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering?surrey_option=option-2053211",
+        "id": 57055,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering-artificial-intelligence?surrey_option=option-2053475",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering-artificial-intelligence?surrey_option=option-2053478",
+        "id": 57056,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering-artificial-intelligence?surrey_option=option-2053481",
+        "id": 57057,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering-artificial-intelligence?surrey_option=option-2053484",
+        "id": 57058,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering-artificial-intelligence?surrey_option=option-2053487",
+        "id": 57059,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/electronic-engineering-artificial-intelligence?surrey_option=option-2053490",
+        "id": 57060,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/english-literature?surrey_option=option-2053799",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/english-literature?surrey_option=option-2053802",
+        "id": 57061,
+        "status": "staged",
+        "reason": "staged"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/english-literature-and-creative-writing?surrey_option=option-2053823",
+        "status": "already_recorded"
+      },
+      {
+        "url": "https://www.surrey.ac.uk/undergraduate/english-literature-and-creative-writing?surrey_option=option-2053826",
+        "id": 57062,
+        "status": "staged",
+        "reason": "staged"
+      }
+    ]
+  }
+}

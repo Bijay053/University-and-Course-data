@@ -38,7 +38,8 @@ def test_page_fetch_is_not_claimed_as_ielts_verification():
         {"url": "https://example.edu/course/1", "verified": False},
         {"url": "https://example.edu/english", "verified": True}])
     assert (coverage["checked"], coverage["failed"], coverage["unchecked"]) == (1, 1, 2)
-    assert "does not by itself verify" in coverage["summary"]
+    assert "Course-page coverage: 1/4 read successfully" in coverage["summary"]
+    assert "verified" not in coverage["summary"].lower()
 
 
 def test_empty_and_bounded_reviews():

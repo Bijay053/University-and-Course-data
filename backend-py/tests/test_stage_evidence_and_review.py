@@ -820,6 +820,7 @@ async def test_stage_course_persists_completeness_and_evidence():
         ]
         payload = {
             "course_name": "Bachelor of Computer Science",
+            "cricos_code": "123456A",  # Keep this scoring test independent of registration review.
             "degree_level": "Bachelor's",
             "category": "Computer Science & IT",
             "study_mode": "On Campus",
@@ -997,6 +998,7 @@ async def test_stage_course_review_status_when_blockers_present():
                 course_name="Master of Science",
                 payload={
                     "course_name": "Master of Science",
+                    "cricos_code": "123456A",  # Exercise the English blocker, not missing registration.
                     "international_fee": 25000,   # satisfies the fee gate
                 },
                 evidence=[],

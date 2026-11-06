@@ -37,7 +37,7 @@ async def expand_links(links,max_courses,fetch=None):
             raw=await asyncio.wait_for(fetch(url),15)
             cache[url]=raw.decode("utf-8",errors="replace") if isinstance(raw,bytes) else raw
         html=cache[url];options=surrey_options(html,url)
-        options=[o for o in options if not o.get("part_time_only")]
+        # Keep part-time options; staging adds mandatory eligibility review.
         if options:
             result.extend({**link,"name":o["course_name"],"url":option_url(url,o["key"]),
                            "_surrey_html":html} for o in options)

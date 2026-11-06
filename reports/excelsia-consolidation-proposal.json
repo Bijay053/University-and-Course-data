@@ -1,0 +1,864 @@
+{
+  "status": "proposal_not_applied",
+  "pendingRows": 71,
+  "publishedRows": 0,
+  "candidates": [
+    {
+      "name": "Bachelor of Management and Entrepreneurship",
+      "url": "https://excelsia.edu.au/study/business/bachelor-of-management-and-entrepreneurship",
+      "location": null,
+      "retain": 56050,
+      "duplicateIds": [
+        56076,
+        56097
+      ],
+      "conflicts": {},
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56050": "8a5abab14e0455ba568e28c76c842d717572171e6f7ccfa5a932fb4868304d0e",
+        "56076": "f370ffde7eff554b9ff34cbcf9e5f7c2377c5f0174e976060503d92ea53923e2",
+        "56097": "e94914627b8d151eb9f79316ff91c44f448bbb2099b1e27dae672a14007ae6f7"
+      }
+    },
+    {
+      "name": "Bachelor of Business (Accounting)",
+      "url": "https://excelsia.edu.au/study/business/bachelor-of-business-accounting",
+      "location": null,
+      "retain": 56052,
+      "duplicateIds": [
+        56078,
+        56099
+      ],
+      "conflicts": {},
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56052": "abbd15ede0c9bb406a878f0088afb1373998bd66241cd3dec82f73ba13fcd1d3",
+        "56078": "b010928c066caaed7c661fc7b805048c49d9c8690ddc94870f489220ef674a3b",
+        "56099": "25088daf650ef3f14086cfa1f3dc38635c0aa06973cfb9807874c9c40938ef00"
+      }
+    },
+    {
+      "name": "Master of Professional Accounting",
+      "url": "https://excelsia.edu.au/study/business/master-of-professional-accounting",
+      "location": null,
+      "retain": 56053,
+      "duplicateIds": [
+        56079,
+        56100
+      ],
+      "conflicts": {},
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56053": "05a0ebe99050a638651d809911ccc111ece2a70fcf4675383a38196d49e07844",
+        "56079": "95453577d685c4683cc6f54ac5068fcb7b651d2b393c9dd7f6e57ab98809da4c",
+        "56100": "936a85505e183e2a73ffe61f891b2c030147e23ca78da45ae3541a7481d29bed"
+      }
+    },
+    {
+      "name": "Bachelor of Dramatic Art",
+      "url": "https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-dramatic-art",
+      "location": null,
+      "retain": 56055,
+      "duplicateIds": [
+        56081,
+        56102
+      ],
+      "conflicts": {},
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56055": "4174cefc50e6b21a8bfc175f9a7471f9da2d9c4a161a7553f317001c55804a26",
+        "56081": "dd71de4af4933ffaeb884fe6a8be5ebf4c2ba08dfda2a32faa292c40d725f3c9",
+        "56102": "57104411a18edd3d0541813024a4e3d14df6b2017ad74a9a04ec59d6e4cc4c6f"
+      }
+    },
+    {
+      "name": "Bachelor of Music",
+      "url": "https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-music",
+      "location": null,
+      "retain": 56056,
+      "duplicateIds": [
+        56082,
+        56103
+      ],
+      "conflicts": {},
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56056": "b2c5ccf4e5c8a75da03c91c348794717543d1914d1e5750ffe6fcbd9e9565bd7",
+        "56082": "2f17c2daa781dc2a64cf57f1bf7bafae6b982fea9aba4bee75a4b614923833ca",
+        "56103": "d93ca30280a227bc4dc4472c17e752bf32b5306608e70ba5b85b05803cf9a691"
+      }
+    },
+    {
+      "name": "Bachelor of Screen Production",
+      "url": "https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-screen-production",
+      "location": "Sydney",
+      "retain": 56057,
+      "duplicateIds": [
+        56083,
+        56104
+      ],
+      "conflicts": {},
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56057": "e5c130090fac10520633625efbfa63883324e39a5ce9795c56fd8970b83bb6ed",
+        "56083": "c47dadf5a49453a10f533c2d995f93e88fceb5ff50d5b6dae9417e0a4538fc3e",
+        "56104": "5a6a86813afd7e86a9eb9f86dc67bc03354a1b5e777e00b1993b1c44405a1b5a"
+      }
+    },
+    {
+      "name": "Master of Music",
+      "url": "https://excelsia.edu.au/study/creative-and-performing-arts/master-of-music",
+      "location": "Sydney",
+      "retain": 56058,
+      "duplicateIds": [
+        56084
+      ],
+      "conflicts": {},
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9"
+      ],
+      "rowVersions": {
+        "56058": "7e81dc78089721d81d12643bb4a590593f326ac677f2e572ec98754643e9e27f",
+        "56084": "3155aee20b26476033240f107c091e068f25ae3bae140b588beae3a276909558"
+      }
+    },
+    {
+      "name": "Bachelor of Music (Worship)",
+      "url": "https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-music-worship",
+      "location": null,
+      "retain": 56059,
+      "duplicateIds": [
+        56085,
+        56105
+      ],
+      "conflicts": {},
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56059": "e66282bc59dc469eb4b9bc73e25aea3860c3823a7dc2cc049c83e0f16f240ca6",
+        "56085": "2cd322364438e5b6427666940bcd840f13971a18db964bfffa9056078ecd170f",
+        "56105": "2944334338289f1b804a07f1d83bbbc6ad335cb80a06739f37382c39ecb23695"
+      }
+    },
+    {
+      "name": "Graduate Certificate in Disability",
+      "url": "https://excelsia.edu.au/study/counselling/graduate-certificate-in-disability",
+      "location": null,
+      "retain": 56063,
+      "duplicateIds": [
+        56088,
+        56109
+      ],
+      "conflicts": {},
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56063": "cdc459a5b462db719643f0635f4e7c4d0f3655a11527e1380b7f876d3898a3a3",
+        "56088": "18948fd5d1d25063b24bde6350b705c89ba62dff32235aafb3cb4c2da65eaa9f",
+        "56109": "a4ff2535069a46082f5579673750ebbda9bba6b7296e43207bb3f914f428b11e"
+      }
+    },
+    {
+      "name": "Graduate Diploma of Social Science",
+      "url": "https://excelsia.edu.au/study/social-work/graduate-diploma-of-social-science",
+      "location": null,
+      "retain": 56074,
+      "duplicateIds": [
+        56092,
+        56115
+      ],
+      "conflicts": {},
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56074": "f3e9413647dc17460ffbbf56f3367a9a107ea84a790566f9d04e2dffadcea378",
+        "56092": "da21217bd52e0421ceb4157608837d3bfd4e01314100ff9fb0b5c9297925d756",
+        "56115": "ba24c0327e878dc0830ae4c92ed55f0d5777b89768408f18729f203fddde64cd"
+      }
+    }
+  ],
+  "held": [
+    {
+      "name": "Bachelor of Information Technology",
+      "url": "https://excelsia.edu.au/study/business/bachelor-of-information-technology",
+      "location": null,
+      "retain": 56051,
+      "duplicateIds": [
+        56077,
+        56098
+      ],
+      "conflicts": {
+        "eligibility_status": [
+          {
+            "id": 56051,
+            "value": "ready"
+          },
+          {
+            "id": 56077,
+            "value": "ready"
+          },
+          {
+            "id": 56098,
+            "value": "review"
+          }
+        ],
+        "other_requirement": [
+          {
+            "id": 56051,
+            "value": "Successful completion of Year 12 with an ATAR of 60 or equivalent, or an equivalent secondary qualification either interstate or overseas (in English or see below), or Successful completion of an Australian qualification recognised as at least AQF Certificate IV (minimum period of study of 1 scho..."
+          },
+          {
+            "id": 56077,
+            "value": "IELTS: 6.0 with no band less than 6.0; PTE: 50 (no band less than 50); Cambridge English: Level B2 (169) (writing not less than 169)"
+          },
+          {
+            "id": 56098,
+            "value": null
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56051": "917b0d7a7b448c4c8ae4f0d68c651c1f37da1735c0bd22c06060740e2639e0db",
+        "56077": "fa21808fac869bd341fecd8b3dcea391e746538c4371f68b5d02adc567924d2c",
+        "56098": "f756c792d90e96be0fbd55995f5d41950e9dd17481ed7b2ce5088263d5e7920c"
+      }
+    },
+    {
+      "name": "Master of Business (Research)",
+      "url": "https://excelsia.edu.au/study/business/master-of-business-research",
+      "location": null,
+      "retain": 56054,
+      "duplicateIds": [
+        56080,
+        56101
+      ],
+      "conflicts": {
+        "eligibility_status": [
+          {
+            "id": 56054,
+            "value": "ready"
+          },
+          {
+            "id": 56080,
+            "value": "review"
+          },
+          {
+            "id": 56101,
+            "value": "ready"
+          }
+        ],
+        "other_requirement": [
+          {
+            "id": 56054,
+            "value": "Statement of Intent (max 500 words) identifying research cluster"
+          },
+          {
+            "id": 56080,
+            "value": null
+          },
+          {
+            "id": 56101,
+            "value": "Statement of Intent (max 500 words) identifying research cluster; Successful applicants will be issued an offer letter and a written agreement."
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56054": "5affefefe598ababfdb912cfc2dd64aefe0d7b6f4f8b91f55111b6157c14a203",
+        "56080": "d489d5cbe0491003684f485e812b0fb12bb56b5bfa95d95b28eb67c5056457f4",
+        "56101": "7dd0303a89ca3326e7d4df5b82cb3c1cabca86222b5cdc9bfa2200abaa5b67c1"
+      }
+    },
+    {
+      "name": "Graduate Diploma of Counselling",
+      "url": "https://excelsia.edu.au/study/counselling/graduate-diploma-of-counselling",
+      "location": null,
+      "retain": 56061,
+      "duplicateIds": [
+        56086,
+        56107
+      ],
+      "conflicts": {
+        "eligibility_status": [
+          {
+            "id": 56061,
+            "value": "review"
+          },
+          {
+            "id": 56086,
+            "value": "ready"
+          },
+          {
+            "id": 56107,
+            "value": "ready"
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56061": "7908bf4fcfc19554ce9abb148df72a9f937e8bb0c29583dcc0c373505e711087",
+        "56086": "7c61203f9fbf3a07d5ff00dca89cf79b74592fa19b6ceacdd516293841477f10",
+        "56107": "11589414c1fc7bc0ceff679dc585601e6cd8ce3b007f132f7dc07f600555c05b"
+      }
+    },
+    {
+      "name": "Graduate Diploma of Disability",
+      "url": "https://excelsia.edu.au/study/counselling/graduate-diploma-of-disability",
+      "location": null,
+      "retain": 56062,
+      "duplicateIds": [
+        56087,
+        56108
+      ],
+      "conflicts": {
+        "category": [
+          {
+            "id": 56062,
+            "value": "Medicine & Health"
+          },
+          {
+            "id": 56087,
+            "value": "Education & Social Work"
+          },
+          {
+            "id": 56108,
+            "value": "Education & Social Work"
+          }
+        ],
+        "sub_category": [
+          {
+            "id": 56062,
+            "value": "Disability Studies"
+          },
+          {
+            "id": 56087,
+            "value": "Disability and Inclusion Studies"
+          },
+          {
+            "id": 56108,
+            "value": "Disability and Inclusion Studies"
+          }
+        ],
+        "other_requirement": [
+          {
+            "id": 56062,
+            "value": "Relevant bachelor degree with subjects such as psychology, social work, education and health sciences; Applicants with non-relevant degrees will be considered on the basis of their work and life experience; Work and life experience pathway may consider other forms of study, volunteer activities,..."
+          },
+          {
+            "id": 56087,
+            "value": "Relevant undergraduate degree (e.g., psychology, social work, education, health sciences); Alternatively, applicants with non-relevant degrees will be considered on the basis of work and life experience; Work and life experience pathway may consider other forms of study, volunteer activities, con..."
+          },
+          {
+            "id": 56108,
+            "value": "Relevant bachelor degree including psychology, social work, education, or health sciences; OR Relevant work and life experience; OR Other forms of study, volunteer activities, church life contribution, professional development relevant to human welfare and disability."
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56062": "6c7e7fb7ce02fec71ff2ac2cd9bc1508a75cec9dcca795db978d6bf4fcbf4b01",
+        "56087": "bcb1c5b17ecb32dbc765ca22aa4bb872f6df7174421fb72c0877f09619f6322d",
+        "56108": "086563d84e0c61e2e365f6f33c8c4561b736640f60bb7c901a465ba5c59b5b5f"
+      }
+    },
+    {
+      "name": "Master of Teaching (Primary)",
+      "url": "https://excelsia.edu.au/study/education/master-of-teaching-primary",
+      "location": null,
+      "retain": 56065,
+      "duplicateIds": [
+        56089,
+        56110
+      ],
+      "conflicts": {
+        "other_requirement": [
+          {
+            "id": 56065,
+            "value": "Mandatory LANTITE test prior to final Professional Experience; Personal statement outlining motivation for teaching, reasons for wanting to teach children/young people, relevant skills and experience, commitment to learning and professional growth, and understanding of teacher roles and responsib..."
+          },
+          {
+            "id": 56089,
+            "value": "Personal statement; Mandatory attendance for unit EDPF500 Course Tutorials and Workshops I for one week in Semester 1; Mandatory completion of LANTITE test prior to final Professional Experience."
+          },
+          {
+            "id": 56110,
+            "value": "Mandatory LANTITE test prior to final Professional Experience; Personal statement required, outlining motivation for teaching, reasons for teaching children/young people, relevant skills/experience, commitment to learning/professional growth, and understanding of teacher roles/responsibilities (a..."
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56065": "09c78cab5945124f70caa3e580b00bc39bcad4133eba044e96d7368c22cd0275",
+        "56089": "ce42b4c8f8f533cb461702df76afa82b8fa5ff20685c7356f60696a9d826fa34",
+        "56110": "17fd879fb45634492a3abec53f26c6077f45164c21f8b4859d1010de130e01ea"
+      }
+    },
+    {
+      "name": "Master of Teaching (Secondary)",
+      "url": "https://excelsia.edu.au/study/education/master-of-teaching-secondary",
+      "location": null,
+      "retain": 56066,
+      "duplicateIds": [
+        56111
+      ],
+      "conflicts": {
+        "other_requirement": [
+          {
+            "id": 56066,
+            "value": "NESA Initial Teacher Education Non-Academic Selection Framework assessment including a personal statement (approx. 500 words) addressing motivation for teaching, interest in teaching children/young people, relevant skills and experience, commitment to learning and professional growth, and underst..."
+          },
+          {
+            "id": 56111,
+            "value": "Personal statement: outline motivation for pursuing a career in teaching, why you want to teach children/young people, relevant skills and experience, commitment to learning and professional growth, and understanding of the roles and responsibilities of a teacher (approx. 500 words).; Applicants..."
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56066": "f06167efb975901db8991a7b0ec63a28a6793d635dde9d8f7b45644ea569d52d",
+        "56111": "1e86689acf5116c415e75c02a43be5b27413915043d5dcfd56860ca4b59c168e"
+      }
+    },
+    {
+      "name": "Master of Education Research",
+      "url": "https://excelsia.edu.au/study/education/master-of-education-research",
+      "location": null,
+      "retain": 56067,
+      "duplicateIds": [
+        56112
+      ],
+      "conflicts": {
+        "academic_level": [
+          {
+            "id": 56067,
+            "value": "Master's degree"
+          },
+          {
+            "id": 56112,
+            "value": "Bachelor's degree"
+          }
+        ],
+        "other_requirement": [
+          {
+            "id": 56067,
+            "value": "Minimum of a 3-year undergraduate degree in a relevant discipline, with a Grade Point Average of a Credit or above, OR A Bachelor (Honours) OR Master\u2019s degree in a relevant discipline AND A Statement of Intent that is succinct and no longer than 500 words."
+          },
+          {
+            "id": 56112,
+            "value": "Statement of Intent that is succinct and no longer than 500 words; Equivalent overseas qualifications must be recognised by the National Office of Overseas Skills Recognition (NOOSR)."
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56067": "be17599106ecdf496b5e8b305b63fa60e612ce4fb50e2d55d8f0e3e49f59821a",
+        "56112": "7143145ab17cf6a33ce621bf63b826bdf7c5520f53ccad5a753477cdb22d49c6"
+      }
+    },
+    {
+      "name": "Master of Social Work (Qualifying)",
+      "url": "https://excelsia.edu.au/study/social-work/master-of-social-work",
+      "location": null,
+      "retain": 56068,
+      "duplicateIds": [
+        56090,
+        56113
+      ],
+      "conflicts": {
+        "eligibility_status": [
+          {
+            "id": 56068,
+            "value": "ready"
+          },
+          {
+            "id": 56090,
+            "value": "ready"
+          },
+          {
+            "id": 56113,
+            "value": "review"
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56068": "b2db5fd46d6236f7aec9d96c8b82a8343fe5dfc95682e68b460bfcca54e9947b",
+        "56090": "76653d7028d4d58a52ff8f117d32e2460da9f96d01dff2e28b60e3e1965b1993",
+        "56113": "61c1934d0e8c195ee5874e86dad11713d296a7eb3fe9275addf613b4d9c8a4c0"
+      }
+    },
+    {
+      "name": "Graduate Certificate in Social Science",
+      "url": "https://excelsia.edu.au/study/social-work/graduate-certificate-in-social-science",
+      "location": null,
+      "retain": 56069,
+      "duplicateIds": [
+        56091,
+        56114
+      ],
+      "conflicts": {
+        "academic_level": [
+          {
+            "id": 56069,
+            "value": "Bachelor's degree"
+          },
+          {
+            "id": 56091,
+            "value": "Master's degree"
+          },
+          {
+            "id": 56114,
+            "value": "Bachelor's degree"
+          }
+        ],
+        "other_requirement": [
+          {
+            "id": 56069,
+            "value": "IELTS: 6.5 with no band less than 6.0 or equivalent English Language proficiency test results."
+          },
+          {
+            "id": 56091,
+            "value": "Applicants whose qualifying undergraduate degree studies were taken in a language other than English will be required to demonstrate English Language proficiency."
+          },
+          {
+            "id": 56114,
+            "value": "IELTS of 6.5 with no band less than 6.0 or equivalent English Language proficiency test results."
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56069": "4f3215487331aee4683e57a71cad844e1c43bd3064bcdbaa3093cf78643204d9",
+        "56091": "a9ac5012522adeed8c5849ba028a0ccecaae708cafc51dc2a40f35c63b934482",
+        "56114": "9905747ce9cdab095687a1d759665d7f5874d0f5b7963c891ff77ae8c95a3902"
+      }
+    },
+    {
+      "name": "Master of Community Services and Youth Work",
+      "url": "https://excelsia.edu.au/study/counselling/master-of-community-services-and-youth-work",
+      "location": null,
+      "retain": 56070,
+      "duplicateIds": [
+        56093,
+        56116
+      ],
+      "conflicts": {
+        "category": [
+          {
+            "id": 56070,
+            "value": "Social Sciences & Humanities"
+          },
+          {
+            "id": 56093,
+            "value": "Social Work"
+          },
+          {
+            "id": 56116,
+            "value": "Education & Social Work"
+          }
+        ],
+        "sub_category": [
+          {
+            "id": 56070,
+            "value": "Community Services"
+          },
+          {
+            "id": 56093,
+            "value": "Community Services and Youth Work"
+          },
+          {
+            "id": 56116,
+            "value": "Youth Work"
+          }
+        ],
+        "other_requirement": [
+          {
+            "id": 56070,
+            "value": "Criminal History Record: Provide a National Criminal History Record check at time of application; Working with Children Check: Provide a Working with Children authorisation at time of application; All students in the MCSYW course are required to engage in personal counselling provided by Excelsia..."
+          },
+          {
+            "id": 56093,
+            "value": "Criminal History Record; Working with Children Check; Personal counselling provided by Excelsia (at least 12 hours)"
+          },
+          {
+            "id": 56116,
+            "value": "Criminal History Record; Working with Children Check; Personal counselling throughout the course"
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56070": "65a9c3fd2d54dc7aca56a485d5c0225b2c1fd7bd91e7a912d0d78c0638a3ecc9",
+        "56093": "0a24fcac873b98d442cd0a665bde419c40f26637133f9cfd017fddc3fc7dedb4",
+        "56116": "ed5ab667cfc5599c72b160dcafaef8aa841b4dda37429a066531d9056515b007"
+      }
+    },
+    {
+      "name": "Graduate Diploma of Community Services",
+      "url": "https://excelsia.edu.au/study/counselling/graduate-diploma-of-community-services",
+      "location": null,
+      "retain": 56071,
+      "duplicateIds": [
+        56094,
+        56117
+      ],
+      "conflicts": {
+        "category": [
+          {
+            "id": 56071,
+            "value": "Social Sciences & Humanities"
+          },
+          {
+            "id": 56094,
+            "value": "Education & Social Work"
+          },
+          {
+            "id": 56117,
+            "value": "Social Work"
+          }
+        ],
+        "sub_category": [
+          {
+            "id": 56071,
+            "value": "Community Services"
+          },
+          {
+            "id": 56094,
+            "value": "Education, Community Services"
+          },
+          {
+            "id": 56117,
+            "value": "Community Services"
+          }
+        ],
+        "other_requirement": [
+          {
+            "id": 56071,
+            "value": "Criminal History Record; Working with Children Check; Personal counselling (at least 12 hours throughout the course, with at least six hours in the first year)."
+          },
+          {
+            "id": 56094,
+            "value": "Criminal History Record: Provide a National Criminal History Record check at time of application; Working with Children Check: Provide a Working with Children authorisation at time of application; All students are required to engage in personal counselling provided by Excelsia throughout their co..."
+          },
+          {
+            "id": 56117,
+            "value": "Criminal History Record; Working with Children Check; Minimum 12 hours of personal counselling throughout the course (at least six hours in first year)."
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56071": "bd4ceb8903f84cbc8de9106b83ce80b29ce1241a3f32a42a763babfa52ea503c",
+        "56094": "b294724fa568b4bb2847808325fe9fa03846733a1ce923cd2b7f62daeeb39389",
+        "56117": "c66e1ffa53591cd68bcb9ce5fab300316d4d928c7f0524d6f1b21a0644524cf2"
+      }
+    },
+    {
+      "name": "Graduate Certificate in Community Services",
+      "url": "https://excelsia.edu.au/study/counselling/graduate-certificate-in-community-services",
+      "location": null,
+      "retain": 56072,
+      "duplicateIds": [
+        56095,
+        56118
+      ],
+      "conflicts": {
+        "category": [
+          {
+            "id": 56072,
+            "value": "Social Sciences & Humanities"
+          },
+          {
+            "id": 56095,
+            "value": "Social Sciences & Humanities"
+          },
+          {
+            "id": 56118,
+            "value": "Education & Social Work"
+          }
+        ],
+        "sub_category": [
+          {
+            "id": 56072,
+            "value": "Community Services"
+          },
+          {
+            "id": 56095,
+            "value": "Community Services"
+          },
+          {
+            "id": 56118,
+            "value": "Education, Community Services"
+          }
+        ],
+        "other_requirement": [
+          {
+            "id": 56072,
+            "value": "National Criminal History Record check; Working with Children authorisation; Minimum 12 hours of personal counselling throughout the course."
+          },
+          {
+            "id": 56095,
+            "value": "Criminal History Record; Working with Children Check; Undertake personal counselling throughout the course."
+          },
+          {
+            "id": 56118,
+            "value": "Criminal History Record; Working with Children Check; Undertake personal counselling throughout the course"
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56072": "b2bc55958e56aced300f3d25fe975beb09034eff211e012759281c849a990a5d",
+        "56095": "62d4c8179e5569c959072ca72b3e6c3ada6c666ecd7147807af31784b29f88cf",
+        "56118": "778bc864295e33f879b6efbbf2cd0db4cc3e892f222a5d8811ced39698525d20"
+      }
+    },
+    {
+      "name": "Master of Educational Leadership",
+      "url": "https://excelsia.edu.au/study/education/master-of-educational-leadership",
+      "location": null,
+      "retain": 56073,
+      "duplicateIds": [
+        56096,
+        56119
+      ],
+      "conflicts": {
+        "other_requirement": [
+          {
+            "id": 56073,
+            "value": "A four-year Bachelor of Education or equivalent qualification; OR completion of postgraduate studies in a relevant field; OR professional experience equivalent to one year full-time in an appropriate field. For those with a postgraduate initial teaching education degree: A bachelor degree AND one..."
+          },
+          {
+            "id": 56096,
+            "value": "Completion of postgraduate studies in a relevant field; Professional experience equivalent to one year full-time in a field considered by the School to be appropriate to the program of study; A bachelor degree AND ONE of the following postgraduate qualifications: Master of Teaching Graduate Diplo..."
+          },
+          {
+            "id": 56119,
+            "value": "One of the following postgraduate qualifications: Master of Teaching, Graduate Diploma in Education, Equivalent postgraduate teaching qualification; Professional experience equivalent to one year full-time in a field considered by the School to be appropriate to the program of study"
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_3fccc303d6c0",
+        "job_e42ea9dc02c9",
+        "job_ef64e47aa13e"
+      ],
+      "rowVersions": {
+        "56073": "441b03b3ce0f7bfa5967b66249a1f79e4815d835c8b88adcaf3f87b2b5b9db40",
+        "56096": "5ed358b686eadd55dc3fc51534c1a8ecf88168860207d0344634a2c6750c1bf4",
+        "56119": "fb5e676a19bf0d255b128496e6c262db501e0d6fad7669451654989c4e18273d"
+      }
+    },
+    {
+      "name": "Master of Counselling",
+      "url": "https://excelsia.edu.au/study/counselling/master-of-counselling",
+      "location": null,
+      "retain": 56075,
+      "duplicateIds": [
+        56106
+      ],
+      "conflicts": {
+        "other_requirement": [
+          {
+            "id": 56075,
+            "value": "Interview; National Criminal History Record check; Working with Children authorisation"
+          },
+          {
+            "id": 56106,
+            "value": "Successfully complete an admission interview (including a Readiness for Counselling and Psychotherapy Training Questionnaire); Provide a National Criminal History Record check at time of application; Provide a Working with Children authorisation at time of application."
+          }
+        ]
+      },
+      "sourceJobIds": [
+        "job_ef64e47aa13e",
+        "job_fef77a006101"
+      ],
+      "rowVersions": {
+        "56075": "c72dc9c3b6f078576d6b4f4dc8c37c7a6a34c9e42486f271b93235ef96671404",
+        "56106": "41200519a1e5e36621a4b90916ae6786ee9c53365db267a316503f50d3d154b3"
+      }
+    }
+  ],
+  "proposedSoftExclusions": 19
+}

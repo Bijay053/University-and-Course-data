@@ -16,6 +16,19 @@ The user said: “do not ask for review and run do it and give me result” and 
 
 **How to apply:** Automatically fix pending records with clear evidence, using soft exclude with an audit log and undo. Ask for confirmation for published records, bulk changes over 10 rows, or unclear evidence. Honor explicit read-only requests. Permanent deletion and production deployment remain outside automatic pending-record work.
 
+## Provider consolidation holds
+
+An import pause must not prevent ordinary pending-field repairs. Excelsia must
+remain paused until its consolidation is reviewed and complete. Resume is an
+owner-administrator attestation, not an automated claim that duplicates are gone.
+
+**Why:** The owner required consolidation before allowing further assistant imports,
+after repeated fetches created duplicate pending reviews.
+
+**How to apply:** Require an explicit completion confirmation and review note before
+resuming. Keep an audit, do not launch old proposals on resume, and retain the
+normal publication and large-batch confirmation rules.
+
 ## Eligibility policy
 
 A missing CRICOS code means “eligibility unverified”, not automatic rejection. Apply CRICOS checks only to Australian providers. Domestic prices alongside international prices are not exclusion evidence; eligibility must apply to the course itself.
@@ -35,7 +48,23 @@ Named existing-course commands such as “add intake Feb and July” edit fields
 
 **Why:** The user reported a live intake edit being misrouted to course recovery, leaving the intake empty.
 
-**How to apply:** Resolve existing pending identity first, retain source verification and audit requirements, and stop on ambiguous matches.
+**How to apply:** Resolve existing pending identity first, retain audits, distinguish official verification from staff-provided values, and stop on ambiguous matches.
+
+## Staff-provided edits and provider-wide follow-ups
+
+Direct staff-supplied values must be applied with source “staff-provided” and an audit log, without requiring page evidence. Only flag a supplied value when official evidence contradicts it.
+
+“Add this in all courses” applies the last edit to every course for the current provider, not catalogue discovery. Pending rows can be changed directly; published rows or batches over ten rows require the affected list and confirmation.
+
+**Why:** The user explicitly corrected a refusal to save Sydney and a follow-up that launched discovery instead of applying the edit.
+
+**How to apply:** Retain the last explicit field/value in conversation context, preserve provider scope, keep staff provenance separate from official verification, and never split large edits to bypass confirmation.
+
+Course candidates need course structure: duration, fees, entry requirements or a course code. Exclude news, blogs and events, even when their titles contain degree names.
+
+**Why:** A PhD-graduate celebration article was incorrectly offered as a missing course.
+
+**How to apply:** Require detail-page evidence before presenting an unrecorded link as a course; award words in link text are insufficient.
 
 Official PDF research must remain separate from HTML field extraction and numeric writes.
 

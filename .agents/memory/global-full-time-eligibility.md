@@ -3,9 +3,11 @@ name: Global full-time eligibility
 description: International catalogue policy for mixed, equivalent, part-time-only, and unconfirmed study-load wording.
 ---
 
-The international catalogue accepts only courses with a confirmed full-time route. Mixed wording such as “full-time or part-time equivalent” is stored as Full Time, and a value of Both is normalized to Full Time. Explicit wording such as “only available part-time” overrides an “equivalent full-time study” workload measure and is ineligible. A final unresolved Part Time value fails closed.
+The user changed the staging policy on 2026-11-05: retain part-time-only courses in pending review with visa-eligibility warnings; never automatically publish them. A confirmed full-time route is still necessary before treating a course as full-time eligible. Mixed wording such as “full-time or part-time equivalent” is stored as Full Time, and Both normalizes to Full Time. Explicit “only available part-time” overrides a full-time-equivalent workload measure.
 
 **Why:** Checking for “part-time” first misclassified full-time courses across many universities, while checking for “full-time” first alone admitted courses that quote a full-time-equivalent workload but are actually offered only part-time.
+
+**Policy change reason:** The user explicitly chose “Keep them flagged for review” when resolving the updated scenario document against the old exclusion rule.
 
 **How to apply:** Prefer the DOM value paired with the Duration label. Apply explicit part-time-only phrases first, then full-time/mixed availability, then implied primary full-time wording such as “N years, or part-time equivalent.” Quarantine unsupported live rows rather than deleting them.
 

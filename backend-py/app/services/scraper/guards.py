@@ -1073,6 +1073,9 @@ def should_stage_course(
     just before the DB write in ``stage_course``) so Bug B and C have settled
     payloads to inspect.
     """
+    from app.services.scraper.extractors.course_name import is_domain_only_name
+    if is_domain_only_name(payload.get("course_name") or course_name):
+        return False,"invalid_course_name_domain"
     # ── Global international-audience policy ─────────────────────────────────
     # Online-only programmes must never enter the international review queue.
     # This is intentionally not configurable per university: old YAML and
@@ -1080,11 +1083,11 @@ def should_stage_course(
     # but cannot silently bypass the shared safety gate.
     if is_online_only_for_staging(course_name, payload, source_url):
         log.info(
-            "[REJECT CHECK] course=%r decision=reject "
+            "[DELIVERY REVIEW] course=%r decision=review "
             "(online_only — source delivery signal) global_policy=true",
             payload.get("course_name") or course_name,
         )
-        return (False, "online_only")
+        # Retain genuine courses for eligibility review; publication stays gated.
 
     # URL-based category-page rejection — runs FIRST so that pages whose
     # title accidentally gains a degree-level prefix (e.g. "MBA – Two
@@ -1188,11 +1191,11 @@ def should_stage_course(
     if is_part_time_only_for_staging(payload):
         log.info(
             "[REJECT CHECK] course=%r study_load=%r "
-            "decision=reject (part_time_only) global_policy=true",
+            "decision=review (part_time_only) global_policy=true",
             effective_name,
             payload.get("study_load"),
         )
-        return (False, "part_time_only")
+        # Part-time-only is now a review warning, not a discovery/staging veto.
 
     # Slug-name + empty-data rejection: catches pages that silently redirected
     # to a "course not found" 404 during extraction.  When that happens the
@@ -1258,6 +1261,11 @@ def should_stage_course(
     # of auto-rejecting.  International fees on a separate page are legitimate.
     from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
     if payload.get("international_fee") is None:
+        if (is_online_only_for_staging(course_name, payload, source_url)
+                or is_part_time_only_for_staging(payload) or payload.get("parttime_only")):
+            # Missing tuition is another review issue, not grounds to discard
+            # an otherwise genuine delivery-restricted course.
+            return (True, "accepted")
         # Hard block: fee.py's structured-table extractor found a real fee
         # table on THIS course's own page and confirmed it has Home/Part-time
         # rows only — no International + Full-time row at all (e.g. HNC

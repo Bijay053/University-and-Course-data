@@ -3,6 +3,12 @@ name: Reconciliation identity coverage
 description: A reviewed evidence-component map can still conflict with the published offering identity.
 ---
 
+Bulk consolidation must compare all approved course fields, not just a chat row-version token. Preserve source-job identities and original evidence, and fence undo against the complete resulting record.
+
+**Why:** Legacy chat version tokens cover only a subset of course fields. Exported database numerics also need consistent normalization during comparison; a Decimal represented as JSON text is not necessarily a concurrent edit.
+
+**How to apply:** Compare normalized snapshots under row locks, abort on real differences, preserve conflicting groups, and verify counts and untouched groups after commit.
+
 A campus-course reconciliation needs two independent partitions: evidence
 components (which prove historical ID relationships) and the application’s
 published offering identity (which determines whether two proposed canonical

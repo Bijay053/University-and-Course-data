@@ -23,9 +23,46 @@ Database = Annotated[AsyncSession, Depends(get_db)]
 Actor = Annotated[dict, Depends(require_permission("scraping.trigger"))]
 
 
+class ResumeImportsBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    consolidationComplete: StrictBool
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+@router.get("/jobs/{job_id}/assistant/import-status")
+async def assistant_import_status(job_id: str, db: Database, actor: Actor):
+    from app.services.assistant_import_pause import provider_for_job, status, live_owner
+    return status(await provider_for_job(db, job_id), await live_owner(db, actor))
+
+
+@router.post("/jobs/{job_id}/assistant/resume-imports")
+async def resume_assistant_imports(job_id: str, body: ResumeImportsBody, db: Database, actor: Actor):
+    from app.models import CourseAuditLog
+    from app.services.assistant_import_pause import provider_for_job, status, is_paused, live_owner
+    if not await live_owner(db, actor, lock=True):
+        raise HTTPException(403, "Only an owner administrator can resume provider imports.")
+    if body.consolidationComplete is not True or len(body.reason.strip()) < 10:
+        raise HTTPException(422, "Confirm consolidation is complete and record the review outcome.")
+    university = await provider_for_job(db, job_id, lock=True)
+    if is_paused(university):
+        config = dict(university.scrape_config or {})
+        config["assistant_imports_paused"] = False
+        university.scrape_config = config
+        db.add(CourseAuditLog(
+            field_key="assistant_imports_paused", action="assistant_imports_resumed",
+            old_value="true", new_value="false", actor=str(actor["id"]),
+            reason=f"University {university.id}; job {job_id}; consolidation confirmed complete: {body.reason.strip()}",
+        ))
+    await db.commit()
+    return status(university, True)
+
+
 class PromptBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     prompt: str = Field(min_length=1)
+
+
+from app.services.scrape_agent_v2.access import enabled_for
 
 
 class ConfirmBody(BaseModel):
@@ -47,9 +84,12 @@ async def owned_thread(job_id: str, actor: dict, db, *, lock=False):
     return job, (await db.execute(stmt.execution_options(populate_existing=True))).scalar_one_or_none()
 
 
-async def response(thread, db):
+async def response(thread, db, job_id=None):
     if thread is None:
-        return {"threadId": None, "status": "idle", "phase": "", "error": None, "messages": [],
+        from app.services.review_counts import pending_counts
+        job=await db.get(ScrapeRuntimeJob,job_id) if job_id else None
+        counts=await pending_counts(db,job.university_id,job_id) if job else None
+        return {"reviewCounts":counts,"threadId": None, "status": "idle", "phase": "", "error": None, "messages": [],
                 "activity": [], "queuedAt": None, "startedAt": None, "updatedAt": None}
     messages = deepcopy(thread.messages)
     changed = False
@@ -196,7 +236,10 @@ async def response(thread, db):
                     seen.add(item["jobId"])
                 if len(related) == 3:
                     break
-    return {"threadId": thread.id, "turnId": thread.turn_id, "status": thread.status, "phase": live_phase,
+    from app.services.review_counts import pending_counts
+    count_job=await db.get(ScrapeRuntimeJob,thread.job_id)
+    counts=await pending_counts(db,count_job.university_id,thread.job_id) if count_job else None
+    return {"reviewCounts":counts,"threadId": thread.id, "turnId": thread.turn_id, "status": thread.status, "phase": live_phase,
             "error": thread.error, "messages": public, "activity": activity,
             "queuedAt": queued_at, "startedAt": started_at, "updatedAt": thread.updated_at.isoformat(),
             "relatedReviews": related}
@@ -205,7 +248,7 @@ async def response(thread, db):
 @router.get("/jobs/{job_id}/assistant")
 async def get_assistant(job_id: str, db: Database, actor: Actor):
     _, thread = await owned_thread(job_id, actor, db, lock=True)
-    result = await response(thread, db)
+    result = await response(thread, db, job_id)
     await db.commit()
     if thread and result["status"] == "queued":
         from app.services.scrape_assistant_runner import schedule
@@ -236,8 +279,10 @@ async def prompt_assistant(job_id: str, body: PromptBody, db: Database, actor: A
     thread.activity = [service.event("Request received", status="completed",
                                      detail="Preparing a bounded, official-source investigation.")]
     from app.services.scrape_assistant_autorun import execution_requested
+    from app.config import settings
     thread.messages = list(thread.messages[-18:]) + [{
         "role": "user", "content": prompt, "createdAt": service.now().isoformat(), "turnId": turn, "autoRun": execution_requested(prompt),
+        "_engine":"v2" if enabled_for(settings,actor["id"]) else "legacy",
     }]
     thread.updated_at = service.now()
     await db.commit()
@@ -265,8 +310,41 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
         raise HTTPException(404, "Proposed action not found.")
     if action["state"] != "proposed":
         return await response(thread, db)  # Idempotent confirmation; never dispatch twice.
+    from app.services.assistant_import_pause import IMPORT_KINDS, PAUSE_REASON, provider_for_job, is_paused
+    if action["kind"] in IMPORT_KINDS:
+        university = await provider_for_job(db, job_id, lock=True)
+        if is_paused(university):
+            raise HTTPException(409, PAUSE_REASON)
     if thread.status in service.ACTIVE:
         raise HTTPException(409, "Wait for the investigation to finish.")
+    if action["kind"] == "staff_edit":
+        if action.get("_turnId") != thread.turn_id:
+            raise HTTPException(409, "This staff preview belongs to an older request")
+        from app.services.assistant_staff_edits import apply as apply_staff_edit
+        try:
+            await apply_staff_edit(service, db, action, job.university_id, actor["id"], confirmed=True)
+        except ValueError as exc:
+            await db.rollback()
+            raise HTTPException(409, str(exc))
+        thread.messages = messages
+        await db.commit()
+        return await response(thread, db)
+    if action["kind"] in {"staff_location","undo_staff_location"}:
+        if action["kind"]=="staff_location" and action.get("_turnId")!=thread.turn_id:
+            raise HTTPException(409,"This location preview belongs to an older request")
+        from app.services.assistant_staff_locations import apply as apply_locations
+        try:
+            await apply_locations(service,db,action,job.university_id,actor["id"],confirmed=True,
+                                  undo=action["kind"]=="undo_staff_location")
+        except ValueError as exc:
+            await db.rollback()
+            raise HTTPException(409,str(exc))
+        if action["kind"]=="staff_location":
+            from app.services.assistant_staff_locations import undo_proposal
+            next(m for m in messages if any(a["id"]==action_id for a in m.get("actions",[])))["actions"].append(undo_proposal(action))
+        thread.messages=messages
+        await db.commit()
+        return await response(thread,db)
     if action["kind"] == "approve_course":
         from app.permissions import user_has_permission
         from app.routers.scrape import staged_approve

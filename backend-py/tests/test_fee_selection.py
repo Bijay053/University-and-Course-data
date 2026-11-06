@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.models import ScrapedCourse
+from app.models import ScrapedCourse, University
 from app.routers.scrape import _FeeSelectionBody, staged_fee_selection, staged_approve
 from app.services.scraper.extractors.ulaw_fees import METHOD
 from app.services.scraper.fee_selection import fee_selection, unresolved_fee_selection
@@ -46,7 +46,9 @@ class DB:
                                     snippet=json.dumps(sc.extraction_method["fee_variants"]))
         self.commit = AsyncMock()
         self.refresh = AsyncMock()
-        self.get = AsyncMock(return_value=sc)
+        self.get = AsyncMock(side_effect=lambda model, ident: (
+            SimpleNamespace(id=sc.university_id, country="United Kingdom")
+            if model is University else sc))
 
     async def execute(self, stmt, *args, **kwargs):
         if "scraped_field_evidence" in str(stmt):

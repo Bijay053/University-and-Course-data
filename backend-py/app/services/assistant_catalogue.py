@@ -22,7 +22,36 @@ def is_course_candidate_url(url):
     path = urlsplit(url).path.lower()
     segments = [value for value in path.split("/") if value]
     editorial = {"news", "news-and-opinion", "news-and-events", "newsroom", "blog", "blogs", "events", "articles", "stories", "press-releases"}
-    return not (set(segments[:2]) & editorial or re.search(r"\.(?:pdf|docx?|xlsx?|png|jpe?g|zip)$", path))
+    return not (set(segments) & editorial
+                or re.search(r"/(?:celebrating|congratulations|meet-our)-", path)
+                or re.search(r"\.(?:pdf|docx?|xlsx?|png|jpe?g|zip)$", path))
+
+
+def has_course_structure(html, url):
+    """Award words in a news headline are not course-detail evidence."""
+    if not is_course_candidate_url(url):
+        return False
+    soup=BeautifulSoup(html,"html.parser")
+    for node in soup.select("nav,header,footer,aside,form,[class*='related']"):
+        node.decompose()
+    main=soup.find("main") or soup.find("article") or soup
+    heading=main.find("h1")
+    title=heading.get_text(" ",strip=True) if heading else ""
+    if not AWARD.search(title) or re.search(r"\b(celebrating|congratulations|graduate story|first phd graduate)\b",title,re.I):
+        return False
+    for script in soup.select('script[type="application/ld+json"]'):
+        if re.search(r'"@type"\s*:\s*"(?:NewsArticle|BlogPosting|Event)"',script.get_text(),re.I):
+            return False
+    for node in main.select("script,style"):
+        node.decompose()
+    if any(re.fullmatch(r"(?:tuition\s+)?fees|entry requirements|course code|cricos code",
+                        node.get_text(" ",strip=True),re.I)
+           for node in main.select("h2,h3,h4,dt,th")):
+        return True
+    text=main.get_text(" ",strip=True)
+    return bool(re.search(
+        r"\b(?:duration\s*:?\s*\d|(?:tuition\s+)?fees?\s*:|entry requirements|"
+        r"(?:course|cricos)\s+code\s*:?\s*[A-Z0-9])",text,re.I))
 
 
 def identity(url):
@@ -78,6 +107,7 @@ async def compare_candidates(candidates, university_id, factory):
 
 async def inspect_comparison(config, home, university_id, factory):
     candidates, sources, seen = {}, [], set()
+    pages={}
     discovery = config.discovery
     queue = list(dict.fromkeys(list(discovery.seed_urls or []) + [home]))[:MAX_PAGES]
 
@@ -97,6 +127,7 @@ async def inspect_comparison(config, home, university_id, factory):
         try:
             url = official_url(url, home)
             raw = await asyncio.wait_for(public_request(url), 8)
+            pages[identity(url)]=raw
             soup = BeautifulSoup(raw, "lxml")
             title = soup.title.get_text(" ", strip=True) if soup.title else ""
             if raw.lstrip().startswith(b"%PDF") or re.search(r"just a moment|access denied|verify.*human", title, re.I):
@@ -154,7 +185,26 @@ async def inspect_comparison(config, home, university_id, factory):
                 await asyncio.gather(*(read_page(url) for url in batch))
     except TimeoutError:
         sources.append({"url": home, "status": "unverified", "note": "Comparison time budget reached."})
-    rows = await compare_candidates(list(candidates.values()), university_id, factory)
+    verified=[]
+    remaining=max(0,MAX_PAGES-len(seen))
+    try:
+        async with asyncio.timeout(25):
+            for candidate in candidates.values():
+                raw=pages.get(identity(candidate["url"]))
+                if raw is None and remaining:
+                    remaining-=1
+                    try:
+                        raw=await asyncio.wait_for(public_request(candidate["url"]),8)
+                    except Exception:
+                        raw=None
+                if raw is not None and has_course_structure(raw,candidate["url"]):
+                    verified.append(candidate)
+                else:
+                    sources.append({"url":candidate["url"],"status":"unverified",
+                                    "note":"Not counted as a course: course-owned structure was not verified."})
+    except TimeoutError:
+        sources.append({"url":home,"status":"unverified","note":"Course-detail verification time budget reached."})
+    rows = await compare_candidates(verified, university_id, factory)
     return {
         "available": bool(rows), "complete": False, "observed": len(rows),
         "note": "Partial comparison of observed official course links, not proof of full catalogue coverage or international eligibility. Unseen courses are not removed.",

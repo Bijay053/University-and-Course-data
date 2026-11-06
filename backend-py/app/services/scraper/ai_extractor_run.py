@@ -216,7 +216,8 @@ def _apply_xpath(html: str, expr: str, attribute: str | None) -> str | None:
     try:
         from lxml import etree  # type: ignore[import-untyped]
         parser = etree.HTMLParser()
-        tree = etree.fromstring(html.encode(), parser)
+        from app.services.scraper.unicode_text import scalar_text
+        tree = etree.fromstring(scalar_text(html).encode("utf-8"), parser)
         results = tree.xpath(expr)
         if not results:
             return None
