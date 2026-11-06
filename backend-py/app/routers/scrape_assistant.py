@@ -70,6 +70,27 @@ async def resume_assistant_imports(job_id: str, body: ResumeImportsBody, db: Dat
 class PromptBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     prompt: str = Field(min_length=1)
+    documentToken: str | None = Field(default=None, max_length=4000)
+
+
+class DocumentUploadBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    filename: str = Field(min_length=1, max_length=180)
+    size: int = Field(gt=0, le=2_000_000)
+    contentType: str
+
+
+@router.post("/jobs/{job_id}/assistant/documents/upload-url")
+async def document_upload(job_id: str, body: DocumentUploadBody, db: Database, actor: Actor):
+    await owned_thread(job_id, actor, db)
+    from app.config import settings
+    if not settings.assistant_document_uploads_enabled:
+        raise HTTPException(503, "Document uploads are awaiting private-storage browser access configuration. Link-based checks and staff-provided edits remain available.")
+    from app.services.assistant_documents import request_upload
+    try:
+        return await request_upload(int(actor["id"]), job_id, body.filename, body.size, body.contentType)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 from app.services.scrape_agent_v2.access import enabled_for
@@ -305,6 +326,12 @@ async def prompt_assistant(job_id: str, body: PromptBody, db: Database, actor: A
     if not prompt:
         raise HTTPException(422, "Describe what you want checked.")
     await owned_thread(job_id, actor, db)
+    if body.documentToken:
+        from app.services.assistant_documents import verify
+        try:
+            verify(body.documentToken, int(actor["id"]), job_id)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
     await db.execute(insert(ScrapeAssistantThread).values(
         id=uuid.uuid4().hex, job_id=job_id, actor_id=int(actor["id"]),
         turn_id=uuid.uuid4().hex, status="idle", phase="", messages=[], updated_at=service.now(),
@@ -326,6 +353,7 @@ async def prompt_assistant(job_id: str, body: PromptBody, db: Database, actor: A
     thread.messages = list(thread.messages[-18:]) + [{
         "role": "user", "content": prompt, "createdAt": service.now().isoformat(), "turnId": turn, "autoRun": execution_requested(prompt),
         "_engine":"v2" if enabled_for(settings,actor["id"]) else "legacy",
+        "_documentToken": body.documentToken,
     }]
     thread.updated_at = service.now()
     await db.commit()
@@ -389,6 +417,17 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
             raise HTTPException(409, PAUSE_REASON)
     if thread.status in service.ACTIVE:
         raise HTTPException(409, "Wait for the investigation to finish.")
+    if action["kind"] == "document_update":
+        from app.services.assistant_document_review import apply
+        try:
+            await apply(db, thread, action, job.university_id, actor)
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        thread.messages = messages
+        await db.commit()
+        return await response(thread, db, job_id)
     if action["kind"] == "runtime_tuning":
         if action.get("_turnId") != thread.turn_id:
             raise HTTPException(409, "Runtime preview belongs to an older request.")

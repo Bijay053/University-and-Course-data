@@ -66,6 +66,72 @@ class CataloguePagesUnavailable(RuntimeError):
     """Catalogue transport failed; do not stage a partial BFS discovery."""
 
 
+async def _iter_surrey_extraction_batches(
+    links, max_courses, *, parallel, batch_size, on_progress, stop_flag,
+    on_prepared, fetch=None, fetch_gate=None,
+):
+    """Hand ready sources to the serial resume/staging owner, not to DB tasks."""
+    from contextlib import aclosing
+    from app.services.scraper.extractors.uk_course_facts import iter_expanded_links
+
+    # Dedup exact source identities before the provider cap, then exact option
+    # identities before staging. Parent URLs must never stand in for siblings.
+    by_source = {}
+    for link in links:
+        by_source.setdefault(_normalize_course_url(link["url"]), link)
+    sources = list(by_source.values())
+    seen = set()
+    async with aclosing(iter_expanded_links(
+        sources, max_courses, fetch, parallel=parallel,
+        on_progress=on_progress, stop_flag=stop_flag, fetch_gate=fetch_gate,
+    )) as stream:
+        async for group in stream:
+            unique = []
+            for link in group:
+                key = _normalize_course_url(link.get("url"))
+                if key not in seen:
+                    seen.add(key)
+                    unique.append(link)
+            if not unique:
+                continue
+            remaining = await on_prepared(unique)
+            for index in range(0, len(remaining), batch_size):
+                if stop_flag[0]:
+                    raise asyncio.CancelledError()
+                yield remaining[index:index + batch_size]
+
+
+def _record_surrey_prepared_group(
+    job, group, *, links, checkpoints, pending_rows, source_count,
+):
+    """Update preparation/resume metadata without settling new extraction work.
+
+    Called only by the serial staging owner. Return exact pending replacements
+    and the number of previously settled options separately from new work.
+    """
+    links.extend({k: v for k, v in link.items() if k != "_surrey_html"}
+                 for link in group)
+    job.total_found = max(source_count, len(links))
+    keys, ids, source_jobs = _matched_resume_provenance(group, checkpoints)
+    remaining = [link for link in group
+                 if _normalize_course_url(link.get("url")) not in keys]
+    if ids:
+        payload = dict(job.request_payload or {})
+        payload["resumeCourseIds"] = sorted(set(payload.get("resumeCourseIds", [])) | set(ids))
+        payload["resumeSourceJobIds"] = sorted(set(payload.get("resumeSourceJobIds", [])) | set(source_jobs))
+        job.request_payload = payload
+    bypassed_ids = {
+        course_id for link in group
+        for course_id in pending_rows.get(_normalize_course_url(link.get("url")), [])
+    }
+    dc = dict(job.discovered_config or {})
+    stats = dict(dc.get("pipeline_stats") or {})
+    stats["expanded_course_options"] = len(links)
+    dc["pipeline_stats"] = stats
+    job.discovered_config = dc
+    return remaining, len(group) - len(remaining), bypassed_ids
+
+
 async def _run_browser_discovery_with_deadline(
     browser_discover,
     *,
@@ -6749,15 +6815,28 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             if (job.request_payload or {}).get("courseReport"):
                 links = links[:min(max_courses, _verification.max_courses)]
         _source_candidates_before_options = len(links)
+        _surrey_source_links = None
+        _stream_resume_rows = {}
+        _stream_pending_rows = {}
         try:
             from app.services.scraper.extractors.uk_course_facts import expand_links as expand_surrey_links
+            from urllib.parse import urlsplit as _option_urlsplit
+            async def _surrey_prepare_progress(**observation):
+                await emit("status",
+                    f"Preparing course options: {observation['completed']}/{observation['total']} — {observation['url']}",
+                    phase="prepare", **observation)
+            # Bounded verification freezes a deterministic sample before any
+            # extraction. Full Surrey catalogues can stream completion order;
+            # selected retries already carry their exact option identities.
+            if (not _targeted_retry and not _verification and links and all(
+                _option_urlsplit(link.get("url", "")).hostname in
+                {"www.surrey.ac.uk", "surrey.ac.uk"} for link in links
+            )):
+                _surrey_source_links = list(links)
             if not _targeted_retry:
-                async def _surrey_prepare_progress(**observation):
-                    await emit("status",
-                        f"Preparing course options: {observation['completed']}/{observation['total']} — {observation['url']}",
-                        phase="prepare", **observation)
-                links = await expand_surrey_links(links, max_courses,
-                    parallel=_effective_parallel, on_progress=_surrey_prepare_progress, stop_flag=stop_flag)
+                if _surrey_source_links is None:
+                    links = await expand_surrey_links(links, max_courses,
+                        parallel=_effective_parallel, on_progress=_surrey_prepare_progress, stop_flag=stop_flag)
             links = await _expand_uel_course_links_for_run(
                 links, max_courses=max_courses, targeted_retry=_targeted_retry,
                 emit=emit, stop_flag=stop_flag,
@@ -6771,13 +6850,15 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         _options_dc = dict(job.discovered_config or {})
         _options_stats = dict(_options_dc.get("pipeline_stats") or {})
         _options_stats.update(source_candidates=_source_candidates_before_options,
-                              expanded_course_options=len(links))
+                              expanded_course_options=0 if _surrey_source_links is not None else len(links))
         _options_dc["pipeline_stats"] = _options_stats
         job.discovered_config = _options_dc
         await db.commit()
         await emit("status",
-            f"[OPTIONS] {_source_candidates_before_options} source candidates prepared into {len(links)} course options; checking saved checkpoints before extraction.",
-            phase="resume_check", kind="course_options_ready",
+            ("[OPTIONS] Streaming ready source pages into extraction."
+             if _surrey_source_links is not None else
+             f"[OPTIONS] {_source_candidates_before_options} source candidates prepared into {len(links)} course options; checking saved checkpoints before extraction."),
+            phase="resume_check", kind="course_options_streaming" if _surrey_source_links is not None else "course_options_ready",
             source_candidates=_source_candidates_before_options, total=len(links))
 
         if _verification:
@@ -6896,7 +6977,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     _current_link_keys = {
                         _normalize_course_url(link.get("url"))
                         for link in links
-                        if _normalize_course_url(link.get("url"))
+                        if _surrey_source_links is None and _normalize_course_url(link.get("url"))
                     }
                     _bypassed_resume_course_ids = sorted(
                         {
@@ -6920,7 +7001,12 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                         bypassed_rows=len(_bypassed_resume_course_ids),
                         remaining=len(links),
                     )
-                _done_urls = set(_done_rows)
+                _stream_resume_rows = _done_rows
+                if not _resume_allowed:
+                    _stream_pending_rows = _pending_rows
+                # Match only expanded identities in streaming mode, never a
+                # parent's checkpoint against all its unprepared options.
+                _done_urls = set(_done_rows) if _surrey_source_links is None else set()
                 if _done_urls:
                     _before = len(links)
                     (
@@ -7031,7 +7117,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         job.current = min(_resume_processed_offset, job.total_found or 0)
         await db.commit()
         await emit("status",
-            f"[EXTRACT] Ready: {len(links)} options remaining; {_resume_processed_offset} already processed.",
+            ("[EXTRACT] Source stream ready; saved checkpoints will be matched to each prepared option."
+             if _surrey_source_links is not None else
+             f"[EXTRACT] Ready: {len(links)} options remaining; {_resume_processed_offset} already processed."),
             phase="extract", kind="extraction_ready",
             remaining=len(links), current=job.current, total=job.total_found)
 
@@ -7137,6 +7225,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             for i in range(0, len(links), _effective_batch_size)
         ]
         _n_batches = len(_link_batches)
+        if _surrey_source_links is not None:
+            _n_batches = 0  # Option batch count is not known until preparation ends.
         if _n_batches > 1:
             log.info(
                 "[BATCH] %d courses → %d batch(es) of \u2264%d for %s",
@@ -7154,7 +7244,56 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # Advertise controls only when extraction is ready to consume them.
         await sem.refresh()
         runtime_control_task = asyncio.create_task(_runtime_control_pulse())
-        for _batch_idx, _batch_links in enumerate(_link_batches):
+        async def _extraction_batches():
+            nonlocal links, _resume_already_staged, _resume_processed_offset
+            nonlocal _bypassed_resume_course_ids
+            if _surrey_source_links is None:
+                for batch in _link_batches:
+                    yield batch
+                return
+
+            links = []
+            async def on_prepared(group):
+                nonlocal _resume_already_staged, _resume_processed_offset
+                nonlocal _bypassed_resume_course_ids
+                remaining, skipped, bypassed_ids = _record_surrey_prepared_group(
+                    job, group, links=links, checkpoints=_stream_resume_rows,
+                    pending_rows=_stream_pending_rows,
+                    source_count=_source_candidates_before_options,
+                )
+                summary["discovered"] = len(links)
+                _resume_already_staged += skipped
+                _resume_processed_offset += skipped
+                completed[0] += skipped
+                job.current = completed[0]
+                _bypassed_resume_course_ids = sorted(set(_bypassed_resume_course_ids) | bypassed_ids)
+                await db.commit()
+                return remaining
+
+            from contextlib import aclosing
+            try:
+                async with aclosing(_iter_surrey_extraction_batches(
+                    _surrey_source_links, max_courses, parallel=_effective_parallel,
+                    batch_size=_effective_batch_size, on_progress=_surrey_prepare_progress,
+                    stop_flag=stop_flag, on_prepared=on_prepared, fetch_gate=sem,
+                )) as stream:
+                    async for batch in stream:
+                        yield batch
+            except asyncio.CancelledError:
+                if stop_flag[0]:
+                    return
+                raise
+            job.total_found = len(links)
+            await db.commit()
+            await emit("status",
+                f"[OPTIONS] {_source_candidates_before_options} source candidates prepared into {len(links)} course options.",
+                phase="prepare", kind="course_options_ready",
+                source_candidates=_source_candidates_before_options, total=len(links))
+
+        _batch_stream = _extraction_batches()
+        _batch_idx = -1
+        async for _batch_links in _batch_stream:
+            _batch_idx += 1
             if _n_batches > 1:
                 _b_start = _batch_idx * _effective_batch_size + 1
                 _b_end = _b_start + len(_batch_links) - 1
@@ -8050,6 +8189,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             # Explicitly free the batch result list so GC can reclaim the
             # memory before the next batch's extraction begins.
             del results
+
+        if stop_flag[0]:
+            return await _finalize_stopped()
 
         # ── T04: End-of-batch recovery sweep ─────────────────────────────────
         # Re-extract only transient failures after the main parallel batch pass.
@@ -9402,6 +9544,11 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             staging_failures=_selected_staging_failures,
         )
 
+        # Selected recovery owns only its explicit URL set. Never dispatch
+        # catalogue-wide learning/repair/publication hooks after it settles.
+        if (job.request_payload or {}).get("selectiveRetry"):
+            return {"ok": job.status == "completed", **summary}
+
         if _full_review:
             persist_review_policy(
                 job, outcome=job.status, counters=dict(summary),
@@ -9853,6 +10000,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         )
         return {"ok": False, "reason": str(exc), **summary}
     finally:
+        if "_batch_stream" in locals():
+            await _batch_stream.aclose()
         if "runtime_control_task" in locals():
             runtime_control_task.cancel()
             await asyncio.gather(runtime_control_task, return_exceptions=True)

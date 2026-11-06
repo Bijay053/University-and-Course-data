@@ -1,4 +1,4 @@
-"""Generation-aware Redis locks for autonomous verification.
+"""Generation-aware Redis locks for verification and selected retries.
 
 The primary university key stays a job ID for compatibility with normal scrape
 workers and startup checks. A sidecar carries the generation. Redis CAS scripts
@@ -95,8 +95,10 @@ return 0
 
 async def _authority(db, job_id):
     owner = current_owner.get()
-    if owner is None or owner.key != f"verification:{job_id}":
-        raise OwnershipLost("University-lock recovery requires its current verification generation")
+    if owner is None or owner.key not in {
+        f"verification:{job_id}", f"selective-retry:{job_id}",
+    }:
+        raise OwnershipLost("University-lock recovery requires its current worker generation")
     await guard_transaction(db)
     # guard_transaction keeps the shared generation lock across the Redis Lua
     # command. Revocation/replacement cannot race this check and side effect.

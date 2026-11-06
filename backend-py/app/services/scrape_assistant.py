@@ -281,7 +281,7 @@ async def investigate(thread_id: str, turn_id: str):
         return
     v2 = False
     try:
-        async with asyncio.timeout(RESEARCH_TIMEOUT):
+        async with asyncio.timeout(RESEARCH_TIMEOUT) as research_deadline:
             from app.config import settings
             async with AsyncSessionLocal() as db:
                 claimed_thread=await db.get(ScrapeAssistantThread,thread_id)
@@ -300,7 +300,19 @@ async def investigate(thread_id: str, turn_id: str):
                                       {"job": {"id": claimed_thread.job_id}},
                                       requested["content"]):
                 return
-            if v2:
+            from app.services.assistant_document_review import requested as document_requested, review as review_document
+            from app.services.assistant_staff_values import parse as parse_staff
+            staff_request = parse_staff(requested["content"], claimed_thread.messages)
+            if staff_request and staff_request.values and not staff_request.error:
+                from app.services.assistant_staff_locations import handle as handle_staff
+                ctx = await context(claimed_thread.job_id)
+                if await handle_staff(service, thread_id, turn_id, run_id, ctx,
+                                      requested["content"], claimed_thread.messages):
+                    return
+            if document_requested(requested):
+                research_deadline.reschedule(asyncio.get_running_loop().time() + 1800)
+                await review_document(thread_id, turn_id, run_id, claimed_thread, requested)
+            elif v2:
                 from app.services.scrape_agent_v2.access import enabled_for
                 if not enabled_for(settings, claimed_thread.actor_id):
                     raise ValueError("The new agent is disabled; unfinished work will not fall back to another engine")
@@ -567,6 +579,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                     "error": "Source check reached its time budget; this source remains unchecked.",
                 }
         await record_activity(thread_id, turn_id, run_id, event(
+            "Source access verification failed" if result.get("failureStage") == "robots" else
             ("Saved official source reused" if result.get("verified") else "Recent access restriction reused")
             if result.get("_sourceCacheHit") else
             ("Official PDF checked" if result.get("verified") else "Official PDF unavailable")
@@ -857,8 +870,17 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         )
     # Coverage remains available in the activity ledger; do not append the
     # same IELTS disclaimer to unrelated answers.
-    await save_research_reply(thread_id, turn_id, run_id, reply,
-                              detail=f"{len(citations)} verified source excerpts. No course changes applied.")
+    if access_failure and not check_catalogue:
+        reply["sourceOutcome"] = "access_verification_failed"
+        reply["coursesUpdated"] = 0
+        await save_research_reply(
+            thread_id, turn_id, run_id, reply,
+            detail="Source access verification failed. 0 courses updated; no correction queued.",
+            phase="Source access blocked — 0 courses updated",
+        )
+    else:
+        await save_research_reply(thread_id, turn_id, run_id, reply,
+                                  detail=f"{len(citations)} verified source excerpts. No course changes applied.")
 
 
 async def save_research_reply(thread_id, turn_id, run_id, reply, *, detail, phase="Investigation ready — no changes applied"):
@@ -874,7 +896,11 @@ async def save_research_reply(thread_id, turn_id, run_id, reply, *, detail, phas
             return
         items = [dict(item) for item in thread.activity]
         finish_running(items)
-        items.append(event("Answer ready", status="completed", detail=detail))
+        access_failed = reply.get("sourceOutcome") == "access_verification_failed"
+        items.append(event(
+            "Source access blocked — no updates" if access_failed else "Answer ready",
+            status="error" if access_failed else "completed", detail=detail,
+        ))
         thread.activity = items[-40:]
         reply["activity"] = public_activity(thread.activity)
         thread.messages, thread.status = (list(thread.messages) + [reply])[-20:], "ready"

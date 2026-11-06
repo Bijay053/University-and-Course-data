@@ -3,6 +3,22 @@ name: Prompt assistant scope and grounding
 description: User-selected scope and why researched citations use immutable source excerpts.
 ---
 
+## Document-based course updates
+
+The user requires a provider-independent document workflow: official PDF URLs
+or uploaded copies, course/level/exception matching, source excerpts and
+before/after values, then approval before applying document-derived batches to
+existing records. Cover English tests, tuition, scholarships, entry requirements
+and intakes; insufficient evidence must preserve the existing value.
+
+**Why:** Document-based IELTS requests were intercepted as unsupported literal
+field edits and sent to manual forms before any source check.
+
+**How to apply:** Route evidence-based document requests to research, not
+discovery or literal-value editing. Distinguish access verification, parsing,
+matching and application outcomes. Uploaded copies are not independently
+authenticated official downloads merely because a user supplies an official URL.
+
 ## Scope
 The user chose “Scraping and course reviews” for the prompt assistant and said the portal already has the OpenAI API.
 

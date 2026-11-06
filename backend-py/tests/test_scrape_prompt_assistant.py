@@ -6,6 +6,48 @@ from types import SimpleNamespace
 import uuid
 
 import pytest
+
+
+@pytest.mark.asyncio
+async def test_document_upload_is_disabled_until_storage_is_ready(store, monkeypatch):
+    from app.config import settings
+    from app.routers.scrape_assistant import document_upload, DocumentUploadBody
+    monkeypatch.setattr(settings, "assistant_document_uploads_enabled", False)
+    async with store() as db:
+        with pytest.raises(HTTPException) as error:
+            await document_upload("source", DocumentUploadBody(
+                filename="requirements.pdf", size=100, contentType="application/pdf",
+            ), db, {"id": 1})
+        assert error.value.status_code == 503
+        assert "storage" in error.value.detail
+
+
+@pytest.mark.asyncio
+async def test_document_confirmation_persists_audit_and_rejects_stale_replay(store, monkeypatch):
+    from app.services.assistant_document_review import apply
+    from app.services import assistant_staff_edits
+    from app.models.audit import CourseAuditLog
+    from app.models.evidence import ScrapedFieldEvidence
+    monkeypatch.setattr(assistant_staff_edits, "permissions", lambda actor: None)
+    async with store() as db:
+        row = await db.get(ScrapedCourse, 1)
+        action = {"id": "doc-proof", "_turnId": "turn", "_source": "https://www.example.edu/english.pdf",
+                  "_provenance": "official-document", "_targets": [{"id": 1, "version": service.row_version(row),
+                    "changes": [{"field": "ielts_reading", "newValue": 5.5,
+                                 "quote": "IELTS no component below 5.5", "page": 1}]}]}
+        await apply(db, SimpleNamespace(turn_id="turn"), action, 1, {"id": 1})
+        await db.commit()
+    async with store() as db:
+        assert (await db.get(ScrapedCourse, 1)).ielts_reading == 5.5
+        audits = (await db.execute(select(CourseAuditLog).where(
+            CourseAuditLog.action == "assistant_document_update"))).scalars().all()
+        assert len(audits) == 1 and "english.pdf" in audits[0].reason
+        proofs = (await db.execute(select(ScrapedFieldEvidence).where(
+            ScrapedFieldEvidence.scraped_course_id == 1,
+            ScrapedFieldEvidence.field_key == "ielts_reading"))).scalars().all()
+        assert len(proofs) == 1 and proofs[0].selected
+        with pytest.raises(ValueError, match="changed"):
+            await apply(db, SimpleNamespace(turn_id="turn"), action, 1, {"id": 1})
 import pytest_asyncio
 from fastapi import HTTPException
 from sqlalchemy import select, text
@@ -162,7 +204,9 @@ async def test_prompt_persists_and_is_private_to_actor(store, monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("alternative_readable", [True, False])
-async def test_lsbu_pdf_fallback_keeps_course_context_and_exact_source_urls(store, monkeypatch, alternative_readable):
+@pytest.mark.parametrize("update_requested", [True, False])
+async def test_lsbu_pdf_fallback_keeps_course_context_and_exact_source_urls(store, monkeypatch, alternative_readable, update_requested):
+    from app.services import assistant_document_review
     import json
     from app.services.assistant_official_sources import LSBU_ENGLISH_SOURCES
     from app.tasks.scrape_assistant import research_scrape
@@ -198,6 +242,7 @@ async def test_lsbu_pdf_fallback_keeps_course_context_and_exact_source_urls(stor
             "action": None,
         }
     monkeypatch.setattr(service, "inspect_source", source)
+    monkeypatch.setattr(assistant_document_review, "inspect_source", source)
     monkeypatch.setattr(service, "chat_json", answer)
     errors = []
     investigate = service._investigate
@@ -208,17 +253,31 @@ async def test_lsbu_pdf_fallback_keeps_course_context_and_exact_source_urls(stor
             errors.append(exc)
             raise
     monkeypatch.setattr(service, "_investigate", checked_investigation)
-    thread_id, turn_id = await prompt_thread(store, "Read English guidance " + requested + "; do not update anything")
+    prompt = (requested + "\nupdate each band ielts for all courses" if update_requested
+              else "Read English guidance " + requested + "; do not update anything")
+    thread_id, turn_id = await prompt_thread(store, prompt)
     await service.investigate(thread_id, turn_id)
     assert not errors, repr(errors[0]) if errors else ""
-    assert set(seen) == {requested, *LSBU_ENGLISH_SOURCES}
-    assert len(seen) == 3
+    if update_requested and alternative_readable:
+        assert {requested, LSBU_ENGLISH_SOURCES[0]} <= set(seen)
+    else:
+        assert {requested, *LSBU_ENGLISH_SOURCES} <= set(seen)
+    if not update_requested:
+        assert len(seen) == 3
     async with store() as db:
         result = await get_assistant("source", db, {"id": 1})
         assert result["status"] == "ready"
         reply = result["messages"][-1]
         assert not reply["actions"]
-        assert bool(reply["sources"]) is alternative_readable
+        if not update_requested:
+            assert bool(reply["sources"]) is alternative_readable
+        assert "edit form" not in reply["content"]
+        if not alternative_readable:
+            assert result["phase"] == "Source access blocked — 0 courses updated"
+            assert reply["sourceOutcome"] == "access_verification_failed"
+            assert reply.get("coursesUpdated", 0) == 0
+            assert reply["activity"][-1]["status"] == "error"
+            assert not any(event["label"] == "Official PDF unavailable" for event in reply["activity"])
 
 
 @pytest.mark.asyncio

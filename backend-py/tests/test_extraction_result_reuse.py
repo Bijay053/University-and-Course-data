@@ -75,6 +75,18 @@ def test_unproven_or_changed_evidence_is_never_reused(change):
     assert not cache.authoritative(value, URL, HTML)
 
 
+@pytest.mark.parametrize("method,accepted", [
+    ("course_name.title", True), ("course_name.h1", True),
+    ("course_name.title_openai", False), ("course_name.guessed", False),
+])
+def test_real_title_methods_still_require_selected_literal_source_proof(method, accepted):
+    value = result()
+    value["evidence"][0]["extraction_method"] = method
+    assert cache.authoritative(value, URL, HTML) is accepted
+    value["evidence"][0]["raw_value"] = "A title not on the source"
+    assert not cache.authoritative(value, URL, HTML)
+
+
 @pytest.mark.asyncio
 async def test_unknown_source_or_version_performs_fresh_extraction():
     extract = AsyncMock(return_value=result())
@@ -99,3 +111,34 @@ async def test_real_extract_only_path_reuses_current_html_and_retains_evidence(s
     second = await orchestrator._extract_only(link, "UK")
     assert extract.await_count == 1
     assert first["evidence"] == second["evidence"] and second["_result_cache_hit"]
+
+
+@pytest.mark.asyncio
+async def test_stale_source_config_audience_year_cannot_relabel_cached_authority(store):
+    """A prior audience/year receipt cannot become authority for a new retry."""
+    async with store() as db:
+        await cache.ensure_schema(db)
+        await db.commit()
+    prior = result()
+    extract = AsyncMock(return_value=prior)
+    await cache.reuse(URL, HTML, SCOPE, extract, session_factory=store)
+    original_key = cache.cache_key(URL, HTML, SCOPE)
+    current_html = HTML.replace("2027 GBP 20000", "2028 GBP 21000")
+    current_scope = {**SCOPE, "config": "config-v2", "audience": "international-new-intake", "year": 2028}
+    fresh = result()
+    fresh["payload"].update(international_fee=21000, fee_year=2028)
+    fresh["evidence"][1].update(normalized_value=21000,
+        raw_value="Overseas tuition 2028 GBP 21000 per year")
+    refresh = AsyncMock(return_value=fresh)
+    recovered = await cache.reuse(URL, current_html, current_scope, refresh, session_factory=store)
+    assert refresh.await_count == 1 and not recovered.get("_result_cache_hit")
+    assert recovered["payload"]["international_fee"] == 21000
+    assert recovered["evidence"] == fresh["evidence"]
+    # Persisted older authority remains intact, under its original exact key.
+    async with store() as db:
+        saved = await db.scalar(text(
+            "SELECT payload FROM scrape_extraction_result_cache WHERE cache_key=:key"),
+            {"key": original_key})
+    assert saved["scope"] == SCOPE and saved["result"] == prior
+    hit = await cache.reuse(URL, current_html, current_scope, refresh, session_factory=store)
+    assert hit["_result_cache_hit"] and refresh.await_count == 1

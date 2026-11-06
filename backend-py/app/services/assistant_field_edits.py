@@ -20,6 +20,11 @@ def edit_field(prompt):
 
 
 async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt):
+    # A document is evidence to investigate, not a literal replacement value.
+    # In particular "update each band IELTS" used to fall into unsupported
+    # manual editing before the source reader ever saw the supplied PDF.
+    if document_research_requested(prompt):
+        return False
     from app.services.assistant_eligibility import scope
     rows = scope(prompt, ctx["samples"])
     field = edit_field(prompt)
@@ -136,3 +141,17 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt):
         "content": content, "actions": [], "sources": [],
     }, detail="Field edit resolved without discovery.")
     return True
+
+
+def document_research_requested(prompt):
+    """Keep source-based updates on the research path, without changing URLs.
+
+    Explicit staff values are handled by the staff-edit router before this
+    handler. This gate must not fetch, parse scores from filenames, or create
+    courses merely because a document URL appears in the request.
+    """
+    return bool(
+        re.search(r"https://[^\s<>`]+\.pdf(?:[?#][^\s<>`]*)?(?=[\s`)>.,]|$)", prompt, re.I)
+        or re.search(r"\b(?:this|the|attached|uploaded|official)\s+(?:\w+\s+){0,3}PDF\b", prompt, re.I)
+        or re.search(r"\b(?:from|using|read|check|extract)\b.{0,80}\bPDF\b", prompt, re.I)
+    )

@@ -1,0 +1,70 @@
+{
+  "environment": "workspace",
+  "executedAt": "2026-11-06T08:27:11Z",
+  "parserSourceHash": "77a1614d2204cf36e51721a01d2913747d3ede1c37db70f1e609feb1962f2817",
+  "canarySourceHash": "6fbbdfc2907910be04097abae9b67b13cef11eb228f706c73b90f1e78b344080",
+  "source": {
+    "url": "https://www.winchester.ac.uk/study/undergraduate/courses/llb-hons-law/",
+    "sha256": "9b9f98ca069009485cc5e2284e21ad19da58ebcc78b4e1b8edb85fcc5626c9bf",
+    "bytes": 163023,
+    "robotsChecked": true
+  },
+  "liveCanary": {"passed": 2, "failed": 0, "durationSeconds": 42.71},
+  "deterministicRegression": {"passed": 119, "failed": 0, "warnings": 2, "durationSeconds": 57.66},
+  "fullScraperRegression": {"passed": 7596, "skipped": 93, "deselected": 30, "failed": 0, "warnings": 47, "durationSeconds": 1543.83},
+  "fullRegressionFollowOn": {"passed": 22, "failed": 0, "warnings": 1, "durationSeconds": 10.79},
+  "completionValidation": {
+    "configuredShellChecksCompleted": 24,
+    "configuredShellChecksFailed": 0,
+    "automaticTracking": "Stopped after its 30-minute tracking window; the full scraper regression and 20 other checks had already passed.",
+    "remainingChecksExecutedUnchangedManually": [
+      {"name": "partial-release-recovery", "exitCode": 0, "passed": 224, "skipped": 6, "durationSeconds": 212.81},
+      {"name": "pending-import-reuse", "exitCode": 0, "passed": 48, "warnings": 2, "durationSeconds": 17.69},
+      {"name": "selective-retry-safety", "exitCode": 0, "passed": 605, "skipped": 3, "warnings": 2, "durationSeconds": 131.30}
+    ],
+    "browserFailureCleanup": "AsyncExitStack closes Chromium before its Playwright driver, including assertion failures."
+  },
+  "cases": [
+    {
+      "case": "valid",
+      "passed": true,
+      "cacheHit": true,
+      "fullExtractions": 0,
+      "attempts": [
+        {"ordinal": 1, "outcome": "error", "at": "2026-11-06T08:26:56.748153+00:00", "reservationId": "f2d2c2c1f1784de7817851cb650e1b6d", "resultHash": "ec1c73783e5afcf4f45967a511ad6bb4bd1c2632b1ef94bbe0223209c136a3d0"},
+        {"ordinal": 2, "outcome": "extracted", "at": "2026-11-06T08:26:57.795791+00:00", "reservationId": "2d6d89bcd75a49bf8935e6a4eb90cdd6", "resultHash": "7b054d1b869f758453e89838f18bf47c2f0066fd2ebd40433de3b93d1539fb3d"}
+      ],
+      "childJobId": "job-aa1cfa65708b435e869549b85e4a96ae",
+      "taskId": "00403e14-a0c1-4c2f-a584-915098f7d495",
+      "taskState": "SUCCESS",
+      "pendingRowId": 2,
+      "selectedEvidenceIds": [2, 3],
+      "successfulStateUnchanged": true,
+      "cleanupVerified": true
+    },
+    {
+      "case": "mismatch",
+      "passed": true,
+      "cacheHit": false,
+      "fullExtractions": 1,
+      "attempts": [
+        {"ordinal": 1, "outcome": "error", "at": "2026-11-06T08:27:10.157836+00:00", "reservationId": "1a99e93066904155b1c82179848ee9f0", "resultHash": "ec1c73783e5afcf4f45967a511ad6bb4bd1c2632b1ef94bbe0223209c136a3d0"},
+        {"ordinal": 2, "outcome": "extracted", "at": "2026-11-06T08:27:11.188986+00:00", "reservationId": "b5b3cea9d56143f9af8e1cd59bfab5aa", "resultHash": "d615d0a0cbe426fa19a39ed4f7a578ed1f531904c3a74001a716c4a1828c9808"}
+      ],
+      "childJobId": "job-da950169b9ec4d9a841c06bdbb033ddd",
+      "taskId": "24c5df46-3885-4009-9f6e-cb552a075ca3",
+      "taskState": "SUCCESS",
+      "pendingRowId": 2,
+      "selectedEvidenceIds": [11, 4, 2, 9, 3, 8, 6, 7, 5, 10, 12],
+      "successfulStateUnchanged": true,
+      "cleanupVerified": true
+    }
+  ],
+  "otpRequired": true,
+  "modelCalls": 0,
+  "modelBudget": "No model request; reservation not needed",
+  "publishedWrites": 0,
+  "forbiddenOperations": [],
+  "chatSummaryBothCases": "1 URLs stored pending, 0 skipped, 0 unverified. Nothing published.",
+  "productionAcceptance": false
+}

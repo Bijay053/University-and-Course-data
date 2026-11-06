@@ -22,7 +22,35 @@ CASES = [
     ("set duration 2 years on all courses", {"duration":2, "duration_term":"Year"}),
     ("in all missing course intake add intake Feb, July\nalso in all course location add sydney",
      {"intake_months": ["February", "July"], "course_location": "Sydney"}),
+    ("set IELTS reading 5.5 on all courses", {"ielts_reading": 5.5}),
+    ("set IELTS each band 5.5 on all courses",
+     {f"ielts_{k}": 5.5 for k in ("listening", "reading", "writing", "speaking")}),
 ]
+
+
+@pytest.mark.asyncio
+async def test_literal_value_with_pdf_reference_edits_without_document_research(store, monkeypatch):
+    from app.services import assistant_document_review
+    await seed_thread(store)
+    prompt = "set IELTS reading 5.5 on row 1 source: https://www.example.edu/english.pdf"
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, "eligibility")
+        thread.status, thread.run_id = "queued", None
+        thread.messages = [{"role": "user", "content": prompt, "_engine": "legacy"}]
+        await db.commit()
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("A staff literal must not fetch the reference PDF")
+    monkeypatch.setattr(assistant_document_review, "review", forbidden)
+    await service.investigate("eligibility", "turn")
+    async with store() as db:
+        row = await db.get(ScrapedCourse, 1)
+        assert row.ielts_reading == 5.5
+        proof = (await db.execute(select(ScrapedFieldEvidence).where(
+            ScrapedFieldEvidence.scraped_course_id == 1,
+            ScrapedFieldEvidence.field_key == "ielts_reading",
+            ScrapedFieldEvidence.selected.is_(True),
+        ))).scalar_one()
+        assert proof.validation_status == "staff-provided"
 
 COMPOUND = "in all missing course intake add intake Feb, July\n\nalso in all course location add sydney"
 NATURAL_BULK = "In all courses with missing intake information, add February and July. Also, add Sydney to all course locations."

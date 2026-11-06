@@ -21,9 +21,15 @@ def scope_option_html(html,url):
         if tab.get("href")!="#"+selected:tab.decompose()
     return str(soup)
 
-async def expand_links(links,max_courses,fetch=None,*,parallel=1,on_progress=None,stop_flag=None):
-    """Expand course-owned options before extraction; reuse the exact source HTML."""
+async def iter_expanded_links(links,max_courses,fetch=None,*,parallel=1,on_progress=None,
+                             stop_flag=None,ordered=False,fetch_gate=None):
+    """Yield source-owned option groups with bounded fetch/parse lookahead.
+
+    The consumer owns this iterator and must close it on early exit. No DB
+    work happens in preparation tasks; extraction/staging remain consumer-owned.
+    """
     import asyncio
+    from contextlib import nullcontext
     if fetch is None:
         from app.services.scrape_assistant_tools import public_request
         fetch=public_request
@@ -33,79 +39,102 @@ async def expand_links(links,max_courses,fetch=None,*,parallel=1,on_progress=Non
         and "surrey_option" not in parse_qs(urlsplit(link.get("url","")).query)))
     if len(sources)>max_courses:
         raise ValueError("Surrey source count exceeds the configured course limit; catalogue was not truncated.")
-    cache={};parsed={};result=[];surrey_count=0;completed=0
-    sem=asyncio.Semaphore(min(16,max(1,int(parallel))))
+    completed=0
+    width=min(16,max(1,int(parallel)))
+    groups={}
+    for link in links:
+        groups.setdefault(link.get("url",""),[]).append(link)
     async def observe(kind,url,**fields):
         if on_progress:
             await on_progress(kind=kind,url=url,completed=completed,total=len(sources),**fields)
     async def prepare(url):
         nonlocal completed
-        async with sem:
-            if stop_flag and stop_flag[0]:
-                raise asyncio.CancelledError()
-            await observe("course_prepare_start",url)
-            started=time.monotonic()
-            try:
+        if stop_flag and stop_flag[0]:
+            raise asyncio.CancelledError()
+        p=urlsplit(url)
+        if p.hostname not in {"www.surrey.ac.uk","surrey.ac.uk"} or "surrey_option" in parse_qs(p.query):
+            return groups[url]
+        await observe("course_prepare_start",url)
+        started=time.monotonic()
+        try:
+            # Include parsing in the slot: fast downloads cannot create an
+            # unbounded backlog of CPU work or retained source documents.
+            async with fetch_gate if fetch_gate is not None else nullcontext():
+                if stop_flag and stop_flag[0]:
+                    raise asyncio.CancelledError()
                 raw=await asyncio.wait_for(fetch(url),15)
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                await observe("course_prepare_error",url,error=type(exc).__name__,
-                              durationSeconds=time.monotonic()-started)
-                raise
-            cache[url]=raw.decode("utf-8",errors="replace") if isinstance(raw,bytes) else raw
+            html=raw.decode("utf-8",errors="replace") if isinstance(raw,bytes) else raw
             await observe("course_source_fetched",url,durationSeconds=time.monotonic()-started)
             if stop_flag and stop_flag[0]:
                 raise asyncio.CancelledError()
-    tasks=[asyncio.create_task(prepare(url)) for url in sources]
-    try:
-        if tasks:
-            await asyncio.gather(*tasks)
-    finally:
-        for task in tasks:
-            if not task.done():
-                task.cancel()
-        if tasks:
-            await asyncio.gather(*tasks,return_exceptions=True)
-    for link in links:
-        if stop_flag and stop_flag[0]:
-            raise asyncio.CancelledError()
-        url=link.get("url","")
-        p=urlsplit(url)
-        if p.hostname not in {"www.surrey.ac.uk","surrey.ac.uk"}:
-            result.append(link);continue
-        if "surrey_option" in parse_qs(p.query):
-            result.append(link)
-            surrey_count += 1
-            if surrey_count > max_courses:
-                raise ValueError("Surrey option count exceeds the configured course limit; increase it before retrying. Catalogue was not truncated.")
-            continue
-        html=cache[url]
-        if url not in parsed:
             await observe("course_prepare_parse_start",url)
             started=time.monotonic()
-            try:
-                # DOM parsing is CPU work. Do not block the worker's heartbeat,
-                # stop poller or buffered-log writer while parsing a catalogue.
-                parsed[url]=await asyncio.to_thread(surrey_options,html,url)
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                await observe("course_prepare_error",url,error=type(exc).__name__,
-                              durationSeconds=time.monotonic()-started)
-                raise
+            options=await asyncio.to_thread(surrey_options,html,url)
             completed+=1
             await observe("course_prepare_done",url,durationSeconds=time.monotonic()-started,
-                          variants=len(parsed[url]) or 1)
-        options=parsed[url]
-        # Keep part-time options; staging adds mandatory eligibility review.
-        if options:
-            result.extend({**link,"name":o["course_name"],"url":option_url(url,o["key"]),
-                           "_surrey_html":html} for o in options)
-        else:result.append({**link,"_surrey_html":html})
-        surrey_count += len(options) if options else 1
-        if surrey_count>max_courses:
-            raise ValueError("Surrey option count exceeds the configured course limit; increase it before retrying. Catalogue was not truncated.")
+                          variants=len(options) or 1)
+            return [
+                {**link,"name":o["course_name"],"url":option_url(url,o["key"]),"_surrey_html":html}
+                for link in groups[url] for o in options
+            ] if options else [{**link,"_surrey_html":html} for link in groups[url]]
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            await observe("course_prepare_error",url,error=type(exc).__name__,
+                          durationSeconds=time.monotonic()-started)
+            raise
+
+    pending={}
+    remaining=iter(groups)
+    counted=set()
+    def fill():
+        while len(pending)<width:
+            url=next(remaining,None)
+            if url is None:break
+            pending[asyncio.create_task(prepare(url))]=url
+    try:
+        fill()
+        while pending:
+            if stop_flag and stop_flag[0]:
+                raise asyncio.CancelledError()
+            if ordered:
+                ready=[next(iter(pending))]
+                done,_=await asyncio.wait(ready,timeout=.25)
+            else:
+                done,_=await asyncio.wait(pending,timeout=.25,return_when=asyncio.FIRST_COMPLETED)
+            ready=done
+            for task in ready:
+                pending.pop(task)
+                batch=task.result()
+                counted.update(link.get("url","") for link in batch
+                               if urlsplit(link.get("url","")).hostname in
+                               {"www.surrey.ac.uk","surrey.ac.uk"})
+                if len(counted)>max_courses:
+                    raise ValueError("Surrey option count exceeds the configured course limit; increase it before retrying. Catalogue was not truncated.")
+                yield batch
+            fill()
+    finally:
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending,return_exceptions=True)
+
+
+async def expand_links(links,max_courses,fetch=None,*,parallel=1,on_progress=None,stop_flag=None):
+    """Compatibility collector for bounded samples and non-streaming callers."""
+    from collections import Counter, deque
+    from contextlib import aclosing
+    counts=Counter(link.get("url","") for link in links)
+    keys=iter(counts)
+    prepared={}
+    async with aclosing(iter_expanded_links(links,max_courses,fetch,parallel=parallel,
+                        on_progress=on_progress,stop_flag=stop_flag,ordered=True)) as stream:
+        async for batch in stream:
+            prepared[next(keys)]=deque(batch)
+    widths={url:len(batch)//counts[url] for url,batch in prepared.items()}
+    result=[]
+    for link in links:
+        url=link.get("url","")
+        result.extend(prepared[url].popleft() for _ in range(widths[url]))
     return result
 
 def clean_uk_title(name):

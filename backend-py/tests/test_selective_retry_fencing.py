@@ -76,3 +76,42 @@ async def test_lost_ownership_never_falls_back_to_uncached_network(db_factory):
         await reuse("https://example.edu/course", "<h1>Course</h1>",
                     {"config": "cfg", "parser": "parser"}, fresh, session_factory=db_factory)
     fresh.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_selected_worker_uses_real_generation_aware_broker_locks(db_factory):
+    """Selected retries must reach transport, without weakening Redis fencing."""
+    from redis.asyncio import Redis
+    from tests.helpers.run_disposable_redis import private_broker
+    from app.services.scraper import fenced_redis_locks as locks
+
+    jid = await child(db_factory)
+    async with db_factory() as db:
+        owner = await fences.claim(db, "selective-retry:" + jid)
+        await db.commit()
+    with private_broker() as port:
+        async with Redis.from_url(f"redis://127.0.0.1:{port}/0", decode_responses=True) as redis:
+            with fences.ownership_scope(owner):
+                async with db_factory() as db:
+                    assert await locks.acquire_university_lock(db, redis, "uni:canary", jid)
+                    assert await locks.acquire_global_slot(
+                        db, redis, "slots:canary", jid, now=1, limit=1)
+                    await db.commit()
+                async with db_factory() as db:
+                    with pytest.raises(fences.OwnershipLost):
+                        await locks.acquire_university_lock(db, redis, "uni:other", "unrelated")
+            # A wrong generation cannot release the selected worker's slot.
+            assert not await locks.release_university_lock(redis, "uni:canary", jid, "wrong")
+            assert not await locks.release_global_slot(redis, "slots:canary", jid, "wrong")
+            assert await redis.get("uni:canary") == jid
+            assert await redis.zcard("slots:canary") == 1
+            async with db_factory.kw["bind"].begin() as control:
+                await control.execute(text(
+                    "UPDATE autonomous_worker_claims SET state='revoked',proof='worker_lost' WHERE claim_key=:key"
+                ), {"key": owner.key})
+            with fences.ownership_scope(owner):
+                async with db_factory() as db:
+                    with pytest.raises(fences.OwnershipLost):
+                        await locks.acquire_university_lock(db, redis, "uni:canary", jid)
+            assert await locks.release_university_lock(redis, "uni:canary", jid, owner.generation)
+            assert await locks.release_global_slot(redis, "slots:canary", jid, owner.generation)

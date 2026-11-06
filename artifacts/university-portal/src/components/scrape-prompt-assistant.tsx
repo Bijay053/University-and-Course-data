@@ -5,7 +5,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertCircle, ArrowDown, ArrowUp, ExternalLink, Loader2, ShieldAlert, Sparkles, Wrench } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowUp, ExternalLink, FileText, Loader2, Paperclip, ShieldAlert, Sparkles, Wrench, X } from "lucide-react";
+import { DocumentReviewView, type DocumentReview } from "./assistant-document-review";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { useAuth } from "@/context/auth";
 import { safeSourceUrl } from "./assistant-safe-url";
@@ -17,7 +18,7 @@ export { safeSourceUrl };
 export type AssistantSource = { url: string; title: string; excerpt: string; page?: number; quoteId?: string };
 export type AssistantAction = {
   id: string;
-  kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed";
+  kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed" | "document_update";
   requiresConfirmation?: boolean;
   label: string;
   courseCount: number;
@@ -52,6 +53,7 @@ export type AssistantMessage = {
   /** Archived real tool events for the turn this reply concluded. */
   activity?: AssistantActivity[];
   comparison?: CatalogueComparison;
+  documentReview?: DocumentReview;
 };
 export type AssistantRelatedReview = { jobId: string; courseName: string; status: string };
 export type AssistantThread = {
@@ -79,6 +81,19 @@ export type ScrapePromptAssistantProps = {
 };
 
 export const ASSISTANT_POLL_MS = 1000;
+export const MAX_DOCUMENT_BYTES = 2_000_000;
+/** Kinds that must never run without an explicit confirmation dialog. */
+export function actionNeedsConfirmation(a: AssistantAction): boolean {
+  return !!a.requiresConfirmation || ["runtime_tuning", "staff_edit", "staff_location", "undo_staff_location", "document_update"].includes(a.kind);
+}
+export function validateDocument(file: File): string | null {
+  const isPdf = file.type === "application/pdf" && /\.pdf$/i.test(file.name);
+  if (!isPdf) return "Only PDF documents can be attached.";
+  if (file.size <= 0) return "The selected PDF is empty.";
+  if (file.size > MAX_DOCUMENT_BYTES) return "PDF is larger than the 2 MB (2,000,000 bytes) limit.";
+  return null;
+}
+type Attachment = { key: string; seq: number; name: string; size: number; status: "uploading" | "ready" | "error"; token: string | null; error: string | null };
 export const AUTO_CORRECTABLE_FIELDS = ["international_fee", "ielts_overall", "duration", "course_location"] as const;
 const FIELD_LABELS: Record<string, string> = {
   international_fee: "International fee",
@@ -259,6 +274,10 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
   const nearBottom = useRef(true);
   const [showJump, setShowJump] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const uploadSeq = useRef(0);
+  const [attachState, setAttachState] = useState<Attachment | null>(null);
+  const attachment = attachState && attachState.key === viewKey ? attachState : null;
 
   const base = `/api/scrape/jobs/${encodeURIComponent(jobId)}/assistant`;
 
@@ -284,6 +303,8 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     setActionBusy(false);
     setSubmitting(false);
     setShowJump(false);
+    setAttachState(null);
+    uploadSeq.current++;
     nearBottom.current = true;
     seenCompleted.current = null;
     mutateAbort.current?.abort();
@@ -377,12 +398,46 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
   }, [prompt]);
 
+  const clearAttachment = () => { uploadSeq.current++; setAttachState(null); if (fileRef.current) fileRef.current.value = ""; };
+  const attach = async (file: File) => {
+    if (!viewKey) return;
+    const forKey = viewKey;
+    const seq = ++uploadSeq.current;
+    const baseAtt = { key: forKey, seq, name: file.name, size: file.size, token: null };
+    const invalid = validateDocument(file);
+    if (invalid) { setAttachState({ ...baseAtt, status: "error", error: invalid }); return; }
+    setAttachState({ ...baseAtt, status: "uploading", error: null });
+    const current = () => uploadSeq.current === seq && viewKeyRef.current === forKey;
+    try {
+      const res = await fetch(`${base}/documents/upload-url`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, size: file.size, contentType: "application/pdf" }),
+      });
+      if (!res.ok) throw new Error(await errorFor(res));
+      const grant = await readResponseJson<{ uploadUrl: string; fields: Record<string, string>; documentToken: string }>(res);
+      if (!grant?.uploadUrl || !grant.documentToken) throw new Error("Upload could not be prepared.");
+      if (!current()) return;
+      const form = new FormData();
+      Object.entries(grant.fields ?? {}).forEach(([k, v]) => form.append(k, String(v)));
+      form.append("file", file);
+      const up = await fetch(grant.uploadUrl, { method: "POST", body: form });
+      if (!up.ok) throw new Error(`Document upload failed (${up.status}).`);
+      if (!current()) return;
+      setAttachState({ ...baseAtt, status: "ready", token: grant.documentToken, error: null });
+    } catch (err) {
+      if (current()) setAttachState({ ...baseAtt, status: "error", error: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
   const trimmed = prompt.trim();
   const lengthOk = trimmed.length > 0;
   const busy = submitting || active;
+  const attachBlocks = !!attachment && attachment.status !== "ready";
 
   const submit = async () => {
-    if (!lengthOk || busy || disabled || !viewKey) return;
+    if (!lengthOk || busy || disabled || !viewKey || attachBlocks) return;
+    const sentSeq = attachment?.seq;
+    const documentToken = attachment?.token ?? undefined;
     setSubmitting(true);
     setSubmitError(null);
     nearBottom.current = true;
@@ -394,14 +449,17 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: trimmed }),
+        body: JSON.stringify(documentToken ? { prompt: trimmed, documentToken } : { prompt: trimmed }),
         signal: ctrl.signal,
       });
       if (!res.ok) throw new Error(await errorFor(res));
       const t = await readResponseJson<AssistantThread>(res);
       if (!t) throw new Error("Assistant returned an empty response.");
       accept(forKey, t);
-      if (viewKeyRef.current === forKey) setPrompt("");
+      if (viewKeyRef.current === forKey) {
+        setPrompt("");
+        if (sentSeq !== undefined && uploadSeq.current === sentSeq) clearAttachment();
+      }
     } catch (err) {
       // Draft is kept so the user can retry.
       if (!ctrl.signal.aborted) setSubmitError(err instanceof Error ? err.message : String(err));
@@ -497,8 +555,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
           </details>
           {a.state === "proposed" && (
             <Button size="sm" variant="outline" className="mt-2 h-8 border-amber-300 text-[12px]" disabled={disabled || actionBusy || (isImport(a) && importsBlocked)}
-              onClick={() => a.requiresConfirmation || a.kind === "runtime_tuning" || a.kind === "staff_edit" || a.kind === "staff_location" || a.kind === "undo_staff_location"
-                ? openConfirm(a) : void runAction(a)} data-testid={`button-run-action-${a.id}`}>
+              onClick={() => actionNeedsConfirmation(a) ? openConfirm(a) : void runAction(a)} data-testid={`button-run-action-${a.id}`}>
               {isImport(a) && importsBlocked ? "Imports paused or status unavailable" : a.kind === "undo_staff_location" ? "Undo locations" : "Run now"}
             </Button>
           )}
@@ -638,6 +695,9 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                           {m.comparison && typeof m.comparison === "object" && (
                             <CatalogueComparisonView comparison={m.comparison} onReviewJob={onReviewJob} testId={`assistant-comparison-${i}`} />
                           )}
+                          {m.documentReview && typeof m.documentReview === "object" && (
+                            <DocumentReviewView review={m.documentReview} testId={`assistant-document-review-${i}`} />
+                          )}
                           {renderActions(m)}
                         </div>
                       </li>
@@ -699,6 +759,21 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
       {thread && (
         <form onSubmit={e => { e.preventDefault(); void submit(); }} className="border-t border-slate-200/80 bg-[#fbfaf6] px-4 py-3 sm:px-6">
           <label htmlFor={`assistant-prompt-${jobId}`} className="sr-only">Message the scrape assistant</label>
+          {attachment && (
+            <div className={`mb-2 flex items-center gap-2 rounded-xl border px-3 py-1.5 text-[12px] ${attachment.status === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-teal-200 bg-teal-50/60 text-teal-950"}`} data-testid="assistant-attachment" data-status={attachment.status}>
+              {attachment.status === "uploading" ? <Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin" aria-hidden /> : <FileText className="h-3.5 w-3.5" aria-hidden />}
+              <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
+              <span className="shrink-0 font-mono text-[11px]" role="status" data-testid="text-attachment-status">
+                {attachment.status === "uploading" ? "Uploading" : attachment.status === "ready" ? `${(attachment.size / 1_000_000).toFixed(2)} MB · Ready` : attachment.error}
+              </span>
+              <button type="button" onClick={clearAttachment} aria-label="Remove attachment" disabled={submitting}
+                className="rounded p-0.5 hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600" data-testid="button-remove-attachment">
+                <X className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            </div>
+          )}
+          <input ref={fileRef} type="file" accept="application/pdf,.pdf" className="hidden" data-testid="input-assistant-document"
+            onChange={e => { const f = e.target.files?.[0]; if (f) void attach(f); e.target.value = ""; }} />
           <div className="flex items-end gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 focus-within:border-teal-600 focus-within:ring-2 focus-within:ring-teal-600/20 motion-safe:transition-shadow">
             <textarea
               ref={inputRef}
@@ -718,13 +793,18 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
               className="max-h-60 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[13.5px] leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-60"
               data-testid="input-assistant-prompt"
             />
+            <Button type="button" size="icon" variant="ghost" aria-label="Attach PDF (max 2 MB)"
+              className="h-8 w-8 shrink-0 rounded-full text-teal-800 hover:bg-teal-50"
+              disabled={disabled || submitting} onClick={() => fileRef.current?.click()} data-testid="button-attach-document">
+              <Paperclip className="h-4 w-4" aria-hidden />
+            </Button>
             <Button type="submit" size="icon" aria-label={active ? "Assistant is working" : submitting ? "Sending" : "Send message"}
               className="h-8 w-8 shrink-0 rounded-full bg-teal-800 text-teal-50 hover:bg-teal-900 disabled:bg-slate-300"
-              disabled={disabled || busy || !lengthOk} data-testid="button-assistant-submit">
+              disabled={disabled || busy || !lengthOk || attachBlocks} data-testid="button-assistant-submit">
               {busy ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden /> : <ArrowUp className="h-4 w-4" aria-hidden />}
             </Button>
           </div>
-          <p id={`assistant-hint-${jobId}`} className="mt-1.5 text-[11px] text-slate-500">Enter to send, Shift+Enter for a new line.</p>
+          <p id={`assistant-hint-${jobId}`} className="mt-1.5 text-[11px] text-slate-500">Enter to send, Shift+Enter for a new line. Attach one PDF up to 2 MB.</p>
           {submitError && (
             <p role="alert" className="mt-1 text-[12px] text-red-700" data-testid="assistant-submit-error">{submitError}</p>
           )}
@@ -754,11 +834,13 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                     ? "This runs the existing configured full catalogue discovery for this university, bypassing cached pages, as a review-only run. It does not delete existing review rows. It may take considerably longer than the quick check. It cannot guarantee that every course on the website is discoverable, and it does not approve, delete or publish anything."
                     : confirming?.kind === "review_courses"
                     ? "This fetches the requested official course URLs into a fresh pending review. It does not rename the course in the current review or duplicate a published course."
+                    : confirming?.kind === "document_update"
+                    ? "This applies the document-sourced before/after values listed in the chat to the matched records. Each value cites the quoted PDF page."
                     : confirming?.kind === "retry_failed"
                       ? "This retries only the selected, settled failures. Attempt limits and backoff are listed in the chat. Successful URLs are not replayed."
                     : "This re-extracts the listed fields for staged review courses."}
                   {confirming?.kind === "runtime_tuning" ? ""
-                    : confirming?.kind === "staff_location" || confirming?.kind === "undo_staff_location" || confirming?.kind === "staff_edit" ? ` It changes ${confirming.courseCount} listed records, including ${confirming.publishedCount ?? 0} published records.`
+                    : confirming?.kind === "staff_location" || confirming?.kind === "undo_staff_location" || confirming?.kind === "staff_edit" || confirming?.kind === "document_update" ? ` It changes ${confirming.courseCount} listed records, including ${confirming.publishedCount ?? 0} published records.`
                     : confirming?.kind === "scan_catalogue" ? " Results land in review data only."
                     : confirming?.kind === "recover_catalogue" ? ` It checks ${selectedUrls.length} selected link${selectedUrls.length === 1 ? "" : "s"}; results land in review data only.`
                     : ` It affects ${confirming?.courseCount} course${confirming?.courseCount === 1 ? "" : "s"} in review data only.`}

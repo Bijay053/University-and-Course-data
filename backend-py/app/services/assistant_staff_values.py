@@ -30,7 +30,8 @@ def staff_scope(prompt, samples, *, all_courses=False):
     ids = {int(n) for n in re.findall(r"\b(?:row|record)\s*#?\s*(\d+)\b", target_text, re.I)}
     if ids:
         return [row for row in samples if row["id"] in ids]
-    urls = {u.rstrip("/.,);") for u in re.findall(r"https://[^\s]+", target_text)}
+    urls = {u.rstrip("/.,);") for u in re.findall(r"https://[^\s]+", target_text)
+            if not re.search(r"\.pdf(?:[?#]|$)", u.rstrip("/.,);"), re.I)}
     if urls:
         return [row for row in samples if (row.get("url") or "").rstrip("/") in urls]
     normal = lambda text: " ".join(re.findall(r"\w+", (text or "").casefold()))
@@ -127,7 +128,7 @@ def parse(prompt, messages=()):
         return StaffRequest({}, True, prompt, "There is no prior explicit staff edit to repeat.")
     match = re.search(
         r"\b(?:add|set|change|update|edit)\s+(?:the\s+)?(?:course\s+)?"
-        r"(intakes?|fees?|tuition|ielts|duration|name|pte|toefl|cricos(?: code)?)"
+        r"(intakes?|fees?|tuition|ielts(?:\s+(?:overall|listening|reading|writing|speaking|each band|all bands))?|duration|name|pte|toefl|cricos(?: code)?)"
         r"\b\s*(?:=|to\b|as\b|:)?\s*(.*)", prompt, re.I)
     if not match:
         # Keep legacy location grammar without allowing its history scan.
@@ -138,11 +139,18 @@ def parse(prompt, messages=()):
     all_courses = bool(re.search(r"\ball\s+(?:\w+\s+)?courses?\b", prompt, re.I))
     value = re.split(r"\s+(?:(?:on|in|to)\s+(?:all\b|row\b|record\b|course\b)|for\s+(?!20\d{2}\b))",
                      text, maxsplit=1, flags=re.I)[0].strip().rstrip(".!")
+    # An attached/reference URL is not itself a literal field value.
+    value = re.sub(r"\s+(?:(?:source|reference|see)\s*:?\s*)?https://\S+.*$", "", value, flags=re.I).strip()
     request = StaffRequest({}, all_courses, prompt)
     # Bare source-recovery requests still belong to the evidence-backed path.
     if not value or re.match(r"^(?:from|using|based on|according to|missing\b)", value, re.I):
         return None
-    if field.startswith("intake"):
+    if field.startswith("ielts "):
+        part = field.split(" ", 1)[1]
+        if re.fullmatch(r"\d(?:\.\d)?", value) and 0 < float(value) <= 9 and float(value)*2 == int(float(value)*2):
+            parts = ("listening", "reading", "writing", "speaking") if part in {"each band", "all bands"} else (part,)
+            request.values = {"ielts_" + p: float(value) for p in parts}
+    elif field.startswith("intake"):
         parts = re.split(r"\s*(?:,|/|&|\band\b)\s*", value, flags=re.I)
         lookup = {m.lower(): m for m in MONTHS}
         lookup.update({m[:3].lower(): m for m in MONTHS})

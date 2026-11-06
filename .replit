@@ -124,6 +124,10 @@ args = "scrape-chat-ui"
 task = "workflow.run"
 args = "live-runtime-controls"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "surrey-streaming-safety"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -418,6 +422,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_scrape_runtime_controls.py tests/test_live_scrape_diagnostics.py tests/test_runtime_course_progress.py -q -c /dev/null --noconftest -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "surrey-streaming-safety"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_surrey_streaming.py tests/test_uk_course_scenarios.py tests/test_live_pipeline_diagnostics.py tests/test_surrey_source_boundaries.py tests/test_task229_resume_and_limits.py tests/test_uel_variants.py tests/test_uel_source_capture.py -q -c /dev/null --noconftest -p no:cacheprovider"
 
 [workflows.workflow.metadata]
 isValidation = true

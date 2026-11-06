@@ -26,3 +26,15 @@ Verify recovery invariants only after the actual Celery task returns, using a fr
 **Why:** A terminal job row is not proof that the worker lifecycle has finished: post-terminal recovery work may still mutate data. Logs alone also cannot prove reload persistence.
 
 **How to apply:** Wait for an exact-job task completion signal before taking authoritative snapshots; compare diagnostics and protected records from that snapshot with fresh API projections.
+
+Changing Celery's broker configuration does not clear its cached connection and producer pools.
+
+**Why:** Consecutive private-broker cases otherwise publish the second case into the first case's stopped broker, even though the worker itself connects to the new address.
+
+**How to apply:** Give each case a private Celery app or explicitly isolate both cached pools when switching a test-owned app's broker. Do not reset pools used by live workers.
+
+Explicitly inject session factories into worker runtime controls in multi-case acceptance tests.
+
+**Why:** Python default arguments can retain the first case's private factory when a module is imported after fixture patching. The next case can silently query the previous schema.
+
+**How to apply:** Pass the current private factory explicitly and guard SQL execution against any other engine, rather than assuming a module-level factory patch reaches captured defaults.

@@ -1,0 +1,9 @@
+{
+  "environment": "production",
+  "executed": false,
+  "passed": null,
+  "courseWrites": 0,
+  "publication": false,
+  "deploymentAttempted": false,
+  "reason": "Workspace canary is not production acceptance. No production connection or deployment was attempted for this task."
+}

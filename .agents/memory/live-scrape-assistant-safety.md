@@ -25,6 +25,16 @@ to increase website load. A larger global maximum alone is not safe authority.
 Treat an increase beyond the starting ceiling as a separate reviewed
 configuration decision, never as a live-assistant shortcut.
 
+When source preparation overlaps extraction, both must share the job's live
+admission ceiling. A separate bounded preparation pool is not permission to
+increase total in-flight network work.
+
+**Why:** Two individually compliant pools can double the university's load when
+they run concurrently, and a runtime reduction would otherwise affect only one.
+
+**How to apply:** Share admission across overlapping phases, while keeping source
+preparation counters separate from settled option/extraction progress.
+
 Keep deterministic live controls independent of experimental assistant-engine
 rollouts.
 

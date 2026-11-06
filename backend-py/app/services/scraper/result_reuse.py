@@ -25,6 +25,7 @@ TTL_SECONDS = 300
 MAX_BYTES = 262144
 METHODS = ("regex", "css", "xpath", "static", "structured", "json_ld", "jsonld",
            "surrey_option", "uws_structured", "course_facts")
+TITLE_METHODS = {"course_name.title", "course_name.h1"}
 
 
 def fingerprint(value):
@@ -52,7 +53,9 @@ def authoritative(result, url, html=None):
     source_text = " ".join(unescape(re.sub(r"<[^>]+>", " ", html)).split())
     for e in evidence:
         method = str(e.get("extraction_method") or "")
-        if e.get("source_url") != url or not method.startswith(METHODS) or re_ai(method):
+        if e.get("source_url") != url or (
+            not method.startswith(METHODS) and method not in TITLE_METHODS
+        ) or re_ai(method):
             return False
         quote = " ".join(str(e.get("raw_value") or "").split())
         if not quote or quote not in source_text:
