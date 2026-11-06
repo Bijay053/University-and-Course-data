@@ -18,6 +18,7 @@ export type AssistantSource = { url: string; title: string; excerpt: string; pag
 export type AssistantAction = {
   id: string;
   kind: "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit";
+  requiresConfirmation?: boolean;
   label: string;
   courseCount: number;
   publishedCount?: number;
@@ -498,7 +499,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             <Button size="sm" variant="outline" className="mt-2 h-8 border-amber-300 text-[12px]" disabled={disabled || actionBusy || (isImport(a) && importsBlocked)}
               onClick={() => a.kind === "staff_edit" || a.kind === "staff_location" || a.kind === "undo_staff_location"
                 ? openConfirm(a) : void runAction(a)} data-testid={`button-run-action-${a.id}`}>
-              {isImport(a) && importsBlocked ? "Imports paused or status unavailable" : "Run now"}
+              {isImport(a) && importsBlocked ? "Imports paused or status unavailable" : a.kind === "undo_staff_location" ? "Undo locations" : "Run now"}
             </Button>
           )}
         </div>

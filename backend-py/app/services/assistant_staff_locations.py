@@ -2,7 +2,8 @@
 import json
 import re
 import uuid
-from sqlalchemy import select
+from copy import deepcopy
+from sqlalchemy import select, literal_column, Text
 from app.models import ScrapedCourse
 from app.models.course import Course
 from app.models.audit import CourseAuditLog
@@ -38,33 +39,67 @@ def location_request(prompt, messages):
 
 
 def version(service,row,kind):
-    if kind=="pending":
-        return service.row_version(row)
-    return service.fingerprint({"location":row.course_location,"updated":str(row.updated_at),"status":row.status})
+    return service.fingerprint({
+        column.key: getattr(row, column.key) for column in row.__table__.columns
+    })
 
 
-async def apply(service,db,action,university_id,actor_id,*,confirmed=False,undo=False):
+async def revision(db, model, row_id):
+    # PostgreSQL's tuple version detects even edit-away/edit-back sequences.
+    return await db.scalar(select(literal_column("xmin::text", Text)).select_from(model).where(model.id == row_id))
+
+
+async def apply(service, db, action, university_id, actor_id, *, confirmed=False, undo=False):
+    # Keep data, evidence and audit changes atomic even for non-route callers.
+    working = deepcopy(action)
+    async with db.begin_nested():
+        await _apply(service, db, working, university_id, actor_id, confirmed=confirmed, undo=undo)
+    action.clear()
+    action.update(working)
+
+
+async def _apply(service,db,action,university_id,actor_id,*,confirmed=False,undo=False):
     from app.models.user import User
     from app.permissions import user_has_permission
     from app.routers.auth import _payload_for,_perm_keys
-    actor=await db.get(User,actor_id)
+    if action.get("_actorId") != actor_id or action.get("_universityId") != university_id:
+        raise ValueError("This location action belongs to another actor or provider")
+    actor=await db.get(User,actor_id, populate_existing=True)
     if not actor or not actor.is_active:
         raise ValueError("Editing permission is unavailable")
     permissions=_payload_for(actor,_perm_keys(actor))
+    if not user_has_permission(permissions,"scraping.trigger"):
+        raise ValueError("Assistant permission is required")
     if not user_has_permission(permissions,"staged.edit"):
         raise ValueError("Pending-course editing permission is required")
     if any(t["kind"]=="published" for t in action["_targets"]) and not user_has_permission(permissions,"courses.edit"):
         raise ValueError("Published-course editing permission is required")
     targets=action["_targets"]
-    if not confirmed and (len(targets)>10 or any(t["kind"]=="published" for t in targets)):
+    if not confirmed and (undo or len(targets)>10 or any(t["kind"]=="published" for t in targets)):
         raise ValueError("Confirmation is required for this location edit")
+    if action["state"] == "completed":
+        return
     locked=[]
+    proofs={}
     for target in sorted(targets,key=lambda t:(t["kind"],t["id"])):
+        if target["kind"] not in {"pending", "published"}:
+            raise ValueError("Unknown location record kind")
         model=ScrapedCourse if target["kind"]=="pending" else Course
-        row=(await db.execute(select(model).where(model.id==target["id"],model.university_id==university_id).with_for_update())).scalar_one_or_none()
+        row=(await db.execute(select(model).where(model.id==target["id"],model.university_id==university_id).with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
         if (not row or version(service,row,target["kind"])!=target["version"]
             or (target["kind"]=="pending" and row.status not in service.REVIEW_STATUSES)):
             raise ValueError("A listed record changed; refresh the preview before applying")
+        if undo and await revision(db, model, row.id) != target.get("revision"):
+            raise ValueError("A listed record changed; undo refused")
+        if undo and target["kind"] == "pending":
+            proof = (await db.execute(select(ScrapedFieldEvidence).where(
+                ScrapedFieldEvidence.id == target["evidenceId"],
+            ).with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+            if (not proof or proof.scraped_course_id != row.id
+                    or proof.field_key != "course_location"
+                    or version(service, proof, "evidence") != target.get("evidenceVersion")):
+                raise ValueError("Staff evidence changed; undo refused")
+            proofs[row.id] = proof
         if target["kind"]=="pending" and not undo:
             evidence=(await db.execute(select(ScrapedFieldEvidence).where(
                 ScrapedFieldEvidence.scraped_course_id==row.id,
@@ -81,18 +116,13 @@ async def apply(service,db,action,university_id,actor_id,*,confirmed=False,undo=
     for row,target in locked:
         before=row.course_location
         if not undo and target["kind"]=="pending":
-            target["oldMethod"]=(row.extraction_method or {}).get("course_location")
+            target["oldMethods"]=deepcopy(row.extraction_method)
         row.course_location=target["before"] if undo else action["_value"]
         if target["kind"]=="pending":
             methods=dict(row.extraction_method or {})
             if undo:
-                if target.get("oldMethod") is None:
-                    methods.pop("course_location",None)
-                else:
-                    methods["course_location"]=target["oldMethod"]
-                proof=await db.get(ScrapedFieldEvidence,target["evidenceId"])
-                if not proof or proof.scraped_course_id!=row.id or proof.extraction_method!="staff-provided":
-                    raise ValueError("Staff evidence changed; undo refused")
+                methods=deepcopy(target["oldMethods"])
+                proof=proofs[row.id]
                 proof.selected=False
                 proof.validation_status="superseded"
             else:
@@ -104,6 +134,7 @@ async def apply(service,db,action,university_id,actor_id,*,confirmed=False,undo=
                 db.add(proof)
                 await db.flush()
                 target["evidenceId"]=proof.id
+                target["evidenceVersion"]=version(service,proof,"evidence")
             row.extraction_method=methods
         db.add(CourseAuditLog(
             scraped_course_id=row.id if target["kind"]=="pending" else None,
@@ -118,6 +149,7 @@ async def apply(service,db,action,university_id,actor_id,*,confirmed=False,undo=
             raise ValueError("Location read-back did not match")
         if not undo:
             target["version"]=version(service,row,target["kind"])
+            target["revision"]=await revision(db, type(row), row.id)
     if not undo:
         action["_undoTargets"]=targets
     action["state"]="completed"
@@ -130,7 +162,9 @@ def undo_proposal(action):
     return {"id":uuid.uuid4().hex,"kind":"undo_staff_location","label":"Undo staff-provided locations",
             "state":"proposed","courseCount":action["courseCount"],"publishedCount":action.get("publishedCount",0),
             "fields":["course_location"],"requiresConfirmation":True,
-            "_targets":deepcopy(action["_undoTargets"]),"_instruction":action["_instruction"]}
+            "_targets":deepcopy(action["_undoTargets"]),"_instruction":action["_instruction"],
+            "_actorId":action["_actorId"],"_universityId":action["_universityId"],
+            "_originalActionId":action["id"]}
 
 
 async def handle(service,thread_id,turn_id,run_id,ctx,prompt,messages):
@@ -181,7 +215,8 @@ async def handle(service,thread_id,turn_id,run_id,ctx,prompt,messages):
                 "fields":["course_location"],"courseCount":len(targets),"state":"proposed",
                 "requiresConfirmation":len(targets)>10 or any(t["kind"]=="published" for t in targets),
                 "publishedCount":sum(t["kind"]=="published" for t in targets),
-                "_targets":targets,"_value":value,"_instruction":prompt,"_turnId":turn_id}
+                "_targets":targets,"_value":value,"_instruction":prompt,"_turnId":turn_id,
+                "_actorId":thread.actor_id,"_universityId":ctx["university_id"]}
         content="No location changes are needed."
         if targets:
             content=f"Set location to **{value}**, source **staff-provided**. No catalogue discovery.\n\n"

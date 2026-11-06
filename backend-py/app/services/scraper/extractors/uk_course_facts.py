@@ -27,12 +27,18 @@ async def expand_links(links,max_courses,fetch=None):
     if fetch is None:
         from app.services.scrape_assistant_tools import public_request
         fetch=public_request
-    cache={};result=[]
+    cache={};result=[];surrey_count=0
     for link in links:
         url=link.get("url","")
         p=urlsplit(url)
-        if p.hostname not in {"www.surrey.ac.uk","surrey.ac.uk"} or "surrey_option" in parse_qs(p.query):
+        if p.hostname not in {"www.surrey.ac.uk","surrey.ac.uk"}:
             result.append(link);continue
+        if "surrey_option" in parse_qs(p.query):
+            result.append(link)
+            surrey_count += 1
+            if surrey_count > max_courses:
+                raise ValueError("Surrey option count exceeds the configured course limit; increase it before retrying. Catalogue was not truncated.")
+            continue
         if url not in cache:
             raw=await asyncio.wait_for(fetch(url),15)
             cache[url]=raw.decode("utf-8",errors="replace") if isinstance(raw,bytes) else raw
@@ -42,7 +48,8 @@ async def expand_links(links,max_courses,fetch=None):
             result.extend({**link,"name":o["course_name"],"url":option_url(url,o["key"]),
                            "_surrey_html":html} for o in options)
         else:result.append({**link,"_surrey_html":html})
-        if len(result)>max_courses:
+        surrey_count += len(options) if options else 1
+        if surrey_count>max_courses:
             raise ValueError("Surrey option count exceeds the configured course limit; increase it before retrying. Catalogue was not truncated.")
     return result
 

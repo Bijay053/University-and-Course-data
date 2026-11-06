@@ -175,7 +175,7 @@ async def response(thread, db, job_id=None):
         current_start = max((index for index, message in enumerate(messages)
                              if message["role"] == "user"), default=0)
         actions = [action for message in messages[current_start:] for action in message.get("actions", [])
-                   if action.get("kind") != "undo_exclusion"]
+                   if action.get("kind") not in {"undo_exclusion", "undo_staff_location"}]
         if any(action["state"] in {"starting", "running"} for action in actions):
             live_phase = "Research complete — work is running. Results are not yet verified."
         elif actions and actions[-1]["state"] == "completed":

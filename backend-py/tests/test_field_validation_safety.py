@@ -20,6 +20,23 @@ def test_units_currency_and_test_ranges():
     invalid,_=validate_fields({"international_fee":18000,"currency":"Domestic fees"})
     assert invalid["currency"] is None and invalid["international_fee"] is None
 
+
+def test_fee_currency_alias_is_validated_without_overwriting_canonical_currency():
+    result, invalid = validate_fields({"international_fee":42000,"fee_currency":"AUD"})
+    assert result["international_fee"] == 42000 and result["currency"] == "AUD"
+    assert not invalid
+    result, _ = validate_fields({"international_fee":42000,"fee_currency":"AUD","currency":"invalid"})
+    assert result["international_fee"] is None
+    result, _ = validate_fields({"international_fee":42000,"fee_currency":"not a currency"})
+    assert result["international_fee"] is None
+
+
+def test_malformed_evidence_does_not_crash_invalid_field_validation():
+    evidence = [None, "invalid", 12, {"field_key":"international_fee","selected":True}]
+    result, invalid = validate_fields({"international_fee":-1}, evidence)
+    assert result["international_fee"] is None and "international_fee" in invalid
+    assert evidence[-1]["selected"] is False
+
 def test_site_unreachable_during_bulk_fix():
     reply={"content":"I will queue 229 courses","actions":[{"kind":"fix_fields","state":"proposed","courseCount":229}]}
     result=gate_unreachable_repair(reply,[{"verified":False}])

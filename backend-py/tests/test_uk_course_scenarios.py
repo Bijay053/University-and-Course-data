@@ -3,6 +3,23 @@ from app.services.scraper.extractors.uk_course_facts import clean_uk_title,surre
 from app.services.scraper.extractors import fee,course_name
 
 URL="https://www.surrey.ac.uk/undergraduate/accounting-and-finance"
+
+
+@pytest.mark.asyncio
+async def test_expansion_limit_counts_only_surrey_and_preserves_other_provider_capping():
+    from app.services.scraper.extractors.uk_course_facts import expand_links
+    other = [{"url":f"https://example.edu/course/{i}"} for i in range(5)]
+    async def fetch(url):
+        assert url == URL
+        return page()
+    assert await expand_links(other, 2, fetch) == other
+    options = await expand_links([{"url":URL}], 10, fetch)
+    mixed = await expand_links(other + [{"url":URL}], len(options), fetch)
+    assert mixed[:5] == other and len(mixed) == 5 + len(options)
+    with pytest.raises(ValueError, match="Surrey option count"):
+        await expand_links(other + [{"url":URL}], len(options)-1, fetch)
+    with pytest.raises(ValueError, match="Surrey option count"):
+        await expand_links(options, len(options)-1, fetch)
 def page(label="Overseas fees"):
     panels=[]
     for key,award,duration,amount in [("standard","BSc (Hons)",3,24600),("placement","BSc (Hons) with placement",4,25000),("foundation","BSc (Hons) with foundation year",4,26000)]:

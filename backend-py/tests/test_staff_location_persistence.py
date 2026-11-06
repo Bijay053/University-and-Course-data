@@ -118,3 +118,75 @@ async def test_published_rows_require_confirmation_even_for_one_course(store):
         assert (await db.get(Course,991)).course_location=="Sydney"
         audits=(await db.execute(select(CourseAuditLog))).scalars().all()
         assert len(audits)==2
+        thread=await db.get(ScrapeAssistantThread,"eligibility")
+        undo=thread.messages[-1]["actions"][-1]
+        await confirm_action("source",undo["id"],ConfirmBody(confirm=True),db,{"id":77})
+        assert (await db.get(Course,991)).course_location is None
+        await confirm_action("source",undo["id"],ConfirmBody(confirm=True),db,{"id":77})
+        assert len((await db.execute(select(CourseAuditLog))).scalars().all())==4
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", ["provenance", "evidence", "roundtrip", "revoked", "permissions", "actor", "provider"])
+async def test_undo_fences_and_atomic_failure(store, change):
+    from copy import deepcopy
+    from app.models.user import User
+    await seed_thread(store)
+    async with store() as db:
+        db.add(ScrapedCourse(id=2,university_id=1,scrape_job_id="source",
+                            course_name="Second course",status="pending"))
+        await db.commit()
+    await handle(service,"eligibility","turn","owner",await snapshot(store),"set location Sydney on all courses",[])
+    async with store() as db:
+        thread=await db.get(ScrapeAssistantThread,"eligibility")
+        undo=deepcopy(thread.messages[-1]["actions"][1])
+        row=await db.get(ScrapedCourse,2)
+        if change == "provenance":
+            row.extraction_method={"course_location":"verified"}
+        elif change == "evidence":
+            proof=await db.get(ScrapedFieldEvidence,undo["_targets"][1]["evidenceId"])
+            proof.normalized_value="Another location"
+        elif change == "roundtrip":
+            row.course_location="Melbourne"
+            await db.commit()
+            row.course_location="Sydney"
+        elif change == "revoked":
+            (await db.get(User,77)).is_active=False
+        elif change == "permissions":
+            (await db.get(User,77)).is_super_admin=False
+        await db.commit()
+        with pytest.raises(ValueError):
+            await apply(service,db,undo,2 if change=="provider" else 1,
+                        78 if change=="actor" else 77,confirmed=True,undo=True)
+        # Committing after a failed service call cannot persist partial undo.
+        await db.commit()
+        assert (await db.get(ScrapedCourse,1)).course_location=="Sydney"
+        assert undo["state"]=="proposed"
+        assert len((await db.execute(select(CourseAuditLog))).scalars().all())==2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prior_methods", [None, {}, {"course_location":None,"duration":"official"}])
+async def test_undo_restores_exact_provenance_and_only_original_evidence(store, prior_methods):
+    from copy import deepcopy
+    await seed_thread(store)
+    async with store() as db:
+        (await db.get(ScrapedCourse,1)).extraction_method=prior_methods
+        prior=ScrapedFieldEvidence(scraped_course_id=1,field_key="course_location",
+                                  normalized_value="Original",selected=False,validation_status="pending")
+        db.add(prior)
+        await db.commit()
+        prior_id=prior.id
+    await handle(service,"eligibility","turn","owner",await snapshot(store),"set location Sydney on all courses",[])
+    async with store() as db:
+        thread=await db.get(ScrapeAssistantThread,"eligibility")
+        undo=deepcopy(thread.messages[-1]["actions"][1])
+        with pytest.raises(ValueError,match="Confirmation"):
+            await apply(service,db,undo,1,77,undo=True)
+        await apply(service,db,undo,1,77,confirmed=True,undo=True)
+        await db.commit()
+        assert (await db.get(ScrapedCourse,1)).extraction_method==prior_methods
+        prior=await db.get(ScrapedFieldEvidence,prior_id)
+        assert prior.validation_status=="pending" and not prior.selected
+        await apply(service,db,undo,1,77,confirmed=True,undo=True)
+        assert len((await db.execute(select(CourseAuditLog))).scalars().all())==2

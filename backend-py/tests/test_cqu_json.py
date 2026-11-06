@@ -737,6 +737,7 @@ async def test_aims_online_only_remains_rejected_after_full_pipeline() -> None:
     )
 
     assert result["payload"]["study_mode"] == "Online"
+    # Online is delivery, not a physical campus; retain it for eligibility review.
     assert result["payload"]["course_location"] is None
     should_stage, reason = should_stage_course(
         result["payload"]["course_name"],

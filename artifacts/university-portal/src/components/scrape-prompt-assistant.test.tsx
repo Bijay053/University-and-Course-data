@@ -43,6 +43,29 @@ describe("ScrapePromptAssistant", () => {
     expect((await screen.findByTestId("button-run-action-held") as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByTestId("button-run-action-repair") as HTMLButtonElement).disabled).toBe(false);
   });
+  it("restores a saved location undo through confirmation and refreshes review data", async () => {
+    const saved: AssistantThread = { ...empty, threadId: "saved", status: "ready",
+      messages: [{ role: "assistant", content: "Locations saved.", createdAt: "2024-01-01T00:00:00Z",
+        actions: [{ id: "undo-location", kind: "undo_staff_location", label: "Undo staff-provided locations",
+          state: "proposed", courseCount: 2, publishedCount: 1, fields: ["course_location"], requiresConfirmation: true }] }] };
+    const completed = structuredClone(saved);
+    completed.messages[0].actions![0].state = "completed";
+    completed.messages[0].actions![0].resultSummary = "Restored 2 prior locations and provenance, with audit records.";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) =>
+      json(init?.method === "POST" ? completed : saved));
+    const changed = vi.fn();
+    render(<ScrapePromptAssistant jobId="source" onChanged={changed} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Undo locations" }));
+    expect(await screen.findByTestId("dialog-confirm-action")).toBeTruthy();
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and start" }));
+    await screen.findByText("Restored 2 prior locations and provenance, with audit records.");
+    expect(changed).toHaveBeenCalled();
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(String(post?.[0])).toContain("/actions/undo-location");
+    expect(JSON.parse(String(post?.[1]?.body))).toEqual({ confirm: true });
+    expect(screen.queryByRole("button", { name: "Undo locations" })).toBeNull();
+  });
   it("shows partial recovery and each exclusion inline with the resulting review link", async () => {
     const messages = [
       "Verified in pending review.",
