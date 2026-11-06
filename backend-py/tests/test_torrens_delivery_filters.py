@@ -34,8 +34,8 @@ def test_torrens_config_blocks_domestic_and_online_only_courses() -> None:
                 "bachelor-of-applied-business-marketing"
             ),
         )
-        assert online_ok is False
-        assert online_reason == "online_only"
+        assert online_ok is True
+        assert online_reason == "accepted"
 
         domestic_ok, domestic_reason = should_stage_course(
             "Master of Counselling",

@@ -306,6 +306,7 @@ def apply_curtin_static_extraction(url: str, html: str) -> dict[str, Any]:
         result["international_fee"] = float(offer["price"])
         result["fee_term"] = "Annual"
         result["fee_currency"] = "AUD"
+        result["currency"] = "AUD"
         year_match = re.search(r"\b(20\d{2})\b", str(offer.get("name") or ""))
         if year_match:
             result["fee_year"] = int(year_match.group(1))

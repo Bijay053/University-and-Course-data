@@ -166,6 +166,7 @@ async def test_curtin_direct_failure_uses_static_proxy_before_browser_skip() -> 
     assert browser_calls == []
     assert result.get("error") != "fetch_failed"
     assert result["payload"]["international_fee"] == 42000.0
+    assert result["payload"]["currency"] == "AUD"
 
 
 @pytest.mark.asyncio

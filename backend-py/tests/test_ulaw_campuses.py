@@ -328,4 +328,4 @@ async def test_latest_single_course_extract_rejects_changed_delivery_without_ai(
     assert payload.get("international_fee") is None
     assert payload.get("fee_year") is None
     assert not payload.get("extraction_method", {}).get("fee_variants")
-    assert should_stage_course(payload["course_name"], payload, source_url=source["url"])[1] == "online_only"
+    assert should_stage_course(payload["course_name"], payload, source_url=source["url"]) == (True, "accepted")

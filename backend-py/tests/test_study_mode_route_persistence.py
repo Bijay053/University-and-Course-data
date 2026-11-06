@@ -269,8 +269,10 @@ async def test_fee_only_fix_still_quarantines_fresh_online_only_evidence(operato
                        {"study_mode": mode, "international_fee": 18000},
                        [candidate(mode)], ["international_fee"])
     row, _ = await persisted(operator, sc_id)
-    assert result["results"][0]["outcome"] == "rejected_online_only"
-    assert row.status == "rejected" and row.international_fee is None
+    assert result["results"][0]["outcome"] == "retained_online_only_review"
+    assert row.status == "pending" and row.international_fee is None
+    assert row.eligibility_status == "unverified"
+    assert row.auto_publish_status == "review"
     assert row.course_location is None
 
 

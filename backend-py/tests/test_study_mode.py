@@ -774,8 +774,8 @@ async def test_utas_online_location_survives_full_pipeline_and_is_rejected():
     }
     assert "study_mode:utas_international_location" in study_mode_methods
     assert should_stage_course(payload["course_name"], payload, url) == (
-        False,
-        "online_only",
+        True,
+        "accepted",
     )
 
 
@@ -847,8 +847,8 @@ async def test_apu_full_pipeline_keeps_standard_masters_and_rejects_odl():
     )
     assert odl_payload["online_only"] is True
     assert should_stage_course(odl_payload["course_name"], odl_payload, odl_url) == (
-        False,
-        "online_only",
+        True,
+        "accepted",
     )
 
 

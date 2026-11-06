@@ -2,8 +2,19 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def no_live_transport_for_saved_delivery_pages(monkeypatch):
+    """Saved-page policy tests must not wait on external browser/HTTP rescue."""
+    from app.services.scraper.pipelines import single_course
+    from app.services.scraper.browser_pool import pool
+    monkeypatch.setattr(single_course, "fetch_html", AsyncMock(return_value=None))
+    monkeypatch.setattr(single_course, "fetch_html_scrape_do", AsyncMock(return_value=None))
+    monkeypatch.setattr(pool, "fetch_html", AsyncMock(return_value=None))
 
 from app.services.scraper.config.context import current_uni_config
 from app.services.scraper.config.schema import UniConfig
@@ -52,8 +63,8 @@ def test_disabled_legacy_overrides_cannot_bypass_global_delivery_filters() -> No
             },
             source_url="https://example.edu/courses/master-of-business-online",
         )
-        assert online_ok is False
-        assert online_reason == "online_only"
+        assert online_ok is True
+        assert online_reason == "accepted"
 
         domestic_ok, domestic_reason = should_stage_course(
             "Master of Business",
@@ -418,7 +429,7 @@ def test_adelaide_shared_online_navigation_does_not_reject_campus_degree() -> No
             "msc-pollution-and-environmental-control-online/",
             """
             <main>
-              <h1>Pollution and Environmental Control (online)</h1>
+              <h1>Pollution and Environmental Control (online) MSc</h1>
               <dl><dt>Delivery</dt><dd>100% online learning</dd></dl>
             </main>
             """,
@@ -686,7 +697,7 @@ def test_audited_host_templates_ignore_hidden_chrome_and_keep_mixed_courses(
             "Pollution and Environmental Control (online) MSc",
             """
             <main>
-              <h1>Pollution and Environmental Control (online)</h1>
+              <h1>Pollution and Environmental Control (online) MSc</h1>
               <dl><dt>Delivery</dt><dd>100% online learning</dd></dl>
             </main>
             """,
@@ -747,8 +758,8 @@ async def test_audited_host_pipeline_exits_as_online_only(
         result["payload"],
         source_url=result["url"],
     )
-    assert accepted is False
-    assert reason == "online_only"
+    assert accepted is True
+    assert reason == "accepted"
 
 
 @pytest.mark.asyncio
@@ -804,8 +815,8 @@ async def test_adelaide_online_degree_pipeline_exits_before_mode_overwrite() -> 
         result["payload"],
         source_url=result["url"],
     )
-    assert accepted is False
-    assert reason == "online_only"
+    assert accepted is True
+    assert reason == "accepted"
 
 
 def test_adelaide_domestic_student_type_metadata_rejects_course() -> None:
@@ -1058,8 +1069,8 @@ def test_part_time_only_duration_is_globally_rejected() -> None:
         },
         source_url="https://example.edu/master-of-part-time-study",
     )
-    assert accepted is False
-    assert reason == "part_time_only"
+    assert accepted is True
+    assert reason == "accepted"
 
 
 def test_uel_captured_options_distinguish_unknown_from_authoritative_part_time() -> None:
@@ -1144,5 +1155,5 @@ def test_uel_captured_options_distinguish_unknown_from_authoritative_part_time()
         },
         source_url=f"https://www.uel.ac.uk{part_time_route}",
     )
-    assert accepted is False
-    assert reason == "part_time_only"
+    assert accepted is True
+    assert reason == "accepted"

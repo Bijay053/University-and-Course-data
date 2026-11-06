@@ -25,6 +25,25 @@ the row pending removes that implicit protection.
 state before writing again. Preserve explicit domestic-only exclusion precedence
 when both domestic-only and online-only evidence are present.
 
+Evidence cleanup must not erase a conservative delivery restriction before the
+final publication-readiness decision.
+
+**Why:** Removing an unsupported delivery value also removed the input used to
+flag the row for eligibility review, allowing later scoring to miss the hold.
+
+**How to apply:** Keep the restriction signal separate from publishable field
+values and reapply the review hold after scoring and campus splitting. Do not
+weaken source-proof requirements to retain the signal.
+
+Review status alone is not an automatic-publication guard.
+
+**Why:** The publishing pass can rescore review rows. Courses formerly rejected
+at staging became reachable by that pass when the delivery policy changed.
+
+**How to apply:** Enforce delivery holds in both publication scoring and the
+automatic approval boundary, including holds preserved only in warnings. Campus
+splits must retain the hold on the original row as well as every child.
+
 UTAS embeds a shared “may not be available” / “see the list of distance courses” advisory on ordinary course pages. Inline links can split the phrase in raw HTML and re-form it only after tag stripping, so cleanup must also run on normalized visible text. Explicit statements inside the International section remain authoritative.
 
 **Why:** Raw-HTML-only cleanup missed the split advisory and falsely rejected mainstream courses, while genuinely unavailable courses still published explicit International-section exclusions.

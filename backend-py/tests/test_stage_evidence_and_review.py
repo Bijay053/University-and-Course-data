@@ -826,8 +826,10 @@ async def test_stage_course_persists_completeness_and_evidence():
             "study_mode": "On Campus",
             "course_location": "Sydney",
             "duration": 3.0,  # FLOAT column — years as numeric
+            "duration_term": "Year",
             "intake_months": ["February", "July"],
             "international_fee": 45000,
+            "currency": "AUD",
             "description": "A great course.",
             "academic_level": "Year 12",
             "academic_score": 85,
@@ -1439,6 +1441,7 @@ async def test_re_extract_refreshes_unchanged_fee_from_newer_canonical_page(monk
                 payload={
                     "course_name": "Bachelor of Computer Science",
                     "international_fee": 41000,
+                    "currency": "AUD",
                     "fee_year": 2026,
                     "course_website": old_url,
                 },

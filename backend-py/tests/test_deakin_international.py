@@ -237,8 +237,8 @@ async def test_deakin_online_only_banner_is_explicitly_ineligible() -> None:
         result["payload"],
         "https://www.deakin.edu.au/course/graduate-certificate-advanced-nursing",
     )
-    assert should_stage is False
-    assert reason == "online_only"
+    assert should_stage is True
+    assert reason == "accepted"
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,6 @@
 import asyncio
 import re
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock, AsyncMock
 
 import pytest
 
@@ -1042,7 +1042,33 @@ def test_central_fee_alias_rejects_cross_level_mapping():
     assert kind == "none"
 
 
-def test_sit_online_only_programme_remains_globally_rejected():
+@pytest.fixture
+def sit_delivery_policy():
+    from app.services.scraper.config.context import current_uni_config
+    token = current_uni_config.set(load_uni_config(
+        slug="sit", scrape_url="https://www.sit.ac.nz",
+        university_id=67, name="Southern Institute of Technology",
+    ))
+    yield
+    current_uni_config.reset(token)
+
+
+def delivery_staging_db():
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None
+    result.scalar.return_value = None
+    result.first.return_value = None
+    result.scalars.return_value.all.return_value = []
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=result)
+    db.get = AsyncMock(return_value=None)
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+    return db
+
+
+def test_sit_online_only_programme_enters_review(sit_delivery_policy):
     accepted, reason = should_stage_course(
         "New Zealand Certificate in Testing",
         {
@@ -1053,8 +1079,8 @@ def test_sit_online_only_programme_remains_globally_rejected():
         },
         "https://www.sit.ac.nz/Programme/Course/New Zealand Certificate in Testing",
     )
-    assert accepted is False
-    assert reason == "online_only"
+    assert accepted is True
+    assert reason == "accepted"
 
 
 @pytest.mark.asyncio
@@ -1064,13 +1090,14 @@ def test_sit_online_only_programme_remains_globally_rejected():
     "Project Management",
 ])
 async def test_sit_schedule_listed_online_only_programme_is_reported_as_intentional(
-    strand,
+    strand, sit_delivery_policy,
 ):
     course_name = (
         f"New Zealand Diploma in Business ({strand} Strand) (Level 5)"
     )
+    db = delivery_staging_db()
     result = await stage_course(
-        Mock(),
+        db,
         scrape_job_id="sit-policy",
         university_id=67,
         course_name=course_name,
@@ -1094,8 +1121,13 @@ async def test_sit_schedule_listed_online_only_programme_is_reported_as_intentio
         skip_url_block=True,
     )
 
-    assert result.saved is False
-    assert result.reason == "rejected: listed_but_ineligible_online_only"
+    from app.models import ScrapedCourse
+    rows = [c.args[0] for c in db.add.call_args_list if isinstance(c.args[0], ScrapedCourse)]
+    assert result.saved is True
+    assert len(rows) == 1
+    assert rows[0].status == "pending"
+    assert rows[0].eligibility_status == "unverified"
+    assert rows[0].auto_publish_status == "review"
 
 
 @pytest.mark.asyncio
@@ -1131,8 +1163,10 @@ async def test_online_only_reporting_exception_is_narrow_to_sit_schedule_matches
         source_url="https://www.sit.ac.nz/Programme/Course/Business-Online",
     )
 
-    assert non_sit.reason == "rejected: online_only"
-    assert unlisted_sit.reason == "rejected: online_only"
+    # Without SIT's verified provider configuration these unqualified titles
+    # still fail the course-page guard; delivery never bypasses other guards.
+    assert non_sit.reason == "rejected: category_landing_page_missing_degree_qualifier"
+    assert unlisted_sit.reason == "rejected: category_landing_page_missing_degree_qualifier"
 
 
 def test_unlisted_sit_certificate_cannot_receive_an_exact_fee():

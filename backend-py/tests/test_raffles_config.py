@@ -117,8 +117,8 @@ def test_raffles_odl_is_rejected_even_if_metadata_says_blended(
         source_url=source_url,
     )
 
-    assert accepted is False
-    assert reason == "online_only"
+    assert accepted is True
+    assert reason == "accepted"
 
 
 @pytest.mark.asyncio

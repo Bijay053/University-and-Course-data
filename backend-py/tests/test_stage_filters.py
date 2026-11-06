@@ -222,8 +222,8 @@ class TestShouldStageCourse:
                 "bachelor-of-applied-business-marketing"
             ),
         )
-        assert accept is False
-        assert reason == "online_only"
+        assert accept is True
+        assert reason == "accepted"
 
     def test_nested_online_url_rejected_even_if_mode_was_overwritten(self) -> None:
         """A trailing /online/ route is authoritative despite noisy campus fallback."""
@@ -240,8 +240,8 @@ class TestShouldStageCourse:
                 "msc-project-management/online/"
             ),
         )
-        assert accept is False
-        assert reason == "online_only"
+        assert accept is True
+        assert reason == "accepted"
 
     def test_online_course_name_rejected_when_url_signal_is_missing(self) -> None:
         """Provider course names ending in Online are explicit online-only evidence."""
@@ -255,8 +255,8 @@ class TestShouldStageCourse:
             },
             source_url="https://example.edu/courses/llm-family-law",
         )
-        assert accept is False
-        assert reason == "online_only"
+        assert accept is True
+        assert reason == "accepted"
 
     # ---- Fixture 5: international, on-campus Master (accepted) ------------
 
@@ -341,8 +341,8 @@ class TestBugAEdgeCases:
                 "study_mode": "online",
             },
         )
-        assert accept is False
-        assert reason == "online_only"
+        assert accept is True
+        assert reason == "accepted"
 
     def test_payload_course_name_preferred_over_link_name(self) -> None:
         """payload['course_name'] (H1 source) wins over discovery link name for Bug A."""
@@ -438,12 +438,7 @@ class TestBugAEdgeCases:
                     "study_mode": "Online",
                 },
             )
-            assert accept is False, (
-                f"Expected online_only rejection for {name!r}, got accept={accept!r} reason={reason!r}"
-            )
-            assert reason == "online_only", (
-                f"Expected reason='online_only' for {name!r}, got {reason!r}"
-            )
+            assert (accept, reason) == (True, "accepted"), name
 
     def test_all_bug_a_category_landing_names(self) -> None:
         """Every user-reported category landing page name is rejected by Bug A."""

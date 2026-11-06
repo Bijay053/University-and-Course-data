@@ -402,8 +402,8 @@ def test_latrobe_modes_integrate_with_global_delivery_gate():
         },
         "https://www.latrobe.edu.au/courses/master-of-business-administration",
     )
-    assert accepted is False
-    assert reason == "online_only"
+    assert accepted is True
+    assert reason == "accepted"
 
 
 def test_pick_international_url_prefers_earliest_year_and_canonical_campus():

@@ -644,6 +644,9 @@ async def stage_course(
     # duration) that lack source proof.  Better to publish "unknown" than
     # publish a guess.  The dropped fields are logged so the operator can
     # see WHY a row landed in review with NULLs.
+    # Evidence cleanup may blank delivery prose, but must not remove the
+    # conservative restriction that keeps a course out of automatic publication.
+    delivery_review_payload = dict(payload)
     payload, dropped_fields = enforce_source_evidence(payload, evidence)
     if dropped_fields:
         log.info(
@@ -1148,6 +1151,9 @@ async def stage_course(
             if k in PERSISTABLE_STAGING_PAYLOAD_FIELDS
         },
     )
+    # SQLAlchemy's insert default is not populated until flush; all newly
+    # staged rows must be pending before eligibility helpers inspect them.
+    sc.status = "pending"
     from app.services.scraper.requirement_status import build_requirement_status
 
     sc.requirement_status = build_requirement_status(
@@ -1320,15 +1326,16 @@ async def stage_course(
         # continuation can reconstruct the row without re-fetching the page.
         from app.services.scraper.snapshot_save import persist_staged_row_backup
         from app.services.scraper.delivery_review import apply_delivery_review
-        apply_delivery_review(sc, name, payload, source_url)
+        apply_delivery_review(sc, name, delivery_review_payload, source_url)
 
         from app.services.scraper.campus_fee_split import split_pending_course
         campus_split = await split_pending_course(db, sc)
+        apply_delivery_review(sc, name, delivery_review_payload, source_url)
         await persist_staged_row_backup(db, sc, source_url=source_url)
         if campus_split["status"] == "split":
             for child_id in campus_split["courseIds"][1:]:
                 child = await db.get(ScrapedCourse, child_id)
-                apply_delivery_review(child, name, payload, source_url)
+                apply_delivery_review(child, name, delivery_review_payload, source_url)
                 await persist_staged_row_backup(db, child, source_url=source_url)
         await db.commit()
     except Exception as exc:  # noqa: BLE001

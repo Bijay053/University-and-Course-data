@@ -123,6 +123,12 @@ def _apply_group(row, group, original_name, original_locations):
     eligibility = decide_eligibility(row, completeness)
     row.eligibility_status = eligibility.status
     row.eligibility_reason = eligibility.reason
+    from app.services.scraper.delivery_review import publication_hold_reason
+    delivery_hold = publication_hold_reason(row)
+    if delivery_hold:
+        row.eligibility_status = "unverified"
+        row.eligibility_reason = delivery_hold
+        row.auto_publish_status = "review"
 
 
 async def split_pending_course(db, row, *, actor="scraper"):
