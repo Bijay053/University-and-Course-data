@@ -8,6 +8,12 @@ Keep retries tied to structured failure provenance, not repeated log wording. Se
 
 **How to apply:** Preserve the original job and progress. Reserve attempt capacity before extraction; uncertain or interrupted attempts remain spent. Do not release unused reservations merely because a heartbeat is old or a terminal label appeared; require authoritative worker-stop proof. Verify resulting records before reporting recovery.
 
+Freeze a stopped generation before counting unused capacity, and never re-execute a child whose capacity was released. Give restored capacity to a new child in the same original lineage.
+
+**Why:** A delayed broker delivery can have read the queued job before the stop receipt existed. Reusing that child could spend slots already assigned to its successor.
+
+**How to apply:** Serialize release with fenced attempt transactions, retain the immutable release receipt, and recheck durable generation binding after obtaining the execution claim. Legacy unbound executions remain fully reserved.
+
 Reused extraction results must have current source bytes, deterministic selected evidence and matching identity, audience, year, configuration and parser build. Never treat an old pending row as a source-validated cache.
 
 **Why:** Browser states, fee variants and uncommitted parser edits can change facts without changing a course URL.

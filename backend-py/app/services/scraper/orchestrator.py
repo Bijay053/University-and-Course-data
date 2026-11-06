@@ -2435,10 +2435,29 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     if job.status != "queued":
         await db.rollback()
         return {"ok": False, "reason": "already_claimed"}
+    if selective and job.request_payload["selectiveRetry"].get("capacityRelease"):
+        await db.rollback()
+        return {"ok": False, "reason": "capacity_released"}
     owner = await claim(db, f"{'selective-retry' if selective else 'verification'}:{runtime_job_id}")
     if owner is None:
         await db.rollback()
         return {"ok": False, "reason": "already_claimed"}
+    if selective:
+        from copy import deepcopy
+        # Refresh AFTER the claim's exclusive lock. A delayed initial delivery
+        # may have read the queued row before the previous generation stopped.
+        await db.refresh(job)
+        policy = job.request_payload["selectiveRetry"]
+        if policy.get("capacityGeneration") or policy.get("capacityRelease"):
+            await db.rollback()
+            return {"ok": False, "reason": "already_claimed"}
+        # Bind accounting to the same durable claim as all network/staging work.
+        # A legacy unbound child remains conservatively reserved until this
+        # fenced execution has authoritatively stopped.
+        if policy.get("capacityAccounting") == 1:
+            payload = deepcopy(job.request_payload)
+            payload["selectiveRetry"]["capacityGeneration"] = owner.generation
+            job.request_payload = payload
     try:
         with ownership_scope(owner):
             return await _run_scrape_entry(db, runtime_job_id)

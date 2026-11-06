@@ -72,6 +72,14 @@ async def reserve_attempt(job_id, url):
         policy = (job.request_payload or {}).get("selectiveRetry") if job else None
         if not policy or job.status != "running" or key not in policy["budgets"]:
             raise ValueError("Selective retry no longer owns this running URL.")
+        from app.services.worker_fencing import current_owner, OwnershipLost
+        generation = policy.get("capacityGeneration")
+        if policy.get("capacityRelease") or (policy.get("capacityAccounting") == 1 and not generation) or (generation and (
+            current_owner.get() is None
+            or current_owner.get().key != f"selective-retry:{job_id}"
+            or current_owner.get().generation != generation
+        )):
+            raise OwnershipLost("Selective retry attempt capacity is fenced.")
         await guard_source(db, job)
         count = await db.scalar(text(
             "SELECT count(*) FROM scrape_retry_attempts WHERE job_id=:job AND url_hash=:hash"
@@ -109,6 +117,61 @@ async def effective_config(db, university):
                    "parser": {"revision": get_release_revision(), "source": _BUILD_SOURCE_HASH}})
 
 
+async def released_capacity(db, child):
+    """Freeze the exact stopped generation before counting unstarted slots.
+
+    The claim lock conflicts with every fenced attempt transaction. Revocation
+    and this immutable receipt commit together with the caller's transaction.
+    No attempt rows, original budgets, progress or dispatch receipts are edited.
+    """
+    policy = (child.request_payload or {}).get("selectiveRetry") or {}
+    generation = policy.get("capacityGeneration")
+    if policy.get("capacityAccounting") != 1 or not generation:
+        return {}
+    from app.services.worker_fencing import current_owner
+    # Worker validation also reads inventory. Never upgrade its own SHARE lock,
+    # or let a live worker release capacity belonging to another execution.
+    if current_owner.get() is not None:
+        return {}
+    claim = (await db.execute(text(
+        "SELECT state, proof FROM autonomous_worker_claims "
+        "WHERE claim_key=:key AND generation=:generation "
+        "AND state IN ('stopped','revoked') AND proof IN "
+        "('worker_lost','terminated_acknowledgement','completed_stop_acknowledgement') "
+        "FOR UPDATE"
+    ), {"key": f"selective-retry:{child.runtime_job_id}", "generation": generation})).first()
+    if not claim:
+        return {}
+    # Refresh under lock: another reader may already have committed a receipt.
+    child = (await db.execute(select(ScrapeRuntimeJob).where(
+        ScrapeRuntimeJob.runtime_job_id == child.runtime_job_id
+    ).with_for_update().execution_options(populate_existing=True))).scalar_one()
+    policy = (child.request_payload or {}).get("selectiveRetry") or {}
+    if policy.get("capacityGeneration") != generation:
+        return {}
+    receipt = policy.get("capacityRelease")
+    if receipt:
+        return receipt["unstarted"]
+    from app.services.worker_fencing import revoke_stopped
+    if claim.state == "stopped":
+        if not await revoke_stopped(db, f"selective-retry:{child.runtime_job_id}", generation):
+            return {}
+    counts = dict((await db.execute(text(
+        "SELECT url, count(*) FROM scrape_retry_attempts WHERE job_id=:job GROUP BY url"
+    ), {"job": child.runtime_job_id})).all())
+    unstarted = {url: max(0, int(budget) - counts.get(url, 0))
+                 for url, budget in policy["budgets"].items()}
+    payload = deepcopy(child.request_payload)
+    payload["selectiveRetry"]["capacityRelease"] = {
+        "generation": generation, "proof": claim.proof,
+        "recordedAt": datetime.now(timezone.utc).isoformat(),
+        "started": counts, "unstarted": unstarted,
+    }
+    child.request_payload = payload
+    await db.flush()
+    return unstarted
+
+
 async def inventory(db, source_id):
     from app.routers.scrape import _unresolved_history_entries
     source = await db.get(ScrapeRuntimeJob, source_id)
@@ -117,6 +180,12 @@ async def inventory(db, source_id):
     # Never reclaim a worker or race its primary pass / recovery sweep.
     if source.status in ACTIVE or not source.completed_at:
         raise ValueError("This scrape has not settled. Its worker may still recover these URLs; no retry was queued.")
+    from app.services.worker_fencing import current_owner
+    if current_owner.get() is None:
+        # Match queue's provider -> source -> claim lock order, including when
+        # the selected source is itself a retry child receiving a release.
+        await db.execute(text("SELECT pg_advisory_xact_lock(:uid)"),
+                         {"uid": source.university_id})
     root_id = ((source.request_payload or {}).get("selectiveRetry") or {}).get("rootJobId") or source_id
     children = (await db.execute(select(ScrapeRuntimeJob).where(
         ScrapeRuntimeJob.university_id == source.university_id,
@@ -146,13 +215,15 @@ async def inventory(db, source_id):
             failures.pop(url_key(url), None)
     spent = {}
     for child in children:
+        released = await released_capacity(db, child)
         policy = (child.request_payload or {}).get("selectiveRetry") or {}
         budgets = policy.get("budgets") or {}
         # An older continuation has no trustworthy attempt ledger. Conservatively
         # reserve the entire cap rather than silently offering unlimited retries.
-        for url in ((child.request_payload or {}).get("courseUrls") or []):
+        for url in dict.fromkeys([*budgets, *((child.request_payload or {}).get("courseUrls") or [])]):
             key = url_key(url)
-            spent[key] = spent.get(key, 0) + int(budgets.get(key, MAX_ATTEMPTS))
+            spent[key] = spent.get(key, 0) + max(
+                0, int(budgets.get(key, MAX_ATTEMPTS)) - released.get(key, 0))
     return source, failures, spent, children
 
 
@@ -254,6 +325,7 @@ async def queue(db, action, actor_id):
         "rootJobId": ((source.request_payload or {}).get("selectiveRetry") or {}).get("rootJobId") or source.runtime_job_id,
         "configHash": current["_config"], "sourceOwner": current["_owner"],
         "failureProof": current["_failures"], "budgets": current["_budgets"],
+        "capacityAccounting": 1,
         "maxAttempts": attempts, "backoffSeconds": backoff,
         "source": "staff-requested selective retry", "queuedAt": datetime.now(timezone.utc).isoformat(),
         "before": {"reservedAttempts": {u: attempts - n for u, n in current["_budgets"].items()}},

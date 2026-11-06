@@ -129,6 +129,11 @@ async def test_durable_attempt_cap_includes_interrupted_attempts(store, monkeypa
     await seed(store, monkeypatch)
     async with store() as db:
         child = await retry.queue(db, await retry.proposal(db, "source", attempts=2), 77)
+        # This exercises the retained legacy ledger path. Generation-bound
+        # workers and release races have separate real-claim integration tests.
+        payload = deepcopy(child.request_payload)
+        payload["selectiveRetry"].pop("capacityAccounting")
+        child.request_payload = payload
         child.status = "running"
         await db.commit()
         jid = child.runtime_job_id
@@ -266,6 +271,9 @@ async def test_actual_staging_boundary_rechecks_source_after_attempt_reservation
     await seed(store, monkeypatch)
     async with store() as db:
         job = await retry.queue(db, await retry.proposal(db, "source"), 77)
+        payload = deepcopy(job.request_payload)
+        payload["selectiveRetry"].pop("capacityAccounting")
+        job.request_payload = payload
         job.status = "running"
         await db.commit()
     assert await retry.reserve_attempt(job.runtime_job_id, URL)
