@@ -30,6 +30,18 @@ def test_domestic_only_still_rejected_even_if_online():
     assert not should_stage_course("Master of Business",payload)[0]
 
 
+@pytest.mark.parametrize("restriction", [
+    {"study_mode":"Online"}, {"online_only":True},
+    {"study_load":"Part Time"}, {"parttime_only":True},
+])
+def test_confirmed_no_international_fee_overrides_delivery_review(restriction):
+    payload = {"course_name":"Master of Business", "international_fee":None,
+               "fee_table_confirmed_no_international":True, **restriction}
+    assert should_stage_course("Master of Business", payload) == (False, "no_international_fee")
+    payload.pop("fee_table_confirmed_no_international")
+    assert should_stage_course("Master of Business", payload) == (True, "accepted")
+
+
 @pytest.mark.parametrize("status,course_id",[("approved",None),("pending",123),("rejected",None)])
 def test_no_implicit_revival_or_published_change(status,course_id):
     row=SimpleNamespace(status=status,course_id=course_id)

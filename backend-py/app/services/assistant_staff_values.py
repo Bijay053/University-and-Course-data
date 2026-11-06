@@ -1,6 +1,6 @@
 """Parse literal staff instructions, never model/tool/page text, into atomic edits."""
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
 
 MONTHS = ("January February March April May June July August September October November December").split()
 EDIT = re.compile(r"\b(?:add|set|change|update|edit)\b", re.I)
@@ -44,9 +44,36 @@ class StaffRequest:
     all_courses: bool
     instruction: str
     error: str = ""
+    missing_only: set = dataclass_field(default_factory=set)
 
 
 def parse(prompt, messages=()):
+    if prompt.strip() == "?" and any(
+        m.get("role") == "user" and EDIT.search(m.get("content", ""))
+        for m in messages
+    ):
+        previous = next((m.get("content", "") for m in reversed(messages)
+                         if m.get("role") == "assistant"), "")
+        return StaffRequest({}, False, prompt,
+            previous or "Your last request was a field edit, not a course search. No additional changes have been made.")
+    if re.fullmatch(r"\s*no need to match it just add (?:this|what I) requested[.!]?\s*", prompt, re.I):
+        for index in range(len(messages) - 1, -1, -1):
+            text = messages[index].get("content", "")
+            if messages[index].get("role") == "user" and text != prompt and EDIT.search(text):
+                return parse(text, messages[:index])
+        return StaffRequest({}, False, prompt, "There is no earlier explicit field edit to apply.")
+    clauses = [c.strip() for c in re.split(r"\n+|\balso\b", prompt, flags=re.I) if c.strip()]
+    if len(clauses) > 1 and all(EDIT.search(c) for c in clauses):
+        parts = [parse(c, ()) for c in clauses]
+        if any(not p or p.error or not p.all_courses for p in parts):
+            return StaffRequest({}, False, prompt, "Please give each edit an explicit value and the same all-courses scope. Nothing changed.")
+        values, missing = {}, set()
+        for p in parts:
+            if set(values) & set(p.values):
+                return StaffRequest({}, True, prompt, "The request edits the same field twice; specify one value.")
+            values.update(p.values)
+            missing.update(p.missing_only)
+        return StaffRequest(values, True, prompt, missing_only=missing)
     from app.services.scrape_assistant_autorun import execution_requested
     if (not execution_requested(prompt) or
         re.match(r"\s*(?:explain|how|why|what|show|compare)\b", prompt, re.I) or
@@ -65,7 +92,7 @@ def parse(prompt, messages=()):
             if EDIT.search(text) or FOLLOW.fullmatch(text):
                 prior = parse(text, history[:index])
                 if prior:
-                    return StaffRequest(prior.values, True, prior.instruction, prior.error)
+                    return StaffRequest(prior.values, True, prior.instruction, prior.error, prior.missing_only)
                 return StaffRequest({}, True, text, "The latest edit has no reusable explicit values.")
         return StaffRequest({}, True, prompt, "There is no prior explicit staff edit to repeat.")
     match = re.search(
@@ -131,4 +158,6 @@ def parse(prompt, messages=()):
         request.error = ("Supply an explicit value with its units. Tuition needs amount, ISO currency, "
                          "fee period and year (for example AUD 24000 annual 2026); "
                          "duration needs a number and unit; intake needs month names; IELTS needs a valid score.")
+    if re.search(r"\bmissing\b|\bempty\b|\bblank\b", prompt, re.I):
+        request.missing_only = set(request.values)
     return request

@@ -19,3 +19,20 @@ Do not reuse research-wide targeting for writes.
 **Why:** Research helpers can interpret “others” as broad scope, including inside “leave others unchanged.”
 
 **How to apply:** Resolve explicit row IDs before names and URLs; ambiguous provider-wide exclusions must fail closed.
+
+Undo must detect intervening writes even when the visible value returns to its original value, and must preserve null versus absent provenance.
+
+**Why:** Content-only fingerprints miss edit-away/edit-back sequences; treating null provenance as an empty map is not an exact restoration.
+
+**How to apply:** Fence location undo with both persisted row content and PostgreSQL tuple revision. Treat missing legacy undo fences as unsafe rather than guessing. Restore only the original edit's evidence; do not supersede unrelated evidence.
+
+Compound staff instructions retain separate field scopes: “all missing course
+intake” fills empty intakes, while “all course location” changes locations
+without replacing existing intakes.
+
+**Why:** The user reported a combined intake/location instruction being treated
+as an ambiguous single-course edit, followed by unwanted course-name matching.
+
+**How to apply:** Prepare one combined preview with per-row field changes.
+Apply confirmation limits to the complete affected row set, not each clause
+individually. Explicit follow-ups retain the original fields and scope.

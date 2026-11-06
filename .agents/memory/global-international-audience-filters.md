@@ -15,6 +15,12 @@ the updated scenario document against the earlier exclusion policy.
 staging and re-extraction. Do not confuse delivery restrictions with explicit
 domestic-only admission. Keep publication gated.
 
+Capture delivery restrictions before field validation strips an invalid display
+value, and carry those restrictions into the final review decision.
+
+**Why:** Sanitizing prose out of study mode can otherwise erase the original
+online signal before the pending-row warning is persisted.
+
 Retained review records need idempotent re-checks: finding the same restriction
 again must not create another change audit or report new progress.
 

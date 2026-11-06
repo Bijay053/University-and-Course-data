@@ -1376,7 +1376,10 @@ async def history_list(
         _func.max(PageSnapshot.fetched_at).label("latest_snap_at"),
     ).group_by(PageSnapshot.scrape_job_id).subquery()
     
-    base_where = []
+    # Release probes deliberately check one known course. They are operational
+    # evidence, not catalogue runs; retain their detail/audit records but keep
+    # them out of both the normal history page and its pagination total.
+    base_where = [ScrapeRuntimeJob.job_type != "safe_restart_smoke"]
     if university_id is not None:
         base_where.append(ScrapeRuntimeJob.university_id == university_id)
     if release_revision is not None:

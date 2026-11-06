@@ -1261,11 +1261,6 @@ def should_stage_course(
     # of auto-rejecting.  International fees on a separate page are legitimate.
     from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
     if payload.get("international_fee") is None:
-        if (is_online_only_for_staging(course_name, payload, source_url)
-                or is_part_time_only_for_staging(payload) or payload.get("parttime_only")):
-            # Missing tuition is another review issue, not grounds to discard
-            # an otherwise genuine delivery-restricted course.
-            return (True, "accepted")
         # Hard block: fee.py's structured-table extractor found a real fee
         # table on THIS course's own page and confirmed it has Home/Part-time
         # rows only — no International + Full-time row at all (e.g. HNC
@@ -1284,6 +1279,11 @@ def should_stage_course(
                 source_url,
             )
             return (False, "no_international_fee")
+        if (is_online_only_for_staging(course_name, payload, source_url)
+                or is_part_time_only_for_staging(payload) or payload.get("parttime_only")):
+            # Unknown tuition may need review; confirmed domestic-only fee
+            # tables above must never use this exception.
+            return (True, "accepted")
         if validated_fee_variants({
             **payload, "course_website": payload.get("course_website") or source_url,
         }):

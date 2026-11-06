@@ -135,8 +135,12 @@ async def test_real_pipeline_retries_contaminated_mode_without_losing_evidence(
         assert "invalid_study_mode" in cleaned["scrape_warnings"]
         assert payload["extraction_method"]["study_mode"].endswith(":null")
     if authoritative_online_only or recovered == "Online":
+        from app.services.scraper.guards import is_online_only_for_staging
+        assert is_online_only_for_staging("Bachelor of Testing", payload, URL)
         assert should_stage_course("Bachelor of Testing", payload, URL) == (True, "accepted")
     elif study_load == "Part Time":
+        from app.services.scraper.guards import is_part_time_only_for_staging
+        assert is_part_time_only_for_staging(payload)
         assert should_stage_course("Bachelor of Testing", payload, URL) == (True, "accepted")
     else:
         assert not payload.get("online_only")

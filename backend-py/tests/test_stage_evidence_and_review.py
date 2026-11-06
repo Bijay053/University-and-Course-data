@@ -1443,6 +1443,7 @@ async def test_re_extract_refreshes_unchanged_fee_from_newer_canonical_page(monk
                     "international_fee": 41000,
                     "currency": "AUD",
                     "fee_year": 2026,
+                    "currency": "AUD",
                     "course_website": old_url,
                 },
                 evidence=[{
@@ -1472,7 +1473,7 @@ async def test_re_extract_refreshes_unchanged_fee_from_newer_canonical_page(monk
         async def _fake_extract_only(*_args, **_kwargs):
             return {
                 "url": new_url,
-                "payload": {"international_fee": 41000},
+                "payload": {"international_fee": 41000, "currency": "AUD"},
                 "evidence": [{
                     "field_key": "international_fee",
                     "value": 41000,

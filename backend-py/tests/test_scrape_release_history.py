@@ -369,3 +369,45 @@ async def test_history_filters_release_mixed_status_university_and_pagination() 
             )
             await cleanup.commit()
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_release_probes_do_not_pollute_history_or_pagination():
+    prefix = f"test_probe_history_{uuid.uuid4().hex[:12]}"
+    await engine.dispose()
+    previous_override = app.dependency_overrides.get(get_current_user)
+    async def view_user():
+        return {"permissions": ["scraping.view"]}
+    try:
+        async with AsyncSessionLocal() as db:
+            db.add_all([
+                _job(runtime_job_id=f"{prefix}_real", university_name="Torrens University",
+                     release_revision=prefix),
+                _job(runtime_job_id=f"{prefix}_probe", university_name="Torrens University",
+                     release_revision=prefix, job_type="safe_restart_smoke"),
+            ])
+            await db.commit()
+        app.dependency_overrides[get_current_user] = view_user
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            first = await client.get("/api/scrape/history", params={
+                "release_revision": prefix, "limit": 1, "offset": 0})
+            assert first.status_code == 200
+            assert first.json()["total"] == 1
+            assert [r["jobId"] for r in first.json()["runs"]] == [f"{prefix}_real"]
+            second = await client.get("/api/scrape/history", params={
+                "release_revision": prefix, "limit": 1, "offset": 1})
+            assert second.status_code == 200
+            assert second.json()["total"] == 1 and second.json()["runs"] == []
+            detail = await client.get(f"/api/scrape/history/{prefix}_probe")
+            assert detail.status_code == 200
+        async with AsyncSessionLocal() as db:
+            assert await db.get(ScrapeRuntimeJob, f"{prefix}_probe") is not None
+    finally:
+        if previous_override is None:
+            app.dependency_overrides.pop(get_current_user, None)
+        else:
+            app.dependency_overrides[get_current_user] = previous_override
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("DELETE FROM scrape_runtime_jobs WHERE release_revision = :r"), {"r": prefix})
+            await db.commit()
+        await engine.dispose()

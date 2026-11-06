@@ -28,6 +28,10 @@ def validate_fields(payload,evidence=None):
         invalid["duration"]="requires a positive number and a time unit"
         invalid["duration_term"]="duration could not be validated"
     fee=cleaned.get("international_fee")
+    # Extractors may emit fee_currency; never guess a missing currency or
+    # override an explicit (including invalid) canonical currency.
+    if cleaned.get("currency") is None and cleaned.get("fee_currency") is not None:
+        cleaned["currency"]=cleaned["fee_currency"]
     currency=cleaned.get("currency")
     if currency is not None and not re.fullmatch(r"[A-Z]{3}",str(currency)):
         invalid["currency"]="requires a currency code"
