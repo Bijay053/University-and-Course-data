@@ -23,6 +23,16 @@ Database = Annotated[AsyncSession, Depends(get_db)]
 Actor = Annotated[dict, Depends(require_permission("scraping.trigger"))]
 
 
+@router.get("/jobs/{job_id}/live-diagnostics")
+async def live_diagnostics(job_id: str, db: Database,
+                           actor: Annotated[dict, Depends(require_permission("scraping.view"))]):
+    from app.services.live_scrape_diagnostics import inspect
+    try:
+        return await inspect(db, job_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
 class ResumeImportsBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     consolidationComplete: StrictBool
