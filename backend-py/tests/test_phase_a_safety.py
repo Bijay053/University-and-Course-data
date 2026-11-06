@@ -425,7 +425,7 @@ def test_drops_fee_when_no_source_proof():
 
 
 def test_keeps_fee_when_source_url_and_snippet_present():
-    payload = {"course_name": "Bachelor of X", "international_fee": 32480}
+    payload = {"course_name": "Bachelor of X", "international_fee": 32480, "currency": "AUD"}
     evidence = [
         {
             "field_key": "international_fee",
@@ -484,7 +484,7 @@ def test_does_not_touch_non_critical_fields():
 
 def test_drops_only_unproven_critical_fields():
     """Mixed scenario: fee proven, ielts unproven → only ielts dropped."""
-    payload = {"international_fee": 32480, "ielts_overall": 6.5}
+    payload = {"international_fee": 32480, "currency": "AUD", "ielts_overall": 6.5}
     evidence = [
         {
             "field_key": "international_fee",
@@ -1005,7 +1005,7 @@ def test_enforce_source_evidence_accepts_snippet_key():
     """enforce_source_evidence must KEEP fields whose evidence rows use the
     correct 'snippet' key — confirming the fixed _extended_extract output
     passes the guard."""
-    payload = {"international_fee": 36160, "ielts_overall": 6.5}
+    payload = {"international_fee": 36160, "currency": "AUD", "ielts_overall": 6.5}
     good_evidence = [
         {
             "field_key": "international_fee",

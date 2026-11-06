@@ -41,3 +41,35 @@ def test_no_implicit_revival_or_published_change(status,course_id):
 def test_mixed_delivery_is_not_downgraded():
     row=SimpleNamespace(course_id=None,status="pending")
     assert not apply_delivery_review(row,"Master of Business",{"study_mode":"On Campus, Online","study_load":"Full Time"})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode,warnings", [
+    ("Online", []),
+    (None, ["Online-only delivery: student-visa eligibility requires review."]),
+    ("Part Time", ["Part-time-only study: no full-time route confirmed; visa eligibility requires review."]),
+])
+async def test_high_scoring_delivery_hold_cannot_auto_publish(monkeypatch, mode, warnings):
+    from unittest.mock import AsyncMock, Mock
+    from app.models import ScrapedCourse
+    from app.services import publishing_engine
+    from app.services.scraper import approve_course, review_policy
+    row = ScrapedCourse(id=123, university_id=1, status="pending",
+        course_name="Master of Testing", course_website="https://example.edu/master",
+        study_mode=mode, completeness=100, eligibility_confidence=100,
+        scrape_warnings=warnings, auto_publish_status="review", extraction_method={})
+    scored = publishing_engine.compute_pub_score(row, 0, 0)
+    assert scored["score"] >= 90 and scored["decision"] == "needs_review"
+    # Defense in depth: callers cannot bypass scoring and directly auto-approve.
+    with pytest.raises(approve_course.ApprovalValidationError, match="Automatic publication blocked"):
+        await approve_course.approve_scraped_course(None, row)
+    approve = AsyncMock()
+    monkeypatch.setattr(approve_course, "approve_scraped_course", approve)
+    monkeypatch.setattr(publishing_engine, "_count_conflicts", AsyncMock(return_value=(0, 0)))
+    monkeypatch.setattr(review_policy, "blocks_automatic_followup", AsyncMock(return_value=False))
+    db = SimpleNamespace(execute=AsyncMock(return_value=SimpleNamespace(scalars=lambda: [row])),
+                         add=Mock(), commit=AsyncMock(), flush=AsyncMock())
+    counts = await publishing_engine.run_publishing_pass(db)
+    assert counts["auto_published"] == 0 and counts["needs_review"] == 1
+    approve.assert_not_awaited()
+    assert row.status == "pending" and row.auto_publish_status == "review"

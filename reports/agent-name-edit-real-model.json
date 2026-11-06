@@ -3,5 +3,5 @@
   "isolatedFixture": true,
   "productionWrites": 0,
   "storedNameVerified": true,
-  "answer": "Updated pending row 1 course name using verified evidence 1. Read-back confirms: **BAcc (Hons) Accounting**."
+  "answer": "Updated pending row 1 course name to **\u201cBAcc (Hons) Accounting\u201d** using verified evidence 1. Confirmed the stored row remains pending."
 }

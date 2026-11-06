@@ -124,7 +124,7 @@ def test_non_numeric_duration_value_does_not_raise():
         ({"duration_value": 18.0, "duration_unit": "months"}, 18.0, "Month"),
         ({"duration_value": 13.0, "duration_unit": "weeks"}, 13.0, "Week"),
         ({"duration_value": None, "duration_unit": None}, None, None),
-        ({"duration_value": 1.0, "duration_unit": "credits"}, 1.0, None),
+        ({"duration_value": 1.0, "duration_unit": "credits"}, None, None),
         ({"duration_value": "three", "duration_unit": "years"}, None, "Year"),
     ],
     ids=["years", "months", "weeks", "nulls", "unknown-unit", "non-numeric"],

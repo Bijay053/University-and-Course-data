@@ -426,8 +426,8 @@ def test_aims_online_only_sets_online_mode_without_weakening_gate() -> None:
         payload,
         "https://www.cqu.edu.au/courses/cc00/online-example",
     )
-    assert should_stage is False
-    assert reason == "online_only"
+    assert should_stage is True
+    assert reason == "accepted"
 
 
 @pytest.mark.asyncio
@@ -737,11 +737,11 @@ async def test_aims_online_only_remains_rejected_after_full_pipeline() -> None:
     )
 
     assert result["payload"]["study_mode"] == "Online"
-    assert result["payload"]["course_location"] == "Online"
+    assert result["payload"]["course_location"] is None
     should_stage, reason = should_stage_course(
         result["payload"]["course_name"],
         result["payload"],
         result["payload"]["course_website"],
     )
-    assert should_stage is False
-    assert reason == "online_only"
+    assert should_stage is True
+    assert reason == "accepted"

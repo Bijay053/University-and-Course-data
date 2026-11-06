@@ -198,6 +198,11 @@ async def approve_scraped_course(
         raise ApprovalValidationError(
             f"scraped_course id={sc.id} has empty course_name; cannot promote"
         )
+    from app.services.scraper.delivery_review import publication_hold_reason
+    if (not actor or actor == "system") and publication_hold_reason(sc):
+        raise ApprovalValidationError(
+            "Automatic publication blocked: " + publication_hold_reason(sc)
+        )
     if sc.status == "rejected" and sc.rejection_reason == "online_only":
         raise ApprovalValidationError(
             "Online-only course was rejected on re-extraction; re-stage from current campus evidence before approval"

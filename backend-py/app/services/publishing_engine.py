@@ -109,6 +109,12 @@ def compute_pub_score(
             decision = "needs_review"
         reason += " | Campus fee groups require explicit reviewer approval"
 
+    from app.services.scraper.delivery_review import publication_hold_reason
+    delivery_hold = publication_hold_reason(sc)
+    if delivery_hold:
+        decision = "needs_review"
+        reason += " | " + delivery_hold
+
     return {
         "score": pub_score,
         "breakdown": {

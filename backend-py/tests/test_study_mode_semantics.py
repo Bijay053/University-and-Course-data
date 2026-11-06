@@ -194,8 +194,18 @@ async def test_invalid_online_prose_cannot_erase_original_staging_eligibility_si
     from unittest.mock import AsyncMock, MagicMock
     from app.services.scraper.stage_course import stage_course
 
+    from app.models.scraped_course import ScrapedCourse
+    query_result = MagicMock()
+    query_result.scalar_one_or_none.return_value = None
+    query_result.scalar.return_value = None
+    query_result.first.return_value = None
+    query_result.scalars.return_value.all.return_value = []
     db = MagicMock()
-    db.execute = AsyncMock()
+    db.execute = AsyncMock(return_value=query_result)
+    db.get = AsyncMock(return_value=None)
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
     result = await stage_course(
         db=db, scrape_job_id=2, university_id=1,
         course_name="Bachelor of Accounting",
@@ -203,6 +213,9 @@ async def test_invalid_online_prose_cannot_erase_original_staging_eligibility_si
         payload={"study_mode": "Online learning equips students with knowledge and practical skills."},
         evidence=[],
     )
-    db.add.assert_not_called()
-    db.execute.assert_not_awaited()
-    assert "online_only" in result.reason
+    staged = [call.args[0] for call in db.add.call_args_list if isinstance(call.args[0], ScrapedCourse)]
+    assert len(staged) == 1
+    assert staged[0].status == "pending"
+    assert staged[0].eligibility_status == "unverified"
+    assert staged[0].auto_publish_status == "review"
+    assert staged[0].study_mode is None

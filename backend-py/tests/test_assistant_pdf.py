@@ -147,12 +147,14 @@ async def test_redirect_is_never_followed_even_to_an_official_pdf(monkeypatch, t
         instance = real_transport(**kwargs)
         async def handle(request):
             calls.append(str(request.url))
+            if request.url.path == "/robots.txt":
+                return httpx.Response(200, text="User-agent: *\nAllow: /\n", request=request)
             return httpx.Response(302, headers={"location": target}, request=request)
         instance.handle_async_request = handle
         return instance
     monkeypatch.setattr(tools.httpx, "AsyncHTTPTransport", transport)
     result = await tools.inspect_source(HOME + "/fees.pdf", HOME)
-    assert not result["verified"] and calls == [HOME + "/fees.pdf"]
+    assert not result["verified"] and calls == [HOME + "/robots.txt", HOME + "/fees.pdf"]
 
 
 @pytest.mark.asyncio

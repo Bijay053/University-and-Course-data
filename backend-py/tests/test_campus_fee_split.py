@@ -166,6 +166,30 @@ async def test_single_course_owned_campus_is_scoped_and_uniform_without_siblings
     assert (await split_pending_course(db, row))["status"] == "unchanged"
 
 
+@pytest.mark.asyncio
+async def test_split_retains_delivery_hold_for_original_and_all_children():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    values = row_values()
+    values["study_mode"] = "Online"
+    values["scrape_warnings"] = ["Online-only delivery: student-visa eligibility requires review."]
+    row = ScrapedCourse(id=123, **values)
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(
+            scalars=lambda: SimpleNamespace(all=lambda: []))),
+        flush=AsyncMock(), add=Mock(),
+    )
+    result = await split_pending_course(db, row)
+    assert result["status"] == "split"
+    children = [c.args[0] for c in db.add.call_args_list if isinstance(c.args[0], ScrapedCourse)]
+    assert children
+    for course in [row, *children]:
+        assert course.status == "pending"
+        assert course.eligibility_status == "unverified"
+        assert course.auto_publish_status == "review"
+        assert "Online-only" in course.eligibility_reason
+
+
 @pytest.mark.parametrize("change", ["missing", "unknown", "mixed_year", "mixed_period", "mixed_route", "conflict", "qualified"])
 def test_ambiguous_scopes_fail_closed(change):
     row = row_values()
