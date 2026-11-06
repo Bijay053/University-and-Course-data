@@ -8,7 +8,7 @@ from app.models.course import Course
 from app.models.audit import CourseAuditLog
 from app.models.evidence import ScrapedFieldEvidence
 from app.models.scrape_assistant import ScrapeAssistantThread
-from app.services.assistant_staff_values import parse, record_kind, staff_scope
+from app.services.assistant_staff_values import parse, record_kind, staff_scope, location_union
 
 
 def plain(value):
@@ -76,7 +76,12 @@ async def apply(service, db, action, university_id, actor_id, *, confirmed=False
     locked = []
     for target in sorted(targets, key=lambda t: (t["kind"], t["id"])):
         values = target.get("values", all_values)
-        if not values or any(k not in all_values or v != all_values[k] for k, v in values.items()):
+        expected = dict(all_values)
+        for key in action.get("_appendFields", []):
+            if key != "course_location" or key not in expected:
+                raise ValueError("Invalid append field")
+            expected[key] = location_union(target["before"].get(key), expected[key])
+        if not values or any(k not in expected or v != expected[k] for k, v in values.items()):
             raise ValueError("Invalid per-row staff values")
         kind = target["kind"]
         model = ScrapedCourse if kind == "pending" else Course
@@ -106,6 +111,16 @@ async def apply(service, db, action, university_id, actor_id, *, confirmed=False
                 if isinstance(expected, list) and isinstance(actual, str):
                     actual = [v.strip() for v in actual.split(",")]
                 equal = actual == expected or str(actual).casefold() == str(expected).casefold()
+                if proof.field_key == "course_location" and "course_location" in action.get("_appendFields", []):
+                    # Retaining an evidenced campus while adding a staff value
+                    # does not contradict that campus's existing evidence.
+                    known = {str(p).strip().casefold() for p in
+                             (actual if isinstance(actual, list) else str(actual).split(",")) if str(p).strip()}
+                    combined = {p.strip().casefold() for p in str(expected).split(",") if p.strip()}
+                    equal = bool(known) and known.issubset(combined)
+                    import re
+                    if re.search(r"\b(?:only|exclusively|not available)\b", proof.snippet or "", re.I):
+                        equal = known == combined
                 if isinstance(expected, (float, int)):
                     try:
                         equal = float(actual) == expected
@@ -178,6 +193,15 @@ async def apply(service, db, action, university_id, actor_id, *, confirmed=False
                 actor=str(actor_id), reason="staff-provided:" + json.dumps(metadata)))
     action["state"] = "completed"
     action["resultSummary"] = f"Saved {len(locked)} course records with staff-provided values and audit records. Not independently verified."
+    counts = action.get("_counts")
+    if counts:
+        action["resultCounts"] = {**counts, "updated": len(locked)}
+        action["resultSummary"] += (
+            f" Inspected: {counts['inspected']}; updated: {len(locked)};"
+            f" skipped: {counts['skipped']}; failed: 0. Records remain pending; nothing published."
+            if not any(t["kind"] == "published" for t in targets)
+            else f" Inspected: {counts['inspected']}; updated: {len(locked)}; skipped: {counts['skipped']}; failed: 0."
+        )
 
 
 async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
@@ -192,26 +216,34 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
         ).with_for_update())).scalar_one_or_none()
         if not thread:
             raise ValueError("Staff request was superseded")
+        inspected, targets = 0, []
         try:
             permissions(await db.get(User, thread.actor_id))
             if request.error:
                 raise ValueError(request.error)
-            targets = []
             for kind, model in (("pending", ScrapedCourse), ("published", Course)):
+                if request.review_only and kind != "pending":
+                    continue
                 if not request.all_courses and record_kind(request.instruction) not in {None, kind}:
                     continue
                 query = select(model).where(model.university_id == ctx["university_id"],
                     model.status.in_(service.REVIEW_STATUSES if kind == "pending" else ["active"]))
+                if request.review_only:
+                    query = query.where(ScrapedCourse.scrape_job_id == thread.job_id)
                 for row in (await db.execute(query.order_by(model.id))).scalars():
                     name = row.course_name if kind == "pending" else row.name
                     if not staff_scope(request.instruction, [{"id":row.id, "name":name, "url":row.course_website}],
                                        all_courses=request.all_courses):
                         continue
+                    inspected += 1
                     if not name or "://" in name or ".edu" in name:
                         raise ValueError("A selected row needs course-identity review")
                     before, related = await state(db, row, kind, request.values)
                     values = {k:v for k,v in request.values.items()
                               if k not in request.missing_only or before.get(k) in (None, "", [])}
+                    for key in request.append_fields:
+                        if key in values:
+                            values[key] = location_union(before.get(key), values[key])
                     if not values:
                         continue
                     before, related = await state(db, row, kind, values)
@@ -225,8 +257,10 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
                 publishedCount=sum(t["kind"] == "published" for t in targets),
                 requiresConfirmation=len(targets) > 10 or any(t["kind"] == "published" for t in targets),
                 _targets=targets, _values=request.values, _instruction=request.instruction,
+                _appendFields=list(request.append_fields),
+                _counts={"inspected": inspected, "updated": 0, "skipped": inspected - len(targets), "failed": 0},
                 _turnId=turn_id, _universityId=ctx["university_id"])
-            content = "No matching course records need changes."
+            content = f"Inspected: {inspected}; updated: 0; skipped: {inspected}; failed: 0. No matching course records need changes."
             if targets:
                 permissions(await db.get(User, thread.actor_id), bool(action["publishedCount"]))
                 content = "Staff-provided values (not independently verified). No discovery or page fetch.\n" + "\n".join(
@@ -235,6 +269,8 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
                 if not action["requiresConfirmation"]:
                     await apply(service, db, action, ctx["university_id"], thread.actor_id)
                     content = action["resultSummary"]
+                else:
+                    content += f"\nInspected: {inspected}; proposed: {len(targets)}; updated: 0; skipped: {inspected - len(targets)}; failed: 0. Confirmation required before applying."
             thread.messages = list(thread.messages) + [dict(role="assistant", turnId=turn_id,
                 createdAt=service.now().isoformat(), content=content, sources=[], actions=[action] if targets else [])]
             thread.status, thread.phase, thread.updated_at = "ready", "Staff edit processed without discovery", service.now()
@@ -243,7 +279,9 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
             await db.rollback()
             await service.save_research_reply(thread_id, turn_id, run_id, dict(role="assistant", turnId=turn_id,
                 createdAt=service.now().isoformat(),
-                content=("Previous result (no additional changes): " if prompt.strip() == "?" else "No values changed: ") + str(exc),
+                content=("Previous result (no additional changes): " if prompt.strip() == "?" else "No values changed: ") + str(exc)
+                    + ("" if prompt.strip() == "?" else
+                       f" Inspected: {inspected}; updated: 0; skipped: 0; failed: {inspected}."),
                 sources=[], actions=[]),
                 detail="Staff edit requires review.")
     return True

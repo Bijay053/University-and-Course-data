@@ -45,6 +45,17 @@ class StaffRequest:
     instruction: str
     error: str = ""
     missing_only: set = dataclass_field(default_factory=set)
+    append_fields: set = dataclass_field(default_factory=set)
+    review_only: bool = False
+
+
+def location_union(existing, incoming):
+    parts = [p.strip() for p in str(existing or "").split(",") if p.strip()]
+    for part in str(incoming).split(","):
+        part = part.strip()
+        if part and part.casefold() not in {p.casefold() for p in parts}:
+            parts.append(part)
+    return ", ".join(parts)
 
 
 def parse(prompt, messages=()):
@@ -62,7 +73,7 @@ def parse(prompt, messages=()):
             if messages[index].get("role") == "user" and text != prompt and EDIT.search(text):
                 return parse(text, messages[:index])
         return StaffRequest({}, False, prompt, "There is no earlier explicit field edit to apply.")
-    clauses = [c.strip() for c in re.split(r"\n+|\balso\b", prompt, flags=re.I) if c.strip()]
+    clauses = [c.strip(" ,.") for c in re.split(r"\n+|\balso\b", prompt, flags=re.I) if c.strip(" ,.")]
     if len(clauses) > 1 and all(EDIT.search(c) for c in clauses):
         parts = [parse(c, ()) for c in clauses]
         if any(not p or p.error or not p.all_courses for p in parts):
@@ -73,7 +84,25 @@ def parse(prompt, messages=()):
                 return StaffRequest({}, True, prompt, "The request edits the same field twice; specify one value.")
             values.update(p.values)
             missing.update(p.missing_only)
-        return StaffRequest(values, True, prompt, missing_only=missing)
+        return StaffRequest(values, True, prompt, missing_only=missing,
+            append_fields=set().union(*(p.append_fields for p in parts)),
+            review_only=any(p.review_only for p in parts))
+    natural = re.fullmatch(
+        r"\s*(?:in|for)\s+(?:all|every)\s+courses?\s+with\s+(?:missing|empty|blank)\s+"
+        r"intake(?:\s+information)?\s*,?\s*(?:add|set)\s+(.+?)[.!]?\s*", prompt, re.I)
+    if natural:
+        request = parse("set intake " + natural[1].rstrip(".!") + " on all courses")
+        if request:
+            request.instruction = prompt
+            request.review_only = True
+            request.missing_only = {"intake_months"}
+        return request
+    append = re.fullmatch(
+        r"\s*add\s+([A-Za-z][A-Za-z '\-]{0,60}?)\s+to\s+(?:all|every)\s+course\s+locations?[.!]?\s*", prompt, re.I)
+    if append:
+        value = append[1].strip()
+        return StaffRequest({"course_location": value.title() if value.islower() else value}, True, prompt,
+                            append_fields={"course_location"}, review_only=True)
     from app.services.scrape_assistant_autorun import execution_requested
     if (not execution_requested(prompt) or
         re.match(r"\s*(?:explain|how|why|what|show|compare)\b", prompt, re.I) or
@@ -92,7 +121,8 @@ def parse(prompt, messages=()):
             if EDIT.search(text) or FOLLOW.fullmatch(text):
                 prior = parse(text, history[:index])
                 if prior:
-                    return StaffRequest(prior.values, True, prior.instruction, prior.error, prior.missing_only)
+                    return StaffRequest(prior.values, True, prior.instruction, prior.error, prior.missing_only,
+                                        prior.append_fields, prior.review_only)
                 return StaffRequest({}, True, text, "The latest edit has no reusable explicit values.")
         return StaffRequest({}, True, prompt, "There is no prior explicit staff edit to repeat.")
     match = re.search(

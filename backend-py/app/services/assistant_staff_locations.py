@@ -171,7 +171,7 @@ def undo_proposal(action):
 async def handle(service,thread_id,turn_id,run_id,ctx,prompt,messages):
     from app.services.assistant_staff_values import parse
     request = parse(prompt, messages)
-    if request and (request.error or set(request.values) != {"course_location"}):
+    if request and (request.error or request.append_fields or request.review_only or set(request.values) != {"course_location"}):
         from app.services.assistant_staff_edits import handle as staff_edits
         return await staff_edits(service, thread_id, turn_id, run_id, ctx, prompt, messages)
     if request:

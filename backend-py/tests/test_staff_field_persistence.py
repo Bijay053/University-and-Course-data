@@ -25,6 +25,48 @@ CASES = [
 ]
 
 COMPOUND = "in all missing course intake add intake Feb, July\n\nalso in all course location add sydney"
+NATURAL_BULK = "In all courses with missing intake information, add February and July. Also, add Sydney to all course locations."
+
+
+@pytest.mark.asyncio
+async def test_natural_bulk_is_review_scoped_appends_locations_and_reports_counts(store):
+    await seed_thread(store)
+    async with store() as db:
+        first = await db.get(ScrapedCourse, 1)
+        first.intake_months = None
+        first.course_location = "Melbourne"
+        db.add(ScrapedFieldEvidence(scraped_course_id=1, field_key="course_location",
+            selected=True, validation_status="verified", normalized_value="Melbourne",
+            source_url="https://example.edu/current-course", snippet="Campus: Melbourne"))
+        db.add_all([
+            ScrapedCourse(id=2, university_id=1, scrape_job_id="source", status="pending",
+                course_name="Bachelor of Testing", course_location="sydney", intake_months=["September"]),
+            ScrapedCourse(id=3, university_id=1, scrape_job_id="another-review", status="pending",
+                course_name="Bachelor of Outside", course_location="Perth", intake_months=None),
+            Course(id=99, university_id=1, name="Published Course", status="active", course_location="Perth"),
+        ])
+        await db.commit()
+    await handle(service, "eligibility", "turn", "owner", await snapshot(store), NATURAL_BULK, [])
+    async with store() as db:
+        first, second, outside = [await db.get(ScrapedCourse, i) for i in (1, 2, 3)]
+        assert first.intake_months == ["February", "July"] and first.course_location == "Melbourne, Sydney"
+        assert second.intake_months == ["September"] and second.course_location == "sydney"
+        assert outside.course_location == "Perth" and outside.intake_months is None
+        assert (await db.get(Course, 99)).course_location == "Perth"
+        assert first.status == second.status == outside.status == "pending"
+        reply = (await db.get(ScrapeAssistantThread, "eligibility")).messages[-1]
+        assert reply["actions"][0]["resultCounts"] == {
+            "inspected": 2, "updated": 1, "skipped": 1, "failed": 0}
+        assert "Inspected: 2; updated: 1; skipped: 1; failed: 0" in reply["content"]
+
+
+def test_every_course_and_followup_preserve_natural_bulk_scope():
+    request = parse(NATURAL_BULK.replace("all courses", "every course").replace("all course locations", "every course location"))
+    assert not request.error and request.review_only and request.missing_only == {"intake_months"}
+    assert request.append_fields == {"course_location"}
+    follow = parse("no need to match it just add this requested",
+                   [{"role": "user", "content": NATURAL_BULK}])
+    assert follow.review_only and follow.append_fields == {"course_location"}
 
 
 def test_exact_compound_and_followup_keep_per_field_scope():
@@ -40,7 +82,8 @@ def test_exact_compound_and_followup_keep_per_field_scope():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("count", [2, 11])
-async def test_compound_request_preserves_existing_intakes_and_batch_confirmation(store, count):
+@pytest.mark.parametrize("prompt", [COMPOUND, NATURAL_BULK])
+async def test_compound_request_preserves_existing_intakes_and_batch_confirmation(store, count, prompt):
     await seed_thread(store)
     async with store() as db:
         original = await db.get(ScrapedCourse, 1)
@@ -51,7 +94,7 @@ async def test_compound_request_preserves_existing_intakes_and_batch_confirmatio
                 course_website=f"https://example.edu/course/{ident}",
                 intake_months=["September"], course_location="Melbourne"))
         await db.commit()
-    await handle(service, "eligibility", "turn", "owner", await snapshot(store), COMPOUND, [])
+    await handle(service, "eligibility", "turn", "owner", await snapshot(store), prompt, [])
     async with store() as db:
         thread = await db.get(ScrapeAssistantThread, "eligibility")
         action = thread.messages[-1]["actions"][0]
@@ -67,7 +110,8 @@ async def test_compound_request_preserves_existing_intakes_and_batch_confirmatio
         second = await db.get(ScrapedCourse, 2)
         assert first.intake_months == ["February", "July"]
         assert second.intake_months == ["September"]
-        assert first.course_location == second.course_location == "Sydney"
+        assert first.course_location == "Sydney"
+        assert second.course_location == ("Melbourne, Sydney" if prompt == NATURAL_BULK else "Sydney")
         audits = list((await db.execute(select(CourseAuditLog))).scalars())
         assert len(audits) == count + 1
         assert all("staff-provided" in a.reason for a in audits)
@@ -89,7 +133,9 @@ async def test_single_row_tool_does_not_overwrite_a_nonmissing_intake(store):
         assert not list((await db.execute(select(CourseAuditLog))).scalars())
 
 
-@pytest.mark.parametrize("prompt,values", CASES)
+@pytest.mark.parametrize("prompt,values", CASES + [
+    (NATURAL_BULK, {"intake_months": ["February", "July"], "course_location": "Sydney"}),
+])
 @pytest.mark.asyncio
 async def test_literal_values_persist_without_network(store, monkeypatch, prompt, values):
     from app.services.scrape_agent_v2 import runtime
