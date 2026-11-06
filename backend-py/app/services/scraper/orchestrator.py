@@ -221,11 +221,17 @@ async def stage_runtime_extraction(db, *, scrape_job_id: str, university_id: int
     payload = dict(extracted.get("payload") or {})
     evidence = apply_runtime_recipe(payload, recipe, extracted.get("evidence"))
     from app.services.scraper.stage_course import stage_course
+    job = await db.get(ScrapeRuntimeJob, scrape_job_id)
+    request = (job.request_payload or {}) if job else {}
+    reuse_pending = "autonomousVerification" not in request and bool(
+        targeted_retry or request.get("fullCatalogueReviewOnly")
+    )
     return await stage_course(
         db, scrape_job_id=scrape_job_id, university_id=university_id,
         course_name=course_name, source_url=source_url, payload=payload,
         evidence=evidence, targeted_retry=targeted_retry,
         preserve_existing=preserve_existing,
+        reuse_pending=reuse_pending,
     )
 
 _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS = float(
@@ -534,6 +540,8 @@ def _record_staged_quality_payload(
 ) -> bool:
     """Retain a payload for QA only when staging actually saved its row."""
     if not getattr(stage_result, "saved", False):
+        return False
+    if (getattr(stage_result, "extra", None) or {}).get("reused_pending"):
         return False
     staged_payloads.append(
         {
@@ -6956,6 +6964,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # Collect non-error result dicts across all batches for the data-quality
         # check that runs after staging (it reads payloads, not the DB).
         _all_staged_dicts: list[dict] = []
+        _reused_pending_ids: set[int] = set()
         # T04 recovery sweep: retryable fetch/extraction failures from the
         # main batch pass.  The sequential replay lets transient provider
         # contention clear while preserving the primary pass's concurrency and
@@ -7796,11 +7805,13 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             skip_url_block=_skip_url_block,
                             targeted_retry=_targeted_retry,
                             preserve_existing=_preserve_review,
+                            reuse_pending=not bool(_verification) and (_full_review or _targeted_retry),
                         )
                         if _targeted_retry:
                             _record_selected_staging_outcome(
                                 _selected_staging_failures, res, source_url=r.get("url"),
                             )
+                        _reused_pending_ids.update(res.extra.get("reused_course_ids", []))
                         await checkpoint_report_urls(db, job, _verification, [r.get("url")])
                         _record_staged_quality_payload(
                             _all_staged_dicts,
@@ -7812,7 +7823,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                         # Runs inside the same session (already committed by
                         # stage_course) so evidence rows are visible.  Soft-fail
                         # only — a verification error must never abort the scrape.
-                        if res.saved and res.scraped_course_id:
+                        if res.saved and res.scraped_course_id and not res.extra.get("reused_pending"):
                             if _discovery_hostname in {"sit.ac.nz", "www.sit.ac.nz"}:
                                 _sit_staged_links.append(
                                     {
@@ -8165,6 +8176,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                                     source_url=_sweep_url,
                                     targeted_retry=_targeted_retry,
                                     preserve_existing=_preserve_review,
+                                    reuse_pending=not bool(_verification) and (_full_review or _targeted_retry),
                                 ),
                                 timeout=_remaining_stage_budget,
                             )
@@ -8172,6 +8184,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             _record_selected_staging_outcome(
                                 _selected_staging_failures, _sw_res, source_url=_sweep_url,
                             )
+                        _reused_pending_ids.update(_sw_res.extra.get("reused_course_ids", []))
                         _record_staged_quality_payload(
                             _all_staged_dicts,
                             _sw_payload,
@@ -8425,6 +8438,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     _dq_upd(_DqSC)
                     .where(_DqSC.scrape_job_id == runtime_job_id)
                     .where(_DqSC.course_website.in_(_dq_url_list))
+                    .where(_DqSC.id.not_in(_reused_pending_ids))
                     .where(_DqSC.auto_publish_status.notin_(["auto_published", "rejected"]))
                     .values(auto_publish_status="data_quality_failure")
                 )
@@ -8468,6 +8482,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         #              so subsequent runs skip re-discovery.
         try:
             from sqlalchemy import text as _qi_sql
+            from app.services.scraper.pending_imports import AUTO_MUTATION_SQL
             _qi_row = None if _preserve_review else (await db.execute(
                 _qi_sql("""
                     SELECT
@@ -8477,7 +8492,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                         SUM(CASE WHEN international_fee IS NOT NULL THEN 1 ELSE 0 END) AS has_fee
                     FROM scraped_courses
                     WHERE scrape_job_id = :jid
-                """),
+                """ + AUTO_MUTATION_SQL),
                 {"jid": runtime_job_id},
             )).mappings().first()
             _qi_total = int((_qi_row or {}).get("total") or 0)
@@ -8538,8 +8553,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                                          WHERE scrape_job_id = :jid
                                            AND (other_requirement IS NULL
                                                 OR other_requirement = '')
-                                    RETURNING id
-                                    """),
+                                    """ + AUTO_MUTATION_SQL + " RETURNING id"),
                                     {"s": _qi_summary[:500], "jid": runtime_job_id},
                                 )
                                 await synchronize_updated_guidance(db, _qi_upd)
@@ -8552,8 +8566,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                                        SET international_fee = :f
                                      WHERE scrape_job_id = :jid
                                        AND international_fee IS NULL
-                                    RETURNING id
-                                """),
+                                """ + AUTO_MUTATION_SQL + " RETURNING id"),
                                 {"f": _qi_fee_data["international_fee"], "jid": runtime_job_id},
                             )
                             await synchronize_updated_guidance(db, _qi_upd2)
@@ -9111,7 +9124,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             job.status = "completed" if finished_cleanly else "failed"
         if not _preserve_review and job.status == "completed" and _bypassed_resume_course_ids:
             _discarded_resume_rows = await _discard_bypassed_resume_rows(
-                db, _bypassed_resume_course_ids
+                db, [i for i in _bypassed_resume_course_ids if i not in _reused_pending_ids]
             )
             log.info(
                 "[RESUME] discarded %d superseded pending checkpoint row(s) "
@@ -9353,7 +9366,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     .where(
                         _FVR.scraped_course_id.in_(
                             _r_sel(_RepSC.id).where(
-                                _RepSC.scrape_job_id == runtime_job_id
+                                _RepSC.scrape_job_id == runtime_job_id,
+                                _RepSC.id.not_in(_reused_pending_ids),
                             )
                         ),
                         _FVR.status == "conflict",

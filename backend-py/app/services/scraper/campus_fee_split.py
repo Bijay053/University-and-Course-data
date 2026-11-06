@@ -131,7 +131,7 @@ def _apply_group(row, group, original_name, original_locations):
         row.auto_publish_status = "review"
 
 
-async def split_pending_course(db, row, *, actor="scraper"):
+async def split_pending_course(db, row, *, actor="scraper", reused=None):
     """Caller holds the row lock and commits the whole transaction."""
     from app.models import ScrapedCourse, ScrapedFieldEvidence, FieldConflict
     if row.status not in {"pending", "review_ready"}:
@@ -150,6 +150,11 @@ async def split_pending_course(db, row, *, actor="scraper"):
         return {"id": row.id, "status": "needs_review", "courseIds": [row.id], "reason": reason}
     if len(groups) == 1 and (row.extraction_method or {}).get("fee_variants", {}).get("status") != "range":
         return {"id": row.id, "status": "unchanged", "courseIds": [row.id], "reason": "Applicable campuses have the same fee."}
+    if reused is not None:
+        from app.services.scraper.pending_imports import pending_group_key
+        groups = [{**group, "key": pending_group_key(row, group)} for group in groups]
+    reused = reused or {}
+    groups = [group for group in groups if group["key"] not in reused]
     evidence = (await db.execute(select(ScrapedFieldEvidence).where(
         ScrapedFieldEvidence.scraped_course_id == row.id,
     ))).scalars().all()
@@ -196,7 +201,8 @@ async def split_pending_course(db, row, *, actor="scraper"):
                 evidence_a_id=getattr(copied_evidence.get(conflict.evidence_a_id), "id", None),
                 evidence_b_id=getattr(copied_evidence.get(conflict.evidence_b_id), "id", None),
             ))
-    return {"id": row.id, "status": "split", "courseIds": [child.id for child in children]}
+    return {"id": row.id, "status": "split",
+            "courseIds": [child.id for child in children] + [old.id for old in reused.values()]}
 
 
 def scope_refresh_payload(row, payload):

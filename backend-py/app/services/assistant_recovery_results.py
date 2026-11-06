@@ -1,5 +1,5 @@
 """Read-only, per-URL recovery results. A checkpoint alone never proves success."""
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from app.models import ScrapedCourse
 from app.models.scrape_runtime import ScrapeRuntimeLog
@@ -17,13 +17,22 @@ FILTER_MESSAGES = {
 
 
 async def review_course_results(db, job, requested_urls, review_statuses):
+    from app.services.scraper.pending_imports import linked_course_ids, attempt_summary
+    from app.services.scraper.url_identity import canonical_course_url_key
+    linked = await linked_course_ids(db, [job.runtime_job_id], job.university_id)
+    attempts = await attempt_summary(db, job.runtime_job_id, job.university_id)
     requested = {identity(url): url for url in requested_urls}
-    actual = (await db.execute(select(ScrapedCourse.course_website).where(
-        ScrapedCourse.scrape_job_id == job.runtime_job_id,
+    actual = (await db.execute(select(ScrapedCourse.id, ScrapedCourse.course_website).where(
+        or_(ScrapedCourse.scrape_job_id == job.runtime_job_id, ScrapedCourse.id.in_(linked)),
         ScrapedCourse.university_id == job.university_id,
         ScrapedCourse.status.in_(review_statuses),
-    ))).scalars().all()
-    staged = {identity(url) for url in actual if url}
+    ))).all()
+    staged = {identity(url) for _, url in actual if url}
+    pending_ids = {row_id for row_id, _ in actual}
+    for url in requested_urls:
+        attempt = attempts.get(canonical_course_url_key(url), {})
+        if attempt.get("courseIds") and set(attempt["courseIds"]) <= pending_ids:
+            staged.add(identity(url))
     # Only course-owned, structured events are evidence; aggregate counters and
     # free-text messages cannot explain an individual missing row.
     events = (await db.execute(select(ScrapeRuntimeLog.payload).where(
@@ -55,6 +64,12 @@ async def review_course_results(db, job, requested_urls, review_statuses):
             reason = reason.removeprefix(prefix).strip()
         if key in staged and is_course_candidate_url(url):
             status, message = "recovered", "Verified in pending review."
+            attempt = attempts.get(canonical_course_url_key(url), {})
+            if attempt.get("existingReviewIds"):
+                message = "Reused existing pending review; stored values were not changed."
+                if attempt.get("conflictingFields"):
+                    message += " New attempt differs in: " + ", ".join(attempt["conflictingFields"]) + ". Compare the saved attempt evidence before editing."
+                message += " Existing review: " + ", ".join(attempt["existingReviewIds"]) + "."
         elif reason == "domestic_only":
             status, message = "international_ineligible", "Excluded by the international-student eligibility check."
         elif reason in {"online_only", "listed_but_ineligible_online_only"}:
@@ -78,7 +93,8 @@ async def review_course_results(db, job, requested_urls, review_statuses):
             status, message = "excluded", "Skipped by the course checks; international eligibility was not established."
         else:
             status, message = "unverified", "No pending course or conclusive failure reason was found; eligibility is unknown."
-        results.append({"url": url, "status": status, "message": message})
+        results.append({"url": url, "status": status, "message": message,
+                        **attempts.get(canonical_course_url_key(url), {})})
     count = sum(item["status"] == "recovered" for item in results)
     complete = bool(results) and count == len(results)
     summary = (

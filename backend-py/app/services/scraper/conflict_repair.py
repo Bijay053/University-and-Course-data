@@ -677,12 +677,14 @@ async def repair_conflicts_for_job(
     from app.models.field_verification import FieldVerificationResult
 
     job_summary = JobRepairSummary(job_id=job_id)
+    from app.services.scraper.pending_imports import automatic_mutation_clause
 
     # Find all courses in this job that have at least one conflict field
     q = await db.execute(
         select(ScrapedCourse.id, ScrapedCourse.avg_verification_confidence)
         .where(
             ScrapedCourse.scrape_job_id == job_id,
+            automatic_mutation_clause(),
             ScrapedCourse.id.in_(
                 select(FieldVerificationResult.scraped_course_id)
                 .where(FieldVerificationResult.status == "conflict")

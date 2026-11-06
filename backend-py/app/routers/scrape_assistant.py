@@ -157,6 +157,15 @@ async def response(thread, db, job_id=None):
                     action["state"] = "completed"
                     if action["kind"] == "scan_catalogue":
                         action["resultSummary"] = f"Discovery finished: {target.total_found or 0} found, {target.imported or 0} staged, {target.skipped or 0} skipped, {target.errors or 0} errors. Nothing was published."
+                        from app.services.scraper.pending_imports import attempt_summary
+                        attempts = await attempt_summary(db, target.runtime_job_id, target.university_id)
+                        reused = [a for a in attempts.values() if a["existingReviewIds"]]
+                        conflicts = sum(bool(a["conflictingFields"]) for a in reused)
+                        if reused:
+                            action["resultSummary"] += (
+                                f" {len(reused)} source page(s) linked existing pending reviews without changing stored values;"
+                                f" {conflicts} have differing attempt evidence requiring review."
+                            )
                 elif target.status not in {"queued", "running", "awaiting_approval"}:
                     action["state"] = "error"
                     action["error"] = "The correction job stopped. Review its results before retrying."
