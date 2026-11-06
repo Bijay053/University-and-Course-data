@@ -1,4 +1,5 @@
 - [Agent dollar budget](agent-dollar-budget.md) — approved US$100/day; reserve before calls, retain uncertain spend, and stop on pricing/accounting uncertainty.
+- [Live scrape assistant safety](live-scrape-assistant-safety.md) — isolate slots; preserve progress, rate limits and manual provenance; no silent global tuning or restarts.
 - [Public course toolkit](public-course-toolkit.md) — visitors can search and view fees without signing in; keep administration and pending records private.
 - [ACAP course availability](acap-course-availability.md) — marked online/campus restrictions are not whole-course exclusions; verify research and repair use usable live transport.
 - [Excelsia course facts](excelsia-course-facts.md) — prefer verified static pages; keep own-award facts, international prices, fee periods and IELTS evidence aligned.

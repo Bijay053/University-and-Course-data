@@ -33,6 +33,9 @@ async def investigate(service, thread_id, turn_id, run_id):
     from app.services.assistant_staff_locations import handle as staff_locations
     if await staff_locations(service,thread_id,turn_id,run_id,ctx,prompt,saved):
         return
+    from app.services.live_scrape_diagnostics import handle as live_diagnostics
+    if await live_diagnostics(service, thread_id, turn_id, run_id, ctx, prompt):
+        return
     tools = DataTools(service, thread_id, turn_id, run_id, ctx, prompt)
     history = [{"role":"system","content":SYSTEM}]
     history.extend({"role":m["role"],"content":m.get("content","")} for m in saved[-12:])

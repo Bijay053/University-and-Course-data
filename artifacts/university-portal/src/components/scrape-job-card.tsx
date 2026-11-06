@@ -15,6 +15,7 @@ import { countPendingReviewCourses } from "@/utils/pending-review-count";
 import { CourseReport } from "@/components/course-report";
 import { useCan } from "@/components/can";
 import { ScrapePromptAssistant } from "@/components/scrape-prompt-assistant";
+import { LiveScrapeAssistant } from "@/components/live-scrape-assistant";
 import {
   TargetedRetryAllFilteredNotice,
   type TargetedRetryDiagnostic,
@@ -2745,6 +2746,14 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                 </>
               )}
             </div>
+            {phase === "running" && activeJobId && (
+              <LiveScrapeAssistant
+                key={activeJobId}
+                jobId={activeJobId}
+                onChanged={handleAssistantChanged}
+                onReviewJob={id => onReviewReady(id, uniName, true)}
+              />
+            )}
             {phase === "error" && providerFailure && repairJobId && (
               <div
                 className="rounded-lg border border-violet-200 bg-violet-50 p-2.5 space-y-2"
