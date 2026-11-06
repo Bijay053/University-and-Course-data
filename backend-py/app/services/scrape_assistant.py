@@ -357,7 +357,7 @@ def known_sources(prompt, ctx, sampled):
         r"fix|correct|verif|ielts|english|fee|duration|location|band", prompt, re.I
     ):
         coverage = True
-    candidates = re.findall(r"https://[^\s<>\"']+", prompt)
+    candidates = re.findall(r"https://[^\s<>\"'`]+", prompt)
     english_audit = bool(re.search(r"ielts|english|band|language", prompt, re.I))
     if english_audit:
         english = ctx["config"].extraction.english
@@ -419,7 +419,7 @@ def requested_course_urls(prompt, messages, home):
              if contextual and not broad else [])
     for text in texts:
         result = []
-        for candidate in re.findall(r"https://[^\s<>\"']+", text):
+        for candidate in re.findall(r"https://[^\s<>\"'`]+", text):
             try:
                 value = official_url(candidate.rstrip(".,);]"), home)
                 if value not in result:
@@ -509,8 +509,9 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
     if recent_user_urls:
         # An open review is context, not the referent of "this course".
         urls, check_catalogue = recent_user_urls[:3], False
-        sampled = [item for item in sampled if item.get("url", "").rstrip("/") in
-                   {value.rstrip("/") for value in recent_user_urls}]
+        if not all(urlsplit(value).path.lower().endswith(".pdf") for value in recent_user_urls):
+            sampled = [item for item in sampled if item.get("url", "").rstrip("/") in
+                       {value.rstrip("/") for value in recent_user_urls}]
     inventory = await inventory_for_urls(ctx["university_id"], recent_user_urls[:3])
     if not urls:
         await progress(thread_id, turn_id, "Locating official source pages", run_id)
@@ -538,6 +539,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
     source_slots = asyncio.Semaphore(6)
     source_deadline = time.monotonic() + 30
     async def source_check(url):
+        from app.services.assistant_official_sources import source_check_detail
         started = time.monotonic()
         identifier = uuid.uuid4().hex
         await record_activity(thread_id, turn_id, run_id, event(
@@ -575,7 +577,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                 f"Read {result.get('pagesRead')}/{result.get('pageCount')} PDF pages. {result.get('note', '')}"
                 if result.get("sourceType") == "pdf" else
                 f"{len(result.get('facts', []))} extracted field facts."
-            ) if result.get("verified") else result.get("error"),
+            ) if result.get("verified") else source_check_detail(result),
             duration_ms=(time.monotonic() - started) * 1000,
         ))
         return result
@@ -605,6 +607,14 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         running = [group.create_task(task) for task in tasks]
     findings = [task.result() for task in running]
     sources, catalogue = (findings[:-1], findings[-1]) if check_catalogue else (findings, None)
+    from app.services.assistant_official_sources import english_guidance_alternatives
+    alternatives = english_guidance_alternatives(ctx["home"], prompt, sources)
+    if alternatives:
+        await record_activity(thread_id, turn_id, run_id, event(
+            "Checking alternative official English guidance", status="running",
+            detail="Separate published URLs; no PDF suffix was added or removed. Each source must pass robots.txt.",
+        ))
+        sources.extend(await asyncio.gather(*(source_check(url) for url in alternatives)))
     link_keys = []
     if re.search(r"ielts|english|band|language", prompt, re.I):
         link_keys.append("englishLinks")
@@ -835,6 +845,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         reply["resolvedCourses"] = name_resolution["choices"]
     from app.services.assistant_source_gate import gate_unreachable_repair
     reply = gate_unreachable_repair(reply, sources)
+    from app.services.assistant_official_sources import gate_general_english_proposals
+    reply = gate_general_english_proposals(reply, sources)
     if messages[-1].get("autoRun") and reply.get("actions"):
         reply["content"] = reply["content"].replace(
             "Confirm the action below to fetch", "I will automatically fetch"

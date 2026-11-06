@@ -78,6 +78,20 @@ Official PDF research must remain separate from HTML field extraction and numeri
 
 **How to apply:** Reuse parsing primitives, not weaker transport. Keep document/page identity in quotations, report unreadable pages and bounded failures, and treat audience, tuition purpose, year and Annual/Full Course applicability as separate requirements. Continue using validated pending-only correction pipelines rather than assigning generated values.
 
+Preserve official document paths exactly, including repeated `.pdf` suffixes.
+Remove chat markup delimiters, not filename extensions. A robots.txt access
+failure does not establish that the document's URL is invalid.
+
+**Why:** A reported extra suffix was already present in a saved request, and
+LSBU search-indexed official filenames also contained repeated suffixes. The
+live permission check stopped before requesting either candidate document.
+
+**How to apply:** Trace the requested URL's provenance before changing it.
+Check alternate official documents as separate sources through the same
+permission checks, and distinguish URL validation, robots access, document
+HTTP failures and parsing failures. General guidance is not proof of health
+or postgraduate-research course requirements.
+
 The user wants this assistant to replace their reliance on Replit for fixes, including software issues, not merely answer scraping questions.
 
 **Why:** They explicitly asked for a capability comparison, scenario checks and a more capable agent after repeated incomplete answers.

@@ -80,6 +80,11 @@ async def web_tool(tools,name,args):
     cached=cache.get(key)
     if reusable_page(cached):
         result={**cached,"cached":True}
+        if not result.get("verified"):
+            from app.services.assistant_official_sources import english_guidance_alternatives
+            result["officialAlternatives"] = english_guidance_alternatives(
+                tools.ctx["home"], "", [result],
+            )
         if name=="search_site":
             result["matches"]=[line for line in result.get("text","").split(". ") if args["query"].casefold() in line.casefold()][:20]
         return result
@@ -122,6 +127,23 @@ async def web_tool(tools,name,args):
         result={"ok":False,"verified":False,"url":url,"reason":str(exc)[:250],"sourceStatus":"unavailable"}
         if isinstance(exc, SourceReadError) and exc.access_issue:
             result.update(accessIssue=exc.access_issue, httpStatus=exc.http_status, error=str(exc))
+        result.update(
+            requestedUrl=args["url"], urlHandling="preserved" if url == args["url"] else "fragment_removed",
+            sourceType="pdf" if urlsplit(url).path.lower().endswith(".pdf") else "html",
+            failureStage=getattr(exc, "failure_stage", None) or "source_fetch",
+            sourceRequestAttempted=(
+                False if getattr(exc, "failure_stage", None) == "robots" else
+                True if getattr(exc, "failure_stage", None) == "source_http" else None
+            ),
+        )
+        if isinstance(exc, SourceReadError) and exc.http_status is not None:
+            result["httpStatus"] = exc.http_status
+    if not result.get("verified"):
+        from app.services.assistant_official_sources import english_guidance_alternatives
+        result["officialAlternatives"] = english_guidance_alternatives(
+            tools.ctx["home"], "", [result],
+        )
+        result["alternativesNote"] = "Unverified candidates only; fetch each through the same robots-fenced tools."
     result["checkedAt"]=datetime.now(timezone.utc).isoformat()
     cache[key]=result
     async with tools.service.AsyncSessionLocal() as db:

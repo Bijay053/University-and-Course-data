@@ -10,6 +10,8 @@ def access_blocked_answer(sources):
         return None
     failures = "\n".join(
         f"- {s.get('url', 'Official source')}: {s.get('error', 'Access unavailable')}"
+        + (" The document itself was not requested; its URL has not been diagnosed as wrong."
+           if s.get("failureStage") == "robots" else "")
         + (" (recent check reused; no new fetch)" if s.get("_sourceCacheHit") else "")
         for s in sources[:3]
     )

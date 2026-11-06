@@ -22,10 +22,14 @@ PDF_PARSE_SECONDS = 4
 class SourceReadError(ValueError):
     """A safe, user-facing failure (never expose raw transport/parser errors)."""
 
-    def __init__(self, message, *, access_issue=None, http_status=None):
+    def __init__(self, message, *, access_issue=None, http_status=None, failure_stage=None):
         super().__init__(message)
         self.access_issue = access_issue
         self.http_status = http_status
+        self.failure_stage = failure_stage or (
+            "robots" if access_issue in {"robots_unavailable", "robots_disallowed"} else
+            "source_http" if http_status is not None else None
+        )
 
 
 async def pdf_pages(raw: bytes) -> dict:
@@ -76,6 +80,9 @@ async def inspect_pdf(raw: bytes, url: str) -> dict:
             "Text-only PDF research; no fee or IELTS values assigned. "
             "Keep page/table headers, course, international/domestic audience, year and Annual/Full Course "
             "period together; missing or ambiguous scope is unverified. Never infer annual tuition from a total. "
+            "General undergraduate/postgraduate guidance does not establish individual course requirements. "
+            "Retain exclusions for health courses and postgraduate research; check course-specific evidence "
+            "before proposing any English-score update. "
             + ("This is non-tuition guidance: its amounts cannot establish international tuition. " if non_tuition else "")
             + (f"Unreadable pages {document['unreadablePages']} remain unverified." if document["unreadablePages"] else "")
         ),
@@ -186,15 +193,23 @@ async def public_request(url: str, *, method="GET", body=None, params=None, user
 
 
 async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) -> dict:
+    requested_url = url
+    stage = "url_validation"
     source_type = "pdf" if urlsplit(url).path.lower().endswith(".pdf") else "html"
     try:
         url = official_url(url, home)
+        identity = {"requestedUrl": requested_url, "urlHandling": (
+            "preserved" if url == requested_url else "fragment_removed"
+        )}
+        stage = "source_fetch"
         raw = raw_body if raw_body is not None else await asyncio.wait_for(public_request(url), timeout=12)
+        stage = "content_validation"
         if len(raw) > MAX_BYTES:
             raise SourceReadError("Source exceeds the safe research size limit.")
         if raw.lstrip().startswith(b"%PDF"):
             source_type = "pdf"
-            return await inspect_pdf(raw, url)
+            stage = "pdf_parse"
+            return {**await inspect_pdf(raw, url), **identity}
         if source_type == "pdf":
             raise SourceReadError("Official PDF URL did not return a PDF document.")
         if b"\x00" in raw[:500]:
@@ -249,7 +264,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
         from app.services.scraper.excelsia_source import facts as excelsia_facts
         intake_facts = excelsia_facts(html, url)
         return {
-            "url": url, "title": title[:200], "text": text[:24000], "_fullText": text,
+            "url": url, "title": title[:200], "text": text[:24000], "_fullText": text, **identity,
             "_eligibilityName": eligibility_name,
             "_excelsiaIntake": {"name": intake_facts.get("course_name"), "months": intake_facts.get("intake_months"),
                                "quote": intake_facts.get("_intake_snippet")},
@@ -260,12 +275,21 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
     except asyncio.CancelledError:
         raise
     except Exception as exc:
+        failure_stage = getattr(exc, "failure_stage", None) or stage
         return {
             "url": url, "verified": False, "sourceType": source_type,
+            **({"requestedUrl": requested_url, "urlHandling": (
+                "preserved" if url == requested_url else "fragment_removed"
+            )} if stage != "url_validation" else {}),
+            "failureStage": failure_stage,
+            "sourceRequestAttempted": (
+                False if failure_stage in {"robots", "url_validation"} else
+                True if failure_stage in {"source_http", "content_validation", "pdf_parse"} else None
+            ),
             "error": str(exc) if isinstance(exc, SourceReadError) else
             f"Official {source_type.upper()} source could not be verified within the research limit.",
-            **({"accessIssue": exc.access_issue, "httpStatus": exc.http_status}
-               if isinstance(exc, SourceReadError) and exc.access_issue else {}),
+            **({"accessIssue": exc.access_issue} if isinstance(exc, SourceReadError) and exc.access_issue else {}),
+            **({"httpStatus": exc.http_status} if isinstance(exc, SourceReadError) and exc.http_status is not None else {}),
         }
 
 

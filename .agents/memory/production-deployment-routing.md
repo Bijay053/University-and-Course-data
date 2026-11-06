@@ -459,6 +459,21 @@ is the prior release ancestry, create a reconciliation commit with both parents
 and the exact tested target tree, verify its tree hash, and fast-forward without
 force. Do not use this to discard production-only source changes.
 
+With a REST-only GitHub connection, if the workspace commit ancestry is not
+available on GitHub, an exact-tree release commit may instead use the existing
+GitHub main revision as its sole parent. Record the workspace source revision
+in the commit message and distinguish it from the resulting release revision.
+
+**Why:** Native Git authentication can reject a legacy REST connection even
+while GitHub's object API works. Preserving the existing remote parent and
+verifying the complete source tree avoids force pushes or invented ancestry.
+
+**How to apply:** Require the remote baseline tree to equal the known workspace
+baseline, reconstruct the complete tested target tree, and verify its exact
+hash before advancing main without force. If the baseline trees differ, stop
+and reconcile instead. Deploy the resulting GitHub revision, not the workspace
+source revision; retain both identities in the release record.
+
 Frontend source changes are not deployed by pulling Git or restarting the API
 and Celery services. Nginx serves the built Vite output directly.
 

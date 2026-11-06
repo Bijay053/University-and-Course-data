@@ -33,6 +33,11 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                     )
                     if result.get("verified") or reusable_failure:
                         cached = deepcopy(result)
+                        cached.setdefault("requestedUrl", url)
+                        cached.setdefault("urlHandling", "preserved")
+                        if cached.get("accessIssue") in {"robots_unavailable", "robots_disallowed"}:
+                            cached.setdefault("failureStage", "robots")
+                            cached.setdefault("sourceRequestAttempted", False)
                         cached["_sourceCacheHit"] = True
                         return cached
                     # An expired latest failure cannot revive an older success.

@@ -161,6 +161,67 @@ async def test_prompt_persists_and_is_private_to_actor(store, monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("alternative_readable", [True, False])
+async def test_lsbu_pdf_fallback_keeps_course_context_and_exact_source_urls(store, monkeypatch, alternative_readable):
+    import json
+    from app.services.assistant_official_sources import LSBU_ENGLISH_SOURCES
+    from app.tasks.scrape_assistant import research_scrape
+    monkeypatch.setattr(research_scrape, "apply_async", lambda **kwargs: None)
+    original_context = service.context
+    async def context(job):
+        result = await original_context(job)
+        result["home"] = "https://www.lsbu.ac.uk"
+        return result
+    monkeypatch.setattr(service, "context", context)
+    requested = "https://www.lsbu.ac.uk/_media_old/pdf/guidelines/Eng-lang-requirements.pdf.pdf.pdf"
+    seen = []
+    async def source(url, home):
+        seen.append(url)
+        if alternative_readable and url == LSBU_ENGLISH_SOURCES[0]:
+            return {
+                "url": url, "title": "Official English guidance", "sourceType": "pdf", "verified": True, "facts": [],
+                "text": "General English guidance except health and postgraduate research.",
+                "excerpts": [{"id": "p1-q0", "text": "General English guidance except health and postgraduate research."}],
+            }
+        return {
+            "url": url, "sourceType": "pdf", "verified": False,
+            "accessIssue": "robots_unavailable", "failureStage": "robots",
+            "error": "robots.txt could not be verified (HTTP 403).",
+        }
+    async def answer(**kwargs):
+        assert alternative_readable, "No model call is needed for wholly blocked sources"
+        payload = json.loads(kwargs["user"])
+        assert payload["sampleSize"] > 0
+        return {
+            "answer": "The alternative guidance was read. Course applicability remains unchecked.",
+            "citations": [{"url": LSBU_ENGLISH_SOURCES[0], "quoteId": "p1-q0"}],
+            "action": None,
+        }
+    monkeypatch.setattr(service, "inspect_source", source)
+    monkeypatch.setattr(service, "chat_json", answer)
+    errors = []
+    investigate = service._investigate
+    async def checked_investigation(*args):
+        try:
+            return await investigate(*args)
+        except Exception as exc:
+            errors.append(exc)
+            raise
+    monkeypatch.setattr(service, "_investigate", checked_investigation)
+    thread_id, turn_id = await prompt_thread(store, "Read English guidance " + requested + "; do not update anything")
+    await service.investigate(thread_id, turn_id)
+    assert not errors, repr(errors[0]) if errors else ""
+    assert set(seen) == {requested, *LSBU_ENGLISH_SOURCES}
+    assert len(seen) == 3
+    async with store() as db:
+        result = await get_assistant("source", db, {"id": 1})
+        assert result["status"] == "ready"
+        reply = result["messages"][-1]
+        assert not reply["actions"]
+        assert bool(reply["sources"]) is alternative_readable
+
+
+@pytest.mark.asyncio
 async def test_real_persistence_research_has_evidence_but_no_automatic_writes(store, monkeypatch):
     from app.tasks.scrape_assistant import research_scrape
     monkeypatch.setattr(research_scrape, "apply_async", lambda **kwargs: None)
