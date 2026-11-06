@@ -38,6 +38,12 @@ A missing CRICOS code means “eligibility unverified”, not automatic rejectio
 **How to apply:** Keep uncertain records pending and distinguish course-level restrictions from audience-specific fee labels.
 
 ## Grounding
+Respect robots.txt and do not bypass bot protection.
+
+**Why:** The user explicitly required this when LSBU source checks failed, despite wanting automatic repairs.
+
+**How to apply:** Keep permission checks ahead of page or browser access. Explain an inaccessible source as a current verification limit, not proof of the original extraction failure. Do not change transports merely to evade a denial or invent a missing fee.
+
 Conversation source caches need invalidation when citation ownership or text-cleaning rules change.
 
 **Why:** Corrected extraction code can otherwise keep serving previously cached navigation-heavy evidence.

@@ -2,6 +2,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
+const permissions = vi.hoisted(() => ({ allowed: true }));
+vi.mock("@/context/auth", () => ({
+  useAuth: () => ({ can: () => permissions.allowed, canAny: () => permissions.allowed }),
+}));
 vi.mock("@/components/scrape-prompt-assistant", () => ({
   ScrapePromptAssistant: (p: { jobId: string; onChanged?: () => void; onReviewJob?: (id: string) => void }) => (
     <div data-testid={`mock-assistant-${p.jobId}`}>
@@ -13,12 +17,56 @@ vi.mock("@/components/scrape-prompt-assistant", () => ({
 
 import { LiveDiagnosticsPanel, LiveScrapeAssistant, LIVE_DIAGNOSTICS_POLL_MS, liveDiagnosticsUrl } from "./live-scrape-assistant";
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); permissions.allowed = true; });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const diag = (jobId: string, extra: Record<string, unknown> = {}) => ({
   jobId, status: "running", processed: 12, total: 40, elapsedSeconds: 130, coursesPerMinute: 5.5, etaSeconds: 300,
   timeouts: 2, retries: 1, duplicateRequests: 0, aiEnrichments: 3, heartbeatAgeSeconds: 4,
   issues: [], capabilities: { runtimeChanges: false }, ...extra,
+});
+
+const runtime = { ceiling: 4, applied: { concurrency: 4, retries: 2, backoffSeconds: 0 } };
+
+it("previews exact job-only values without claiming worker completion", async () => {
+  const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, options) => {
+    if (options?.method === "POST") return json({ status: "queued" }, 202);
+    return json(diag("scoped", { capabilities: { runtimeChanges: true }, runtime }));
+  });
+  render(<LiveScrapeAssistant jobId="scoped" />);
+  fireEvent.change(await screen.findByLabelText("concurrency"), { target: { value: "2" } });
+  fireEvent.change(screen.getByLabelText("retries"), { target: { value: "1" } });
+  fireEvent.change(screen.getByLabelText("Minimum backoff seconds"), { target: { value: "30" } });
+  fireEvent.click(screen.getByText("Preview job-only change"));
+  await screen.findByTestId("mock-assistant-scoped");
+  const post = f.mock.calls.find(([, options]) => options?.method === "POST")!;
+  expect(post[0]).toBe("/api/scrape/jobs/scoped/assistant");
+  expect(JSON.parse(String(post[1]?.body))).toEqual({
+    prompt: "Set concurrency to 2, retries to 1, backoffSeconds to 30",
+  });
+  expect(screen.queryByText(/Worker acknowledged/)).toBeNull();
+});
+
+it("does not offer controls to view-only users or send runtime requests", async () => {
+  permissions.allowed = false;
+  const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(json(diag("view", {
+    capabilities: { runtimeChanges: true }, runtime,
+  })));
+  render(<LiveScrapeAssistant jobId="view" />);
+  await screen.findByTestId("text-live-processed");
+  expect(screen.queryByText("Preview job-only change")).toBeNull();
+  expect(f.mock.calls.every(([, options]) => !options?.method)).toBe(true);
+});
+
+it("distinguishes a pending request from effective settings and disables duplicates", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(json(diag("pending", {
+    capabilities: { runtimeChanges: true },
+    runtime: { ...runtime, request: { state: "pending", new: { ...runtime.applied, concurrency: 1 } } },
+  })));
+  render(<LiveScrapeAssistant jobId="pending" />);
+  const button = await screen.findByText("Preview job-only change");
+  expect((button as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole("status").textContent).toContain("Runtime request: pending");
+  expect(screen.queryByText(/Worker acknowledged/)).toBeNull();
 });
 
 it("shows nulls as unavailable, never as zero or healthy", async () => {

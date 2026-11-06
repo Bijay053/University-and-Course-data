@@ -75,7 +75,8 @@ async def test_diagnostics_api_is_read_only_and_requires_view_permission(monkeyp
     from app.dependencies import get_current_user
     from app.services import live_scrape_diagnostics as live
     db = MagicMock()
-    db.get = AsyncMock(return_value=job())
+    from app.models.scrape_runtime import ScrapeRuntimeJob
+    db.get = AsyncMock(side_effect=lambda model, *args, **kwargs: job() if model is ScrapeRuntimeJob else None)
     result = MagicMock()
     result.all.return_value = []
     db.execute = AsyncMock(return_value=result)

@@ -8,7 +8,7 @@ def full_catalogue_review(payload) -> bool:
 
 def isolated_review(payload) -> bool:
     return full_catalogue_review(payload) or (
-        isinstance(payload, dict) and "autonomousVerification" in payload
+        isinstance(payload, dict) and ("autonomousVerification" in payload or "selectiveRetry" in payload)
     )
 
 

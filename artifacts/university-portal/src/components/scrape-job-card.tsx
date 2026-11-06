@@ -73,6 +73,16 @@ type ScrapeLog = {
   } | null;
 };
 
+export function liveScrapeStageLabel(logs: Array<Pick<ScrapeLog, "phase">>): string {
+  for (let i = logs.length - 1; i >= 0; i--) {
+    if (logs[i].phase === "prepare") return "Preparing course options…";
+    if (logs[i].phase === "resume_check") return "Checking saved course progress…";
+    if (logs[i].phase === "stage") return "Saving course records…";
+    if (logs[i].phase === "extract") break;
+  }
+  return "Processing courses…";
+}
+
 export type ProviderFailure = {
   provider: string;
   http_status: number;
@@ -382,6 +392,18 @@ type AIRepairAttempt = {
     }>;
   } | null;
 };
+export function repairStatusHasValidRuns(data: unknown): boolean {
+  if (!data || typeof data !== "object") return false;
+  const payload = data as Partial<AIRepairSession>;
+  const runs = payload.runs ?? [payload];
+  return Array.isArray(runs) && runs.length > 0 && runs.every(run =>
+    run && typeof run.session_id === "string" && run.session_id.trim().length > 0
+    && typeof run.job_id === "string" && run.job_id.trim().length > 0
+    && Array.isArray(run.attempts)
+    && ["queued","starting","running","completed","failed","not_started"].includes(run.status ?? "")
+  );
+}
+
 type AIRepairSession = {
   session_id:      string;
   job_id:          string;
@@ -1231,7 +1253,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
             // A status response can have been produced before a just-started
             // retry was committed. Never let that older payload replace the
             // new session selected from the POST response.
-            if (liveSessionId && !runs.some(run => run.session_id === liveSessionId)) {
+            if (liveSessionId && (!Array.isArray(runs) || !runs.some(run => run?.session_id === liveSessionId))) {
+              return;
+            }
+            if (!repairStatusHasValidRuns(data)) {
+              setAiRepairPolling(false);
+              toast({ title: "Repair progress unavailable", description: "The server returned incomplete progress. The last result was kept unchanged.", variant: "destructive" });
               return;
             }
             setAiRepairRuns(runs);
@@ -1276,6 +1303,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
       .then(res => res.ok ? readResponseJson<AIRepairSession>(res) : null)
       .then(data => {
         if (!cancelled && requestId === aiRepairRequestRef.current && data && data.status !== "not_started") {
+          if (!repairStatusHasValidRuns(data)) {
+            toast({ title: "Repair history unavailable", description: "The server returned an incomplete repair result.", variant: "destructive" });
+            return;
+          }
           const runs = data.runs ?? [data];
           setAiRepairRuns(runs);
           setSelectedAiRepairRunId(current =>
@@ -2583,7 +2614,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
               return (
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>{allProcessed ? "Finalizing…" : "Processing courses…"}</span>
+                    <span>{allProcessed ? "Finalizing…" : liveScrapeStageLabel(logs)}</span>
                     <span className="tabular-nums">
                       {progressLog.current}/{progressLog.total}
                       {allProcessed

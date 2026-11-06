@@ -63,6 +63,17 @@ class ScrapeRuntimeJob(Base):
     )
 
 
+class ScrapeRuntimeControl(Base):
+    """Separate from request evidence, which resume/checkpoint writers replace."""
+    __tablename__ = "scrape_runtime_controls"
+
+    runtime_job_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("scrape_runtime_jobs.runtime_job_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    state: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
 class ScrapeRuntimeLog(Base):
     __tablename__ = "scrape_runtime_logs"
 

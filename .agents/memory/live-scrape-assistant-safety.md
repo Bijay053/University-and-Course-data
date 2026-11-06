@@ -14,3 +14,23 @@ unverified staff values as manual overrides, audit before/after values, and neve
 publish through an automatic assistant action. Do not present runtime changes,
 cache optimisations or retry operations as applied until the worker acknowledges
 them and persisted results prove the outcome.
+
+Live concurrency tuning may reduce or restore the original job ceiling, not raise
+it above the university's starting limit.
+
+**Why:** Diagnostics do not establish additional provider capacity or permission
+to increase website load. A larger global maximum alone is not safe authority.
+
+**How to apply:** Keep provider throttles and fleet reservations unchanged.
+Treat an increase beyond the starting ceiling as a separate reviewed
+configuration decision, never as a live-assistant shortcut.
+
+Keep deterministic live controls independent of experimental assistant-engine
+rollouts.
+
+**Why:** Staff scraping permissions authorize the control; an engine allowlist
+must not leave the same visible control unusable for other authorized staff.
+
+**How to apply:** Exercise the real prompt → preview → confirmation → worker
+receipt flow with experimental engines both disabled and enabled, rather than
+only mocking a successful chat response.

@@ -9,9 +9,21 @@ from urllib.parse import urlsplit, urljoin
 from urllib.robotparser import RobotFileParser
 from sqlalchemy import select
 from app.models.scrape_assistant import ScrapeAssistantThread
-from app.services.scrape_assistant_tools import public_request, inspect_source, official_url
+from app.services.scrape_assistant_tools import public_request, inspect_source, official_url, SourceReadError
+from app.services.assistant_source_cache import FAILURE_REUSE_SECONDS
 
 AGENT="StudyInfoCentre-ScrapeAssistant"
+
+
+def reusable_page(result):
+    if not result:
+        return False
+    try:
+        age = datetime.now(timezone.utc) - datetime.fromisoformat(result["checkedAt"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    lifetime = timedelta(hours=24) if result.get("verified") else timedelta(seconds=FAILURE_REUSE_SECONDS)
+    return timedelta(0) <= age < lifetime
 
 
 async def throttle(host):
@@ -66,7 +78,7 @@ async def web_tool(tools,name,args):
         for message in thread.messages:
             cache.update(message.get("_agentV2Pages",{}))
     cached=cache.get(key)
-    if cached and datetime.fromisoformat(cached["checkedAt"])>datetime.now(timezone.utc)-timedelta(hours=24):
+    if reusable_page(cached):
         result={**cached,"cached":True}
         if name=="search_site":
             result["matches"]=[line for line in result.get("text","").split(". ") if args["query"].casefold() in line.casefold()][:20]
@@ -82,7 +94,8 @@ async def web_tool(tools,name,args):
                 cache[robots_key]=rules
             parser=RobotFileParser();parser.parse(rules["text"].splitlines())
             if not parser.can_fetch(AGENT,target):
-                raise ValueError("Blocked by robots.txt")
+                raise SourceReadError("robots.txt disallows this source; no browser or proxy bypass was attempted.",
+                                      access_issue="robots_disallowed")
             delay=parser.crawl_delay(AGENT)
             if delay and delay>2:
                 # Do not silently ignore site-specific longer delays.
@@ -91,8 +104,14 @@ async def web_tool(tools,name,args):
         try:
             return await public_request(target,user_agent=AGENT+"/2.0")
         except Exception as exc:
-            if is_robots and getattr(getattr(exc,"response",None),"status_code",None)==404:
+            status = getattr(exc, "http_status", None) or getattr(getattr(exc,"response",None),"status_code",None)
+            if is_robots and status in (404, 410):
                 return b"User-agent: *\nDisallow:\n"
+            if is_robots and isinstance(exc, SourceReadError):
+                raise SourceReadError(
+                    f"robots.txt could not be verified (HTTP {status}); source access stopped without bypassing protection.",
+                    access_issue="robots_unavailable", http_status=status,
+                ) from None
             raise
     try:
         raw=await render(url,allowed_fetch,args.get("tab")) if name in {"render_page","click_tab"} else await allowed_fetch(url)
@@ -101,6 +120,8 @@ async def web_tool(tools,name,args):
         result["ok"]=bool(result.get("verified"))
     except Exception as exc:
         result={"ok":False,"verified":False,"url":url,"reason":str(exc)[:250],"sourceStatus":"unavailable"}
+        if isinstance(exc, SourceReadError) and exc.access_issue:
+            result.update(accessIssue=exc.access_issue, httpStatus=exc.http_status, error=str(exc))
     result["checkedAt"]=datetime.now(timezone.utc).isoformat()
     cache[key]=result
     async with tools.service.AsyncSessionLocal() as db:

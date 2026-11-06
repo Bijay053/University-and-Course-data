@@ -21,14 +21,55 @@ def scope_option_html(html,url):
         if tab.get("href")!="#"+selected:tab.decompose()
     return str(soup)
 
-async def expand_links(links,max_courses,fetch=None):
+async def expand_links(links,max_courses,fetch=None,*,parallel=1,on_progress=None,stop_flag=None):
     """Expand course-owned options before extraction; reuse the exact source HTML."""
     import asyncio
     if fetch is None:
         from app.services.scrape_assistant_tools import public_request
         fetch=public_request
-    cache={};result=[];surrey_count=0
+    import time
+    sources=list(dict.fromkeys(link.get("url","") for link in links
+        if urlsplit(link.get("url","")).hostname in {"www.surrey.ac.uk","surrey.ac.uk"}
+        and "surrey_option" not in parse_qs(urlsplit(link.get("url","")).query)))
+    if len(sources)>max_courses:
+        raise ValueError("Surrey source count exceeds the configured course limit; catalogue was not truncated.")
+    cache={};parsed={};result=[];surrey_count=0;completed=0
+    sem=asyncio.Semaphore(min(16,max(1,int(parallel))))
+    async def observe(kind,url,**fields):
+        if on_progress:
+            await on_progress(kind=kind,url=url,completed=completed,total=len(sources),**fields)
+    async def prepare(url):
+        nonlocal completed
+        async with sem:
+            if stop_flag and stop_flag[0]:
+                raise asyncio.CancelledError()
+            await observe("course_prepare_start",url)
+            started=time.monotonic()
+            try:
+                raw=await asyncio.wait_for(fetch(url),15)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                await observe("course_prepare_error",url,error=type(exc).__name__,
+                              durationSeconds=time.monotonic()-started)
+                raise
+            cache[url]=raw.decode("utf-8",errors="replace") if isinstance(raw,bytes) else raw
+            await observe("course_source_fetched",url,durationSeconds=time.monotonic()-started)
+            if stop_flag and stop_flag[0]:
+                raise asyncio.CancelledError()
+    tasks=[asyncio.create_task(prepare(url)) for url in sources]
+    try:
+        if tasks:
+            await asyncio.gather(*tasks)
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks,return_exceptions=True)
     for link in links:
+        if stop_flag and stop_flag[0]:
+            raise asyncio.CancelledError()
         url=link.get("url","")
         p=urlsplit(url)
         if p.hostname not in {"www.surrey.ac.uk","surrey.ac.uk"}:
@@ -39,10 +80,24 @@ async def expand_links(links,max_courses,fetch=None):
             if surrey_count > max_courses:
                 raise ValueError("Surrey option count exceeds the configured course limit; increase it before retrying. Catalogue was not truncated.")
             continue
-        if url not in cache:
-            raw=await asyncio.wait_for(fetch(url),15)
-            cache[url]=raw.decode("utf-8",errors="replace") if isinstance(raw,bytes) else raw
-        html=cache[url];options=surrey_options(html,url)
+        html=cache[url]
+        if url not in parsed:
+            await observe("course_prepare_parse_start",url)
+            started=time.monotonic()
+            try:
+                # DOM parsing is CPU work. Do not block the worker's heartbeat,
+                # stop poller or buffered-log writer while parsing a catalogue.
+                parsed[url]=await asyncio.to_thread(surrey_options,html,url)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                await observe("course_prepare_error",url,error=type(exc).__name__,
+                              durationSeconds=time.monotonic()-started)
+                raise
+            completed+=1
+            await observe("course_prepare_done",url,durationSeconds=time.monotonic()-started,
+                          variants=len(parsed[url]) or 1)
+        options=parsed[url]
         # Keep part-time options; staging adds mandatory eligibility review.
         if options:
             result.extend({**link,"name":o["course_name"],"url":option_url(url,o["key"]),

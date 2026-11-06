@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Activity, AlertTriangle, ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { ScrapePromptAssistant } from "@/components/scrape-prompt-assistant";
+import { Can } from "@/components/can";
 
 export const LIVE_DIAGNOSTICS_POLL_MS = 5000;
 
@@ -21,6 +22,12 @@ export type LiveDiagnostics = {
   heartbeatAgeSeconds: number | null;
   issues: LiveIssue[] | null;
   capabilities: { runtimeChanges: boolean } | null;
+  runtime?: {
+    current?: boolean;
+    ceiling: number;
+    applied: { concurrency: number; retries: number; backoffSeconds: number };
+    request?: { state: string; new: { concurrency: number; retries: number; backoffSeconds: number } };
+  };
 };
 
 export const liveDiagnosticsUrl = (jobId: string) =>
@@ -82,7 +89,7 @@ function Metric({ label, value, testId, warn }: { label: string; value: string; 
   );
 }
 
-export function LiveDiagnosticsPanel({ jobId, active = true }: { jobId: string; active?: boolean }) {
+export function LiveDiagnosticsPanel({ jobId, active = true, onTune }: { jobId: string; active?: boolean; onTune?: (prompt: string) => Promise<void> }) {
   const { data, error, loading, retry } = useLiveDiagnostics(jobId, active);
   const [open, setOpen] = useState(false);
   const processed = num(data?.processed), total = num(data?.total);
@@ -140,6 +147,19 @@ export function LiveDiagnosticsPanel({ jobId, active = true }: { jobId: string; 
           <Metric label="Heartbeat" testId="text-live-heartbeat" value={hb === null ? "Unavailable" : `${formatSeconds(hb)} ago`} warn={stale} />
         </div>
       )}
+      {data?.capabilities?.runtimeChanges && data.runtime && onTune && !error && (
+        <Can permission="scraping.trigger">
+          <RuntimeControls key={jobId} runtime={data.runtime} onTune={onTune} />
+        </Can>
+      )}
+      {data?.runtime?.request && (
+        <p className="text-[11px]" role="status">
+          {data.runtime.current === false ? "Previous worker settings; not current." : <>
+            Runtime request: {data.runtime.request.state === "applied" ? "Worker acknowledged" : data.runtime.request.state}.
+          </>}
+          {" "}{data.runtime.current === false ? "Historical" : "Effective"} settings: {JSON.stringify(data.runtime.applied)}
+        </p>
+      )}
 
       {data && (
         <div>
@@ -185,6 +205,36 @@ export function LiveDiagnosticsPanel({ jobId, active = true }: { jobId: string; 
   );
 }
 
+function RuntimeControls({ runtime, onTune }: {
+  runtime: NonNullable<LiveDiagnostics["runtime"]>; onTune: (prompt: string) => Promise<void>;
+}) {
+  const [values, setValues] = useState(runtime.applied);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return <form className="space-y-1 text-[11px]" aria-label="Job-only runtime controls" onSubmit={async e => {
+    e.preventDefault(); setBusy(true); setError(null);
+    try {
+      await onTune(`Set concurrency to ${values.concurrency}, retries to ${values.retries}, backoffSeconds to ${values.backoffSeconds}`);
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setBusy(false); }
+  }}>
+    <p>Job only. Future attempts only; no restart or progress loss. Original provider ceiling: {runtime.ceiling}.</p>
+    {(["concurrency", "retries", "backoffSeconds"] as const).map(key => <label key={key} className="inline-flex gap-1 mr-2">
+      {key === "backoffSeconds" ? "Minimum backoff seconds" : key}
+      <input type="number" required min={key === "concurrency" ? 1 : 0}
+        max={key === "concurrency" ? runtime.ceiling : key === "retries" ? 2 : 300}
+        step={1} className="w-14 border rounded" value={values[key]}
+        disabled={busy || runtime.request?.state === "pending"}
+        onChange={e => setValues(v => ({ ...v, [key]: Number(e.target.value) }))} />
+    </label>)}
+    <p>Provider Retry-After is never shortened. Retries: 0–2. Minimum backoff: 0–300 seconds.</p>
+    <button type="submit" disabled={busy || runtime.request?.state === "pending"} className="underline font-medium">
+      {busy ? "Preparing preview…" : "Preview job-only change"}
+    </button>
+    {error && <p role="alert">{error}</p>}
+  </form>;
+}
+
 export type LiveScrapeAssistantProps = {
   jobId: string;
   onChanged?: () => void;
@@ -195,9 +245,19 @@ export type LiveScrapeAssistantProps = {
 /** Live diagnosis + chat for one running job. Parent must key this by jobId. */
 export function LiveScrapeAssistant({ jobId, onChanged, onReviewJob, disabled }: LiveScrapeAssistantProps) {
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatVersion, setChatVersion] = useState(0);
+  async function tune(prompt: string) {
+    const res = await fetch(`/api/scrape/jobs/${encodeURIComponent(jobId)}/assistant`, {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    if (!res.ok) throw new Error(await getFetchErrorMessage(res));
+    setChatVersion(v => v + 1);
+    setChatOpen(true);
+  }
   return (
     <div className="space-y-2 min-w-0" data-testid={`live-scrape-assistant-${jobId}`}>
-      <LiveDiagnosticsPanel jobId={jobId} />
+      <LiveDiagnosticsPanel jobId={jobId} onTune={disabled ? undefined : tune} />
       <button type="button" onClick={() => setChatOpen(o => !o)} aria-expanded={chatOpen}
         className="flex w-full items-center justify-between rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-slate-800 hover:bg-slate-50"
         data-testid="button-toggle-live-assistant">
@@ -205,7 +265,7 @@ export function LiveScrapeAssistant({ jobId, onChanged, onReviewJob, disabled }:
         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${chatOpen ? "rotate-180" : ""}`} aria-hidden />
       </button>
       {chatOpen && (
-        <ScrapePromptAssistant jobId={jobId} onChanged={onChanged} onReviewJob={onReviewJob} disabled={disabled} />
+        <ScrapePromptAssistant key={`${jobId}-${chatVersion}`} jobId={jobId} onChanged={onChanged} onReviewJob={onReviewJob} disabled={disabled} />
       )}
     </div>
   );

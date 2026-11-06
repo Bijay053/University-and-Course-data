@@ -20,6 +20,7 @@ from sqlalchemy import select, text as _sql_text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.services.worker_fencing import OwnershipLost as WorkerOwnershipLost
 from app.database import AsyncSessionLocal
 from app.models import ScrapeRuntimeJob, University
 from app.services.scraper.discovery import discover_course_links, _unwrap_funnelback_redirect
@@ -212,6 +213,14 @@ def recipe_central_prefetch_config(effective_config: dict, scrape_config: dict |
     return config
 
 
+async def _stage_claimed_result(db, *, job, **kwargs):
+    """Fence the real staging transaction, including stage_course's commit."""
+    if (job.request_payload or {}).get("selectiveRetry"):
+        from app.services.selective_retry import guard_source
+        await guard_source(db, job)
+    return await stage_course(db, **kwargs)
+
+
 async def stage_runtime_extraction(db, *, scrape_job_id: str, university_id: int,
                                    course_name: str, source_url: str,
                                    extracted: dict, recipe: dict,
@@ -222,6 +231,9 @@ async def stage_runtime_extraction(db, *, scrape_job_id: str, university_id: int
     evidence = apply_runtime_recipe(payload, recipe, extracted.get("evidence"))
     from app.services.scraper.stage_course import stage_course
     job = await db.get(ScrapeRuntimeJob, scrape_job_id)
+    if job and (job.request_payload or {}).get("selectiveRetry"):
+        from app.services.selective_retry import guard_source
+        await guard_source(db, job)
     request = (job.request_payload or {}) if job else {}
     reuse_pending = "autonomousVerification" not in request and bool(
         targeted_retry or request.get("fullCatalogueReviewOnly")
@@ -399,6 +411,16 @@ def _extraction_failure_details(
         "detail": raw,
         "retryable": False,
     }
+
+
+def _retry_failure_details(result):
+    if isinstance(result, Exception):
+        return _extraction_failure_details(str(result))
+    if isinstance(result, dict) and (result.get("error") or result.get("_retry_after")):
+        if result.get("_retry_after"):
+            return {"reason": "rate_limited", "retryable": True}
+        return _extraction_failure_details(result["error"], result=result)
+    return None
 
 
 def _inject_yaml_fee_page(effective_config: dict, yaml_fees: object) -> bool:
@@ -1250,25 +1272,38 @@ async def _settle_course_with_retries(
     max_retries: int = 2,
     max_elapsed_seconds: float | None = None,
     record_settled=None,
+    retry_errors=False,
+    minimum_backoff=0.0,
+    initial_delay=0.0,
+    runtime_gate=None,
 ):
     """Run bounded cooldown retries and advance progress once after settlement."""
+    from app.services.worker_fencing import OwnershipLost
     started_at = time.monotonic()
-    retry_delay = 0.0
+    retry_delay = initial_delay
     retry_count = 0
     while True:
+        if runtime_gate is not None:
+            await runtime_gate.refresh()
         if retry_delay:
             await sleep(retry_delay)
             retry_delay = 0.0
         try:
             result = await attempt()
+        except OwnershipLost:
+            raise
         except Exception as course_exc:  # noqa: BLE001
             result = course_exc
         if (
-            isinstance(result, dict)
-            and result.get("_retry_after")
-            and retry_count < max_retries
+            ((isinstance(result, dict) and result.get("_retry_after"))
+             or (retry_errors and _retry_failure_details(result)
+                 and _retry_failure_details(result)["retryable"]))
+            and retry_count < (min(max_retries, runtime_gate.values["retries"]) if runtime_gate else max_retries)
         ):
-            retry_delay = float(result["_retry_after"])
+            retry_delay = max(minimum_backoff, float(result.get("_retry_after") or 0) if isinstance(result, dict) else 0)
+            if runtime_gate is not None:
+                # Never shorten Retry-After or the provider's own cooldown.
+                retry_delay = max(retry_delay, runtime_gate.values["backoffSeconds"])
             if (
                 max_elapsed_seconds is not None
                 and time.monotonic() - started_at + retry_delay
@@ -1606,7 +1641,8 @@ async def _extract_only(
     # extract_course() so generated CSS/XPath/regex rules run before regex
     # heuristics and before per-course Gemini, reducing per-course AI cost.
     try:
-        out = await extract_course(
+        async def fresh_extraction():
+            return await extract_course(
             url,
             country=country,
             uni_pdf_data=uni_pdf_data,
@@ -1621,6 +1657,19 @@ async def _extract_only(
                if link.get("_uel_html") or link.get("_surrey_html") else {}),
             **({"_uel_skip_preflight": True} if link.get("_uel_skip_preflight") else {}),
         )
+        current_html = link.get("_uel_html") or link.get("_surrey_html")
+        if current_html:
+            from app.services.scraper.result_reuse import current_scope, reuse
+            scope = current_scope(country=country, title=name, central=central_data,
+                pdf=uni_pdf_data, rules=extraction_rules, ai_provider=ai_provider)
+            out = await reuse(url, current_html, scope, fresh_extraction)
+            if out.get("_result_cache_hit") and emit:
+                await emit("status", "Reused matching current-source extraction evidence",
+                           kind="selective_retry_cache_hit", url=url)
+        else:
+            out = await fresh_extraction()
+    except WorkerOwnershipLost:
+        raise
     except ScrapedoAccountError:
         raise  # propagate — caller sets scrape_do_dead_flag to abort remaining courses
     except Exception as exc:  # noqa: BLE001
@@ -1658,7 +1707,7 @@ async def _extract_only(
     # Save the final HTML snapshot + original extraction result.
     # Fires after extract_course() succeeds — only the winning HTML is saved,
     # not retries or intermediate fallbacks.
-    if not out.get("_retry_after") and not out.get("error"):
+    if not out.get("_retry_after") and not out.get("error") and not out.get("_result_cache_hit"):
         schedule_snapshot(
             _save_extraction_snapshot_safe(out)
         )
@@ -2380,12 +2429,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         claim, ownership_scope, acknowledge_stop, OwnershipLost,
     )
     job = await db.get(ScrapeRuntimeJob, runtime_job_id)
-    if not job or "autonomousVerification" not in (job.request_payload or {}):
+    selective = bool(job and (job.request_payload or {}).get("selectiveRetry"))
+    if not job or ("autonomousVerification" not in (job.request_payload or {}) and not selective):
         return await _run_scrape_entry(db, runtime_job_id)
     if job.status != "queued":
         await db.rollback()
         return {"ok": False, "reason": "already_claimed"}
-    owner = await claim(db, f"verification:{runtime_job_id}")
+    owner = await claim(db, f"{'selective-retry' if selective else 'verification'}:{runtime_job_id}")
     if owner is None:
         await db.rollback()
         return {"ok": False, "reason": "already_claimed"}
@@ -2431,6 +2481,8 @@ async def _run_scrape_entry(db: AsyncSession, runtime_job_id: str) -> dict:
 
     # Validate before any stale-row cleanup, discovery, or billable work.
     try:
+        from app.services.selective_retry import validate_before_run
+        await validate_before_run(db, job)
         full_review = prepare_full_catalogue_review(job)
         verification = await validate_verification(db, job)
     except ValueError as exc:
@@ -2470,7 +2522,7 @@ async def _run_scrape_entry(db: AsyncSession, runtime_job_id: str) -> dict:
 async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict:
     """Run the existing pipeline with optional internal isolation policy."""
     _full_review = prepare_full_catalogue_review(job)
-    _preserve_review = bool(_verification) or _full_review
+    _preserve_review = bool(_verification) or _full_review or bool((job.request_payload or {}).get("selectiveRetry"))
     runtime_job_id = job.runtime_job_id
     # Start per-job Scrape.do call counter.  All coroutines spawned within
     # this job share the same mutable dict via ContextVar, so gather() batches
@@ -6442,7 +6494,14 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             "[TIMEOUT] per-course extraction deadline configured at %.1fs",
             _effective_course_timeout,
         )
-        sem = asyncio.Semaphore(_effective_parallel)
+        _selected_retry_policy = (job.request_payload or {}).get("selectiveRetry") or {}
+        from app.services.scrape_runtime_controls import RuntimeGate, generation
+        sem = RuntimeGate(runtime_job_id, _effective_parallel, generation(job))
+
+        async def _runtime_control_pulse():
+            while True:
+                await asyncio.sleep(2)
+                await sem.refresh()
         # ``total`` is the full discovered catalogue size. On a resumed run,
         # ``links`` is filtered later to only the remaining work, while progress
         # must continue against the original catalogue denominator.
@@ -6530,6 +6589,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                         _dispatch_index[0] = dispatched[0]
                     idx = _dispatch_index[0]
                     nm = (link.get("name") or "").strip() or link.get("url", "?")
+                    await emit("status", f"Course extraction started: {nm}",
+                               phase="extract", kind="course_extraction_start", url=link.get("url"))
                     # Throttle textual [EXTRACT] status messages for large runs.
                     # For universities with >200 courses, emitting every single
                     # course floods the log table and adds DB pressure.  We emit
@@ -6618,12 +6679,32 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 )
                 await asyncio.sleep(delay)
 
+            async def _selected_attempt():
+                from app.services.selective_retry import reserve_attempt, finish_attempt
+                reservation = await reserve_attempt(runtime_job_id, link["url"])
+                if reservation is None:
+                    return {"name": link.get("name") or "Unknown course", "url": link["url"],
+                            "error": "selective_retry_attempts_exhausted"}
+                attempt_id, ordinal = reservation
+                await emit("status", f"Selected retry attempt {ordinal}", kind="selective_retry_attempt",
+                           url=link["url"], attempt=ordinal)
+                result = await _attempt()
+                await finish_attempt(attempt_id, result)
+                return result
+
+            _selected_budget = int(_selected_retry_policy.get("budgets", {}).get(link["url"], 0))
             return await _settle_course_with_retries(
                 link,
-                _attempt,
+                _selected_attempt if _selected_retry_policy else _attempt,
                 _record_extraction_complete,
                 sleep=_cooldown_sleep,
-                max_elapsed_seconds=_effective_course_timeout,
+                runtime_gate=sem,
+                **({"max_retries": max(0, _selected_budget - 1), "retry_errors": True,
+                    "minimum_backoff": _selected_retry_policy["backoffSeconds"],
+                    "initial_delay": _selected_retry_policy["backoffSeconds"]} if _selected_retry_policy else {}),
+                max_elapsed_seconds=(_effective_course_timeout * max(1, _selected_budget)
+                    + _selected_retry_policy.get("backoffSeconds", 0) * max(1, _selected_budget))
+                    if _selected_retry_policy else _effective_course_timeout,
                 record_settled=lambda link, result: _checkpoint_extraction_outcome(
                     db, job, _verification, link, result,
                 ),
@@ -6648,10 +6729,16 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             await db.commit()
             if (job.request_payload or {}).get("courseReport"):
                 links = links[:min(max_courses, _verification.max_courses)]
+        _source_candidates_before_options = len(links)
         try:
             from app.services.scraper.extractors.uk_course_facts import expand_links as expand_surrey_links
             if not _targeted_retry:
-                links = await expand_surrey_links(links, max_courses)
+                async def _surrey_prepare_progress(**observation):
+                    await emit("status",
+                        f"Preparing course options: {observation['completed']}/{observation['total']} — {observation['url']}",
+                        phase="prepare", **observation)
+                links = await expand_surrey_links(links, max_courses,
+                    parallel=_effective_parallel, on_progress=_surrey_prepare_progress, stop_flag=stop_flag)
             links = await _expand_uel_course_links_for_run(
                 links, max_courses=max_courses, targeted_retry=_targeted_retry,
                 emit=emit, stop_flag=stop_flag,
@@ -6662,6 +6749,17 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             raise
         summary["discovered"] = len(links)
         job.total_found = len(links)
+        _options_dc = dict(job.discovered_config or {})
+        _options_stats = dict(_options_dc.get("pipeline_stats") or {})
+        _options_stats.update(source_candidates=_source_candidates_before_options,
+                              expanded_course_options=len(links))
+        _options_dc["pipeline_stats"] = _options_stats
+        job.discovered_config = _options_dc
+        await db.commit()
+        await emit("status",
+            f"[OPTIONS] {_source_candidates_before_options} source candidates prepared into {len(links)} course options; checking saved checkpoints before extraction.",
+            phase="resume_check", kind="course_options_ready",
+            source_candidates=_source_candidates_before_options, total=len(links))
 
         if _verification:
             links = cap_verification_links(job, _verification, links, max_courses)
@@ -6913,6 +7011,10 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         completed = [_resume_processed_offset]
         job.current = min(_resume_processed_offset, job.total_found or 0)
         await db.commit()
+        await emit("status",
+            f"[EXTRACT] Ready: {len(links)} options remaining; {_resume_processed_offset} already processed.",
+            phase="extract", kind="extraction_ready",
+            remaining=len(links), current=job.current, total=job.total_found)
 
         # 2) Extraction + staging split into batches so completed courses are
         # staged and freed before the next batch starts.  For large universities
@@ -7030,6 +7132,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 batch_size=_effective_batch_size,
             )
 
+        # Advertise controls only when extraction is ready to consume them.
+        await sem.refresh()
+        runtime_control_task = asyncio.create_task(_runtime_control_pulse())
         for _batch_idx, _batch_links in enumerate(_link_batches):
             if _n_batches > 1:
                 _b_start = _batch_idx * _effective_batch_size + 1
@@ -7791,8 +7896,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             _gate_detail_pats
                             and any(p.search(_cur_url) for p in _gate_detail_pats)
                         )
-                        res = await stage_course(
+                        res = await _stage_claimed_result(
                             stage_db,
+                            job=job,
                             scrape_job_id=runtime_job_id,
                             university_id=uni_id,
                             course_name=_resolve_stage_course_name(r, payload),
@@ -9728,6 +9834,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         )
         return {"ok": False, "reason": str(exc), **summary}
     finally:
+        if "runtime_control_task" in locals():
+            runtime_control_task.cancel()
+            await asyncio.gather(runtime_control_task, return_exceptions=True)
         # ── Release the per-university Redis distributed lock ────────────────
         # Only release if we actually hold it (lock value must still match our
         # job_id to guard against an expired TTL being re-acquired by a newer

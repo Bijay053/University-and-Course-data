@@ -112,6 +112,18 @@ args = "lsbu-current-catalogue"
 task = "workflow.run"
 args = "pending-import-reuse"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "selective-retry-safety"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "scrape-chat-ui"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "live-runtime-controls"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -337,12 +349,12 @@ isValidation = true
 name = "partial-release-recovery"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_partial_release_recovery.py tests/test_release_manifest.py tests/test_deploy_release_identity.py tests/test_git_metadata_preflight.py -q -c /dev/null --noconftest -p no:cacheprovider"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && PYTHONPATH=. python -m pytest tests/test_partial_release_recovery.py tests/test_release_manifest.py tests/test_deploy_release_identity.py tests/test_git_metadata_preflight.py -q -c /dev/null --noconftest -p no:cacheprovider'"
 
 [[workflows.workflow]]
 name = "surrey-catalogue-source-boundaries"
@@ -373,6 +385,39 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && ALLOW_ISOLATED_PENDING_IMPORT_TESTS=1 PYTHONPATH=. python -m pytest tests/test_pending_import_reuse.py tests/test_full_catalogue_review.py tests/test_stage_result.py -q -c /dev/null --noconftest -p no:cacheprovider'"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "selective-retry-safety"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && ALLOW_ISOLATED_PENDING_IMPORT_TESTS=1 PYTHONPATH=. python tests/helpers/run_disposable_redis.py tests/test_selective_retry*.py tests/test_extraction_result_reuse.py tests/test_scrape_prompt_assistant.py tests/test_scrape_agent_v2*.py tests/test_live_scrape_diagnostics.py tests/test_live_pipeline_diagnostics.py tests/test_shared_course_deadline.py tests/test_report_checkpoint_cancellation.py tests/test_runtime_course_progress.py tests/test_latrobe_extraction_recovery.py tests/test_full_catalogue_review.py tests/test_stage_result.py tests/test_autonomous_verification_isolation.py tests/test_task_loop_resource_cleanup.py tests/test_scrape_task_resource_cleanup.py -q -c /dev/null -o asyncio_mode=auto -p no:cacheprovider --tb=short'"
+
+[[workflows.workflow]]
+name = "scrape-chat-ui"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/pnpm-secure.sh --filter @workspace/university-portal exec vitest run src/components/scrape-prompt-assistant.test.tsx src/components/live-scrape-assistant.test.tsx && bash scripts/pnpm-secure.sh --filter @workspace/university-portal run typecheck"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "live-runtime-controls"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_scrape_runtime_controls.py tests/test_live_scrape_diagnostics.py tests/test_runtime_course_progress.py -q -c /dev/null --noconftest -p no:cacheprovider"
 
 [workflows.workflow.metadata]
 isValidation = true

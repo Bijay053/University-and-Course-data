@@ -105,11 +105,35 @@ async def response(thread, db, job_id=None):
     changed = False
     for message in messages:
         for action in message.get("actions", []):
+            if action["kind"] == "runtime_tuning" and action["state"] == "running":
+                from app.services.scrape_runtime_controls import acknowledgement, control
+                runtime_job = await db.get(ScrapeRuntimeJob, thread.job_id)
+                action["state"], action["resultSummary"] = acknowledgement(
+                    runtime_job, action, await control(db, runtime_job))
+                if action["state"] == "error":
+                    action["error"] = action["resultSummary"]
+                changed = True
+                continue
             if action["state"] not in {"starting", "running"} and not (
                 action["kind"] == "repair_catalogue" and action.get("_sessionId") and action["state"] == "error"
             ):
                 continue
             target = await db.get(ScrapeRuntimeJob, action.get("jobId")) if action.get("jobId") else None
+            if action["kind"] == "retry_failed" and target:
+                action["progress"] = {"current": target.current or 0, "total": target.total_found or 0, "status": target.status}
+                if target.status not in {"queued", "running", "awaiting_approval"}:
+                    from app.services.selective_retry import outcomes
+                    results = await outcomes(db, target)
+                    staged = sum(r["status"] == "staged" for r in results)
+                    skipped = sum(r["status"] == "skipped" for r in results)
+                    unresolved = len(results) - staged - skipped
+                    action.update(courseResults=results,
+                        state="completed" if not unresolved and target.status in {"completed", "completed_with_warnings"} else "error",
+                        resultSummary=f"{staged} URLs stored pending, {skipped} skipped, {unresolved} unverified. Nothing published.")
+                    if unresolved:
+                        action["error"] = "Some selected URLs remain unverified; successful work was preserved."
+                changed = True
+                continue
             if action["kind"] == "repair_catalogue" and action.get("_sessionId"):
                 from app.services import ai_repair_workflow
                 session = await ai_repair_workflow.load(thread.job_id, db, action["_sessionId"])
@@ -327,6 +351,35 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
     action = next((a for m in messages for a in m.get("actions", []) if a["id"] == action_id), None)
     if action is None:
         raise HTTPException(404, "Proposed action not found.")
+    if action["kind"] == "retry_failed":
+        if action.get("_turnId") != thread.turn_id or action.get("_sourceId") != job_id:
+            raise HTTPException(409, "This retry proposal belongs to an older request.")
+        if action["state"] != "proposed":
+            return await response(thread, db, job_id)
+        if thread.status in service.ACTIVE:
+            raise HTTPException(409, "Wait for the investigation to finish.")
+        expected_turn = thread.turn_id
+        from app.services.selective_retry import queue
+        try:
+            child = await queue(db, action, int(actor["id"]))
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        # Queue commits before broker dispatch. Re-lock after that boundary so
+        # a newer prompt/cancellation cannot be overwritten by this receipt.
+        current = (await db.execute(select(ScrapeAssistantThread).where(
+            ScrapeAssistantThread.id == thread.id,
+            ScrapeAssistantThread.turn_id == expected_turn,
+        ).with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+        if current is None:
+            _, latest = await owned_thread(job_id, actor, db)
+            return await response(latest, db, job_id)
+        thread = current
+        messages = deepcopy(thread.messages)
+        action = next(a for m in messages for a in m.get("actions", []) if a["id"] == action_id)
+        action.update(state="running", jobId=child.runtime_job_id)
+        thread.messages = messages
+        await db.commit()
+        return await response(thread, db, job_id)
     if action["state"] != "proposed":
         return await response(thread, db)  # Idempotent confirmation; never dispatch twice.
     from app.services.assistant_import_pause import IMPORT_KINDS, PAUSE_REASON, provider_for_job, is_paused
@@ -336,6 +389,19 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
             raise HTTPException(409, PAUSE_REASON)
     if thread.status in service.ACTIVE:
         raise HTTPException(409, "Wait for the investigation to finish.")
+    if action["kind"] == "runtime_tuning":
+        if action.get("_turnId") != thread.turn_id:
+            raise HTTPException(409, "Runtime preview belongs to an older request.")
+        from app.services.scrape_runtime_controls import enqueue
+        try:
+            await enqueue(db, job_id, action, actor["id"])
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        thread.messages = messages
+        await db.commit()
+        return await response(thread, db)
     if action["kind"] == "staff_edit":
         if action.get("_turnId") != thread.turn_id:
             raise HTTPException(409, "This staff preview belongs to an older request")

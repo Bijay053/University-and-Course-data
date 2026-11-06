@@ -1,4 +1,29 @@
 """Never queue a source-dependent bulk repair on zero verified pages."""
+from app.services.assistant_source_cache import ACCESS_ISSUES
+
+
+def access_blocked_answer(sources):
+    """Explain this check's access failure, not an invented historical cause."""
+    if not sources or any(s.get("verified") for s in sources):
+        return None
+    if not all(s.get("accessIssue") in ACCESS_ISSUES for s in sources):
+        return None
+    failures = "\n".join(
+        f"- {s.get('url', 'Official source')}: {s.get('error', 'Access unavailable')}"
+        + (" (recent check reused; no new fetch)" if s.get("_sourceCacheHit") else "")
+        for s in sources[:3]
+    )
+    return (
+        "I could not verify the requested official source on this check:\n"
+        + failures
+        + "\n\nThis does not establish why the stored field was originally missing. "
+        "No source-dependent correction was queued or applied, and existing values were left unchanged. "
+        "I will not bypass access restrictions or invent a value. "
+        "A permitted official source, or a value you explicitly supply as staff-provided, "
+        "is needed to continue. Staff-provided updates still follow the normal confirmation rules."
+    )
+
+
 async def require_reachable_sources(urls,home,inspect=None):
     import asyncio
     if inspect is None:
@@ -23,5 +48,5 @@ def gate_unreachable_repair(reply,sources):
         a["error"]="No official page could be verified. No repair was queued."
         a["requiresConfirmation"]=True
     if blocked or ("queue" in reply.get("content","").lower() and not reply.get("sources")):
-        reply["content"]="No official page could be verified. No source-dependent repair was queued or applied. Existing values remain unverified; source access must be restored before retrying."
+        reply["content"]=access_blocked_answer(sources) or "No official page could be verified. No source-dependent repair was queued or applied. Existing values remain unverified; source access must be restored before retrying."
     return reply

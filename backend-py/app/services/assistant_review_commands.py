@@ -11,6 +11,9 @@ async def handle_read_or_rule(service, thread_id, turn_id, run_id, ctx, prompt, 
     from app.services.assistant_field_edits import handle_field_edit
     if await handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt):
         return True
+    from app.services.selective_retry import handle as retry_failures
+    if await retry_failures(service, thread_id, turn_id, run_id, ctx, prompt):
+        return True
     from app.services.live_scrape_diagnostics import handle as live_diagnostics
     if await live_diagnostics(service, thread_id, turn_id, run_id, ctx, prompt):
         return True

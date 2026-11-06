@@ -18,6 +18,9 @@ def definition(name, description, properties, required=()):
 
 class DataTools:
     schemas = [
+        definition("list_failed_urls", "Read settled retryable failures for this exact job, without web research.", {}),
+        definition("retry_failed", "Retry selected settled failures only when the user explicitly requested a retry. Limits and backoff come from the actual prompt. Batches over ten require confirmation.",
+                   {"urls": {"type": "array", "items": {"type": "string"}}}),
         definition("fetch_page","Read an official page, respecting robots and the session cache.",
                    {"url":{"type":"string"}},["url"]),
         definition("read_pdf","Read an official PDF and preserve source excerpts.",
@@ -103,6 +106,23 @@ class DataTools:
             if not actor or not actor.is_active or not user_has_permission(_payload_for(actor,_perm_keys(actor)), "scraping.trigger"):
                 raise ValueError("Permission denied")
             base = select(ScrapedCourse).where(ScrapedCourse.university_id == self.ctx["university_id"])
+            if name in {"list_failed_urls", "retry_failed"}:
+                from app.services.selective_retry import inventory, prepare_for_turn, retry_requested, scope_from_prompt
+                if name == "list_failed_urls":
+                    _, failures, spent, _ = await inventory(db, self.ctx["job"]["id"])
+                    return {"ok": True, "changed": False, "failures": list(failures.values()),
+                            "reservedAttempts": spent}
+                if not retry_requested(self.prompt):
+                    return {"ok": False, "changed": False, "reason": "An explicit selected-failure retry request is required."}
+                count = re.search(r"\b(\d+)\s*(?:attempts?|times)\b", self.prompt, re.I)
+                backoff = re.search(r"\b(?:backoff|delay)\s*(?:of\s*)?(\d+)\s*(?:s|seconds?)\b", self.prompt, re.I)
+                action = await prepare_for_turn(db, self.ctx["job"]["id"], args.get("urls"),
+                    actor.id, self.turn_id, self.thread_id,
+                    attempts=int(count.group(1)) if count else 1,
+                    backoff=int(backoff.group(1)) if backoff else 30, prompt=self.prompt)
+                return {"ok": True, "changed": False, "proposal": action,
+                        "requiresConfirmation": action["requiresConfirmation"],
+                        "reason": "Queued is not recovered; completion requires persisted staging outcomes."}
             if name in {"edit_staff_values", "edit_intakes"}:
                 from .staff import edit_staff
                 return await edit_staff(self, db, thread, actor, args, call_id)

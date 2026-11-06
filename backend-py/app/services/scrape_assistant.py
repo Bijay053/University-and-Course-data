@@ -117,6 +117,10 @@ async def ensure_schema(db):
     await db.execute(text("ALTER TABLE scrape_assistant_threads ADD COLUMN IF NOT EXISTS activity JSONB NOT NULL DEFAULT '[]'"))
     await db.execute(text("ALTER TABLE scrape_assistant_threads ADD COLUMN IF NOT EXISTS run_id TEXT"))
     await db.execute(text("CREATE INDEX IF NOT EXISTS ix_scrape_assistant_threads_job_id ON scrape_assistant_threads(job_id)"))
+    from app.services.selective_retry import ensure_schema as ensure_retry_schema
+    await ensure_retry_schema(db)
+    from app.services.scraper.result_reuse import ensure_schema as ensure_result_cache
+    await ensure_result_cache(db)
     await db.commit()
 
 
@@ -283,12 +287,24 @@ async def investigate(thread_id: str, turn_id: str):
                 claimed_thread=await db.get(ScrapeAssistantThread,thread_id)
                 requested=next(m for m in reversed(claimed_thread.messages) if m["role"]=="user")
                 v2=requested.get("_engine")=="v2" or "_agentV2" in requested
+            # Job diagnostics and confirmed runtime previews are deterministic
+            # controls, not an optional agent-engine capability. Dispatch them
+            # before engine selection so every authorized staff member gets
+            # the same preview/acknowledgement contract, including legacy users.
+            from app.services.live_scrape_diagnostics import handle as live_diagnostics
+            from app.services import scrape_assistant as service
+            from app.services.selective_retry import retry_requested
+            # A request to retry settled failures belongs to the fenced retry
+            # handler below, not to a read-only diagnostic matching "retry".
+            if not retry_requested(requested["content"]) and await live_diagnostics(service, thread_id, turn_id, run_id,
+                                      {"job": {"id": claimed_thread.job_id}},
+                                      requested["content"]):
+                return
             if v2:
                 from app.services.scrape_agent_v2.access import enabled_for
                 if not enabled_for(settings, claimed_thread.actor_id):
                     raise ValueError("The new agent is disabled; unfinished work will not fall back to another engine")
                 from app.services.scrape_agent_v2.runtime import investigate as investigate_v2
-                from app.services import scrape_assistant as service
                 await investigate_v2(service, thread_id, turn_id, run_id)
             else:
                 await _investigate(thread_id, turn_id, run_id)
@@ -533,7 +549,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                 if remaining <= 0:
                     raise TimeoutError()
                 await record_activity(thread_id, turn_id, run_id, event(
-                    "Opening official PDF" if urlsplit(url).path.lower().endswith(".pdf") else "Opening official page",
+                    "Checking saved or live official source",
                     status="running", url=url, event_id=identifier,
                 ))
                 from app.services.assistant_source_cache import cached_source
@@ -549,6 +565,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                     "error": "Source check reached its time budget; this source remains unchecked.",
                 }
         await record_activity(thread_id, turn_id, run_id, event(
+            ("Saved official source reused" if result.get("verified") else "Recent access restriction reused")
+            if result.get("_sourceCacheHit") else
             ("Official PDF checked" if result.get("verified") else "Official PDF unavailable")
             if result.get("sourceType") == "pdf" else
             ("Official page checked" if result.get("verified") else "Official page unavailable"),
@@ -614,7 +632,11 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         detail=coverage["summary"],
     ))
     await progress(thread_id, turn_id, "Comparing evidence and preparing the answer", run_id)
-    result = ({"answer": "", "citations": [], "action": None}
+    from app.services.assistant_source_gate import access_blocked_answer
+    access_failure = access_blocked_answer(sources)
+    result = ({"answer": access_failure, "citations": [], "action": None}
+              if access_failure and not check_catalogue else
+              {"answer": "", "citations": [], "action": None}
               if check_catalogue and isinstance(catalogue.get("courses"), list)
               else await asyncio.wait_for(chat_json(
         system=(
@@ -625,6 +647,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             "Use actual source evidence and supplied deterministic facts, distinguish UK/domestic from international, "
             "latest published year, Annual from Full Course/module prices, taught/research/course-specific IELTS "
             "and pre-sessional scores. Never invent a fee, score, campus, requirement, source or completeness. "
+            "A failed source check describes current access only, not why an earlier extraction was missing. "
+            "Answer only the requested fields; do not append unrelated IELTS or academic-verification disclaimers. "
             "Use fee periods exactly: annual tuition is not a full-programme total. "
             "PDF excerpts are page-specific research only, not extracted field authority. "
             "Respect nonTuition and unreadablePages: incidental charges cannot establish tuition, "
@@ -635,7 +659,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             "State sample/coverage limits and failed checks. "
             "Use researchCoverage as the authoritative page-check ledger. A fetched page is not a verified IELTS requirement. "
             "English links are followed automatically when found; do not ask the user to supply a page already in sources. "
-            "Compare stored overall AND all four band scores against the applicable evidence; identify mismatches and missing evidence separately. "
+            "When English requirements are requested, compare stored overall AND all four band scores against the applicable evidence; identify mismatches and missing evidence separately. "
             "An explicitly domestic-only course cannot establish an international IELTS match: flag its eligibility separately rather than count it as internationally verified. "
             "Review counts include approved and unapproved records; pending-only samples do not prove catalogue gaps. "
             "Use recorded skip reasons when available. Do not confuse unpublished review records with missing discovery. "

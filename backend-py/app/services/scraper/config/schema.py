@@ -3386,6 +3386,8 @@ class ExtractionConfig(BaseModel):
             "to use the global per_course_extraction_timeout_s setting."
         ),
     )
+    live_stall_seconds: int = Field(default=180,ge=30,le=1800,
+        description="Warn when live extraction has no observed completion or preparation progress for this many seconds. Never proves worker death.")
     recovery_sweep_max_items: int = Field(
         default=100,
         description=(

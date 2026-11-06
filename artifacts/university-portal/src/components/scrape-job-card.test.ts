@@ -15,6 +15,8 @@ vi.mock("@/components/can", () => ({
 
 import {
   activeRepairFromStartConflict,
+  liveScrapeStageLabel,
+  repairStatusHasValidRuns,
   countSuspiciousSkipped,
   hasCompletedExtractionErrors,
   hasReviewableCourses,
@@ -587,6 +589,17 @@ async function renderFailedFilterCollapseCard(kept = 0): Promise<void> {
 }
 
 describe("runtimeProgressFromStatus", () => {
+  it("rejects empty or incomplete repair snapshots instead of rendering missing attempts", () => {
+    expect(repairStatusHasValidRuns({})).toBe(false);
+    expect(repairStatusHasValidRuns({session_id:"s",job_id:"j",status:"running"})).toBe(false);
+    expect(repairStatusHasValidRuns({session_id:"s",job_id:"j",status:"running",attempts:[]})).toBe(true);
+  });
+  it("shows preparation and checkpoint phases without pretending courses were processed", () => {
+    expect(liveScrapeStageLabel([{phase:"extract"},{phase:"prepare"}])).toBe("Preparing course options…");
+    expect(liveScrapeStageLabel([{phase:"prepare"},{phase:"resume_check"}])).toBe("Checking saved course progress…");
+    expect(liveScrapeStageLabel([{phase:"prepare"},{phase:"extract"}])).toBe("Processing courses…");
+  });
+
   it("uses the persisted processed/total values from every status poll", () => {
     expect(runtimeProgressFromStatus({
       current: 17,

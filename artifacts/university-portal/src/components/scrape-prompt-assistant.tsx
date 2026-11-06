@@ -17,7 +17,7 @@ export { safeSourceUrl };
 export type AssistantSource = { url: string; title: string; excerpt: string; page?: number; quoteId?: string };
 export type AssistantAction = {
   id: string;
-  kind: "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit";
+  kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed";
   requiresConfirmation?: boolean;
   label: string;
   courseCount: number;
@@ -220,7 +220,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
   const [importState, setImportState] = useState<{key: string | null; paused: boolean | null} | null>(null);
   const updateImportStatus = useCallback((paused: boolean | null) => setImportState({key: viewKey, paused}), [viewKey]);
   const importsBlocked = importState?.key !== viewKey || importState?.paused !== false;
-  const isImport = (a: AssistantAction) => ["scan_catalogue", "recover_catalogue", "review_courses", "repair_catalogue"].includes(a.kind);
+  const isImport = (a: AssistantAction) => ["scan_catalogue", "recover_catalogue", "review_courses", "repair_catalogue", "retry_failed"].includes(a.kind);
   const [stored, setStored] = useState<{ key: string; thread: AssistantThread } | null>(null);
   // Render-time guard: a thread from another identity/job is never shown, even for one frame.
   const thread = stored && stored.key === viewKey ? stored.thread : null;
@@ -497,7 +497,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
           </details>
           {a.state === "proposed" && (
             <Button size="sm" variant="outline" className="mt-2 h-8 border-amber-300 text-[12px]" disabled={disabled || actionBusy || (isImport(a) && importsBlocked)}
-              onClick={() => a.kind === "staff_edit" || a.kind === "staff_location" || a.kind === "undo_staff_location"
+              onClick={() => a.requiresConfirmation || a.kind === "runtime_tuning" || a.kind === "staff_edit" || a.kind === "staff_location" || a.kind === "undo_staff_location"
                 ? openConfirm(a) : void runAction(a)} data-testid={`button-run-action-${a.id}`}>
               {isImport(a) && importsBlocked ? "Imports paused or status unavailable" : a.kind === "undo_staff_location" ? "Undo locations" : "Run now"}
             </Button>
@@ -740,7 +740,9 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm">
                 <p>
-                  {confirming?.kind === "undo_staff_location"
+                  {confirming?.kind === "runtime_tuning"
+                    ? "This requests the displayed old/new settings for this job only. The owning worker must acknowledge before this is reported as applied. Active requests finish normally. Provider throttles and fleet limits remain in place. Nothing is restarted, discarded or published."
+                    : confirming?.kind === "undo_staff_location"
                     ? "This restores the prior audited locations and provenance. It refuses to overwrite later edits. No page fetch or discovery runs."
                     : confirming?.kind === "staff_location" || confirming?.kind === "staff_edit"
                     ? "This saves the supplied values on the exact records listed in the chat, with staff-provided provenance and an audit log. It does not independently verify them, fetch pages or run catalogue discovery."
@@ -752,8 +754,11 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                     ? "This runs the existing configured full catalogue discovery for this university, bypassing cached pages, as a review-only run. It does not delete existing review rows. It may take considerably longer than the quick check. It cannot guarantee that every course on the website is discoverable, and it does not approve, delete or publish anything."
                     : confirming?.kind === "review_courses"
                     ? "This fetches the requested official course URLs into a fresh pending review. It does not rename the course in the current review or duplicate a published course."
+                    : confirming?.kind === "retry_failed"
+                      ? "This retries only the selected, settled failures. Attempt limits and backoff are listed in the chat. Successful URLs are not replayed."
                     : "This re-extracts the listed fields for staged review courses."}
-                  {confirming?.kind === "staff_location" || confirming?.kind === "undo_staff_location" || confirming?.kind === "staff_edit" ? ` It changes ${confirming.courseCount} listed records, including ${confirming.publishedCount ?? 0} published records.`
+                  {confirming?.kind === "runtime_tuning" ? ""
+                    : confirming?.kind === "staff_location" || confirming?.kind === "undo_staff_location" || confirming?.kind === "staff_edit" ? ` It changes ${confirming.courseCount} listed records, including ${confirming.publishedCount ?? 0} published records.`
                     : confirming?.kind === "scan_catalogue" ? " Results land in review data only."
                     : confirming?.kind === "recover_catalogue" ? ` It checks ${selectedUrls.length} selected link${selectedUrls.length === 1 ? "" : "s"}; results land in review data only.`
                     : ` It affects ${confirming?.courseCount} course${confirming?.courseCount === 1 ? "" : "s"} in review data only.`}

@@ -31,6 +31,49 @@ afterEach(() => {
 });
 
 describe("ScrapePromptAssistant", () => {
+  it("confirms a large selected-failure retry and shows exact limits without claiming repair", async () => {
+    const thread: AssistantThread = {...empty, status: "ready", messages: [
+      {role: "assistant", content: "Selected failures only.", createdAt: "2024-01-01T00:00:00Z", actions: [
+        {id: "retry", label: "Retry selected failures", kind: "retry_failed", state: "proposed", courseCount: 11, fields: [],
+         requiresConfirmation: true, courseResults: [{url: "https://uni.edu/failed", status: "selected",
+           message: "At most 2 remaining extraction attempts; backoff at least 7s."}]}]}]};
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json(thread)).mockResolvedValueOnce(json(thread));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    fireEvent.click(await screen.findByTestId("button-run-action-retry"));
+    expect(screen.getByTestId("dialog-confirm-action").textContent).toContain("Successful URLs are not replayed");
+    expect(screen.getByText(/At most 2 remaining/)).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId("button-confirm-action"));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({confirm: true});
+  });
+  it("requires a separate confirmation for job-only tuning and waits for acknowledgement", async () => {
+    const proposed = {
+      ...empty, threadId: "runtime", status: "ready",
+      messages: [{ role: "assistant", content: "Confirm this job-only preview", createdAt: new Date().toISOString(),
+        actions: [{ id: "rt", kind: "runtime_tuning", state: "proposed",
+          label: "Concurrency 4 to 2", courseCount: 0, fields: [], requiresConfirmation: true }] }],
+    };
+    const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, options) => {
+      if (options?.method === "POST") return json({
+        ...proposed, messages: [{ ...proposed.messages[0], actions: [{
+          ...proposed.messages[0].actions[0], state: "running", resultSummary: "Waiting for the owning worker acknowledgement.",
+        }] }],
+      });
+      return json(proposed);
+    });
+    render(<ScrapePromptAssistant jobId="job-only" />);
+    fireEvent.click(await screen.findByTestId("button-run-action-rt"));
+    expect(await screen.findByTestId("dialog-confirm-action")).toBeTruthy();
+    expect(screen.getByText(/Active requests finish normally/)).toBeTruthy();
+    expect(fetcher.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("button-confirm-action"));
+    await waitFor(() => expect(screen.getByTestId("status-action-rt").textContent).toBe("running"));
+    const post = fetcher.mock.calls.find(([, options]) => options?.method === "POST")!;
+    expect(post[0]).toBe("/api/scrape/jobs/job-only/assistant/actions/rt");
+    expect(JSON.parse(String(post[1]?.body))).toEqual({ confirm: true });
+    expect(screen.queryByText(/Worker acknowledged/)).toBeNull();
+  });
   it("disables imports during a hold without disabling pending field repairs", async () => {
     importHold.paused = true;
     vi.spyOn(globalThis, "fetch").mockResolvedValue(json({

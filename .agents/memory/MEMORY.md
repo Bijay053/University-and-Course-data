@@ -146,3 +146,5 @@
 - [Legacy repair scope](legacy-repair-scope.md) — hardening connections must not turn a targeted repair into a full upgrade or bypass local-only restrictions.
 - [SSM report completeness](ssm-report-completeness.md) — command stdout can truncate large production inventories; compress or page results before making bulk-edit decisions.
 - [Pending import reuse](pending-import-reuse.md) — link existing reviews without replacing staff values; retain conflicting attempt evidence and exclude reused rows from automatic mutations.
+- [Selected retry safety](selective-retry-safety.md) — reserve uncertain attempts; require current source and parser proof; terminal worker status is not verified recovery.
+- [Long validation runs](long-validation-runs.md) — large suites can outlast automatic polling; retain terminal results and never count partial progress as a pass.

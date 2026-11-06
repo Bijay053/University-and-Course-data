@@ -22,6 +22,11 @@ PDF_PARSE_SECONDS = 4
 class SourceReadError(ValueError):
     """A safe, user-facing failure (never expose raw transport/parser errors)."""
 
+    def __init__(self, message, *, access_issue=None, http_status=None):
+        super().__init__(message)
+        self.access_issue = access_issue
+        self.http_status = http_status
+
 
 async def pdf_pages(raw: bytes) -> dict:
     """Kill and reap the parser on timeout or cancellation, not just its await."""
@@ -144,7 +149,8 @@ async def public_request(url: str, *, method="GET", body=None, params=None, user
             robots_url=value._replace(path="/robots.txt",query="",fragment="").geturl()
             async with client.stream("GET",robots_url) as rules:
                 if rules.status_code not in (200,404,410):
-                    raise SourceReadError(f"robots.txt could not be verified (HTTP {rules.status_code}); source access stopped without bypassing protection.")
+                    raise SourceReadError(f"robots.txt could not be verified (HTTP {rules.status_code}); source access stopped without bypassing protection.",
+                                          access_issue="robots_unavailable", http_status=rules.status_code)
                 if rules.status_code==200:
                     raw_rules=bytearray()
                     async for part in rules.aiter_bytes():
@@ -152,10 +158,12 @@ async def public_request(url: str, *, method="GET", body=None, params=None, user
                         if len(raw_rules)>256_000:raise SourceReadError("robots.txt exceeds the safe size limit.")
                     robots_text=raw_rules.decode("utf-8",errors="replace")
                     if "<html" in robots_text.lower():
-                        raise SourceReadError("robots.txt returned an HTML page or protection challenge; source access stopped.")
+                        raise SourceReadError("robots.txt returned an HTML page or protection challenge; source access stopped.",
+                                              access_issue="robots_unavailable")
                     parser=RobotFileParser();parser.parse(robots_text.splitlines())
                     if not parser.can_fetch(user_agent or "StudyInfoCentre-SourceVerifier/1.0",url):
-                        raise SourceReadError("robots.txt disallows this source; no browser or proxy bypass was attempted.")
+                        raise SourceReadError("robots.txt disallows this source; no browser or proxy bypass was attempted.",
+                                              access_issue="robots_disallowed")
         async with client.stream(method, url, json=body if method == "POST" else None, params=params or None) as response:
             if response.is_redirect:
                 target = official_url(urljoin(url, response.headers.get("location", "")), url)
@@ -164,9 +172,11 @@ async def public_request(url: str, *, method="GET", body=None, params=None, user
                     raise ValueError("Source redirect could not be verified.")
                 raise SourceReadError("Source redirects; provide its final official URL.")
             if response.status_code in (401,403,429):
-                raise SourceReadError(f"Official source refused access (HTTP {response.status_code}); no bot-protection bypass was attempted.")
+                raise SourceReadError(f"Official source refused access (HTTP {response.status_code}); no bot-protection bypass was attempted.",
+                                      access_issue="source_access_denied", http_status=response.status_code)
             if response.status_code>=400:
-                raise SourceReadError(f"Official source returned HTTP {response.status_code}.")
+                raise SourceReadError(f"Official source returned HTTP {response.status_code}.",
+                                      http_status=response.status_code)
             chunks = bytearray()
             async for chunk in response.aiter_bytes():
                 chunks.extend(chunk)
@@ -254,6 +264,8 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
             "url": url, "verified": False, "sourceType": source_type,
             "error": str(exc) if isinstance(exc, SourceReadError) else
             f"Official {source_type.upper()} source could not be verified within the research limit.",
+            **({"accessIssue": exc.access_issue, "httpStatus": exc.http_status}
+               if isinstance(exc, SourceReadError) and exc.access_issue else {}),
         }
 
 

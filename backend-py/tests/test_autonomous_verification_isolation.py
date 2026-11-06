@@ -607,11 +607,15 @@ def test_pipeline_guards_all_resume_and_post_run_mutation_paths():
     assert "if _dq_critical_urls and not _preserve_review:" in source
     stage_calls = [
         node for node in ast.walk(tree) if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name) and node.func.id == "stage_course"
+        and isinstance(node.func, ast.Name) and node.func.id in {"stage_course","_stage_claimed_result"}
     ]
     assert len(stage_calls) == 2
     assert all(any(k.arg == "preserve_existing" and ast.unparse(k.value) == "_preserve_review"
                    for k in call.keywords) for call in stage_calls)
+    # The main staging path now passes through the parent-ownership fence.
+    # Keep checking BOTH staging paths and prove the wrapper cannot stage first.
+    wrapper=inspect.getsource(orch._stage_claimed_result)
+    assert wrapper.index("await guard_source")<wrapper.index("await stage_course")
     early_return = source.index("# Stop before ALL mutation/dispatch hooks")
     assert early_return < source.index("from app.services.scraper.metrics import compute_run_metrics")
     assert early_return < source.index("run_quality_actions as")
