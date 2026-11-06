@@ -36,3 +36,13 @@ as an ambiguous single-course edit, followed by unwanted course-name matching.
 **How to apply:** Prepare one combined preview with per-row field changes.
 Apply confirmation limits to the complete affected row set, not each clause
 individually. Explicit follow-ups retain the original fields and scope.
+
+The bulk-update bug brief requires its natural-language request to affect only
+pending records in the current review. “Add Sydney to all course locations”
+retains other locations and does not duplicate Sydney.
+
+**Why:** The user explicitly specified current-review scope and additive,
+duplicate-free location updates in the supplied bug report.
+
+**How to apply:** Do not silently include other reviews or published courses.
+Keep provider-wide edits as a separate, explicitly broader instruction.
