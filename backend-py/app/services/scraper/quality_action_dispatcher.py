@@ -199,6 +199,7 @@ async def _run_pdf_extraction(
         improved = 0
         parts: list[str] = []
         from app.services.scraper.approval_guidance import synchronize_updated_guidance
+        from app.services.scraper.pending_imports import AUTO_MUTATION_SQL
 
         # international_fee
         if "international_fee" in target_fields:
@@ -206,7 +207,8 @@ async def _run_pdf_extraction(
             if fee_val:
                 r = await db.execute(
                     _sql("UPDATE scraped_courses SET international_fee = :v"
-                         " WHERE scrape_job_id = :j AND international_fee IS NULL RETURNING id"),
+                         " WHERE scrape_job_id = :j AND international_fee IS NULL"
+                         + AUTO_MUTATION_SQL + " RETURNING id"),
                     {"v": fee_val, "j": job_id},
                 )
                 await synchronize_updated_guidance(db, r)
@@ -225,7 +227,8 @@ async def _run_pdf_extraction(
                     r = await db.execute(
                         _sql("UPDATE scraped_courses SET other_requirement = :v"
                              " WHERE scrape_job_id = :j"
-                             "   AND (other_requirement IS NULL OR other_requirement = '') RETURNING id"),
+                             "   AND (other_requirement IS NULL OR other_requirement = '')"
+                             + AUTO_MUTATION_SQL + " RETURNING id"),
                         {"v": er_text[:500], "j": job_id},
                     )
                     await synchronize_updated_guidance(db, r)
@@ -242,7 +245,8 @@ async def _run_pdf_extraction(
             if ielts:
                 r = await db.execute(
                     _sql("UPDATE scraped_courses SET ielts_overall = :v"
-                         " WHERE scrape_job_id = :j AND ielts_overall IS NULL RETURNING id"),
+                         " WHERE scrape_job_id = :j AND ielts_overall IS NULL"
+                         + AUTO_MUTATION_SQL + " RETURNING id"),
                     {"v": float(ielts), "j": job_id},
                 )
                 await synchronize_updated_guidance(db, r)
@@ -263,7 +267,8 @@ async def _run_pdf_extraction(
                 r = await db.execute(
                     _sql("UPDATE scraped_courses SET academic_score = :v"
                          " WHERE scrape_job_id = :j"
-                         "   AND (academic_score IS NULL OR academic_score = '') RETURNING id"),
+                         "   AND (academic_score IS NULL OR academic_score = '')"
+                         + AUTO_MUTATION_SQL + " RETURNING id"),
                     {"v": score_text, "j": job_id},
                 )
                 await synchronize_updated_guidance(db, r)

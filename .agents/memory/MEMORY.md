@@ -145,3 +145,4 @@
 - [Database CA loading](database-ca-loading.md) — explicitly load configured CA bundles; OpenSSL default paths may silently ignore a missing file.
 - [Legacy repair scope](legacy-repair-scope.md) — hardening connections must not turn a targeted repair into a full upgrade or bypass local-only restrictions.
 - [SSM report completeness](ssm-report-completeness.md) — command stdout can truncate large production inventories; compress or page results before making bulk-edit decisions.
+- [Pending import reuse](pending-import-reuse.md) — link existing reviews without replacing staff values; retain conflicting attempt evidence and exclude reused rows from automatic mutations.

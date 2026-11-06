@@ -203,6 +203,9 @@ async def continuation_review_scope(
         if not next_frontier:
             break
         frontier = next_frontier
+    from app.services.scraper.pending_imports import linked_course_ids
+    if isinstance(db, AsyncSession):
+        resume_course_ids.update(await linked_course_ids(db, chain, university_id))
     return chain, university_id, resume_course_ids, full_catalogue_scope
 
 

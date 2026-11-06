@@ -108,6 +108,10 @@ args = "surrey-catalogue-source-boundaries"
 task = "workflow.run"
 args = "lsbu-current-catalogue"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "pending-import-reuse"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -358,6 +362,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_lsbu_config.py tests/test_lsbu_fees.py tests/test_guards.py tests/test_acu_proxy_routing.py tests/test_curtin_transport_recovery.py -q -c /dev/null --noconftest -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "pending-import-reuse"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && ALLOW_ISOLATED_PENDING_IMPORT_TESTS=1 PYTHONPATH=. python -m pytest tests/test_pending_import_reuse.py tests/test_full_catalogue_review.py tests/test_stage_result.py -q -c /dev/null --noconftest -p no:cacheprovider'"
 
 [workflows.workflow.metadata]
 isValidation = true

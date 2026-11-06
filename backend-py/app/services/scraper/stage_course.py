@@ -499,6 +499,7 @@ async def stage_course(
     skip_url_block: bool = False,
     targeted_retry: bool = False,
     preserve_existing: bool = False,
+    reuse_pending: bool = False,
 ) -> StageResult:
     validate_payload_keys("stage_course payload", payload.keys())
     name = (course_name or "").strip()
@@ -578,10 +579,13 @@ async def stage_course(
     # For VIT we also augment the course name with the specialisation derived
     # from the URL path so reviewers can distinguish the rows.
     name = _augment_specialization_name(name, source_url)
+    if reuse_pending:
+        from app.services.scraper.pending_imports import lock_url
+        await lock_url(db, university_id, payload.get("course_website") or source_url)
     try:
         _source_url_key = canonical_course_url_key(source_url)
         _dup = None
-        if _source_url_key:
+        if _source_url_key and not reuse_pending:
             _dup_q = await db.execute(
                 select(ScrapedCourse.id)
                 .where(
@@ -622,7 +626,7 @@ async def stage_course(
     # different paths remain distinct.
     try:
         _source_url_key = canonical_course_url_key(source_url)
-        if _source_url_key and not preserve_existing:
+        if _source_url_key and not preserve_existing and not reuse_pending:
             _alias_deleted = await db.execute(
                 delete(ScrapedCourse).where(
                     ScrapedCourse.university_id == university_id,
@@ -1164,6 +1168,20 @@ async def stage_course(
     if preserve_existing:
         sc.status = "pending"
         sc.auto_publish_status = "review"
+    proposed, reused = {}, {}
+    if reuse_pending:
+        from app.services.scraper.pending_imports import match_pending, record_attempt
+        sc.course_website = sc.course_website or source_url
+        proposed, reused = await match_pending(db, sc)
+        if len(reused) == len(proposed):
+            ids = [row.id for row in reused.values()]
+            comparisons = await record_attempt(db, sc, proposed, reused, ids, evidence)
+            await db.commit()
+            return StageResult(True, "reused_pending", scraped_course_id=ids[0], extra={
+                "staged_course_ids": ids, "reused_pending": True,
+                "reused_course_ids": ids,
+                "existing_reviews": comparisons,
+            })
     db.add(sc)
     try:
         await db.flush()  # need sc.id for the FK on evidence rows
@@ -1329,14 +1347,18 @@ async def stage_course(
         apply_delivery_review(sc, name, delivery_review_payload, source_url)
 
         from app.services.scraper.campus_fee_split import split_pending_course
-        campus_split = await split_pending_course(db, sc)
+        campus_split = await split_pending_course(db, sc, reused=reused if reuse_pending else None)
         apply_delivery_review(sc, name, delivery_review_payload, source_url)
         await persist_staged_row_backup(db, sc, source_url=source_url)
         if campus_split["status"] == "split":
             for child_id in campus_split["courseIds"][1:]:
+                if child_id in {r.id for r in reused.values()}:
+                    continue
                 child = await db.get(ScrapedCourse, child_id)
                 apply_delivery_review(child, name, delivery_review_payload, source_url)
                 await persist_staged_row_backup(db, child, source_url=source_url)
+        if reuse_pending:
+            await record_attempt(db, sc, proposed, reused, campus_split["courseIds"], evidence)
         await db.commit()
     except Exception as exc:  # noqa: BLE001
         await db.rollback()
@@ -1353,5 +1375,6 @@ async def stage_course(
             "conflicts": conflicts_written,
             "staged_course_ids": campus_split["courseIds"],
             "campus_fee_split": campus_split["status"] == "split",
+            "reused_course_ids": [row.id for row in reused.values()],
         },
     )
