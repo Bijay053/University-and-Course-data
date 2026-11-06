@@ -20,7 +20,73 @@ CASES = [
     ("set IELTS 6.5 with no band below 6 on all courses",
      {"ielts_overall":6.5, **{f"ielts_{k}":6 for k in ["listening", "reading", "writing", "speaking"]}}),
     ("set duration 2 years on all courses", {"duration":2, "duration_term":"Year"}),
+    ("in all missing course intake add intake Feb, July\nalso in all course location add sydney",
+     {"intake_months": ["February", "July"], "course_location": "Sydney"}),
 ]
+
+COMPOUND = "in all missing course intake add intake Feb, July\n\nalso in all course location add sydney"
+
+
+def test_exact_compound_and_followup_keep_per_field_scope():
+    request = parse(COMPOUND)
+    assert request.values == {"intake_months": ["February", "July"], "course_location": "Sydney"}
+    assert request.missing_only == {"intake_months"}
+    repeated = parse("no need to match it just add this requested",
+                     [{"role": "user", "content": COMPOUND}])
+    assert repeated.values == request.values and repeated.missing_only == request.missing_only
+    assert parse("?", [{"role": "user", "content": COMPOUND},
+                       {"role": "assistant", "content": "Awaiting confirmation."}]).error == "Awaiting confirmation."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("count", [2, 11])
+async def test_compound_request_preserves_existing_intakes_and_batch_confirmation(store, count):
+    await seed_thread(store)
+    async with store() as db:
+        original = await db.get(ScrapedCourse, 1)
+        original.intake_months = None
+        for ident in range(2, count + 1):
+            db.add(ScrapedCourse(id=ident, university_id=1, scrape_job_id=original.scrape_job_id,
+                course_name=f"Bachelor of Testing {ident}", status="pending",
+                course_website=f"https://example.edu/course/{ident}",
+                intake_months=["September"], course_location="Melbourne"))
+        await db.commit()
+    await handle(service, "eligibility", "turn", "owner", await snapshot(store), COMPOUND, [])
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, "eligibility")
+        action = thread.messages[-1]["actions"][0]
+        assert action["courseCount"] == count
+        assert action["requiresConfirmation"] is (count > 10)
+        if count > 10:
+            assert (await db.get(ScrapedCourse, 1)).intake_months is None
+            assert (await db.get(ScrapedCourse, 2)).course_location == "Melbourne"
+            assert not list((await db.execute(select(CourseAuditLog))).scalars())
+            await apply(service, db, action, 1, thread.actor_id, confirmed=True)
+            await db.commit()
+        first = await db.get(ScrapedCourse, 1)
+        second = await db.get(ScrapedCourse, 2)
+        assert first.intake_months == ["February", "July"]
+        assert second.intake_months == ["September"]
+        assert first.course_location == second.course_location == "Sydney"
+        audits = list((await db.execute(select(CourseAuditLog))).scalars())
+        assert len(audits) == count + 1
+        assert all("staff-provided" in a.reason for a in audits)
+
+
+@pytest.mark.asyncio
+async def test_single_row_tool_does_not_overwrite_a_nonmissing_intake(store):
+    from app.services.scrape_agent_v2.tools import DataTools
+    await seed_thread(store)
+    async with store() as db:
+        (await db.get(ScrapedCourse, 1)).intake_months = ["September"]
+        await db.commit()
+    tools = DataTools(service, "eligibility", "turn", "owner", await snapshot(store),
+                      "set intake February and July for row 1 missing intake")
+    result = await tools.execute("edit_staff_values", {"row_id": 1}, "missing-only")
+    assert not result["changed"]
+    async with store() as db:
+        assert (await db.get(ScrapedCourse, 1)).intake_months == ["September"]
+        assert not list((await db.execute(select(CourseAuditLog))).scalars())
 
 
 @pytest.mark.parametrize("prompt,values", CASES)

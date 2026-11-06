@@ -27,6 +27,7 @@ def location_request(prompt, messages):
                     return None  # Never reuse an older location after a different field edit.
         return None
     patterns=[
+        r"\bin\s+all\s+courses?\s+location\s+add\s+([A-Za-z][A-Za-z '\-]{0,60})[.!]?$",
         r"\b(?:set|change|update|add)\s+(?:the\s+)?(?:course\s+)?location\s*(?:=|to|as|:)?\s*([A-Za-z][A-Za-z '\-]{0,60}?)(?=\s+(?:on|in|for|to)\s+all\b|[.!]|$)",
         r"\badd\s+([A-Za-z][A-Za-z '\-]{0,60}?)\s+(?:as\s+(?:the\s+)?(?:course\s+)?location|in\s+all\s+course\s+location)\b",
     ]

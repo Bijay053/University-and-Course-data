@@ -67,7 +67,7 @@ def permissions(actor, published=False):
 
 async def apply(service, db, action, university_id, actor_id, *, confirmed=False):
     from app.models.user import User
-    targets, values = action["_targets"], action["_values"]
+    targets, all_values = action["_targets"], action["_values"]
     if action["_universityId"] != university_id:
         raise ValueError("Staff edit belongs to another provider")
     permissions(await db.get(User, actor_id), any(t["kind"] == "published" for t in targets))
@@ -75,6 +75,9 @@ async def apply(service, db, action, university_id, actor_id, *, confirmed=False
         raise ValueError("Confirmation is required for this staff edit")
     locked = []
     for target in sorted(targets, key=lambda t: (t["kind"], t["id"])):
+        values = target.get("values", all_values)
+        if not values or any(k not in all_values or v != all_values[k] for k, v in values.items()):
+            raise ValueError("Invalid per-row staff values")
         kind = target["kind"]
         model = ScrapedCourse if kind == "pending" else Course
         row = (await db.execute(select(model).where(
@@ -112,9 +115,9 @@ async def apply(service, db, action, university_id, actor_id, *, confirmed=False
                     raise ValueError(f"Official {proof.field_key} evidence for row {row.id} conflicts; review the conflict")
         elif "intake_months" in values and any(r.intake_year or r.intake_day or not r.is_open for r in related["intakes"]):
             raise ValueError("Dated or closed published intakes require explicit entry selection; no dates or availability were changed")
-        locked.append((row, target, before, related))
+        locked.append((row, target, before, related, values))
     # Validate the entire batch before writing any member.
-    for row, target, before, related in locked:
+    for row, target, before, related, values in locked:
         kind = target["kind"]
         if kind == "pending":
             methods = dict(row.extraction_method or {})
@@ -161,7 +164,7 @@ async def apply(service, db, action, university_id, actor_id, *, confirmed=False
                 action="assistant_edit", old_value=json.dumps(before[field]), new_value=json.dumps(value),
                 actor=str(actor_id), reason="staff-provided: " + action["_instruction"]))
     await db.flush()
-    for row, target, _, _ in locked:
+    for row, target, _, _, values in locked:
         await db.refresh(row)
         saved, _ = await state(db, row, target["kind"], values)
         if saved != values:
@@ -195,21 +198,27 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
                 raise ValueError(request.error)
             targets = []
             for kind, model in (("pending", ScrapedCourse), ("published", Course)):
-                if not request.all_courses and record_kind(prompt) not in {None, kind}:
+                if not request.all_courses and record_kind(request.instruction) not in {None, kind}:
                     continue
                 query = select(model).where(model.university_id == ctx["university_id"],
                     model.status.in_(service.REVIEW_STATUSES if kind == "pending" else ["active"]))
                 for row in (await db.execute(query.order_by(model.id))).scalars():
                     name = row.course_name if kind == "pending" else row.name
-                    if not staff_scope(prompt, [{"id":row.id, "name":name, "url":row.course_website}],
+                    if not staff_scope(request.instruction, [{"id":row.id, "name":name, "url":row.course_website}],
                                        all_courses=request.all_courses):
                         continue
                     if not name or "://" in name or ".edu" in name:
                         raise ValueError("A selected row needs course-identity review")
                     before, related = await state(db, row, kind, request.values)
-                    if before == request.values:
+                    values = {k:v for k,v in request.values.items()
+                              if k not in request.missing_only or before.get(k) in (None, "", [])}
+                    if not values:
+                        continue
+                    before, related = await state(db, row, kind, values)
+                    if before == values:
                         continue
                     targets.append(dict(id=row.id, kind=kind, name=name, before=before,
+                        values=values,
                         version=version(service, row, kind, before, related)))
             action = dict(id=uuid.uuid4().hex, kind="staff_edit", label="Apply staff-provided values",
                 fields=list(request.values), courseCount=len(targets), state="proposed",
@@ -221,7 +230,7 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
             if targets:
                 permissions(await db.get(User, thread.actor_id), bool(action["publishedCount"]))
                 content = "Staff-provided values (not independently verified). No discovery or page fetch.\n" + "\n".join(
-                    f"- {t['kind']} {t['id']}: {t['name']} — {json.dumps(t['before'])} → {json.dumps(request.values)}"
+                    f"- {t['kind']} {t['id']}: {t['name']} — {json.dumps(t['before'])} → {json.dumps(t['values'])}"
                     for t in targets)
                 if not action["requiresConfirmation"]:
                     await apply(service, db, action, ctx["university_id"], thread.actor_id)
@@ -233,6 +242,8 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
         except ValueError as exc:
             await db.rollback()
             await service.save_research_reply(thread_id, turn_id, run_id, dict(role="assistant", turnId=turn_id,
-                createdAt=service.now().isoformat(), content="No values changed: " + str(exc), sources=[], actions=[]),
+                createdAt=service.now().isoformat(),
+                content=("Previous result (no additional changes): " if prompt.strip() == "?" else "No values changed: ") + str(exc),
+                sources=[], actions=[]),
                 detail="Staff edit requires review.")
     return True

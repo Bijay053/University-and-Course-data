@@ -16,13 +16,13 @@ async def edit_staff(tools, db, thread, actor, args, call_id):
         return denied(request.error if request else "No explicit authorized staff values")
     if "months" in args and request.values != {"intake_months": args["months"]}:
         return denied("Tool values differ from the staff instruction")
-    if record_kind(tools.prompt) == "published":
+    if record_kind(request.instruction) == "published":
         return denied("Published edits require the staff preview and confirmation", confirmation=True)
     candidates = list((await db.execute(select(ScrapedCourse).where(
         ScrapedCourse.university_id == tools.ctx["university_id"],
         ScrapedCourse.status.in_(tools.service.REVIEW_STATUSES)).order_by(ScrapedCourse.id))).scalars())
     selected = [r for r in candidates if staff_scope(
-        tools.prompt, [{"id":r.id, "name":r.course_name, "url":r.course_website}],
+        request.instruction, [{"id":r.id, "name":r.course_name, "url":r.course_website}],
         all_courses=request.all_courses)]
     if len(selected) > 10:
         return denied("More than ten requested rows require confirmation", confirmation=True)
@@ -41,6 +41,11 @@ async def edit_staff(tools, db, thread, actor, args, call_id):
         return denied("More than ten changed rows require confirmation", confirmation=True)
     if tools.ctx["versions"].get(str(row.id)) != tools.service.row_version(row):
         return denied("Row changed since it was read")
+    before, related = await state(db, row, "pending", request.values)
+    request.values = {k:v for k,v in request.values.items()
+                      if k not in request.missing_only or before.get(k) in (None, "", [])}
+    if not request.values:
+        return {"ok":True, "changed":False, "reason":"Requested fields are already populated"}
     before, related = await state(db, row, "pending", request.values)
     if before == request.values:
         return {"ok":True, "changed":False, "reason":"Already matches"}
