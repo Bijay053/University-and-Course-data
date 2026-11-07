@@ -1013,6 +1013,75 @@ paths:
               schema:
                 $ref: "#/components/schemas/BulkUploadResult"
 
+  /scrape/jobs/{jobId}/assistant/documents/upload-url:
+    post:
+      operationId: prepareAssistantDocumentUpload
+      summary: Prepare an actor- and review-bound private PDF attachment
+      tags: [scrape-assistant]
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, size, contentType]
+              properties:
+                filename: {type: string, minLength: 1, maxLength: 180}
+                size: {type: integer, minimum: 1, maximum: 2000000}
+                contentType: {type: string, enum: [application/pdf]}
+      responses:
+        '200':
+          description: Same-origin upload grant; authentication is also required for the upload
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transport, documentToken]
+                properties:
+                  transport: {type: string, enum: [portal]}
+                  documentToken: {type: string}
+        '401': {description: Sign-in required}
+        '403': {description: Scraping permission required}
+        '503': {description: Private uploads disabled}
+  /scrape/jobs/{jobId}/assistant/documents/content:
+    post:
+      operationId: uploadAssistantDocumentContent
+      summary: Store a PDF privately through the authenticated same-origin portal
+      tags: [scrape-assistant]
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: {type: string}
+        - name: X-Document-Token
+          in: header
+          required: true
+          schema: {type: string, maxLength: 4000}
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema: {type: string, format: binary}
+      responses:
+        '201':
+          description: Immutable private attachment saved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uploaded]
+                properties:
+                  uploaded: {type: boolean}
+        '401': {description: Sign-in required}
+        '403': {description: Scraping permission required}
+        '413': {description: Attachment size exceeded}
+        '422': {description: Invalid PDF or expired or foreign attachment}
+        '503': {description: Private storage unavailable or uploads disabled}
 components:
   schemas:
     UniversitySourceAccessPolicy:

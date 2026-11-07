@@ -770,3 +770,40 @@ export type DownloadCoursesParams = {
    */
   degreeLevel?: string | null;
 };
+
+export type PrepareAssistantDocumentUploadBodyContentType =
+  (typeof PrepareAssistantDocumentUploadBodyContentType)[keyof typeof PrepareAssistantDocumentUploadBodyContentType];
+
+export const PrepareAssistantDocumentUploadBodyContentType = {
+  "application/pdf": "application/pdf",
+} as const;
+
+export type PrepareAssistantDocumentUploadBody = {
+  /**
+   * @minLength 1
+   * @maxLength 180
+   */
+  filename: string;
+  /**
+   * @minimum 1
+   * @maximum 2000000
+   */
+  size: number;
+  contentType: PrepareAssistantDocumentUploadBodyContentType;
+};
+
+export type PrepareAssistantDocumentUpload200Transport =
+  (typeof PrepareAssistantDocumentUpload200Transport)[keyof typeof PrepareAssistantDocumentUpload200Transport];
+
+export const PrepareAssistantDocumentUpload200Transport = {
+  portal: "portal",
+} as const;
+
+export type PrepareAssistantDocumentUpload200 = {
+  transport: PrepareAssistantDocumentUpload200Transport;
+  documentToken: string;
+};
+
+export type UploadAssistantDocumentContent201 = {
+  uploaded: boolean;
+};

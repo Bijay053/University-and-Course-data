@@ -205,6 +205,37 @@ async def test_schema_checker_matches_real_isolated_storage(store):
 
 
 @pytest.mark.asyncio
+async def test_document_budget_schema_fences_real_missing_ledger_and_migration(store):
+    import importlib.util
+    from pathlib import Path
+    from sqlalchemy import text
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from app.services.source_access_schema import require_document_budget_schema
+    async with store() as db:
+        await require_document_budget_schema(db)
+        # This fixture has a fresh, disposable PostgreSQL database. Preserve
+        # its original table while exercising the actual production migration.
+        await db.execute(text("ALTER TABLE scrape_agent_spend RENAME TO test_saved_spend"))
+        with pytest.raises(RuntimeError):
+            await require_document_budget_schema(db)
+        path = Path(__file__).parents[1] / "alembic/versions/395_document_spend_ledger.py"
+        spec = importlib.util.spec_from_file_location("budget_migration", path)
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        connection = await db.connection()
+        def upgrade(sync):
+            migration.op = Operations(MigrationContext.configure(sync))
+            migration.upgrade()
+        await connection.run_sync(upgrade)
+        await require_document_budget_schema(db)
+        await connection.run_sync(upgrade)
+        await require_document_budget_schema(db)
+        with pytest.raises(RuntimeError, match="financial audit"):
+            migration.downgrade()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("home", [HOME, "https://second.example.edu"])
 async def test_registered_official_pdf_alternative_full_approval_flow(store, monkeypatch, home):
     import json

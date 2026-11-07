@@ -414,13 +414,21 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
         body: JSON.stringify({ filename: file.name, size: file.size, contentType: "application/pdf" }),
       });
       if (!res.ok) throw new Error(await errorFor(res));
-      const grant = await readResponseJson<{ uploadUrl: string; fields: Record<string, string>; documentToken: string }>(res);
-      if (!grant?.uploadUrl || !grant.documentToken) throw new Error("Upload could not be prepared.");
+      const grant = await readResponseJson<{ transport?: string; uploadUrl?: string; fields?: Record<string, string>; documentToken: string }>(res);
+      if (!grant?.documentToken || (grant.transport !== "portal" && !grant.uploadUrl)) throw new Error("Upload could not be prepared.");
       if (!current()) return;
-      const form = new FormData();
-      Object.entries(grant.fields ?? {}).forEach(([k, v]) => form.append(k, String(v)));
-      form.append("file", file);
-      const up = await fetch(grant.uploadUrl, { method: "POST", body: form });
+      let up: Response;
+      if (grant.transport === "portal") {
+        up = await fetch(`${base}/documents/content`, {
+          method: "POST", credentials: "include", body: file,
+          headers: { "Content-Type": "application/pdf", "X-Document-Token": grant.documentToken },
+        });
+      } else {
+        const form = new FormData();
+        Object.entries(grant.fields ?? {}).forEach(([k, v]) => form.append(k, String(v)));
+        form.append("file", file);
+        up = await fetch(grant.uploadUrl!, { method: "POST", body: form });
+      }
       if (!up.ok) throw new Error(`Document upload failed (${up.status}).`);
       if (!current()) return;
       setAttachState({ ...baseAtt, status: "ready", token: grant.documentToken, error: null });

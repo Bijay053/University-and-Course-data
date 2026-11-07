@@ -35,7 +35,7 @@ def verify(token, actor_id, job_id):
         raise ValueError("Document attachment expired or belongs to another user/review. Upload it again.") from exc
 
 
-async def request_upload(actor_id, job_id, filename, size, content_type):
+async def request_upload(actor_id, job_id, filename, size, content_type, *, direct=False):
     if not filename.lower().endswith(".pdf") or content_type != "application/pdf":
         raise ValueError("Upload a PDF document.")
     if not 0 < size <= MAX_BYTES:
@@ -45,6 +45,10 @@ async def request_upload(actor_id, job_id, filename, size, content_type):
     key = f"assistant-documents/{actor_id}/{job_id}/{uuid.uuid4().hex}.pdf"
     data = dict(key=key, actor=actor_id, job=job_id, filename=filename[:180],
                 size=size, expires=time.time() + 3600)
+    if not direct:
+        # Same-origin authenticated transport requires no browser access to S3.
+        # The bucket, object permissions and existing private read path stay unchanged.
+        return {"transport": "portal", "documentToken": sign(data)}
     def generate():
         client = snapshot_store._make_client()
         try:
@@ -58,6 +62,29 @@ async def request_upload(actor_id, job_id, filename, size, content_type):
             client.close()
     upload = await asyncio.to_thread(generate)
     return {"uploadUrl": upload["url"], "fields": upload["fields"], "documentToken": sign(data)}
+
+
+async def store_uploaded(token, actor_id, job_id, raw):
+    data = verify(token, actor_id, job_id)
+    if not isinstance(raw, bytes) or len(raw) != data["size"] or not 0 < len(raw) <= MAX_BYTES:
+        raise ValueError("Uploaded file size does not match the prepared attachment.")
+    if not raw.lstrip().startswith(b"%PDF-"):
+        raise ValueError("Upload a valid PDF document.")
+    if not snapshot_store.is_enabled():
+        raise ValueError("Private document storage is unavailable.")
+    def upload():
+        client = snapshot_store._make_client()
+        try:
+            # A grant is write-once: retries cannot replace bytes that were
+            # already read, matched or included in an approval preview.
+            client.put_object(
+                Bucket=snapshot_store._bucket(), Key=data["key"], Body=raw,
+                ContentType="application/pdf", IfNoneMatch="*",
+            )
+        finally:
+            client.close()
+    await asyncio.to_thread(upload)
+    return {"uploaded": True}
 
 
 async def read_uploaded(token, actor_id, job_id):

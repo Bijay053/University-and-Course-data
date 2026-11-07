@@ -1184,3 +1184,43 @@ export const UploadCoursesResponse = zod.object({
   updated: zod.number(),
   errors: zod.array(zod.string()),
 });
+
+/**
+ * @summary Prepare an actor- and review-bound private PDF attachment
+ */
+export const PrepareAssistantDocumentUploadParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const prepareAssistantDocumentUploadBodyFilenameMax = 180;
+
+export const prepareAssistantDocumentUploadBodySizeMax = 2000000;
+
+export const PrepareAssistantDocumentUploadBody = zod.object({
+  filename: zod
+    .string()
+    .min(1)
+    .max(prepareAssistantDocumentUploadBodyFilenameMax),
+  size: zod.number().min(1).max(prepareAssistantDocumentUploadBodySizeMax),
+  contentType: zod.enum(["application/pdf"]),
+});
+
+export const PrepareAssistantDocumentUploadResponse = zod.object({
+  transport: zod.enum(["portal"]),
+  documentToken: zod.string(),
+});
+
+/**
+ * @summary Store a PDF privately through the authenticated same-origin portal
+ */
+export const UploadAssistantDocumentContentParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const uploadAssistantDocumentContentHeaderXDocumentTokenMax = 4000;
+
+export const UploadAssistantDocumentContentHeader = zod.object({
+  "X-Document-Token": zod
+    .string()
+    .max(uploadAssistantDocumentContentHeaderXDocumentTokenMax),
+});

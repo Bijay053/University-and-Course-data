@@ -1,5 +1,27 @@
 # University document access: operational handoff
 
+## Private upload transport
+
+The default upload transport is the authenticated, same-origin portal API, not
+a cross-origin browser POST to S3. It uses the existing private bucket and
+existing object permissions. Bucket CORS administration is not required.
+
+Prepare an attachment at
+`POST /api/scrape/jobs/{job}/assistant/documents/upload-url`, then send the raw
+PDF to `POST /api/scrape/jobs/{job}/assistant/documents/content` with the session
+cookie, `Content-Type: application/pdf` and the `X-Document-Token` grant header.
+The header does not replace authentication. Grants bind staff actor, review,
+declared size and expiry. The stream is limited to 2 MB. Writes are conditional,
+so a reused grant cannot overwrite bytes already read or included in a preview.
+No public ACL is created and storage errors are sanitised.
+
+The legacy presigned form transport is retained for compatibility. Its optional
+CORS configuration must not block portal uploads.
+
+Enable `ASSISTANT_DOCUMENT_UPLOADS_ENABLED` only after a real private
+write/read/PDF-parse/delete canary succeeds. Verify the signed-in interface
+separately: service tests do not establish browser acceptance.
+
 ## Status and permission boundary
 
 The PDF matcher foundation was verified in production release

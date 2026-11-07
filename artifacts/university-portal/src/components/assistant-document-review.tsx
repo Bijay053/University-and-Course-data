@@ -12,8 +12,28 @@ const STATUS_TONE: Record<string, string> = {
   unmatched: "bg-slate-200 text-slate-700",
 };
 
+function savedAccessError(review: DocumentReview, rows: DocumentReviewRow[]): DocumentReview["accessError"] {
+  if (review.accessError) return review.accessError;
+  // Older stored replies predate document-level errors. Adapt their display,
+  // without rewriting the original evidence or treating a course mismatch as
+  // an access failure.
+  if (review.checked || review.proposed || !rows.length) return undefined;
+  const reason = rows[0].reason?.trim();
+  if (!reason || !/robots\.txt|cloudflare|source access|official (?:pdf|page) unavailable|document (?:unavailable|could not be read)/i.test(reason)) return undefined;
+  if (!rows.every(r => r.status === "not_checked" && r.reason?.trim() === reason)) return undefined;
+  return {
+    message: reason,
+    alternatives: [
+      "Upload an authorised copy when private document uploads are enabled.",
+      "Provide a permitted official alternative or request university authorisation.",
+    ],
+  };
+}
+
 export function DocumentReviewView({ review, testId }: { review: DocumentReview; testId: string }) {
   const rows = Array.isArray(review.rows) ? review.rows.filter(r => r && (typeof r.id === "string" || Number.isSafeInteger(r.id))) : [];
+  const accessError = savedAccessError(review, rows);
+  const notChecked = Number(review.notChecked) || (accessError ? rows.length : 0);
   const matched = rows.filter(r => r.applicability === "verified").length;
   const unchanged = rows.filter(r => r.status === "unchanged").length;
   const manual = rows.filter(r => ["unmatched", "unverified", "conflict", "excluded", "not_checked"].includes(r.status)).length;
@@ -23,21 +43,21 @@ export function DocumentReviewView({ review, testId }: { review: DocumentReview;
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Document review</p>
         <span className="font-mono tabular-nums text-slate-700" data-testid={`${testId}-counts`}>
           {Number(review.checked) || 0} checked · {Number(review.proposed) || 0} proposed · {Number(review.unmatched) || 0} unmatched
-          {!!review.notChecked && <> · {review.notChecked} not checked</>}
+          {!!notChecked && <> · {notChecked} not checked</>}
         </span>
       </div>
-      {review.accessError ? (
+      {accessError ? (
         <div role="alert" className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-950">
           <p className="font-semibold">Document could not be read</p>
-          <p>{review.accessError.message}</p>
-          <p className="mt-1">No course changes were made. {review.notChecked || 0} selected records were not checked.</p>
-          <ul className="mt-1 list-disc pl-4">{review.accessError.alternatives?.map((option, i) => <li key={i}>{option}</li>)}</ul>
+          <p>{accessError.message}</p>
+          <p className="mt-1">No course changes were made. {notChecked} selected records were not checked.</p>
+          <ul className="mt-1 list-disc pl-4">{accessError.alternatives?.map((option, i) => <li key={i}>{option}</li>)}</ul>
         </div>
       ) : <p className="mt-1 text-[12px] text-slate-600">
         {matched} matched · {unchanged} unchanged · {manual} skipped / manual review.
         {" "}This is a preview, not an update receipt. Apply the proposed changes after reviewing the evidence.
       </p>}
-      {review.accessError ? (
+      {accessError ? (
         <details className="mt-2 text-[12px] text-slate-600">
           <summary>Selected records not checked ({rows.length})</summary>
           <ul className="mt-1">{rows.map(r => <li key={r.id}>{r.name} · not checked</li>)}</ul>

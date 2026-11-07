@@ -44,6 +44,33 @@ it("shows one access failure instead of repeating it for every selected course",
 });
 
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
+
+it("collapses saved pre-release access failures without rewriting their rows", () => {
+  const review = {
+    checked: 0, proposed: 0, unmatched: 0,
+    rows: Array.from({ length: 227 }, (_, id) => ({
+      id, name: `Course ${id}`, status: "not_checked",
+      reason: "robots.txt could not be verified (HTTP 403); source access stopped without bypassing protection.",
+      applicability: "unverified",
+    })),
+  };
+  const original = JSON.stringify(review);
+  render(<DocumentReviewView testId="saved-review" review={review} />);
+  expect(screen.getAllByRole("alert")).toHaveLength(1);
+  expect(screen.getAllByText(/robots.txt could not be verified/)).toHaveLength(1);
+  expect(screen.getByText(/227 selected records were not checked/)).toBeTruthy();
+  expect(screen.queryByText(/Applicability: unverified/)).toBeNull();
+  expect(JSON.stringify(review)).toBe(original);
+});
+
+it("does not collapse course applicability problems as document access errors", () => {
+  render(<DocumentReviewView testId="unmatched-review" review={{
+    checked: 0, proposed: 0, unmatched: 1,
+    rows: [{ id: 1, name: "Nursing", status: "not_checked", reason: "Course applicability is unverified." }],
+  }} />);
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByText("Course applicability is unverified.")).toBeTruthy();
+});
 const empty: AssistantThread = { threadId: null, status: "idle", phase: "", error: null, messages: [] };
 const pdf = (size = 10) => new File([new Uint8Array(size)], "fees.pdf", { type: "application/pdf" });
 const grant = { uploadUrl: "https://bucket.s3.test/", fields: { key: "k1", policy: "p" }, documentToken: "tok-1" };
@@ -64,6 +91,24 @@ async function setup(postResult: () => Response) {
 }
 
 describe("document upload", () => {
+  it("uploads through the authenticated portal without cross-origin S3 requests", async () => {
+    const { fetchMock } = await setup(() => json({ ...empty, status: "ready" }));
+    const original = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((url, init) => {
+      if (String(url).endsWith("/documents/upload-url")) return Promise.resolve(json({ transport: "portal", documentToken: "tok-portal" }));
+      if (String(url).endsWith("/documents/content")) return Promise.resolve(json({ uploaded: true }, 201));
+      return original(url, init);
+    });
+    fireEvent.change(screen.getByTestId("input-assistant-document"), { target: { files: [pdf()] } });
+    await waitFor(() => expect(screen.getByTestId("assistant-attachment").dataset.status).toBe("ready"));
+    const upload = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/documents/content"))!;
+    expect(upload[0]).toBe("/api/scrape/jobs/j1/assistant/documents/content");
+    expect(upload[1]?.credentials).toBe("include");
+    expect(upload[1]?.body).toBeInstanceOf(File);
+    expect(upload[1]?.headers).toEqual({ "Content-Type": "application/pdf", "X-Document-Token": "tok-portal" });
+    expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith("https://bucket"))).toBe(false);
+  });
+
   it("uploads directly to S3, sends only the token and clears on success", async () => {
     const { fetchMock, input } = await setup(() => json({ ...empty, status: "ready" }));
     fireEvent.change(screen.getByTestId("input-assistant-document"), { target: { files: [pdf()] } });

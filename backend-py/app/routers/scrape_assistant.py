@@ -6,7 +6,7 @@ from datetime import timedelta
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -85,12 +85,45 @@ async def document_upload(job_id: str, body: DocumentUploadBody, db: Database, a
     await owned_thread(job_id, actor, db)
     from app.config import settings
     if not settings.assistant_document_uploads_enabled:
-        raise HTTPException(503, "Document uploads are awaiting private-storage browser access configuration. Link-based checks and staff-provided edits remain available.")
+        raise HTTPException(503, "Private storage uploads are not enabled. Link-based checks and staff-provided edits remain available.")
     from app.services.assistant_documents import request_upload
     try:
         return await request_upload(int(actor["id"]), job_id, body.filename, body.size, body.contentType)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+@router.post("/jobs/{job_id}/assistant/documents/content", status_code=201)
+async def document_content(job_id: str, request: Request, db: Database, actor: Actor):
+    await owned_thread(job_id, actor, db)
+    from app.config import settings
+    from app.services.assistant_documents import MAX_BYTES, verify, store_uploaded
+    if not settings.assistant_document_uploads_enabled:
+        raise HTTPException(503, "Private document uploads are not enabled.")
+    token = request.headers.get("x-document-token", "")
+    if len(token) > 4000:
+        raise HTTPException(422, "Invalid document attachment.")
+    try:
+        data = verify(token, int(actor["id"]), job_id)
+        if request.headers.get("content-type", "").split(";")[0].lower() != "application/pdf":
+            raise ValueError("Upload a PDF document.")
+        length = request.headers.get("content-length")
+        if length is not None and int(length) != data["size"]:
+            raise ValueError("Uploaded file size does not match the prepared attachment.")
+        chunks, size = [], 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > MAX_BYTES or size > data["size"]:
+                raise HTTPException(413, "PDF exceeds the prepared attachment size.")
+            chunks.append(chunk)
+        return await store_uploaded(token, int(actor["id"]), job_id, b"".join(chunks))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception:
+        # Never return storage exception text, signed credentials or object keys.
+        raise HTTPException(503, "Private document storage could not save this attachment. Prepare a new upload and retry.") from None
 
 
 from app.services.scrape_agent_v2.access import enabled_for

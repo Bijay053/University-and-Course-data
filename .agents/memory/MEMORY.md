@@ -149,3 +149,4 @@
 - [Selected retry safety](selective-retry-safety.md) — reserve uncertain attempts; require current source and parser proof; terminal worker status is not verified recovery.
 - [Long validation runs](long-validation-runs.md) — large suites can outlast automatic polling; retain terminal results and never count partial progress as a pass.
 - [English guidance applicability](english-guidance-applicability.md) — readable general guidance is not course authority; preserve exceptions, conflicts and unchecked rows.
+- [Private upload transport](private-upload-transport.md) — use the authenticated portal; S3 CORS administration is not a prerequisite for private document uploads.

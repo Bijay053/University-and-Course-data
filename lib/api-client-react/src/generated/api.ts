@@ -43,6 +43,8 @@ import type {
   ListScrapingChangesParams,
   ListStagedCoursesParams,
   ListUniversitiesParams,
+  PrepareAssistantDocumentUpload200,
+  PrepareAssistantDocumentUploadBody,
   QualificationRefreshInput,
   QualificationRefreshPreview,
   QualificationRefreshResult,
@@ -58,6 +60,7 @@ import type {
   UpcomingIntake,
   UpdateCourseBody,
   UpdateUniversityBody,
+  UploadAssistantDocumentContent201,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -4305,4 +4308,185 @@ export const useUploadCourses = <
   TContext
 > => {
   return useMutation(getUploadCoursesMutationOptions(options));
+};
+
+/**
+ * @summary Prepare an actor- and review-bound private PDF attachment
+ */
+export const getPrepareAssistantDocumentUploadUrl = (jobId: string) => {
+  return `/api/scrape/jobs/${jobId}/assistant/documents/upload-url`;
+};
+
+export const prepareAssistantDocumentUpload = async (
+  jobId: string,
+  prepareAssistantDocumentUploadBody: PrepareAssistantDocumentUploadBody,
+  options?: RequestInit,
+): Promise<PrepareAssistantDocumentUpload200> => {
+  return customFetch<PrepareAssistantDocumentUpload200>(
+    getPrepareAssistantDocumentUploadUrl(jobId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(prepareAssistantDocumentUploadBody),
+    },
+  );
+};
+
+export const getPrepareAssistantDocumentUploadMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareAssistantDocumentUpload>>,
+    TError,
+    { jobId: string; data: BodyType<PrepareAssistantDocumentUploadBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof prepareAssistantDocumentUpload>>,
+  TError,
+  { jobId: string; data: BodyType<PrepareAssistantDocumentUploadBody> },
+  TContext
+> => {
+  const mutationKey = ["prepareAssistantDocumentUpload"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof prepareAssistantDocumentUpload>>,
+    { jobId: string; data: BodyType<PrepareAssistantDocumentUploadBody> }
+  > = (props) => {
+    const { jobId, data } = props ?? {};
+
+    return prepareAssistantDocumentUpload(jobId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PrepareAssistantDocumentUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof prepareAssistantDocumentUpload>>
+>;
+export type PrepareAssistantDocumentUploadMutationBody =
+  BodyType<PrepareAssistantDocumentUploadBody>;
+export type PrepareAssistantDocumentUploadMutationError = ErrorType<void>;
+
+/**
+ * @summary Prepare an actor- and review-bound private PDF attachment
+ */
+export const usePrepareAssistantDocumentUpload = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareAssistantDocumentUpload>>,
+    TError,
+    { jobId: string; data: BodyType<PrepareAssistantDocumentUploadBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof prepareAssistantDocumentUpload>>,
+  TError,
+  { jobId: string; data: BodyType<PrepareAssistantDocumentUploadBody> },
+  TContext
+> => {
+  return useMutation(getPrepareAssistantDocumentUploadMutationOptions(options));
+};
+
+/**
+ * @summary Store a PDF privately through the authenticated same-origin portal
+ */
+export const getUploadAssistantDocumentContentUrl = (jobId: string) => {
+  return `/api/scrape/jobs/${jobId}/assistant/documents/content`;
+};
+
+export const uploadAssistantDocumentContent = async (
+  jobId: string,
+  uploadAssistantDocumentContentBody: Blob,
+  options?: RequestInit,
+): Promise<UploadAssistantDocumentContent201> => {
+  return customFetch<UploadAssistantDocumentContent201>(
+    getUploadAssistantDocumentContentUrl(jobId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/pdf", ...options?.headers },
+      body: JSON.stringify(uploadAssistantDocumentContentBody),
+    },
+  );
+};
+
+export const getUploadAssistantDocumentContentMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadAssistantDocumentContent>>,
+    TError,
+    { jobId: string; data: BodyType<Blob> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadAssistantDocumentContent>>,
+  TError,
+  { jobId: string; data: BodyType<Blob> },
+  TContext
+> => {
+  const mutationKey = ["uploadAssistantDocumentContent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadAssistantDocumentContent>>,
+    { jobId: string; data: BodyType<Blob> }
+  > = (props) => {
+    const { jobId, data } = props ?? {};
+
+    return uploadAssistantDocumentContent(jobId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UploadAssistantDocumentContentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadAssistantDocumentContent>>
+>;
+export type UploadAssistantDocumentContentMutationBody = BodyType<Blob>;
+export type UploadAssistantDocumentContentMutationError = ErrorType<void>;
+
+/**
+ * @summary Store a PDF privately through the authenticated same-origin portal
+ */
+export const useUploadAssistantDocumentContent = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadAssistantDocumentContent>>,
+    TError,
+    { jobId: string; data: BodyType<Blob> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof uploadAssistantDocumentContent>>,
+  TError,
+  { jobId: string; data: BodyType<Blob> },
+  TContext
+> => {
+  return useMutation(getUploadAssistantDocumentContentMutationOptions(options));
 };
