@@ -4,6 +4,12 @@
 # Discovery: Seeded search results to BFS discovery
 # Notes: Heavily blocked marketing/stories to prevent scraping alumni profiles.
 
+research:
+  # Unverified research candidates, not per-course English requirements.
+  english_guidance_urls:
+    - https://www.lsbu.ac.uk/__data/assets/pdf_file/0019/9280/english-language-qualifications-general.pdf
+    - https://www.lsbu.ac.uk/_media_old/pdf/guidelines/Eng-lang-requirements.pdf.pdf
+
 locked_config_paths:
   - discovery.generic_search_api
   - discovery.use_wayback

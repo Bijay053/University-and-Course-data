@@ -73,7 +73,7 @@ async def inspect_pdf(raw: bytes, url: str) -> dict:
     return {
         "url": url, "title": urlsplit(url).path.rsplit("/", 1)[-1] or "Official PDF guidance",
         "sourceType": "pdf", "verified": True, "text": text[:24000], "_fullText": text,
-        "facts": [], "excerpts": excerpts, "englishLinks": [],
+        "facts": [], "excerpts": excerpts, "englishLinks": [], "_pages": document["pages"],
         "pageCount": document["pageCount"], "pagesRead": len(document["pages"]),
         "unreadablePages": document["unreadablePages"], "nonTuition": non_tuition,
         "note": (

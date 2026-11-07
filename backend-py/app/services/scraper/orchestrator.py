@@ -1707,6 +1707,21 @@ async def _extract_only(
     # extract_course() so generated CSS/XPath/regex rules run before regex
     # heuristics and before per-course Gemini, reducing per-course AI cost.
     try:
+        from app.services.scraper import result_reuse
+        scope = result_reuse.current_scope(
+            country=country, title=name, central=central_data,
+            pdf=uni_pdf_data, rules=extraction_rules, ai_provider=ai_provider,
+        )
+        source = None
+
+        async def current_source(source_url, source_html):
+            nonlocal source
+            from app.services.scraper.snapshot_context import is_current_source
+            if not is_current_source(source_url, source_html):
+                return None
+            source = (source_url, source_html)
+            return await result_reuse.lookup(source_url, source_html, scope)
+
         async def fresh_extraction():
             return await extract_course(
             url,
@@ -1722,18 +1737,21 @@ async def _extract_only(
             **({"html": link.get("_uel_html") or link.get("_surrey_html")}
                if link.get("_uel_html") or link.get("_surrey_html") else {}),
             **({"_uel_skip_preflight": True} if link.get("_uel_skip_preflight") else {}),
+            **({"_current_source": current_source}
+               if not (link.get("_uel_html") or link.get("_surrey_html")) else {}),
         )
         current_html = link.get("_uel_html") or link.get("_surrey_html")
         if current_html:
-            from app.services.scraper.result_reuse import current_scope, reuse
-            scope = current_scope(country=country, title=name, central=central_data,
-                pdf=uni_pdf_data, rules=extraction_rules, ai_provider=ai_provider)
-            out = await reuse(url, current_html, scope, fresh_extraction)
-            if out.get("_result_cache_hit") and emit:
-                await emit("status", "Reused matching current-source extraction evidence",
-                           kind="selective_retry_cache_hit", url=url)
+            out = await result_reuse.reuse(url, current_html, scope, fresh_extraction)
         else:
-            out = await fresh_extraction()
+            from app.services.scraper.snapshot_context import current_source_scope
+            with current_source_scope():
+                out = await fresh_extraction()
+            if source is not None and not out.get("_result_cache_hit"):
+                await result_reuse.remember(*source, scope, out)
+        if out.get("_result_cache_hit") and emit:
+            await emit("status", "Reused matching current-source extraction evidence",
+                       kind="selective_retry_cache_hit", url=url)
     except WorkerOwnershipLost:
         raise
     except ScrapedoAccountError:

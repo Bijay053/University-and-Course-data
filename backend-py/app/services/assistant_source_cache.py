@@ -28,7 +28,7 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                     checked_at = result.get("_sourceCheckedAt")
                     age = wall_time() - checked_at if isinstance(checked_at, (int, float)) else None
                     reusable_failure = (
-                        result.get("accessIssue") in ACCESS_ISSUES
+                        not result.get("verified")
                         and age is not None and 0 <= age < FAILURE_REUSE_SECONDS
                     )
                     if result.get("verified") or reusable_failure:
@@ -43,7 +43,7 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                     # An expired latest failure cannot revive an older success.
                     break
     result = await asyncio.wait_for(inspect(url, home), timeout=timeout)
-    if result.get("verified") or result.get("accessIssue") in ACCESS_ISSUES:
+    if isinstance(result.get("verified"), bool):
         async with service.AsyncSessionLocal() as db:
             thread = (await db.execute(select(ScrapeAssistantThread).where(
                 ScrapeAssistantThread.id == thread_id, ScrapeAssistantThread.turn_id == turn_id,

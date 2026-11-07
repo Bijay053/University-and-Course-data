@@ -2731,6 +2731,7 @@ async def extract_course(
     discovery_title: str = "",
     ai_provider: str = "gemini",
     _uel_skip_preflight: bool = False,
+    _current_source=None,
 ) -> dict[str, Any]:
     """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence.
 
@@ -3667,6 +3668,10 @@ async def extract_course(
             "evidence": [],
         }
 
+    # Retain the transport's exact bytes, before option scoping or compaction.
+    # A cache miss continues this invocation; it must never refetch the page.
+    _transport_html = html
+
     # Browser/JSON sources can contain UTF-16 surrogate code units. Preserve
     # valid pairs and replace lone units before downstream UTF-8 parsers.
     from app.services.scraper.unicode_text import scalar_text
@@ -3683,6 +3688,20 @@ async def extract_course(
             "UEL recovered page has multiple course routes; run catalogue "
             "discovery or select a uel_variant URL"
         )
+
+    if (
+        _current_source is not None
+        and not _secondary_html
+        and not _latrobe_prefetched_doc
+        and not _http_404_bare_retry
+    ):
+        from app.services.scraper.challenge_shell import is_challenge_shell
+        # Browser fallbacks can return a truthy challenge. It is not current
+        # course-source proof, even if a previous result exists for this URL.
+        if not is_challenge_shell(_transport_html):
+            cached = await _current_source(url, _transport_html)
+            if cached is not None:
+                return cached
 
     from app.services.scraper.extractors.hsu_facts import is_hsu_course as _is_hsu_course
     _hsu_source_html = html if _is_hsu_course(url) else None

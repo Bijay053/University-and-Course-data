@@ -92,10 +92,11 @@ async def ensure_schema(db):
     await db.execute(text("CREATE INDEX IF NOT EXISTS ix_scrape_result_cache_expiry ON scrape_extraction_result_cache(expires_at)"))
 
 
-async def reuse(url, html, scope, extract, *, session_factory=None):
+async def lookup(url, html, scope, *, session_factory=None):
+    """Look up proof against bytes obtained by the normal transport."""
     key = cache_key(url, html, scope)
     if key is None:
-        return await extract()
+        return None
     if session_factory is None:
         from app.database import AsyncSessionLocal
         session_factory = AsyncSessionLocal
@@ -114,7 +115,16 @@ async def reuse(url, html, scope, extract, *, session_factory=None):
         raise
     except Exception:
         log.warning("Course result cache unavailable; performing fresh extraction for %s", url, exc_info=True)
-    result = await extract()
+    return None
+
+
+async def remember(url, html, scope, result, *, session_factory=None):
+    key = cache_key(url, html, scope)
+    if key is None:
+        return
+    if session_factory is None:
+        from app.database import AsyncSessionLocal
+        session_factory = AsyncSessionLocal
     if authoritative(result, url, html):
         envelope = {"scope": scope, "source": fingerprint(html), "result": result,
                     "checksum": fingerprint(result)}
@@ -136,6 +146,14 @@ async def reuse(url, html, scope, extract, *, session_factory=None):
                 raise
             except Exception:
                 log.warning("Course result cache write failed for %s; fresh result retained", url, exc_info=True)
+
+
+async def reuse(url, html, scope, extract, *, session_factory=None):
+    hit = await lookup(url, html, scope, session_factory=session_factory)
+    if hit is not None:
+        return hit
+    result = await extract()
+    await remember(url, html, scope, result, session_factory=session_factory)
     return result
 
 

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 # ── Discovery ───────────────────────────────────────────────────────────────
@@ -3787,6 +3787,13 @@ class ExtractionConfig(BaseModel):
 
 # ── Merged UniConfig ─────────────────────────────────────────────────────────
 
+class ResearchGuidanceConfig(BaseModel):
+    """Research candidates only, never extracted values or course authority."""
+
+    model_config = ConfigDict(extra="forbid")
+    english_guidance_urls: List[str] = Field(default_factory=list, max_length=2)
+
+
 class UniConfig(BaseModel):
     """Fully-merged per-university configuration (defaults → per-uni YAML → DB overrides).
 
@@ -3804,6 +3811,20 @@ class UniConfig(BaseModel):
 
     discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
     extraction: ExtractionConfig = Field(default_factory=ExtractionConfig)
+    research: ResearchGuidanceConfig = Field(default_factory=ResearchGuidanceConfig)
+
+    @model_validator(mode="after")
+    def validate_research_ownership(self):
+        from app.services.scrape_assistant_tools import official_url
+        seen = set()
+        for url in self.research.english_guidance_urls:
+            if any(char.isspace() or ord(char) < 32 for char in url):
+                raise ValueError("Research guidance URLs must not contain whitespace.")
+            checked = official_url(url, self.scrape_url)
+            if checked != url or checked in seen:
+                raise ValueError("Research guidance must use unique exact URLs without fragments.")
+            seen.add(checked)
+        return self
 
     def for_tier3_replay(self) -> "UniConfig":
         """Return a config containing ONLY the discovery section.

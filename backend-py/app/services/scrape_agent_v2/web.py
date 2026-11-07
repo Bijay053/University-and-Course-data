@@ -79,11 +79,14 @@ async def web_tool(tools,name,args):
             cache.update(message.get("_agentV2Pages",{}))
     cached=cache.get(key)
     if reusable_page(cached):
-        result={**cached,"cached":True}
+        from app.services.assistant_official_sources import mark_configured_guidance
+        result=mark_configured_guidance({**cached,"cached":True}, tools.ctx["home"], tools.ctx.get("config"))
         if not result.get("verified"):
             from app.services.assistant_official_sources import english_guidance_alternatives
             result["officialAlternatives"] = english_guidance_alternatives(
-                tools.ctx["home"], "", [result],
+                tools.ctx["home"], "", [result, *(
+                    page for page in cache.values() if reusable_page(page)
+                )], tools.ctx.get("config"),
             )
         if name=="search_site":
             result["matches"]=[line for line in result.get("text","").split(". ") if args["query"].casefold() in line.casefold()][:20]
@@ -138,10 +141,14 @@ async def web_tool(tools,name,args):
         )
         if isinstance(exc, SourceReadError) and exc.http_status is not None:
             result["httpStatus"] = exc.http_status
+    from app.services.assistant_official_sources import mark_configured_guidance
+    result = mark_configured_guidance(result, tools.ctx["home"], tools.ctx.get("config"))
     if not result.get("verified"):
         from app.services.assistant_official_sources import english_guidance_alternatives
         result["officialAlternatives"] = english_guidance_alternatives(
-            tools.ctx["home"], "", [result],
+            tools.ctx["home"], "", [result, *(
+                page for page in cache.values() if reusable_page(page)
+            )], tools.ctx.get("config"),
         )
         result["alternativesNote"] = "Unverified candidates only; fetch each through the same robots-fenced tools."
     result["checkedAt"]=datetime.now(timezone.utc).isoformat()

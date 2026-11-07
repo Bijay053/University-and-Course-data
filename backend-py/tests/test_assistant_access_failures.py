@@ -75,14 +75,20 @@ async def test_robots_403_stops_before_course_request(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_followup_reuses_failure_and_fragment_does_not_trigger_fetch(monkeypatch):
+@pytest.mark.parametrize("failure", [
+    denied(),
+    {"url": URL, "verified": False, "error": "Missing document", "httpStatus": 404,
+     "failureStage": "source_http"},
+    {"url": URL, "verified": False, "error": "Document could not be parsed"},
+])
+async def test_followup_reuses_failure_and_fragment_does_not_trigger_fetch(monkeypatch, failure):
     store = Store()
     service = SimpleNamespace(AsyncSessionLocal=store)
     calls = []
 
     async def inspect(url, home):
         calls.append(url)
-        return denied()
+        return deepcopy(failure)
 
     monkeypatch.setattr(cache, "wall_time", lambda: 1000)
     args = (service, "thread", "turn", "owner", URL, HOME, inspect, 1)
@@ -97,7 +103,7 @@ async def test_followup_reuses_failure_and_fragment_does_not_trigger_fetch(monke
     # Returned values cannot mutate the saved, private evidence.
     result["error"] = "changed by caller"
     again = await cache.cached_source(*args)
-    assert again["error"] == denied()["error"]
+    assert again["error"] == failure["error"]
 
 
 @pytest.mark.asyncio

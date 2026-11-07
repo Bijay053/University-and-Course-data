@@ -580,7 +580,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                 }
         await record_activity(thread_id, turn_id, run_id, event(
             "Source access verification failed" if result.get("failureStage") == "robots" else
-            ("Saved official source reused" if result.get("verified") else "Recent access restriction reused")
+            ("Saved official source reused" if result.get("verified") else "Recent failed source check reused")
             if result.get("_sourceCacheHit") else
             ("Official PDF checked" if result.get("verified") else "Official PDF unavailable")
             if result.get("sourceType") == "pdf" else
@@ -593,7 +593,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             ) if result.get("verified") else source_check_detail(result),
             duration_ms=(time.monotonic() - started) * 1000,
         ))
-        return result
+        from app.services.assistant_official_sources import mark_configured_guidance
+        return mark_configured_guidance(result, ctx["home"], ctx.get("config"))
     async def catalogue_check():
         started = time.monotonic()
         identifier = uuid.uuid4().hex
@@ -621,7 +622,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
     findings = [task.result() for task in running]
     sources, catalogue = (findings[:-1], findings[-1]) if check_catalogue else (findings, None)
     from app.services.assistant_official_sources import english_guidance_alternatives
-    alternatives = english_guidance_alternatives(ctx["home"], prompt, sources)
+    alternatives = english_guidance_alternatives(ctx["home"], prompt, sources, ctx.get("config"))
     if alternatives:
         await record_activity(thread_id, turn_id, run_id, event(
             "Checking alternative official English guidance", status="running",
@@ -896,9 +897,10 @@ async def save_research_reply(thread_id, turn_id, run_id, reply, *, detail, phas
             return
         items = [dict(item) for item in thread.activity]
         finish_running(items)
-        access_failed = reply.get("sourceOutcome") == "access_verification_failed"
+        access_failed = reply.get("sourceOutcome") in {"access_verification_failed", "document_read_failed"}
         items.append(event(
-            "Source access blocked — no updates" if access_failed else "Answer ready",
+            ("Document unreadable — no updates" if reply.get("sourceOutcome") == "document_read_failed"
+             else "Source access blocked — no updates") if access_failed else "Answer ready",
             status="error" if access_failed else "completed", detail=detail,
         ))
         thread.activity = items[-40:]

@@ -1,6 +1,7 @@
 export type DocumentReviewChange = { field: string; oldValue?: unknown; newValue?: unknown; quote?: string; page?: number };
-export type DocumentReviewRow = { id: string; name: string; status: string; reason?: string; changes?: DocumentReviewChange[] };
-export type DocumentReview = { checked: number; proposed: number; unmatched: number; rows: DocumentReviewRow[] };
+export type DocumentReviewRow = { id: string | number; name: string; status: string; reason?: string; changes?: DocumentReviewChange[];
+  category?: string; applicability?: string; evidence?: { url?: string; quote: string; page?: number }[] };
+export type DocumentReview = { checked: number; proposed: number; unmatched: number; notChecked?: number; rows: DocumentReviewRow[] };
 
 const show = (v: unknown) => (v === null || v === undefined || v === "" ? "(blank)" : typeof v === "object" ? JSON.stringify(v) : String(v));
 const STATUS_TONE: Record<string, string> = {
@@ -11,13 +12,14 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export function DocumentReviewView({ review, testId }: { review: DocumentReview; testId: string }) {
-  const rows = Array.isArray(review.rows) ? review.rows.filter(r => r && typeof r.id === "string") : [];
+  const rows = Array.isArray(review.rows) ? review.rows.filter(r => r && (typeof r.id === "string" || Number.isSafeInteger(r.id))) : [];
   return (
     <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3" data-testid={testId}>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[12px]">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Document review</p>
         <span className="font-mono tabular-nums text-slate-700" data-testid={`${testId}-counts`}>
           {Number(review.checked) || 0} checked · {Number(review.proposed) || 0} proposed · {Number(review.unmatched) || 0} unmatched
+          {!!review.notChecked && <> · {review.notChecked} not checked</>}
         </span>
       </div>
       {rows.length === 0 ? (
@@ -31,6 +33,17 @@ export function DocumentReviewView({ review, testId }: { review: DocumentReview;
                 <span className={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10.5px] ${STATUS_TONE[r.status] ?? "bg-slate-100 text-slate-700"}`}>{String(r.status)}</span>
               </div>
               {r.reason && <p className="mt-0.5 text-[12px] text-slate-600">{String(r.reason)}</p>}
+              {r.applicability && <p className="mt-1 text-[12px] text-slate-600">
+                {r.category?.replace(/_/g, " ")} · Applicability: {r.applicability}
+              </p>}
+              {r.evidence?.map((e, index) => (
+                <blockquote key={index} className="mt-1 border-l-2 border-slate-200 pl-2 text-[12px] text-slate-600">
+                  <p className="whitespace-pre-wrap break-words">{e.quote}</p>
+                  {e.url && /^https:\/\//i.test(e.url) && <a href={e.url} target="_blank" rel="noopener noreferrer" className="break-all underline">
+                    {e.url}{e.page ? ` (page ${e.page})` : ""}
+                  </a>}
+                </blockquote>
+              ))}
               {!!r.changes?.length && (
                 <ul className="mt-1.5 space-y-1.5">
                   {r.changes.map((c, ci) => (

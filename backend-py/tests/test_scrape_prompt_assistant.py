@@ -9,6 +9,45 @@ import pytest
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("stage", ["robots", "pdf_parse"])
+async def test_unreadable_document_does_not_check_528_pending_rows(store, monkeypatch, stage):
+    from app.services import assistant_document_review
+    from app.services.scrape_agent_v2 import model
+    async with store() as db:
+        db.add_all([ScrapedCourse(
+            id=i, university_id=1, scrape_job_id="source", status="pending",
+            course_name=f"Course {i}", course_website=f"https://www.example.edu/course-{i}",
+        ) for i in range(2, 529)])
+        await db.commit()
+    requested = "https://www.example.edu/english.pdf"
+    inspected = []
+    async def blocked(url, home):
+        inspected.append(url)
+        return {"url": url, "verified": False, "sourceType": "pdf",
+                "failureStage": stage, "error": "Access verification failed" if stage == "robots" else "Malformed PDF"}
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("No model call is permitted without a readable document")
+    monkeypatch.setattr(assistant_document_review, "inspect_source", blocked)
+    monkeypatch.setattr(model, "complete", forbidden)
+    thread_id, turn_id = await prompt_thread(store, requested + "\nupdate each band ielts for all courses")
+    await service.investigate(thread_id, turn_id)
+    assert inspected == [requested]
+    async with store() as db:
+        result = await get_assistant("source", db, {"id": 1})
+        reply = result["messages"][-1]
+        report = reply["documentReview"]
+        assert {k: v for k, v in report.items() if k != "rows"} == {
+            "checked": 0, "proposed": 0, "unmatched": 0, "notChecked": 528,
+        }
+        assert len(report["rows"]) == 528
+        assert all(r["applicability"] == "unverified" and r["status"] == "not_checked" for r in report["rows"])
+        assert not reply["actions"] and reply["coursesUpdated"] == 0
+        assert reply["activity"][-1]["status"] == "error"
+        assert not any("Checking document against pending courses" in e["label"] for e in reply["activity"])
+        assert reply["sourceOutcome"] == ("access_verification_failed" if stage == "robots" else "document_read_failed")
+
+
+@pytest.mark.asyncio
 async def test_document_upload_is_disabled_until_storage_is_ready(store, monkeypatch):
     from app.config import settings
     from app.routers.scrape_assistant import document_upload, DocumentUploadBody
@@ -23,6 +62,64 @@ async def test_document_upload_is_disabled_until_storage_is_ready(store, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_english_applicability_report_scopes_and_fences_bulk_proposals(store, monkeypatch):
+    import json
+    from unittest.mock import AsyncMock
+    from app.services import assistant_document_review
+    from app.services.ai import openai_client
+    from app.services.scrape_agent_v2 import model
+    guidance = "All undergraduate courses require IELTS overall 6.5 with no component below 5.5."
+    async with store() as db:
+        first = await db.get(ScrapedCourse, 1)
+        first.course_name, first.degree_level = "Bachelor of Business 1", "Undergraduate"
+        first.course_website = "https://www.example.edu/course-1"
+        db.add_all([ScrapedCourse(
+            id=i, university_id=1, scrape_job_id="source" if i < 15 else "other-review",
+            status="approved" if i == 14 else "pending",
+            course_name="Bachelor of Nursing" if i == 12 else f"Bachelor of Business {i}",
+            degree_level="Undergraduate", ielts_overall=7 if i == 13 else None,
+            course_website=f"https://www.example.edu/course-{i}",
+        ) for i in range(2, 16)])
+        await db.commit()
+    seen = []
+    async def source(url, home):
+        seen.append(url)
+        if url.endswith(".pdf"):
+            return {"url": url, "verified": True, "sourceType": "pdf", "text": guidance,
+                    "_pages": [{"page": 2, "text": guidance}]}
+        number = int(url.rsplit("-", 1)[1])
+        name = "Bachelor of Nursing" if number == 12 else f"Bachelor of Business {number}"
+        return {"url": url, "verified": True, "text": f"{name} is an undergraduate course.", "facts": []}
+    async def complete(client, messages, *args, **kwargs):
+        data = json.loads(messages[-1]["content"])
+        return {"message": {"content": json.dumps({"rows": [{
+            "id": r["id"], "matched": True,
+            "applicability": {"guidanceQuote": guidance, "courseQuote": r["officialPage"], "page": 2},
+            "changes": [{"field": "ielts_overall", "newValue": 6.5, "quote": guidance, "page": 2}],
+        } for r in data["courses"]]})}}
+    monkeypatch.setattr(assistant_document_review, "inspect_source", source)
+    monkeypatch.setattr(model, "complete", complete)
+    monkeypatch.setattr(openai_client, "_client", lambda: SimpleNamespace(close=AsyncMock()))
+    thread_id, turn_id = await prompt_thread(store, "Check https://www.example.edu/english.pdf and update all courses")
+    await service.investigate(thread_id, turn_id)
+    async with store() as db:
+        result = await get_assistant("source", db, {"id": 1})
+        reply = result["messages"][-1]
+        report = reply["documentReview"]
+        assert len(report["rows"]) == 13
+        assert report["proposed"] == 11
+        by_id = {r["id"]: r for r in report["rows"]}
+        assert by_id[12]["applicability"] == "excluded"
+        assert by_id[13]["applicability"] == "conflict"
+        action = reply["actions"][0]
+        assert action["requiresConfirmation"] and action["courseCount"] == 11
+        assert by_id[1]["evidence"][0]["page"] == 2
+        assert (await db.get(ScrapedCourse, 1)).ielts_overall is None
+        assert (await db.get(ScrapedCourse, 13)).ielts_overall == 7
+    assert not any(url.endswith(("-14", "-15")) for url in seen)
+
+
+@pytest.mark.asyncio
 async def test_document_confirmation_persists_audit_and_rejects_stale_replay(store, monkeypatch):
     from app.services.assistant_document_review import apply
     from app.services import assistant_staff_edits
@@ -31,7 +128,7 @@ async def test_document_confirmation_persists_audit_and_rejects_stale_replay(sto
     monkeypatch.setattr(assistant_staff_edits, "permissions", lambda actor: None)
     async with store() as db:
         row = await db.get(ScrapedCourse, 1)
-        action = {"id": "doc-proof", "_turnId": "turn", "_source": "https://www.example.edu/english.pdf",
+        action = {"id": "doc-proof", "_turnId": "turn", "_applicabilityVersion": 1, "_source": "https://www.example.edu/english.pdf",
                   "_provenance": "official-document", "_targets": [{"id": 1, "version": service.row_version(row),
                     "changes": [{"field": "ielts_reading", "newValue": 5.5,
                                  "quote": "IELTS no component below 5.5", "page": 1}]}]}
@@ -205,19 +302,28 @@ async def test_prompt_persists_and_is_private_to_actor(store, monkeypatch):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("alternative_readable", [True, False])
 @pytest.mark.parametrize("update_requested", [True, False])
-async def test_lsbu_pdf_fallback_keeps_course_context_and_exact_source_urls(store, monkeypatch, alternative_readable, update_requested):
+@pytest.mark.parametrize("home", ["https://www.lsbu.ac.uk", "https://other.example.edu"])
+async def test_lsbu_pdf_fallback_keeps_course_context_and_exact_source_urls(store, monkeypatch, alternative_readable, update_requested, home):
     from app.services import assistant_document_review
     import json
-    from app.services.assistant_official_sources import LSBU_ENGLISH_SOURCES
+    from app.services.scraper.config.loader import load_uni_config
+    from app.services.scraper.config.schema import UniConfig
+    original = load_uni_config(slug="lsbu_2175", name="LSBU", scrape_url="https://www.lsbu.ac.uk",
+                               create_missing_stub=False, strict=True)
+    LSBU_ENGLISH_SOURCES = [url.replace("https://www.lsbu.ac.uk", home)
+                           for url in original.research.english_guidance_urls]
+    config = UniConfig(slug="test", name="Test", base_url=home, scrape_url=home,
+                       research={"english_guidance_urls": LSBU_ENGLISH_SOURCES})
     from app.tasks.scrape_assistant import research_scrape
     monkeypatch.setattr(research_scrape, "apply_async", lambda **kwargs: None)
     original_context = service.context
     async def context(job):
         result = await original_context(job)
-        result["home"] = "https://www.lsbu.ac.uk"
+        result["home"] = home
+        result["config"] = config
         return result
     monkeypatch.setattr(service, "context", context)
-    requested = "https://www.lsbu.ac.uk/_media_old/pdf/guidelines/Eng-lang-requirements.pdf.pdf.pdf"
+    requested = home + "/_media_old/pdf/guidelines/Eng-lang-requirements.pdf.pdf.pdf"
     seen = []
     async def source(url, home):
         seen.append(url)
@@ -271,11 +377,26 @@ async def test_lsbu_pdf_fallback_keeps_course_context_and_exact_source_urls(stor
         assert not reply["actions"]
         if not update_requested:
             assert bool(reply["sources"]) is alternative_readable
+        elif alternative_readable:
+            # A readable central PDF is not a successfully checked course page.
+            assert reply["documentReview"]["checked"] == 0
+            assert reply["documentReview"]["notChecked"] == 1
+            assert reply["documentReview"]["unmatched"] == 0
+            assert reply["documentReview"]["rows"][0]["status"] == "not_checked"
         assert "edit form" not in reply["content"]
         if not alternative_readable:
             assert result["phase"] == "Source access blocked — 0 courses updated"
             assert reply["sourceOutcome"] == "access_verification_failed"
             assert reply.get("coursesUpdated", 0) == 0
+            if update_requested:
+                report = reply["documentReview"]
+                assert {k: v for k, v in report.items() if k != "rows"} == {
+                    "checked": 0, "proposed": 0, "unmatched": 0, "notChecked": 1,
+                }
+                assert len(report["rows"]) == 1
+                assert report["rows"][0]["applicability"] == "unverified"
+                assert not any("Checking document against pending courses" in event["label"]
+                               for event in reply["activity"])
             assert reply["activity"][-1]["status"] == "error"
             assert not any(event["label"] == "Official PDF unavailable" for event in reply["activity"])
 

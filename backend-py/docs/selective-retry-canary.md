@@ -17,11 +17,20 @@ No shared API, worker, broker, account, or university record is used.
 
 The user instruction selects only the failed URL, with two attempts and real
 one-second backoff. The controlled first attempt fails **before** transport.
-The second reads Winchester's official LLB Law page with `public_request`:
-public-network validation, robots verification, bounded response sizes, no
-redirect following, and no challenge/proxy bypass. The transport adapter passes
-these verified bytes into the existing source-HTML input of the real extraction
-pipeline. It does not return a mocked extraction result.
+Each cache case runs with two source paths:
+
+* **Preloaded:** the second attempt reads Winchester's official LLB Law page
+  with `public_request`: public-network validation, robots verification,
+  bounded response sizes, no redirect following, and no challenge/proxy bypass.
+  The adapter passes these verified bytes into the existing source-HTML input.
+* **Ordinary:** after checking the official robots rules, the second attempt
+  passes only the course URL to the real extraction pipeline. Neither
+  `fetch_html` nor `extract_course` is replaced. The normal transport downloads
+  the page, then the new source boundary checks the cache against those exact
+  bytes. A miss continues extraction without downloading the page again.
+
+Neither path returns a mocked extraction result. Proxy/archive escalation is
+forbidden in the canary; protections or source changes must fail explicitly.
 
 ### Cache cases
 
@@ -29,6 +38,8 @@ pipeline. It does not return a mocked extraction result.
   extractors on the current official HTML. This is deliberately a partial
   deterministic extraction: unknown fields stay unknown. The actual worker
   reuses that exact selected evidence without running the full extractor.
+  On the ordinary path, transport and static page guards still run before
+  reuse; only downstream field extraction is avoided.
 * **Mismatch:** seed those same source-backed facts under older source bytes,
   configuration, audience, and year. The actual worker must miss that entry and
   run the full deterministic extraction on the current official bytes. The old
@@ -39,6 +50,9 @@ AI-derived fields still prevent reuse. Only the two explicit deterministic
 title methods were added to the cache's method allowlist; all quote, selected
 evidence, source URL, normalized-value, and populated-field checks still apply.
 Independent cache tests also invalidate each identity dimension separately.
+Ordinary reuse also requires invocation-local live transport provenance.
+Historical Wayback responses, replay, unknown source adapters and auxiliary
+multi-document fetches do not qualify for this path.
 
 ### Assertions
 
@@ -62,7 +76,7 @@ No model call is needed for this explicit retry command. Therefore this
 canary spends zero model USD and does not fabricate a spend reservation.
 The existing real-model probe continues to use the shared durable Sydney-day
 USD ledger before requests; this canary must not bypass that ledger to add AI.
-The official page is fetched once per case, plus its robots check. Extraction
+The official page is fetched once per source-path/cache case, plus its robots check. Extraction
 is capped at 45 seconds, chat completion at 150 seconds, and process shutdown
 is bounded. Protections or source drift fail the live test rather than passing
 using a stored page or pretending recovery succeeded.
@@ -92,16 +106,20 @@ cd backend-py && PYTHONPATH=. python tests/helpers/run_disposable_redis.py \
 
 ## Evidence boundaries
 
-Small sanitized acceptance receipts are retained in version control separately:
+Historical sanitized acceptance receipts are retained in version control separately:
 `docs/selective-retry-workspace-evidence.json` and
-`docs/selective-retry-production-evidence.json`. The former records both live
-cases and the deterministic regression terminal result; the latter explicitly
-records that production acceptance was not run.
+`docs/selective-retry-production-evidence.json`. These predate the ordinary
+transport extension: the former records the original two preloaded cases and
+regression results; the latter records that production acceptance was not run.
+They do not certify the current parser build. Current runs produce the four
+source-path/cache-case receipts below and require a terminal passing pytest result.
 
 Generated artifacts are ignored by Git and deployment:
 
-* `generated-artifacts/selective-retry/valid-workspace.json`
-* `generated-artifacts/selective-retry/mismatch-workspace.json`
+* `generated-artifacts/selective-retry/valid-preloaded-workspace.json`
+* `generated-artifacts/selective-retry/mismatch-preloaded-workspace.json`
+* `generated-artifacts/selective-retry/valid-ordinary-workspace.json`
+* `generated-artifacts/selective-retry/mismatch-ordinary-workspace.json`
 * Browser screenshots, original public HTML, and Vite logs alongside them.
 * `generated-artifacts/selective-retry/production.json` explicitly records
   **not executed**, not a production pass.

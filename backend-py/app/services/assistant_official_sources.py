@@ -1,28 +1,45 @@
 """Bounded official guidance alternatives, never URL extension rewriting."""
 import re
-from urllib.parse import urlsplit
-
-LSBU_ENGLISH_SOURCES = (
-    "https://www.lsbu.ac.uk/__data/assets/pdf_file/0019/9280/english-language-qualifications-general.pdf",
-    "https://www.lsbu.ac.uk/_media_old/pdf/guidelines/Eng-lang-requirements.pdf.pdf",
-)
 
 def is_english_guidance(source):
-    return source.get("sourceType") == "pdf" and bool(re.search(
+    return source.get("guidanceTopic") == "english" or source.get("sourceType") == "pdf" and bool(re.search(
         r"eng(?:lish)?[-_ ]?lang|english-language", source.get("url", ""), re.I,
     ))
 
 
-def english_guidance_alternatives(home, prompt, sources):
-    """Candidates are unverified until the ordinary robots-fenced reader checks them."""
-    if (urlsplit(home).hostname or "").lower().removeprefix("www.") != "lsbu.ac.uk":
+def configured_english_urls(home, config):
+    """Recheck ownership at use time, including when context was copied/replayed."""
+    from app.services.scrape_assistant_tools import official_url
+    from app.services.scraper.config.schema import ResearchGuidanceConfig
+    try:
+        research = ResearchGuidanceConfig.model_validate(
+            config.research.model_dump() if config is not None else {}
+        )
+        urls = research.english_guidance_urls
+        if any(official_url(url, home) != url for url in urls):
+            return []
+        return list(dict.fromkeys(urls))
+    except (ValueError, TypeError, AttributeError):
         return []
+
+
+def mark_configured_guidance(result, home, config):
+    if result.get("url") in configured_english_urls(home, config):
+        result = {**result, "guidanceTopic": "english",
+                  "guidanceNote": "General research only; course applicability is not verified."}
+    return result
+
+
+def english_guidance_alternatives(home, prompt, sources, config=None):
+    """Candidates are unverified until the ordinary robots-fenced reader checks them."""
+    candidates = configured_english_urls(home, config)
+    sources = [mark_configured_guidance(source, home, config) for source in sources]
     if not sources or not any(is_english_guidance(source) for source in sources):
         return []
     if any(source.get("verified") and is_english_guidance(source) for source in sources):
         return []
     seen = {source.get("url", "").split("#", 1)[0] for source in sources}
-    return [url for url in LSBU_ENGLISH_SOURCES if url not in seen][:2]
+    return [url for url in candidates if url not in seen][:2]
 
 
 def source_check_detail(result):
@@ -50,7 +67,7 @@ def gate_general_english_proposals(reply, sources):
                 and "ielts_overall" in action.get("fields", [])):
             action.update(
                 state="blocked", requiresConfirmation=True,
-                error="General PDF guidance is not course-specific English evidence. "
+                error="General guidance is not course-specific English evidence. "
                 "Check each course, including health and postgraduate research exceptions, before proposing updates.",
             )
             blocked.append(action)

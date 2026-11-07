@@ -66,7 +66,8 @@ async def snapshot(factory):
 @pytest.mark.asyncio
 @pytest.mark.skipif(not LIVE, reason="Opt-in official-source browser/worker canary")
 @pytest.mark.parametrize("cache_case", ["valid", "mismatch"])
-async def test_browser_selected_retry_recovers_official_course(store, monkeypatch, cache_case, assistant_postgres, request):
+@pytest.mark.parametrize("source_path", ["preloaded", "ordinary"])
+async def test_browser_selected_retry_recovers_official_course(store, monkeypatch, cache_case, source_path, assistant_postgres, request):
     from celery.contrib.testing.worker import start_worker
     from celery.signals import task_postrun
     from fastapi import FastAPI
@@ -209,7 +210,25 @@ async def test_browser_selected_retry_recovers_official_course(store, monkeypatc
     seeded = {}
     real_extract = orchestrator._extract_with_hard_timeout
     real_reuse = result_reuse.reuse
+    real_lookup = result_reuse.lookup
     warm = False
+    # Keep the ordinary transport unmodified; fail rather than escalate a
+    # protected live page to a proxy or historical archive.
+    from app.services.scraper import http_fetcher
+    async def deny_fallback(*args, **kwargs):
+        forbidden.append("transport_bypass")
+        raise AssertionError("Canary forbids proxy/archive/challenge bypass")
+    for fallback in ("fetch_html_scrape_do", "fetch_html_cffi", "fetch_html_wayback"):
+        monkeypatch.setattr(http_fetcher, fallback, deny_fallback)
+
+    async def record_source(html):
+        raw = html.encode("utf-8")
+        (proof_dir / f"{cache_case}-{source_path}-official.html").write_bytes(raw)
+        verified = await scrape_assistant_tools.inspect_source(COURSE, HOME, raw_body=raw)
+        assert verified.get("verified"), verified.get("error")
+        reads.append({"url": COURSE, "sha256": hashlib.sha256(raw).hexdigest(),
+                      "robotsChecked": True, "bytes": len(raw),
+                      "transport": source_path})
 
     async def authorized_extract(link, *args, **kwargs):
         assert link["url"] == COURSE, "Successful URL must never be extracted"
@@ -227,20 +246,25 @@ async def test_browser_selected_retry_recovers_official_course(store, monkeypatc
         # A controlled pre-transport failure proves the worker's real backoff.
         if len(attempts) == 1:
             return {"url": COURSE, "error": "per_course_timeout", "retryable": True}
+        kwargs["timeout_seconds"] = min(45, kwargs.get("timeout_seconds", 45))
+        if source_path == "ordinary":
+            from urllib.robotparser import RobotFileParser
+            rules = await scrape_assistant_tools.public_request(HOME + "/robots.txt")
+            assert b"<html" not in rules.lower()
+            robots = RobotFileParser()
+            robots.parse(rules.decode("utf-8").splitlines())
+            assert robots.can_fetch("*", COURSE), "Official robots rules forbid this course"
+            assert not any(k.endswith("_html") for k in link)
+            return await real_extract(link, *args, **kwargs)
         raw = await scrape_assistant_tools.public_request(
             scrape_assistant_tools.official_url(COURSE, HOME))
         html = raw.decode("utf-8")
-        (proof_dir / f"{cache_case}-official.html").write_text(html)
-        verified = await scrape_assistant_tools.inspect_source(COURSE, HOME, raw_body=raw)
-        assert verified.get("verified"), verified.get("error")
-        reads.append({"url": COURSE, "sha256": hashlib.sha256(raw).hexdigest(),
-                      "robotsChecked": True, "bytes": len(raw)})
-        kwargs["timeout_seconds"] = min(45, kwargs.get("timeout_seconds", 45))
+        await record_source(html)
         return await real_extract({**link, "_surrey_html": html}, *args, **kwargs)
 
     # Observe the real cache at the worker boundary. The warm entry comes from
     # actual deterministic extraction, never a fabricated payload or pending row.
-    async def observed_reuse(url, html, scope, extract, **kwargs):
+    async def seed_cache(url, html, scope, **kwargs):
         nonlocal warm
         if not warm:
             # Seed a legitimate partial deterministic result using the REAL
@@ -259,24 +283,39 @@ async def test_browser_selected_retry_recovers_official_course(store, monkeypatc
                  "decision_status": "selected", "selected": True, "confidence": candidate.confidence}
                 for candidate in (title, tuition)]}
             assert result_reuse.authoritative(prior, url, html), ("Unproven live cache seed", prior)
-            async def seed_result():
-                return prior
             previous_scope = scope if cache_case == "valid" else {
                 **scope, "audience": "domestic", "year": 1900,
                 "config": "stale-config", "central": "stale-source"}
             previous_html = html if cache_case == "valid" else html + "<!-- older source bytes -->"
-            await real_reuse(url, previous_html, previous_scope, seed_result, **kwargs)
+            await result_reuse.remember(url, previous_html, previous_scope, prior, **kwargs)
             seeded.update(key=result_reuse.cache_key(url, previous_html, previous_scope),
                           result=prior, scope=previous_scope)
             warm = True
+    async def observed_reuse(url, html, scope, extract, **kwargs):
+        await seed_cache(url, html, scope, **kwargs)
         async def counted_extraction():
             fresh_extractions.append(url)
             return await extract()
         result = await real_reuse(url, html, scope, counted_extraction, **kwargs)
         cache_receipts.append(bool(result.get("_result_cache_hit")))
         return result
+
+    async def observed_lookup(url, html, scope, **kwargs):
+        if source_path != "ordinary":
+            return await real_lookup(url, html, scope, **kwargs)
+        await record_source(html)
+        await seed_cache(url, html, scope, **kwargs)
+        hit = await real_lookup(url, html, scope, **kwargs)
+        cache_receipts.append(bool(hit))
+        if hit is None:
+            fresh_extractions.append(url)
+        return hit
+
     monkeypatch.setattr(orchestrator, "_extract_with_hard_timeout", authorized_extract)
-    monkeypatch.setattr(result_reuse, "reuse", observed_reuse)
+    if source_path == "preloaded":
+        monkeypatch.setattr(result_reuse, "reuse", observed_reuse)
+    else:
+        monkeypatch.setattr(result_reuse, "lookup", observed_lookup)
     # Current workspace debug builds intentionally cannot reuse results. Use
     # a content-addressed test release identity, not a fake production receipt.
     from app import release_info
@@ -298,7 +337,7 @@ async def test_browser_selected_retry_recovers_official_course(store, monkeypatc
     browser = None
     report = {"environment": "workspace", "production": {"executed": False,
               "reason": "Task fork; production access and publication not authorized"},
-              "case": cache_case, "passed": False,
+              "case": cache_case, "sourcePath": source_path, "passed": False,
               "parserSourceHash": result_reuse._BUILD_SOURCE_HASH,
               "canarySourceHash": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
     proof_dir = ROOT / "generated-artifacts/selective-retry"
@@ -320,7 +359,7 @@ async def test_browser_selected_retry_recovers_official_course(store, monkeypatc
             while not api.started:
                 assert api_thread.is_alive() and time.monotonic() < deadline
                 await asyncio.sleep(.05)
-            log = (proof_dir / f"{cache_case}-vite.log").open("w")
+            log = (proof_dir / f"{cache_case}-{source_path}-vite.log").open("w")
             web = subprocess.Popen(
                 ["node", "--input-type=module", "-e",
                  (ROOT / "backend-py/tests/helpers/selective_retry_browser.mjs").read_text(),
@@ -388,7 +427,7 @@ async def test_browser_selected_retry_recovers_official_course(store, monkeypatc
                     await page.get_by_text(action["resultSummary"], exact=True).wait_for(timeout=5000)
                     await page.reload()
                     await page.get_by_text(action["resultSummary"], exact=True).wait_for(timeout=10000)
-                    await page.screenshot(path=str(proof_dir / f"{cache_case}-browser.png"))
+                    await page.screenshot(path=str(proof_dir / f"{cache_case}-{source_path}-browser.png"))
             assert len(worker_done) == 1 and worker_done[0]["jobId"] == action["jobId"]
             assert worker_done[0]["state"] == "SUCCESS" and worker_done[0]["result"]["ok"] is True
             assert await snapshot(store) == before, "Successful row/source progress/evidence changed"
@@ -457,7 +496,7 @@ async def test_browser_selected_retry_recovers_official_course(store, monkeypatc
             raise
         finally:
             remove_guards()
-            (proof_dir / f"{cache_case}-workspace.json").write_text(json.dumps(report, indent=2))
+            (proof_dir / f"{cache_case}-{source_path}-workspace.json").write_text(json.dumps(report, indent=2))
             (proof_dir / "production.json").write_text(json.dumps({
                 "environment": "production", "executed": False, "passed": None,
                 "courseWrites": 0, "publication": False,

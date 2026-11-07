@@ -6,6 +6,23 @@ vi.mock("@/context/auth", () => ({ useAuth: () => ({ user: { id: 1, email: "a@un
 vi.mock("./assistant-import-status", () => ({ AssistantImportStatus: () => null }));
 
 import { ScrapePromptAssistant, type AssistantThread } from "./scrape-prompt-assistant";
+import { DocumentReviewView } from "./assistant-document-review";
+
+it("renders numeric backend row IDs and distinguishes unchecked courses", () => {
+  const view = render(<DocumentReviewView testId="review" review={{
+    checked: 1, proposed: 1, unmatched: 0, notChecked: 527,
+    rows: [{ id: 56052, name: "BSc Accounting", status: "proposed",
+      changes: [{ field: "ielts_reading", oldValue: null, newValue: 5.5 }] }],
+  }} />);
+  expect(screen.getByText("BSc Accounting")).toBeTruthy();
+  expect(screen.getByTestId("review-counts").textContent).toContain("527 not checked");
+  view.rerender(<DocumentReviewView testId="review" review={{
+    checked: 0, proposed: 0, unmatched: 0, notChecked: 528, rows: [],
+  }} />);
+  expect(screen.getByTestId("review-counts").textContent).toContain("0 checked");
+  expect(screen.getByTestId("review-counts").textContent).toContain("528 not checked");
+  expect(screen.getByText("No course rows were checked against this document.")).toBeTruthy();
+});
 
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
 const empty: AssistantThread = { threadId: null, status: "idle", phase: "", error: null, messages: [] };

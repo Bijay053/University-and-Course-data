@@ -5,15 +5,22 @@ import pytest
 
 from app.services import scrape_assistant_tools as tools
 from app.services.assistant_official_sources import (
-    LSBU_ENGLISH_SOURCES, english_guidance_alternatives,
+    english_guidance_alternatives as configured_alternatives,
     gate_general_english_proposals, source_check_detail,
 )
 from app.services.assistant_source_gate import access_blocked_answer
+from app.services.scraper.config.loader import load_uni_config
 
 HOME = "https://www.lsbu.ac.uk"
+CONFIG = load_uni_config(slug="lsbu_2175", name="LSBU", scrape_url=HOME,
+                         create_missing_stub=False, strict=True)
+LSBU_ENGLISH_SOURCES = CONFIG.research.english_guidance_urls
 DOUBLE = HOME + "/_media_old/pdf/guidelines/Eng-lang-requirements.pdf.pdf"
 TRIPLE = DOUBLE + ".pdf"
 ALTERNATIVE = LSBU_ENGLISH_SOURCES[0]
+
+def english_guidance_alternatives(home, prompt, sources):
+    return configured_alternatives(home, prompt, sources, CONFIG)
 
 
 @pytest.mark.asyncio
@@ -137,7 +144,7 @@ async def test_new_agent_reports_robots_stage_and_offers_unverified_alternatives
     store = Store()
     agent = SimpleNamespace(
         service=SimpleNamespace(AsyncSessionLocal=store), thread_id="thread",
-        turn_id="turn", run_id="owner", ctx={"home": HOME},
+        turn_id="turn", run_id="owner", ctx={"home": HOME, "config": CONFIG},
     )
     seen = []
     async def fetch(url, **kwargs):

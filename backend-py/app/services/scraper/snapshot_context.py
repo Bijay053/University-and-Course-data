@@ -41,6 +41,30 @@ _snapshot_replay_mode: ContextVar[bool] = ContextVar(
 _pending_snapshot: ContextVar[dict[str, Any] | None] = ContextVar(
     "_pending_snapshot", default=None
 )
+_source_capture: ContextVar[dict | None] = ContextVar("_source_capture", default=None)
+
+
+@contextmanager
+def current_source_scope():
+    """Capture transport provenance only within one extraction invocation."""
+    token = _source_capture.set({})
+    try:
+        yield
+    finally:
+        _source_capture.reset(token)
+
+
+def is_current_source(url: str, html: str) -> bool:
+    source = _source_capture.get() or {}
+    return (
+        source.get("url") == url
+        and source.get("content") == html
+        and source.get("fetch_method") in {
+            "httpx", "cffi", "direct_insecure_tls",
+            "scrape_do_static", "scrape_do_render",
+        }
+        and not is_replay_mode()
+    )
 
 
 @contextmanager
@@ -85,6 +109,9 @@ def stage_snapshot(url: str, content: str | bytes, fetch_method: str) -> None:
     """
     if is_replay_mode():
         return  # never stage during replay
+    capture = _source_capture.get()
+    if capture is not None:
+        capture.update(url=url, content=content, fetch_method=fetch_method)
     uni_id, job_id = get_snapshot_context()
     if not uni_id or not job_id:
         return  # no active scrape scope (e.g. discovery / central pages)
