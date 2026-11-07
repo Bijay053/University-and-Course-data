@@ -106,6 +106,19 @@ cd backend-py && PYTHONPATH=. python tests/helpers/run_disposable_redis.py \
 
 ## Evidence boundaries
 
+`docs/selective-retry-aws-acceptance.json` records a separate, completed AWS
+acceptance run for deployed release `be364341e356d672be798234c2b3270d69cd6aed`.
+All four cases passed on a temporary private host with isolated PostgreSQL and
+Redis. All 2,330 shipped files were checked against the release tree before
+and after execution. The host and stack were deleted, with independent
+host-termination and security-group-absence checks.
+
+The deployed test code was not edited for this run, so its nested receipts
+retain their original `workspace` labels. The enclosing receipt records the
+actual AWS execution environment and source identity. This is acceptance of
+the deployed source in isolation, **not** a canary against live production
+course records and **not** evidence that LSBU access restrictions are resolved.
+
 Historical sanitized acceptance receipts are retained in version control separately:
 `docs/selective-retry-workspace-evidence.json` and
 `docs/selective-retry-production-evidence.json`. These predate the ordinary

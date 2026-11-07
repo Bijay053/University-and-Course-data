@@ -62,6 +62,71 @@ async def test_document_upload_is_disabled_until_storage_is_ready(store, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_uploaded_pdf_partial_preview_preserves_rows_and_requires_approval(store, monkeypatch):
+    import json
+    from unittest.mock import AsyncMock
+    from app.services import assistant_document_review, assistant_documents
+    from app.services.ai import openai_client
+    from app.services.scrape_agent_v2 import model
+    quotes = [f"Bachelor of Business {i} requires IELTS overall 6.5 with no component below 5.5."
+              for i in range(1, 8)]
+    async with store() as db:
+        first = await db.get(ScrapedCourse, 1)
+        first.course_name = "Bachelor of Business 1"
+        first.degree_level = "Undergraduate"
+        first.ielts_overall = None
+        for i in range(2, 8):
+            db.add(ScrapedCourse(id=i, university_id=1, scrape_job_id="source", status="pending",
+                course_name=f"Bachelor of Business {i}", degree_level="Undergraduate",
+                course_website=f"https://www.example.edu/course-{i}"))
+        await db.commit()
+    async def blocked(*args, **kwargs):
+        return {"verified": False, "failureStage": "robots", "httpStatus": 403,
+                "error": "robots.txt unavailable"}
+    async def uploaded(*args):
+        return {"verified": True, "sourceType": "pdf", "url": "uploaded-document:sha",
+                "provenance": "staff-uploaded-document", "officialProvenanceVerified": False,
+                "text": "\n".join(quotes), "_pages": [{"page": 1, "text": "\n".join(quotes)}]}
+    calls = 0
+    async def complete(client, messages, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            return {"message": {"content": "malformed JSON"}}
+        courses = json.loads(messages[-1]["content"])["courses"]
+        return {"message": {"content": json.dumps({"rows": [
+            {"id": r["id"], "matched": True,
+             "applicability": {"guidanceQuote": quotes[r["id"]-1],
+                               "courseQuote": r["courseEvidence"], "page": 1},
+             "changes": [{"field": "ielts_overall", "newValue": 6.5,
+                          "quote": quotes[r["id"]-1], "page": 1}]} for r in courses]})}}
+    monkeypatch.setattr(assistant_documents, "read_uploaded", uploaded)
+    monkeypatch.setattr(assistant_document_review, "inspect_source", blocked)
+    monkeypatch.setattr(model, "complete", complete)
+    monkeypatch.setattr(openai_client, "_client", lambda: SimpleNamespace(close=AsyncMock()))
+    thread_id, turn_id = await prompt_thread(store, "Use uploaded PDF to update IELTS for all courses")
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, thread_id)
+        # Invoke the real document workflow with isolated persistence and a claimed run.
+        messages = deepcopy(thread.messages)
+        messages[-1]["_documentToken"] = "test"
+        thread.messages = messages
+        await db.commit()
+    await service.investigate(thread_id, turn_id)
+    async with store() as db:
+        reply = (await get_assistant("source", db, {"id": 1}))["messages"][-1]
+        assert reply["documentReview"]["proposed"] == 6
+        assert reply["documentReview"]["notChecked"] == 1
+        assert reply["actions"][0]["requiresConfirmation"] is True
+        assert "staff-uploaded" in reply["content"]
+        rows = (await db.execute(select(ScrapedCourse))).scalars().all()
+        assert len(rows) == 7
+        assert all(r.ielts_overall is None for r in rows)
+        failed = next(r for r in reply["documentReview"]["rows"] if r["id"] == 7)
+        assert "invalid response" in failed["reason"]
+
+
+@pytest.mark.asyncio
 async def test_english_applicability_report_scopes_and_fences_bulk_proposals(store, monkeypatch):
     import json
     from unittest.mock import AsyncMock
@@ -94,7 +159,7 @@ async def test_english_applicability_report_scopes_and_fences_bulk_proposals(sto
         data = json.loads(messages[-1]["content"])
         return {"message": {"content": json.dumps({"rows": [{
             "id": r["id"], "matched": True,
-            "applicability": {"guidanceQuote": guidance, "courseQuote": r["officialPage"], "page": 2},
+            "applicability": {"guidanceQuote": guidance, "courseQuote": r["courseEvidence"], "page": 2},
             "changes": [{"field": "ielts_overall", "newValue": 6.5, "quote": guidance, "page": 2}],
         } for r in data["courses"]]})}}
     monkeypatch.setattr(assistant_document_review, "inspect_source", source)

@@ -1,6 +1,6 @@
 export type DocumentReviewChange = { field: string; oldValue?: unknown; newValue?: unknown; quote?: string; page?: number };
 export type DocumentReviewRow = { id: string | number; name: string; status: string; reason?: string; changes?: DocumentReviewChange[];
-  category?: string; applicability?: string; evidence?: { url?: string; quote: string; page?: number }[] };
+  category?: string; applicability?: string; evidence?: { url?: string; quote: string; page?: number; provenance?: string }[] };
 export type DocumentReview = { checked: number; proposed: number; unmatched: number; notChecked?: number; rows: DocumentReviewRow[] };
 
 const show = (v: unknown) => (v === null || v === undefined || v === "" ? "(blank)" : typeof v === "object" ? JSON.stringify(v) : String(v));
@@ -13,6 +13,9 @@ const STATUS_TONE: Record<string, string> = {
 
 export function DocumentReviewView({ review, testId }: { review: DocumentReview; testId: string }) {
   const rows = Array.isArray(review.rows) ? review.rows.filter(r => r && (typeof r.id === "string" || Number.isSafeInteger(r.id))) : [];
+  const matched = rows.filter(r => r.applicability === "verified").length;
+  const unchanged = rows.filter(r => r.status === "unchanged").length;
+  const manual = rows.filter(r => ["unmatched", "unverified", "conflict", "excluded", "not_checked"].includes(r.status)).length;
   return (
     <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3" data-testid={testId}>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[12px]">
@@ -22,6 +25,10 @@ export function DocumentReviewView({ review, testId }: { review: DocumentReview;
           {!!review.notChecked && <> · {review.notChecked} not checked</>}
         </span>
       </div>
+      <p className="mt-1 text-[12px] text-slate-600">
+        {matched} matched · {unchanged} unchanged · {manual} skipped / manual review.
+        {" "}This is a preview, not an update receipt. Apply the proposed changes after reviewing the evidence.
+      </p>
       {rows.length === 0 ? (
         <p className="mt-2 text-[12px] text-slate-600">No course rows were checked against this document.</p>
       ) : (
@@ -38,6 +45,9 @@ export function DocumentReviewView({ review, testId }: { review: DocumentReview;
               </p>}
               {r.evidence?.map((e, index) => (
                 <blockquote key={index} className="mt-1 border-l-2 border-slate-200 pl-2 text-[12px] text-slate-600">
+                  {e.provenance === "existing-record-and-document" && (
+                    <p className="font-medium">Existing record and document evidence — not a live course-page check</p>
+                  )}
                   <p className="whitespace-pre-wrap break-words">{e.quote}</p>
                   {e.url && /^https:\/\//i.test(e.url) && <a href={e.url} target="_blank" rel="noopener noreferrer" className="break-all underline">
                     {e.url}{e.page ? ` (page ${e.page})` : ""}

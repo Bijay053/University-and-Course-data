@@ -1,0 +1,326 @@
+{
+  "environment": "aws-isolated-release-acceptance",
+  "release": "be364341e356d672be798234c2b3270d69cd6aed",
+  "tree": "49199afd3734a00f744512aeedcdfaca2c6c451b",
+  "pytestExitCode": 0,
+  "passed": true,
+  "cases": 4,
+  "productionCourseWrites": 0,
+  "liveProductionCanary": false,
+  "note": "Unmodified canary receipts retain their historical workspace labels; this wrapper records their actual isolated AWS execution.",
+  "cleanup": {
+    "stackDeleted": true,
+    "hostTerminated": true,
+    "resources": [
+      {
+        "type": "AWS::EC2::Instance",
+        "status": "DELETE_COMPLETE"
+      },
+      {
+        "type": "AWS::IAM::InstanceProfile",
+        "status": "DELETE_COMPLETE"
+      },
+      {
+        "type": "AWS::IAM::Role",
+        "status": "DELETE_COMPLETE"
+      },
+      {
+        "type": "AWS::EC2::SecurityGroup",
+        "status": "DELETE_COMPLETE",
+        "absenceVerified": true
+      }
+    ]
+  },
+  "pytestSummary": "4 passed, 5 warnings in 92.92 seconds",
+  "sourceFilesVerifiedBeforeAndAfter": 2330,
+  "receipts": [
+    {
+      "environment": "workspace",
+      "production": {
+        "executed": false,
+        "reason": "Task fork; production access and publication not authorized"
+      },
+      "case": "mismatch",
+      "sourcePath": "ordinary",
+      "passed": true,
+      "parserSourceHash": "de0f12ed79ffbe2c58adbc688dc2040df303c48a6c49c9480da2d5a7a206c64c",
+      "canarySourceHash": "9295200c251c1ec32070d9bec338120c9fd47c29a308387fabbd00668a4cd75b",
+      "reads": [
+        {
+          "url": "https://www.winchester.ac.uk/study/undergraduate/courses/llb-hons-law/",
+          "sha256": "9b9f98ca069009485cc5e2284e21ad19da58ebcc78b4e1b8edb85fcc5626c9bf",
+          "robotsChecked": true,
+          "bytes": 163023,
+          "transport": "ordinary"
+        }
+      ],
+      "attempts": [
+        {
+          "ordinal": 1,
+          "outcome": "error",
+          "at": "2026-11-07T07:13:21.924220+00:00",
+          "resultHash": "ec1c73783e5afcf4f45967a511ad6bb4bd1c2632b1ef94bbe0223209c136a3d0"
+        },
+        {
+          "ordinal": 2,
+          "outcome": "extracted",
+          "at": "2026-11-07T07:13:22.999472+00:00",
+          "resultHash": "d615d0a0cbe426fa19a39ed4f7a578ed1f531904c3a74001a716c4a1828c9808"
+        }
+      ],
+      "cacheHits": [
+        false
+      ],
+      "successfulStateUnchanged": true,
+      "pendingRows": 1,
+      "fullExtractions": 1,
+      "reservationIds": [
+        "9b9737efbcab455bb5713a3801d8644d",
+        "fe039faf9cf54c7e932f327972ab39db"
+      ],
+      "childJobId": "job-627bce7bfee440ec92086ac16df77aaf",
+      "pendingRowId": 2,
+      "selectedEvidenceIds": [
+        11,
+        4,
+        2,
+        9,
+        3,
+        8,
+        6,
+        7,
+        5,
+        10,
+        12
+      ],
+      "workerCompletion": {
+        "taskId": "dcbc0002-b0f5-48e9-a610-2b4c7ef16b11",
+        "jobId": "job-627bce7bfee440ec92086ac16df77aaf",
+        "state": "SUCCESS",
+        "result": {
+          "ok": true,
+          "id": "job-627bce7bfee440ec92086ac16df77aaf"
+        }
+      },
+      "publishedWrites": 0,
+      "modelCalls": 0,
+      "modelBudget": "No model request; reservation not needed",
+      "otpRequired": true,
+      "summary": "1 URLs stored pending, 0 skipped, 0 unverified. Nothing published.",
+      "forbiddenOperations": [],
+      "cleanupVerified": true
+    },
+    {
+      "environment": "workspace",
+      "production": {
+        "executed": false,
+        "reason": "Task fork; production access and publication not authorized"
+      },
+      "case": "mismatch",
+      "sourcePath": "preloaded",
+      "passed": true,
+      "parserSourceHash": "de0f12ed79ffbe2c58adbc688dc2040df303c48a6c49c9480da2d5a7a206c64c",
+      "canarySourceHash": "9295200c251c1ec32070d9bec338120c9fd47c29a308387fabbd00668a4cd75b",
+      "reads": [
+        {
+          "url": "https://www.winchester.ac.uk/study/undergraduate/courses/llb-hons-law/",
+          "sha256": "9b9f98ca069009485cc5e2284e21ad19da58ebcc78b4e1b8edb85fcc5626c9bf",
+          "robotsChecked": true,
+          "bytes": 163023,
+          "transport": "preloaded"
+        }
+      ],
+      "attempts": [
+        {
+          "ordinal": 1,
+          "outcome": "error",
+          "at": "2026-11-07T07:12:39.250312+00:00",
+          "resultHash": "ec1c73783e5afcf4f45967a511ad6bb4bd1c2632b1ef94bbe0223209c136a3d0"
+        },
+        {
+          "ordinal": 2,
+          "outcome": "extracted",
+          "at": "2026-11-07T07:12:40.313374+00:00",
+          "resultHash": "d615d0a0cbe426fa19a39ed4f7a578ed1f531904c3a74001a716c4a1828c9808"
+        }
+      ],
+      "cacheHits": [
+        false
+      ],
+      "successfulStateUnchanged": true,
+      "pendingRows": 1,
+      "fullExtractions": 1,
+      "reservationIds": [
+        "d9949abd308641db928c7014bc54e8fa",
+        "1b42928c3e5f413f95d579e5d846c711"
+      ],
+      "childJobId": "job-e6ef42c2c7ad448780593e3b9322833d",
+      "pendingRowId": 2,
+      "selectedEvidenceIds": [
+        11,
+        4,
+        2,
+        9,
+        3,
+        8,
+        6,
+        7,
+        5,
+        10,
+        12
+      ],
+      "workerCompletion": {
+        "taskId": "190da621-39ad-4816-b483-afc7218cebb3",
+        "jobId": "job-e6ef42c2c7ad448780593e3b9322833d",
+        "state": "SUCCESS",
+        "result": {
+          "ok": true,
+          "id": "job-e6ef42c2c7ad448780593e3b9322833d"
+        }
+      },
+      "publishedWrites": 0,
+      "modelCalls": 0,
+      "modelBudget": "No model request; reservation not needed",
+      "otpRequired": true,
+      "summary": "1 URLs stored pending, 0 skipped, 0 unverified. Nothing published.",
+      "forbiddenOperations": [],
+      "cleanupVerified": true
+    },
+    {
+      "environment": "workspace",
+      "production": {
+        "executed": false,
+        "reason": "Task fork; production access and publication not authorized"
+      },
+      "case": "valid",
+      "sourcePath": "ordinary",
+      "passed": true,
+      "parserSourceHash": "de0f12ed79ffbe2c58adbc688dc2040df303c48a6c49c9480da2d5a7a206c64c",
+      "canarySourceHash": "9295200c251c1ec32070d9bec338120c9fd47c29a308387fabbd00668a4cd75b",
+      "reads": [
+        {
+          "url": "https://www.winchester.ac.uk/study/undergraduate/courses/llb-hons-law/",
+          "sha256": "9b9f98ca069009485cc5e2284e21ad19da58ebcc78b4e1b8edb85fcc5626c9bf",
+          "robotsChecked": true,
+          "bytes": 163023,
+          "transport": "ordinary"
+        }
+      ],
+      "attempts": [
+        {
+          "ordinal": 1,
+          "outcome": "error",
+          "at": "2026-11-07T07:13:02.247879+00:00",
+          "resultHash": "ec1c73783e5afcf4f45967a511ad6bb4bd1c2632b1ef94bbe0223209c136a3d0"
+        },
+        {
+          "ordinal": 2,
+          "outcome": "extracted",
+          "at": "2026-11-07T07:13:03.332307+00:00",
+          "resultHash": "7b054d1b869f758453e89838f18bf47c2f0066fd2ebd40433de3b93d1539fb3d"
+        }
+      ],
+      "cacheHits": [
+        true
+      ],
+      "successfulStateUnchanged": true,
+      "pendingRows": 1,
+      "fullExtractions": 0,
+      "reservationIds": [
+        "c50fbd2c0e6b4af484603d017133e3e0",
+        "42af7996270e4cf9aa62c4e983957dd8"
+      ],
+      "childJobId": "job-b42c80bc8d684237b829e6c6a8229594",
+      "pendingRowId": 2,
+      "selectedEvidenceIds": [
+        2,
+        3
+      ],
+      "workerCompletion": {
+        "taskId": "8eca51ab-ffe1-4e65-933f-c1de2dca8242",
+        "jobId": "job-b42c80bc8d684237b829e6c6a8229594",
+        "state": "SUCCESS",
+        "result": {
+          "ok": true,
+          "id": "job-b42c80bc8d684237b829e6c6a8229594"
+        }
+      },
+      "publishedWrites": 0,
+      "modelCalls": 0,
+      "modelBudget": "No model request; reservation not needed",
+      "otpRequired": true,
+      "summary": "1 URLs stored pending, 0 skipped, 0 unverified. Nothing published.",
+      "forbiddenOperations": [],
+      "cleanupVerified": true
+    },
+    {
+      "environment": "workspace",
+      "production": {
+        "executed": false,
+        "reason": "Task fork; production access and publication not authorized"
+      },
+      "case": "valid",
+      "sourcePath": "preloaded",
+      "passed": true,
+      "parserSourceHash": "de0f12ed79ffbe2c58adbc688dc2040df303c48a6c49c9480da2d5a7a206c64c",
+      "canarySourceHash": "9295200c251c1ec32070d9bec338120c9fd47c29a308387fabbd00668a4cd75b",
+      "reads": [
+        {
+          "url": "https://www.winchester.ac.uk/study/undergraduate/courses/llb-hons-law/",
+          "sha256": "9b9f98ca069009485cc5e2284e21ad19da58ebcc78b4e1b8edb85fcc5626c9bf",
+          "robotsChecked": true,
+          "bytes": 163023,
+          "transport": "preloaded"
+        }
+      ],
+      "attempts": [
+        {
+          "ordinal": 1,
+          "outcome": "error",
+          "at": "2026-11-07T07:12:20.199650+00:00",
+          "resultHash": "ec1c73783e5afcf4f45967a511ad6bb4bd1c2632b1ef94bbe0223209c136a3d0"
+        },
+        {
+          "ordinal": 2,
+          "outcome": "extracted",
+          "at": "2026-11-07T07:12:21.266004+00:00",
+          "resultHash": "7b054d1b869f758453e89838f18bf47c2f0066fd2ebd40433de3b93d1539fb3d"
+        }
+      ],
+      "cacheHits": [
+        true
+      ],
+      "successfulStateUnchanged": true,
+      "pendingRows": 1,
+      "fullExtractions": 0,
+      "reservationIds": [
+        "1114d3a2a170432d86520e2e3f14f766",
+        "a8877f3ac7554f52aee423f63011e0c9"
+      ],
+      "childJobId": "job-01f7f88938d9418a956cd814fa456d24",
+      "pendingRowId": 2,
+      "selectedEvidenceIds": [
+        2,
+        3
+      ],
+      "workerCompletion": {
+        "taskId": "4920e045-d01a-4989-95ae-696bbf3f21ba",
+        "jobId": "job-01f7f88938d9418a956cd814fa456d24",
+        "state": "SUCCESS",
+        "result": {
+          "ok": true,
+          "id": "job-01f7f88938d9418a956cd814fa456d24"
+        }
+      },
+      "publishedWrites": 0,
+      "modelCalls": 0,
+      "modelBudget": "No model request; reservation not needed",
+      "otpRequired": true,
+      "summary": "1 URLs stored pending, 0 skipped, 0 unverified. Nothing published.",
+      "forbiddenOperations": [],
+      "cleanupVerified": true
+    }
+  ],
+  "archiveSha256": "9dcb2a4dad4ba4dfa14ff7e4cdccdb9eb7df640ca6507a613398b31c86c0ac24",
+  "boundary": "Exact deployed source tree tested on a private AWS acceptance host with socket-only PostgreSQL and private Redis. Not a live production-data canary and not LSBU source-access verification."
+}

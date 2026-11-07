@@ -73,6 +73,12 @@ processes with ownership-checked cleanup before independently verifying absence.
 
 **How to apply:** Extract the actual template check and exercise success, missing execution, and duplicate execution locally before provisioning another disposable database.
 
+Do not assume the disposable rehearsal identity can create S3 buckets.
+
+**Why:** Host acceptance provisioning was rolled back because that identity lacked `s3:CreateBucket`, despite being able to run the existing database rehearsal.
+
+**How to apply:** Avoid broadening permissions or borrowing production storage automatically. An SSM-only transfer can preserve test-account isolation; bound transfers and verify file hashes, and independently verify cleanup after failed provisioning.
+
 **Why:** S3 and SSM operations can use different credential sources. Validating only the storage principal does not prove that the SSM target is in the same disposable account, and a bare instance ID can accidentally identify production. Simulated workers and stale logical IDs can let all static tests pass while the rehearsal either proves nothing or fails immediately after provisioning billable resources. Cloud-init, package paths, service recovery, and provider capacity are asynchronous; a single readiness probe is brittle, while an enabled schedule can fire before the fixture is safe. A mode-0600 receipt still leaks a credential if it contains an `X-Amz-Security-Token`.
 
 **How to apply:** Before every mutation class, call STS through the exact session used for that operation, compare it with an explicitly supplied test account ID plus an immutable production denylist, resolve the target in that account and region, and fail closed unless its run-specific disposable tag matches. Use the actual broker/worker path, durable exactly-once evidence, startup markers, bounded readiness retries, host-native command names, template-to-runner contract tests, disabled-until-owned schedules, scheduler-first shutdown, and paginated residue verification. Redirect setup chatter when an exact output token is part of the contract. Treat a provider `insufficient-capacity` event as infrastructure failure rather than application proof; inspect stack events and independently verify rollback residue before deciding whether to retry. Emit maintenance proof only after cleanup, sign the canonical payload with KMS, and verify it against a repository-pinned account/key/public key.

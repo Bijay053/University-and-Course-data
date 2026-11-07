@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.english_applicability import applicability, category, quote_page, score_binding
+from app.services.english_applicability import applicability, category, quote_page, score_binding, uploaded_course_evidence
 from app.services.assistant_document_review import requested, validate_changes
 
 
@@ -51,7 +51,6 @@ def test_named_health_guidance_can_be_verified_without_exclusions():
 @pytest.mark.parametrize("mutate", [
     lambda r, c, s, p: s.update(verified=False),
     lambda r, c, s, p: p.update(verified=False),
-    lambda r, c, s, p: s.update(provenance="staff-uploaded-document"),
     lambda r, c, s, p: s.update(unreadablePages=[3]),
     lambda r, c, s, p: c["applicability"].update(page=1),
     lambda r, c, s, p: c["applicability"].update(courseQuote="Invented course evidence"),
@@ -141,3 +140,115 @@ def test_unlabelled_subject_requirement_elsewhere_cannot_inherit_default():
     source["_fullText"] = source["text"] + " Ceramics requires IELTS overall 7.0."
     candidate["changes"] = [{"field": "ielts_overall", "newValue": 6.5, "quote": source["text"], "page": 2}]
     assert not score_binding(row, candidate, source)
+
+
+def test_uploaded_named_course_can_supply_evidence_without_live_website():
+    row, candidate, source, _ = sample(scope="Bachelor of Business requires IELTS overall 6.5.")
+    source.update(provenance="staff-uploaded-document", officialProvenanceVerified=False)
+    course = uploaded_course_evidence(row, source)
+    assert course and course["officialProvenanceVerified"] is False
+    candidate["applicability"]["courseQuote"] = course["text"]
+    result = applicability(row, candidate, source, course)
+    assert result["applicability"] == "verified"
+    assert "not independently verified" in result["reason"]
+
+
+@pytest.mark.parametrize("quote", [
+    "Bachelor of Business Administration requires IELTS overall 6.5.",
+    "Not Bachelor of Business requires IELTS overall 6.5.",
+])
+def test_upload_cannot_invent_course_identity_or_borrow_general_scope(quote):
+    row, candidate, source, _ = sample(scope=quote)
+    source["provenance"] = "staff-uploaded-document"
+    course = uploaded_course_evidence(row, source)
+    if course:
+        candidate["applicability"]["courseQuote"] = course["text"]
+        # A name embedded in a different award or negative statement is not authority.
+        assert applicability(row, candidate, source, course)["applicability"] != "verified"
+
+
+@pytest.mark.parametrize("field", ["listening", "reading", "writing", "speaking"])
+def test_each_individual_band_is_extracted_from_named_upload_evidence(field):
+    quote = f"Bachelor of Business requires IELTS overall 6.5; {field}: 6.0."
+    row, candidate, source, course = sample(scope=quote)
+    candidate["changes"] = [{"field": f"ielts_{field}", "newValue": 6.0, "quote": quote, "page": 2}]
+    assert validate_changes(candidate, source, course)
+    assert score_binding(row, candidate, source)
+
+
+@pytest.mark.parametrize("provenance", ["staff-uploaded-document", "official-document"])
+@pytest.mark.parametrize("university", ["university-one.example", "university-two.example", "lsbu.ac.uk"])
+def test_multi_level_pdf_matches_existing_records_without_live_pages(provenance, university):
+    ug = "All undergraduate courses require IELTS overall 6.5 with no component below 5.5."
+    pg = "All postgraduate taught courses require IELTS overall 7.0 with no component below 6.0."
+    for name, level, quote, score, band in [
+        ("Bachelor of Business", "Undergraduate", ug, 6.5, 5.5),
+        ("Master of Business", "Master", pg, 7.0, 6.0),
+    ]:
+        row, candidate, source, _ = sample(name, level, quote)
+        source.update(url=f"https://{university}/requirements.pdf", provenance=provenance,
+                      _fullText=ug + "\n" + pg, _pages=[{"page": 2, "text": ug + "\n" + pg}])
+        course = uploaded_course_evidence(row, source)
+        assert course
+        candidate["applicability"]["courseQuote"] = course["text"]
+        candidate["changes"] = [
+            {"field": "ielts_overall", "newValue": score, "quote": quote, "page": 2},
+            *[{"field": f"ielts_{field}", "newValue": band, "quote": quote, "page": 2}
+              for field in ["listening", "reading", "writing", "speaking"]],
+        ]
+        assert applicability(row, candidate, source, course)["applicability"] == "verified"
+        assert len(validate_changes(candidate, source, course)) == 5
+        assert score_binding(row, candidate, source)
+
+
+def test_subject_scope_uses_record_subject_not_name_guess():
+    row, candidate, source, _ = sample(scope="All engineering courses require IELTS overall 6.5.")
+    row.category = "Engineering"
+    course = uploaded_course_evidence(row, source)
+    assert course
+    candidate["applicability"]["courseQuote"] = course["text"]
+    assert applicability(row, candidate, source, course)["applicability"] == "verified"
+    row.category = "Business"
+    assert uploaded_course_evidence(row, source) is None
+
+
+@pytest.mark.parametrize("title", ["Accounting & Finance BSc (Hons)", "BSc (Hons) Accounting and Finance"])
+def test_harmless_award_order_and_punctuation_differences(title):
+    row, candidate, source, _ = sample(
+        "Bachelor of Science (Honours) Accounting and Finance", "Bachelor",
+        f"{title} requires IELTS overall 6.5.",
+    )
+    course = uploaded_course_evidence(row, source)
+    assert course
+    candidate["applicability"]["courseQuote"] = course["text"]
+    candidate["changes"] = [{"field": "ielts_overall", "newValue": 6.5, "quote": source["text"], "page": 2}]
+    assert applicability(row, candidate, source, course)["applicability"] == "verified"
+    assert score_binding(row, candidate, source)
+    row.course_name += " with Foundation Year"
+    assert uploaded_course_evidence(row, source) is None
+
+
+def test_unknown_level_and_protected_courses_never_use_record_default():
+    for name, level in [("Business", "Postgraduate"), ("Bachelor of Nursing", "Undergraduate"),
+                        ("MRes Business", "Master")]:
+        row, _, source, _ = sample(name, level)
+        assert uploaded_course_evidence(row, source) is None
+
+
+def test_explicit_health_exception_does_not_block_unrelated_business_course():
+    row, candidate, source, _ = sample()
+    source["_fullText"] = source["text"] + "\nExceptions apply to health courses."
+    course = uploaded_course_evidence(row, source)
+    candidate["applicability"]["courseQuote"] = course["text"]
+    assert applicability(row, candidate, source, course)["applicability"] == "verified"
+
+
+def test_single_component_minimum_is_not_a_floor_for_other_bands():
+    row, candidate, source, course = sample(scope="Bachelor of Business requires IELTS Reading minimum 6.0.")
+    candidate["changes"] = [{"field": "ielts_speaking", "newValue": 6.0,
+                              "quote": source["text"], "page": 2}]
+    assert not validate_changes(candidate, source, course)
+    assert not score_binding(row, candidate, source)
+    candidate["changes"][0]["field"] = "ielts_reading"
+    assert validate_changes(candidate, source, course)
+    assert score_binding(row, candidate, source)

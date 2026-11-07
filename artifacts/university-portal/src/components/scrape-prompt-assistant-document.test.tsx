@@ -128,6 +128,8 @@ describe("document review", () => {
     expect(screen.getByText("AUD 30,000")).toBeTruthy();
     expect(screen.getByText(/page 3/)).toBeTruthy();
     expect(screen.getByTestId("document-row-r2").textContent).toContain("Not found in document");
+    expect(screen.getByText(/1 skipped \/ manual review/)).toBeTruthy();
+    expect(screen.getByText(/This is a preview, not an update receipt/)).toBeTruthy();
     fireEvent.click(screen.getByTestId("button-run-action-doc"));
     expect(await screen.findByTestId("dialog-confirm-action")).toBeTruthy();
     expect(fetchMock.mock.calls.filter(([, i]) => i?.method === "POST")).toHaveLength(0);
