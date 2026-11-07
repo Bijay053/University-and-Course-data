@@ -17,6 +17,14 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
         # Invalid/foreign URLs must still be rejected by the normal reader,
         # never satisfied from another provider's cached data.
         return await asyncio.wait_for(inspect(url, home), timeout=timeout)
+    registry_enabled = getattr(service, "SOURCE_ACCESS_REGISTRY", False) is True
+    if registry_enabled:
+        from app.services.university_source_access import entry, refusal
+        async with service.AsyncSessionLocal() as db:
+            held = refusal(await entry(db, url, home))
+        if held:
+            # Apply policy before even private-session evidence reuse.
+            return held
     if not fresh:
         async with service.AsyncSessionLocal() as db:
             thread = await db.get(ScrapeAssistantThread, thread_id)
@@ -42,8 +50,12 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                         return cached
                     # An expired latest failure cannot revive an older success.
                     break
-    result = await asyncio.wait_for(inspect(url, home), timeout=timeout)
-    if isinstance(result.get("verified"), bool):
+    if registry_enabled:
+        from app.services.university_source_access import guarded_read
+        result = await guarded_read(service.AsyncSessionLocal, url, home, inspect, timeout)
+    else:
+        result = await asyncio.wait_for(inspect(url, home), timeout=timeout)
+    if isinstance(result.get("verified"), bool) and result.get("failureStage") != "access_in_progress":
         async with service.AsyncSessionLocal() as db:
             thread = (await db.execute(select(ScrapeAssistantThread).where(
                 ScrapeAssistantThread.id == thread_id, ScrapeAssistantThread.turn_id == turn_id,

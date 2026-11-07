@@ -24,6 +24,7 @@ from app.services.scrape_assistant_tools import (
 
 FIELDS = {"international_fee", "ielts_overall", "duration", "course_location"}
 REVIEW_STATUSES = {"pending", "review", "review_ready"}
+SOURCE_ACCESS_REGISTRY = True
 ACTIVE = {"queued", "researching"}
 RESEARCH_TIMEOUT = 75
 

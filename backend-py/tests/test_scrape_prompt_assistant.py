@@ -36,9 +36,14 @@ async def test_unreadable_document_does_not_check_528_pending_rows(store, monkey
         result = await get_assistant("source", db, {"id": 1})
         reply = result["messages"][-1]
         report = reply["documentReview"]
-        assert {k: v for k, v in report.items() if k != "rows"} == {
+        assert {k: v for k, v in report.items() if k not in {"rows", "accessError"}} == {
             "checked": 0, "proposed": 0, "unmatched": 0, "notChecked": 528,
         }
+        assert report["accessError"]["message"] == (
+            "Access verification failed" if stage == "robots" else "Malformed PDF"
+        )
+        assert all(r["reason"] == "Document unavailable; this record was not checked."
+                   for r in report["rows"])
         assert len(report["rows"]) == 528
         assert all(r["applicability"] == "unverified" and r["status"] == "not_checked" for r in report["rows"])
         assert not reply["actions"] and reply["coursesUpdated"] == 0
@@ -455,9 +460,10 @@ async def test_lsbu_pdf_fallback_keeps_course_context_and_exact_source_urls(stor
             assert reply.get("coursesUpdated", 0) == 0
             if update_requested:
                 report = reply["documentReview"]
-                assert {k: v for k, v in report.items() if k != "rows"} == {
+                assert {k: v for k, v in report.items() if k not in {"rows", "accessError"}} == {
                     "checked": 0, "proposed": 0, "unmatched": 0, "notChecked": 1,
                 }
+                assert report["accessError"]["url"] == requested
                 assert len(report["rows"]) == 1
                 assert report["rows"][0]["applicability"] == "unverified"
                 assert not any("Checking document against pending courses" in event["label"]

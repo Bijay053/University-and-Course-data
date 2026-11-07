@@ -6,6 +6,7 @@ description: Pointers for test isolation, lifecycle proof, frontend timing and d
 - [Vitest accessibility ordering](vitest-accessibility-hook-ordering.md) — global DOM checks must precede test-local cleanup.
 - [Failure and termination teardown proof](expected-failure-teardown-proof.md) — prove cleanup independently of exit codes and detect rolled-back write attempts.
 - [Revision provenance](verification-revision-provenance.md) — evidence certifies its recorded revision, not a later merged tree.
+- [Generated API verification](generated-api-verification.md) — generator success does not prove barrel exports or repository-wide types are valid.
 - [Injected resource ownership](injected-release-resource-ownership.md) — separate borrowed fixtures from production-owned temporaries.
 - [Asyncio isolation](pytest-asyncio-isolation.md) — private schemas, test-owned connections and correct event-loop lifetime.
 - [Regression Redis ownership](full-regression-redis-ownership.md) — overlapping suites must not shut down a shared test broker.

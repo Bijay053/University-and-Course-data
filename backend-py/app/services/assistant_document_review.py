@@ -113,13 +113,22 @@ async def review(thread_id, turn_id, run_id, thread, message):
 
         source = await read_guidance(url)
         if not source.get("verified"):
-            for alternative in english_guidance_alternatives(ctx["home"], prompt, [source], ctx.get("config")):
+            alternatives = english_guidance_alternatives(ctx["home"], prompt, [source], ctx.get("config"))
+            if getattr(service, "SOURCE_ACCESS_REGISTRY", False) is True:
+                from app.services.university_source_access import entry
+                async with service.AsyncSessionLocal() as db:
+                    registered = await entry(db, url, ctx["home"])
+                    if registered:
+                        alternatives = list(dict.fromkeys(
+                            [*registered.policy.get("alternatives", []), *alternatives]
+                        ))[:5]
+            for alternative in alternatives:
                 checked = await read_guidance(alternative)
                 if checked.get("verified"):
                     source = checked
                     break
     if not source.get("verified"):
-        blocked = source.get("failureStage") == "robots" or source.get("accessIssue") in {
+        blocked = source.get("failureStage") in {"robots", "access_policy"} or source.get("accessIssue") in {
             "robots_unavailable", "robots_disallowed",
         }
         await service.save_research_reply(thread_id, turn_id, run_id, {
@@ -132,10 +141,20 @@ async def review(thread_id, turn_id, run_id, thread, message):
             "sourceOutcome": "access_verification_failed" if blocked else "document_read_failed",
             "coursesUpdated": 0, "actions": [], "sources": [],
             "documentReview": {"checked": 0, "proposed": 0, "unmatched": 0,
+                               "accessError": {
+                                   "message": source.get("error", "Document unavailable."),
+                                   "restrictionKind": source.get("restrictionKind"),
+                                   "url": source.get("url"),
+                                   "alternatives": [
+                                       "Upload an authorised copy of this document when private uploads are enabled.",
+                                       "Provide a permitted official alternative source.",
+                                       "Ask the university to authorise the production crawler.",
+                                   ],
+                               },
                                "notChecked": len(rows), "rows": [
                                    {"id": r.id, "name": r.course_name, "status": "not_checked",
                                     "category": category(r), "applicability": "unverified",
-                                    "reason": source.get("error", "Guidance unavailable."), "changes": []}
+                                    "reason": "Document unavailable; this record was not checked.", "changes": []}
                                    for r in rows]},
         }, detail=f"0 courses checked; {len(rows)} not checked; 0 updates.",
            phase="Source access blocked — 0 courses updated" if blocked

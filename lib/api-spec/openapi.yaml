@@ -31,6 +31,38 @@ tags:
     description: Bulk upload/download
 
 paths:
+  /universities/{universityId}/source-access:
+    parameters:
+      - in: path
+        name: universityId
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: listUniversitySourceAccess
+      tags: [universities]
+      responses:
+        "200":
+          description: Shared access metadata, not course applicability evidence.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UniversitySourceAccessList"
+    put:
+      operationId: updateUniversitySourceAccess
+      tags: [universities]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UniversitySourceAccessInput"
+      responses:
+        "200":
+          description: Audited access policy update. Does not bypass restrictions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UniversitySourceAccessEntry"
   /scrape/staged:
     get:
       operationId: listStagedCourses
@@ -983,6 +1015,49 @@ paths:
 
 components:
   schemas:
+    UniversitySourceAccessPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        method:
+          type: string
+          enum: [official_https, authorized_upload, authorization_required]
+          default: official_https
+        restrictions: { type: string, maxLength: 2000 }
+        authorization_reference: { type: string, maxLength: 1000 }
+        alternatives:
+          type: array
+          maxItems: 5
+          items: { type: string }
+    UniversitySourceAccessInput:
+      type: object
+      required: [url, policy]
+      properties:
+        url: { type: string }
+        policy:
+          $ref: "#/components/schemas/UniversitySourceAccessPolicy"
+    UniversitySourceAccessEntry:
+      type: object
+      required: [url, origin, policy, observation, history, updatedAt]
+      properties:
+        url: { type: string }
+        origin: { type: string }
+        policy:
+          $ref: "#/components/schemas/UniversitySourceAccessPolicy"
+        observation: { type: object, additionalProperties: true }
+        history:
+          type: array
+          items: { type: object, additionalProperties: true }
+        lastSuccessAt: { type: [string, "null"] }
+        updatedAt: { type: string }
+    UniversitySourceAccessList:
+      type: object
+      required: [sources]
+      properties:
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/UniversitySourceAccessEntry"
     StagedCourseGuidanceResponse:
       type: object
       additionalProperties: true

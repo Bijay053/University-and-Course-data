@@ -5,6 +5,49 @@
  * University Course, Fee, Intake & Requirement Management System API
  * OpenAPI spec version: 0.1.0
  */
+export type UniversitySourceAccessPolicyMethod =
+  (typeof UniversitySourceAccessPolicyMethod)[keyof typeof UniversitySourceAccessPolicyMethod];
+
+export const UniversitySourceAccessPolicyMethod = {
+  official_https: "official_https",
+  authorized_upload: "authorized_upload",
+  authorization_required: "authorization_required",
+} as const;
+
+export interface UniversitySourceAccessPolicy {
+  method?: UniversitySourceAccessPolicyMethod;
+  /** @maxLength 2000 */
+  restrictions?: string;
+  /** @maxLength 1000 */
+  authorization_reference?: string;
+  /** @maxItems 5 */
+  alternatives?: string[];
+}
+
+export interface UniversitySourceAccessInput {
+  url: string;
+  policy: UniversitySourceAccessPolicy;
+}
+
+export type UniversitySourceAccessEntryObservation = { [key: string]: unknown };
+
+export type UniversitySourceAccessEntryHistoryItem = { [key: string]: unknown };
+
+export interface UniversitySourceAccessEntry {
+  url: string;
+  origin: string;
+  policy: UniversitySourceAccessPolicy;
+  observation: UniversitySourceAccessEntryObservation;
+  history: UniversitySourceAccessEntryHistoryItem[];
+  /** @nullable */
+  lastSuccessAt?: string | null;
+  updatedAt: string;
+}
+
+export interface UniversitySourceAccessList {
+  sources: UniversitySourceAccessEntry[];
+}
+
 export type LastQualificationApprovalReasonCode =
   (typeof LastQualificationApprovalReasonCode)[keyof typeof LastQualificationApprovalReasonCode];
 

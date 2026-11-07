@@ -90,6 +90,19 @@ verify_target_reporting_schema() {
   fi
 }
 
+verify_target_source_access_schema() {
+  if run_release_user git -C "$repo_root" cat-file -e \
+      "$target:backend-py/app/models/source_access.py" 2>/dev/null; then
+    local source
+    if ! source="$(run_release_user git -C "$repo_root" show \
+        "$target:backend-py/app/services/source_access_schema.py" 2>/dev/null)"; then
+      echo "Release refused: target source registry lacks a schema prerequisite checker." >&2
+      return 1
+    fi
+    printf '%s\n' "$source" | "$python_bin" -B -
+  fi
+}
+
 verify_target_runtime() {
   # Bootstrap from immutable target bytes, without changing installed source.
   # Legacy targets have no helper; this entrypoint's checker can still read
@@ -152,6 +165,7 @@ if [ "$release_test_mode" != 1 ]; then
   verify_target_runtime
   verify_target_worker_schema
   verify_target_reporting_schema
+  verify_target_source_access_schema
   # Use the reviewed target's sample lifecycle rules before checkout, without
   # modifying installed code. Keep the helper beside its pinned proof assets.
   smoke_helper="$(mktemp "$backend_root/deploy/.release-smoke.XXXXXX.py")"
@@ -292,6 +306,7 @@ if [ "$release_test_mode" = 1 ]; then
   run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
   verify_target_worker_schema
   verify_target_reporting_schema
+  verify_target_source_access_schema
   # Optional hermetic lifecycle seam. Injected helpers are borrowed; the
   # ordinary reconciliation-only tests retain their existing behavior.
   if [ -n "${GUARDED_RELEASE_TEST_SMOKE:-}" ]; then

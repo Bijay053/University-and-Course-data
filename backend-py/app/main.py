@@ -45,6 +45,7 @@ from app.routers import (
     scraper_configs,
     search,
     snapshots,
+    source_access,
     universities,
     users,
     verification,
@@ -209,3 +210,4 @@ app.include_router(monitoring.router, prefix="/api", tags=["monitoring"])
 app.include_router(publishing.router, prefix="/api", tags=["publishing"])
 app.include_router(snapshots.router, prefix="/api/scrape", tags=["snapshots"])
 app.include_router(recovery.router, prefix="/api/scrape", tags=["recovery"])
+app.include_router(source_access.router, prefix="/api", tags=["source-access"])

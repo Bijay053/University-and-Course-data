@@ -24,6 +24,25 @@ it("renders numeric backend row IDs and distinguishes unchecked courses", () => 
   expect(screen.getByText("No course rows were checked against this document.")).toBeTruthy();
 });
 
+it("shows one access failure instead of repeating it for every selected course", () => {
+  render(<DocumentReviewView testId="blocked-review" review={{
+    checked: 0, proposed: 0, unmatched: 0, notChecked: 227,
+    accessError: {
+      message: "Cloudflare challenged robots.txt; the document was not requested.",
+      alternatives: ["Upload an authorised document.", "Request crawler authorisation."],
+    },
+    rows: Array.from({ length: 227 }, (_, i) => ({
+      id: i, name: `Course ${i}`, status: "not_checked",
+      reason: "Cloudflare challenged robots.txt", applicability: "unverified",
+    })),
+  }} />);
+  expect(screen.getAllByRole("alert")).toHaveLength(1);
+  expect(screen.getAllByText(/Cloudflare challenged robots.txt/)).toHaveLength(1);
+  expect(screen.getByText(/227 selected records were not checked/)).toBeTruthy();
+  expect(screen.queryByText(/Applicability: unverified/)).toBeNull();
+  expect(screen.getByText("Upload an authorised document.")).toBeTruthy();
+});
+
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
 const empty: AssistantThread = { threadId: null, status: "idle", phase: "", error: null, messages: [] };
 const pdf = (size = 10) => new File([new Uint8Array(size)], "fees.pdf", { type: "application/pdf" });

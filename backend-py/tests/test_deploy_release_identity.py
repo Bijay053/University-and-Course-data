@@ -229,6 +229,40 @@ engine = Engine()
         assert marker.read_text().startswith("SET TRANSACTION READ ONLY\nSELECT")
 
 
+@pytest.mark.parametrize("schema_state", ["checker_absent", "blocked", "ready"])
+def test_source_registry_prerequisite_blocks_before_checkout(tmp_path, schema_state):
+    checkout, source, predecessor, _ = _release_revision_repo(tmp_path)
+    model = source / "backend-py/app/models/source_access.py"
+    model.parent.mkdir(parents=True)
+    model.write_text("# registry model\n")
+    if schema_state != "checker_absent":
+        checker = source / "backend-py/app/services/source_access_schema.py"
+        checker.parent.mkdir(parents=True)
+        checker.write_text("print('REGISTRY_PREREQUISITE_CHECKED')\n" +
+                           ("raise SystemExit(1)\n" if schema_state == "blocked" else ""))
+    _git(source, "add", "backend-py")
+    _git(source, "commit", "-qm", "registry prerequisite target")
+    _git(source, "push", "-q", "origin", "main")
+    target = _git(source, "rev-parse", "HEAD")
+    (checkout / "backend-py").mkdir()
+    result = subprocess.run(
+        [str(DEPLOY_DIR / "guarded_release.sh"), predecessor, target, "123456789012"],
+        capture_output=True, text=True, cwd=tmp_path, env={
+            **os.environ, "GUARDED_RELEASE_TEST_MODE": "1",
+            "GUARDED_RELEASE_REPO_ROOT": str(checkout), "GUARDED_RELEASE_PYTHON": sys.executable,
+            "GUARDED_RELEASE_REVISION_FENCE": str(DEPLOY_DIR / "release_revision_fence.sh"),
+            "GUARDED_RELEASE_RECONCILER": str(DEPLOY_DIR / "reconcile_generated_configs.py"),
+            "GUARDED_RELEASE_RESUME_MARKER": str(tmp_path / "resume"),
+        },
+    )
+    if schema_state == "ready":
+        assert result.returncode == 0, result.stderr
+        assert _git(checkout, "rev-parse", "HEAD") == target
+    else:
+        assert result.returncode != 0
+        assert _git(checkout, "rev-parse", "HEAD") == predecessor
+
+
 def test_schema_preflight_precedes_smoke_and_service_mutations():
     script = (DEPLOY_DIR / "guarded_release.sh").read_text()
     production = script[script.index('if [ "$release_test_mode" != 1 ]; then'):]

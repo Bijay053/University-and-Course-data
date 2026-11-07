@@ -1,7 +1,8 @@
 export type DocumentReviewChange = { field: string; oldValue?: unknown; newValue?: unknown; quote?: string; page?: number };
 export type DocumentReviewRow = { id: string | number; name: string; status: string; reason?: string; changes?: DocumentReviewChange[];
   category?: string; applicability?: string; evidence?: { url?: string; quote: string; page?: number; provenance?: string }[] };
-export type DocumentReview = { checked: number; proposed: number; unmatched: number; notChecked?: number; rows: DocumentReviewRow[] };
+export type DocumentReview = { checked: number; proposed: number; unmatched: number; notChecked?: number; rows: DocumentReviewRow[];
+  accessError?: { message: string; url?: string; restrictionKind?: string; alternatives?: string[] } };
 
 const show = (v: unknown) => (v === null || v === undefined || v === "" ? "(blank)" : typeof v === "object" ? JSON.stringify(v) : String(v));
 const STATUS_TONE: Record<string, string> = {
@@ -25,11 +26,23 @@ export function DocumentReviewView({ review, testId }: { review: DocumentReview;
           {!!review.notChecked && <> · {review.notChecked} not checked</>}
         </span>
       </div>
-      <p className="mt-1 text-[12px] text-slate-600">
+      {review.accessError ? (
+        <div role="alert" className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-950">
+          <p className="font-semibold">Document could not be read</p>
+          <p>{review.accessError.message}</p>
+          <p className="mt-1">No course changes were made. {review.notChecked || 0} selected records were not checked.</p>
+          <ul className="mt-1 list-disc pl-4">{review.accessError.alternatives?.map((option, i) => <li key={i}>{option}</li>)}</ul>
+        </div>
+      ) : <p className="mt-1 text-[12px] text-slate-600">
         {matched} matched · {unchanged} unchanged · {manual} skipped / manual review.
         {" "}This is a preview, not an update receipt. Apply the proposed changes after reviewing the evidence.
-      </p>
-      {rows.length === 0 ? (
+      </p>}
+      {review.accessError ? (
+        <details className="mt-2 text-[12px] text-slate-600">
+          <summary>Selected records not checked ({rows.length})</summary>
+          <ul className="mt-1">{rows.map(r => <li key={r.id}>{r.name} · not checked</li>)}</ul>
+        </details>
+      ) : rows.length === 0 ? (
         <p className="mt-2 text-[12px] text-slate-600">No course rows were checked against this document.</p>
       ) : (
         <ul className="mt-2 divide-y divide-slate-100">

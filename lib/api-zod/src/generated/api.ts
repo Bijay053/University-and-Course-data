@@ -7,6 +7,124 @@
  */
 import * as zod from "zod";
 
+export const ListUniversitySourceAccessParams = zod.object({
+  universityId: zod.coerce.number(),
+});
+
+export const listUniversitySourceAccessResponseSourcesItemPolicyMethodDefault = `official_https`;
+export const listUniversitySourceAccessResponseSourcesItemPolicyRestrictionsMax = 2000;
+
+export const listUniversitySourceAccessResponseSourcesItemPolicyAuthorizationReferenceMax = 1000;
+
+export const listUniversitySourceAccessResponseSourcesItemPolicyAlternativesMax = 5;
+
+export const ListUniversitySourceAccessResponse = zod.object({
+  sources: zod.array(
+    zod.object({
+      url: zod.string(),
+      origin: zod.string(),
+      policy: zod.object({
+        method: zod
+          .enum([
+            "official_https",
+            "authorized_upload",
+            "authorization_required",
+          ])
+          .default(
+            listUniversitySourceAccessResponseSourcesItemPolicyMethodDefault,
+          ),
+        restrictions: zod
+          .string()
+          .max(
+            listUniversitySourceAccessResponseSourcesItemPolicyRestrictionsMax,
+          )
+          .optional(),
+        authorization_reference: zod
+          .string()
+          .max(
+            listUniversitySourceAccessResponseSourcesItemPolicyAuthorizationReferenceMax,
+          )
+          .optional(),
+        alternatives: zod
+          .array(zod.string())
+          .max(
+            listUniversitySourceAccessResponseSourcesItemPolicyAlternativesMax,
+          )
+          .optional(),
+      }),
+      observation: zod.record(zod.string(), zod.unknown()),
+      history: zod.array(zod.record(zod.string(), zod.unknown())),
+      lastSuccessAt: zod.string().nullish(),
+      updatedAt: zod.string(),
+    }),
+  ),
+});
+
+export const UpdateUniversitySourceAccessParams = zod.object({
+  universityId: zod.coerce.number(),
+});
+
+export const updateUniversitySourceAccessBodyPolicyMethodDefault = `official_https`;
+export const updateUniversitySourceAccessBodyPolicyRestrictionsMax = 2000;
+
+export const updateUniversitySourceAccessBodyPolicyAuthorizationReferenceMax = 1000;
+
+export const updateUniversitySourceAccessBodyPolicyAlternativesMax = 5;
+
+export const UpdateUniversitySourceAccessBody = zod.object({
+  url: zod.string(),
+  policy: zod.object({
+    method: zod
+      .enum(["official_https", "authorized_upload", "authorization_required"])
+      .default(updateUniversitySourceAccessBodyPolicyMethodDefault),
+    restrictions: zod
+      .string()
+      .max(updateUniversitySourceAccessBodyPolicyRestrictionsMax)
+      .optional(),
+    authorization_reference: zod
+      .string()
+      .max(updateUniversitySourceAccessBodyPolicyAuthorizationReferenceMax)
+      .optional(),
+    alternatives: zod
+      .array(zod.string())
+      .max(updateUniversitySourceAccessBodyPolicyAlternativesMax)
+      .optional(),
+  }),
+});
+
+export const updateUniversitySourceAccessResponsePolicyMethodDefault = `official_https`;
+export const updateUniversitySourceAccessResponsePolicyRestrictionsMax = 2000;
+
+export const updateUniversitySourceAccessResponsePolicyAuthorizationReferenceMax = 1000;
+
+export const updateUniversitySourceAccessResponsePolicyAlternativesMax = 5;
+
+export const UpdateUniversitySourceAccessResponse = zod.object({
+  url: zod.string(),
+  origin: zod.string(),
+  policy: zod.object({
+    method: zod
+      .enum(["official_https", "authorized_upload", "authorization_required"])
+      .default(updateUniversitySourceAccessResponsePolicyMethodDefault),
+    restrictions: zod
+      .string()
+      .max(updateUniversitySourceAccessResponsePolicyRestrictionsMax)
+      .optional(),
+    authorization_reference: zod
+      .string()
+      .max(updateUniversitySourceAccessResponsePolicyAuthorizationReferenceMax)
+      .optional(),
+    alternatives: zod
+      .array(zod.string())
+      .max(updateUniversitySourceAccessResponsePolicyAlternativesMax)
+      .optional(),
+  }),
+  observation: zod.record(zod.string(), zod.unknown()),
+  history: zod.array(zod.record(zod.string(), zod.unknown())),
+  lastSuccessAt: zod.string().nullish(),
+  updatedAt: zod.string(),
+});
+
 export const ListStagedCoursesQueryParams = zod.object({
   jobId: zod.coerce.string().optional(),
   universityId: zod.coerce.number().optional(),

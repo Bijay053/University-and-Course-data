@@ -52,6 +52,9 @@ import type {
   StagedCourseGuidanceResponse,
   University,
   UniversityListResponse,
+  UniversitySourceAccessEntry,
+  UniversitySourceAccessInput,
+  UniversitySourceAccessList,
   UpcomingIntake,
   UpdateCourseBody,
   UpdateUniversityBody,
@@ -65,6 +68,180 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+export const getListUniversitySourceAccessUrl = (universityId: number) => {
+  return `/api/universities/${universityId}/source-access`;
+};
+
+export const listUniversitySourceAccess = async (
+  universityId: number,
+  options?: RequestInit,
+): Promise<UniversitySourceAccessList> => {
+  return customFetch<UniversitySourceAccessList>(
+    getListUniversitySourceAccessUrl(universityId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListUniversitySourceAccessQueryKey = (universityId: number) => {
+  return [`/api/universities/${universityId}/source-access`] as const;
+};
+
+export const getListUniversitySourceAccessQueryOptions = <
+  TData = Awaited<ReturnType<typeof listUniversitySourceAccess>>,
+  TError = ErrorType<unknown>,
+>(
+  universityId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listUniversitySourceAccess>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListUniversitySourceAccessQueryKey(universityId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listUniversitySourceAccess>>
+  > = ({ signal }) =>
+    listUniversitySourceAccess(universityId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!universityId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listUniversitySourceAccess>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListUniversitySourceAccessQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listUniversitySourceAccess>>
+>;
+export type ListUniversitySourceAccessQueryError = ErrorType<unknown>;
+
+export function useListUniversitySourceAccess<
+  TData = Awaited<ReturnType<typeof listUniversitySourceAccess>>,
+  TError = ErrorType<unknown>,
+>(
+  universityId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listUniversitySourceAccess>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListUniversitySourceAccessQueryOptions(
+    universityId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getUpdateUniversitySourceAccessUrl = (universityId: number) => {
+  return `/api/universities/${universityId}/source-access`;
+};
+
+export const updateUniversitySourceAccess = async (
+  universityId: number,
+  universitySourceAccessInput: UniversitySourceAccessInput,
+  options?: RequestInit,
+): Promise<UniversitySourceAccessEntry> => {
+  return customFetch<UniversitySourceAccessEntry>(
+    getUpdateUniversitySourceAccessUrl(universityId),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(universitySourceAccessInput),
+    },
+  );
+};
+
+export const getUpdateUniversitySourceAccessMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateUniversitySourceAccess>>,
+    TError,
+    { universityId: number; data: BodyType<UniversitySourceAccessInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateUniversitySourceAccess>>,
+  TError,
+  { universityId: number; data: BodyType<UniversitySourceAccessInput> },
+  TContext
+> => {
+  const mutationKey = ["updateUniversitySourceAccess"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateUniversitySourceAccess>>,
+    { universityId: number; data: BodyType<UniversitySourceAccessInput> }
+  > = (props) => {
+    const { universityId, data } = props ?? {};
+
+    return updateUniversitySourceAccess(universityId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateUniversitySourceAccessMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateUniversitySourceAccess>>
+>;
+export type UpdateUniversitySourceAccessMutationBody =
+  BodyType<UniversitySourceAccessInput>;
+export type UpdateUniversitySourceAccessMutationError = ErrorType<unknown>;
+
+export const useUpdateUniversitySourceAccess = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateUniversitySourceAccess>>,
+    TError,
+    { universityId: number; data: BodyType<UniversitySourceAccessInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateUniversitySourceAccess>>,
+  TError,
+  { universityId: number; data: BodyType<UniversitySourceAccessInput> },
+  TContext
+> => {
+  return useMutation(getUpdateUniversitySourceAccessMutationOptions(options));
+};
 
 export const getListStagedCoursesUrl = (params?: ListStagedCoursesParams) => {
   const normalizedParams = new URLSearchParams();
