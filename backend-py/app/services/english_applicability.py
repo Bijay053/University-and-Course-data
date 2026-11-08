@@ -30,9 +30,10 @@ def score_binding(row, candidate, source):
             return False
         key, value = change.get("field"), change.get("newValue")
         if key == "ielts_overall":
-            pattern = r"(?:overall(?:\s+score)?|IELTS(?:\s+Academic)?(?:\s+overall(?:\s+score)?)?)\s*:?\s*([0-9](?:\.[05])?)(?!\d|\.\d)"
+            from app.services.document_ielts_matching import OVERALL
+            pattern = OVERALL
         elif isinstance(key, str) and key.startswith("ielts_"):
-            pattern = rf"(?:{re.escape(key[6:])}(?:\s+(?:score|minimum))?|no\s+(?:component|band)\s+below)\s*:?\s*([0-9](?:\.[05])?)(?!\d|\.\d)"
+            pattern = rf"(?:{re.escape(key[6:])}(?:\s+(?:score|minimum))?|no\s+(?:components?|bands?|skills?)\s+below)\s*:?\s*([0-9](?:\.[05])?)(?!\d|\.\d)"
         else:
             return False
         # Check all named clauses, not just the model's chosen excerpt.
@@ -93,7 +94,8 @@ def uploaded_course_evidence(row, source):
         return None
     passages = [clause for page in source.get("_pages", [])
                 for clause in clauses(page.get("text"))
-                if (named_clause(row, clause) or scope_matches(row, clause, category(row)))
+                if (named_clause(row, clause) or (scope_matches(row, clause, category(row))
+                    and declared_scope(clause) != "undergraduate and postgraduate taught"))
                 and re.search(r"\bIELTS\b", clause, re.I)]
     if not passages:
         return None
@@ -109,8 +111,9 @@ def uploaded_course_evidence(row, source):
 def applicability(row, candidate, source, course):
     group = category(row)
     result = {"category": group, "applicability": "unverified", "evidence": []}
-    def reject(reason, state="unverified"):
-        return {**result, "applicability": state, "reason": reason}
+    def reject(reason, state="unverified", code=None):
+        return {**result, "applicability": state, "reason": reason,
+                **({"diagnosticCode": code} if code else {})}
     if not source.get("verified") or not course.get("verified"):
         return reject("Readable guidance and sufficient existing-course evidence are required.")
     if source.get("unreadablePages"):
@@ -120,21 +123,27 @@ def applicability(row, candidate, source, course):
         return reject("No structured applicability evidence supplied.")
     scope = normalized(proof.get("guidanceQuote"))
     identity = normalized(proof.get("courseQuote"))
-    if not quote_page(source, scope, proof.get("page")) or not quote_page(course, identity, None):
-        return reject("Applicability quotes or guidance page could not be verified.")
+    if not scope:
+        return reject("The model supplied no applicability passage.", code="guidance_quote_missing")
+    if not quote_page(source, scope, proof.get("page")):
+        return reject("The guidance quote was not found on the cited PDF page.", code="guidance_page_quote_mismatch")
+    if not quote_page(course, identity, None):
+        return reject("The course identity quote was not found in its source.", code="course_quote_mismatch")
     # Reading a page is not identity proof; require the named course in its quote.
     name = normalized(row.course_name)
-    if len(name) < 5 or name.casefold() not in identity.casefold():
+    from app.services.document_ielts_matching import identity_matches, corroboration
+    if len(name) < 5 or not (name.casefold() in identity.casefold() or identity_matches(name, identity)):
         return reject("The course evidence does not identify this course.")
+    confirmed_course = corroboration(row, source, course, scope)
     named = any(named_clause(row, c) for c in clauses(proof.get("guidanceQuote")))
-    if exception_blocks(row, scope, group):
+    if exception_blocks(row, scope, group) and not confirmed_course:
         return reject("The applicability passage contains exclusions; course-specific confirmation is required.", "excluded")
     if group in {"health", "postgraduate_research"} and not named:
         return reject("Health and research courses require explicitly named course guidance.", "excluded")
     if not named:
         # Any exception in the document defeats a blanket default, even for
         # subjects absent from our conservative display-category vocabulary.
-        if any(exception_blocks(row, c, group) for c in clauses(source.get("_fullText") or source.get("text"))):
+        if not confirmed_course and any(exception_blocks(row, c, group) for c in clauses(source.get("_fullText") or source.get("text"))):
             return reject("The guidance contains exceptions; explicitly named course guidance is required.", "excluded")
         if any(named_clause(row, c) for c in clauses(source.get("_fullText") or source.get("text"))):
             return reject("This course is mentioned separately in the guidance; check its own requirement.", "conflict")
@@ -144,9 +153,9 @@ def applicability(row, candidate, source, course):
         stored_match = stored_identity and scope_matches(row, scope, group)
         live_match = (not stored_identity and level and re.search(level, identity, re.I)
                       and re.search(rf"\b(?:all|every)\s+{level}\s+(?:courses|programmes|programs)\b", scope, re.I))
-        if not stored_match and not live_match:
+        if not stored_match and not live_match and not confirmed_course:
             return reject("General guidance does not explicitly cover this course's verified level.")
-        if exception_blocks(row, scope, group):
+        if exception_blocks(row, scope, group) and not confirmed_course:
             return reject("Qualified general guidance requires course-specific confirmation.", "excluded")
     if not re.search(r"IELTS|English", scope, re.I):
         return reject("Applicability evidence does not concern English requirements.")
@@ -155,6 +164,9 @@ def applicability(row, candidate, source, course):
         {"url": course.get("url"), "quote": identity,
          "provenance": course.get("provenance", "official-page")},
     ]
+    if confirmed_course:
+        result["evidence"].append({"url": course.get("url"), "quote": confirmed_course["quote"],
+                                   "provenance": "official-course-english"})
     return {**result, "applicability": "verified", "reason": (
         "Document scope matched to course evidence; staff-uploaded provenance is not independently verified."
         if source.get("provenance") == "staff-uploaded-document"

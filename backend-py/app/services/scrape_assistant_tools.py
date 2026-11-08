@@ -260,6 +260,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
         return {
             "url": url, "title": title[:200], "text": text[:24000], "_fullText": text, **identity,
             "_eligibilityName": eligibility_name,
+            "courseTitle": eligibility_name,
             "_excelsiaIntake": {"name": intake_facts.get("course_name"), "months": intake_facts.get("intake_months"),
                                "quote": intake_facts.get("_intake_snippet")},
             "_eligibilityQuote": domestic_evidence(html, eligibility_name) if eligibility_name else None,
@@ -285,6 +286,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
             **({"accessIssue": exc.access_issue} if isinstance(exc, SourceReadError) and exc.access_issue else {}),
             **({"httpStatus": exc.http_status} if isinstance(exc, SourceReadError) and exc.http_status is not None else {}),
             **({"restrictionKind": exc.restriction_kind} if isinstance(exc, SourceReadError) and exc.restriction_kind else {}),
+            **({"redirectUrl": exc.redirect_url} if isinstance(exc, SourceReadError) and getattr(exc, "redirect_url", None) else {}),
         }
 
 

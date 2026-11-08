@@ -39,6 +39,11 @@ def stored_level(row):
 
 
 def declared_scope(clause):
+    value = text(clause)
+    if re.search(r"\bstandard English language requirement\b", value, re.I) and re.search(
+        r"\bundergraduate or taught postgraduate qualification", value, re.I
+    ) and re.search(r"\bIELTS\b", value, re.I):
+        return "undergraduate and postgraduate taught"
     match = re.search(
         r"\b(?:all|every)\s+([a-z][a-z &-]{1,65}?)\s+(?:courses|programmes|programs)\b",
         text(clause), re.I,
@@ -50,6 +55,8 @@ def scope_matches(row, clause, group):
     if group in {"health", "postgraduate_research"}:
         return False
     scope = declared_scope(clause)
+    if scope == "undergraduate and postgraduate taught":
+        return stored_level(row) in {"undergraduate", "postgraduate_taught"}
     if scope == "undergraduate":
         return stored_level(row) == "undergraduate"
     if scope in {"postgraduate taught", "taught postgraduate"}:

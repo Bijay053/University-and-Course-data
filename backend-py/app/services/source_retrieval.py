@@ -38,7 +38,14 @@ async def _read_response(response, url, *, raw=None):
     # Both provider and target redirects must be checked at a fresh permission
     # boundary, never followed automatically by either HTTP client.
     if response.is_redirect or response.headers.get("Scrape.do-Target-Redirected-Location"):
-        raise _error("Source redirects; provide its final official URL.")
+        error = _error("Source redirects; provide its final official URL.")
+        # Expose only a direct Location for a separate checked request. Provider
+        # redirects remain blocked and are never treated as university authority.
+        if (response.is_redirect and getattr(response, "_request", None) is not None
+                and response.url.host not in {"api.scrape.do", "scrape.do"}):
+            from urllib.parse import urljoin
+            error.redirect_url = urljoin(str(response.url), response.headers.get("location", ""))
+        raise error
     raw = await _bounded(response) if raw is None else raw
     if _challenge(response, raw):
         raise _error(

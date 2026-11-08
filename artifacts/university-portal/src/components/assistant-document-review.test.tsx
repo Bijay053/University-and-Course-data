@@ -5,6 +5,26 @@ import { DocumentReviewView } from "./assistant-document-review";
 
 afterEach(cleanup);
 
+it("shows all five current and proposed IELTS scores without applying changes", () => {
+  const fields = ["overall", "listening", "reading", "writing", "speaking"];
+  render(<DocumentReviewView testId="report" review={{
+    checked: 1, proposed: 1, unmatched: 0,
+    rows: [{ id: 10, name: "Accounting and Finance", status: "proposed", applicability: "verified",
+      currentValues: { ielts_overall: 6 },
+      proposedValues: Object.fromEntries(fields.map(f => [`ielts_${f}`, f === "overall" ? 6 : 5.5])),
+      changes: fields.filter(f => f !== "overall").map(f => ({
+        field: `ielts_${f}`, oldValue: null, newValue: 5.5, quote: "No skill below 5.5.", page: 1,
+      })),
+    }],
+  }} />);
+  const preview = screen.getByTestId("document-ielts-preview-10");
+  for (const field of fields) expect(preview.textContent).toContain(field);
+  expect(preview.textContent).toContain("Existing");
+  expect(preview.textContent).toContain("Proposed");
+  expect(preview.textContent).toContain("no changes applied");
+  expect(preview.querySelectorAll("tbody tr")).toHaveLength(5);
+});
+
 it("retains unverified and excluded rows alongside exact applicability citations", () => {
   render(<DocumentReviewView testId="report" review={{
     checked: 2, proposed: 1, unmatched: 1, notChecked: 1,

@@ -1,5 +1,6 @@
 export type DocumentReviewChange = { field: string; oldValue?: unknown; newValue?: unknown; quote?: string; page?: number };
 export type DocumentReviewRow = { id: string | number; name: string; status: string; reason?: string; changes?: DocumentReviewChange[];
+  currentValues?: Record<string, unknown>; proposedValues?: Record<string, unknown>; diagnosticCode?: string;
   category?: string; applicability?: string; evidence?: { url?: string; quote: string; page?: number; provenance?: string }[] };
 export type DocumentReview = { checked: number; proposed: number; unmatched: number; notChecked?: number; rows: DocumentReviewRow[];
   accessError?: { message: string; url?: string; restrictionKind?: string; alternatives?: string[] } };
@@ -87,6 +88,22 @@ export function DocumentReviewView({ review, testId }: { review: DocumentReview;
                   </a>}
                 </blockquote>
               ))}
+              {!!r.changes?.length && (
+                <div className="mt-2 overflow-x-auto" data-testid={`document-ielts-preview-${r.id}`}>
+                  <table className="w-full text-left text-[12px]">
+                    <caption className="text-left text-slate-600">IELTS approval preview — no changes applied</caption>
+                    <thead><tr><th>Requirement</th><th>Existing</th><th>Proposed</th></tr></thead>
+                    <tbody>{["overall", "listening", "reading", "writing", "speaking"].map(band => {
+                      const field = `ielts_${band}`;
+                      const change = r.changes?.find(c => c.field === field);
+                      const before = r.currentValues?.[field] ?? change?.oldValue;
+                      const after = r.proposedValues?.[field] ?? change?.newValue ?? before;
+                      return <tr key={field}><th className="capitalize font-medium">{band}</th>
+                        <td>{show(before)}</td><td>{show(after)}</td></tr>;
+                    })}</tbody>
+                  </table>
+                </div>
+              )}
               {!!r.changes?.length && (
                 <ul className="mt-1.5 space-y-1.5">
                   {r.changes.map((c, ci) => (
