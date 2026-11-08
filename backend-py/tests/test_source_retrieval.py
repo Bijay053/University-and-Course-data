@@ -169,3 +169,21 @@ async def test_downloaded_pdf_uses_real_isolated_text_parser(monkeypatch):
     assert "IELTS overall 6.5" in result["text"]
     assert result["pagesRead"] == 1
     assert result["excerpts"][0]["page"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [200, 403, 503])
+async def test_incomplete_response_never_triggers_proxy(monkeypatch, status):
+    class BrokenStream(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            yield b"<html>"
+            raise httpx.ReadTimeout("Incomplete body may conceal a challenge")
+    async def forbidden(*args, **kwargs):
+        pytest.fail("Unknown partial response must not trigger proxy fallback")
+    monkeypatch.setenv("SCRAPE_DO_TOKEN", "test-token")
+    monkeypatch.setattr(retrieval, "_scrape_do_bytes", forbidden)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(
+        lambda request: httpx.Response(status, stream=BrokenStream())
+    )) as client:
+        with pytest.raises(tools.SourceReadError):
+            await retrieval.read_permitted_source(client, URL, robots_allowed=True)

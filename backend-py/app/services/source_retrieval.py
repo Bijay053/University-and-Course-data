@@ -98,9 +98,11 @@ async def read_permitted_source(client, url, *, method="GET", body=None,
     """Return original bytes, not response.text or HTML-unescaped content."""
     # Preserve existing query strings, including published repeated PDF suffixes.
     target = str(httpx.URL(url).copy_merge_params(params)) if params else url
+    response_received = False
     try:
         async with client.stream(method, url, json=body if method == "POST" else None,
                                  params=params or None) as response:
+            response_received = True
             # Only plain temporary origin failures qualify for a transport
             # fallback. Read the body first to reject disguised challenges.
             raw = await _bounded(response)
@@ -109,7 +111,9 @@ async def read_permitted_source(client, url, *, method="GET", body=None,
             if not (robots_allowed and method == "GET" and os.environ.get("SCRAPE_DO_TOKEN")):
                 return await _read_response(response, target, raw=raw)
     except (httpx.TimeoutException, httpx.NetworkError):
-        if not (robots_allowed and method == "GET" and os.environ.get("SCRAPE_DO_TOKEN")):
+        # A truncated body may conceal a restriction/challenge. Do not turn
+        # an incomplete response into permission to try a different transport.
+        if response_received or not (robots_allowed and method == "GET" and os.environ.get("SCRAPE_DO_TOKEN")):
             raise _error("Official source transport failed within its request budget.") from None
     return await _scrape_do_bytes(
         target, user_agent=client.headers.get("User-Agent", "StudyInfoCentre-SourceVerifier/1.0")
