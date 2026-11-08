@@ -179,27 +179,11 @@ async def public_request(url: str, *, method="GET", body=None, params=None, user
                     if not parser.can_fetch(user_agent or "StudyInfoCentre-SourceVerifier/1.0",url):
                         raise SourceReadError("robots.txt disallows this source; no browser or proxy bypass was attempted.",
                                               access_issue="robots_disallowed")
-        async with client.stream(method, url, json=body if method == "POST" else None, params=params or None) as response:
-            if response.is_redirect:
-                target = official_url(urljoin(url, response.headers.get("location", "")), url)
-                # Revalidate every hop, limit redirects and never forward credentials.
-                if target == url:
-                    raise ValueError("Source redirect could not be verified.")
-                raise SourceReadError("Source redirects; provide its final official URL.")
-            if response.status_code in (401,403,429):
-                raise SourceReadError(f"Official source refused access (HTTP {response.status_code}); no bot-protection bypass was attempted.",
-                                      access_issue="source_access_denied", http_status=response.status_code,
-                                      restriction_kind=("cloudflare_challenge" if response.headers.get("cf-mitigated", "").lower() == "challenge"
-                                                        else "source_http_failure"))
-            if response.status_code>=400:
-                raise SourceReadError(f"Official source returned HTTP {response.status_code}.",
-                                      http_status=response.status_code)
-            chunks = bytearray()
-            async for chunk in response.aiter_bytes():
-                chunks.extend(chunk)
-                if len(chunks) > MAX_BYTES:
-                    raise SourceReadError("Source exceeds the safe research size limit.")
-            return bytes(chunks)
+        from app.services.source_retrieval import read_permitted_source
+        return await read_permitted_source(
+            client, url, method=method, body=body, params=params,
+            robots_allowed=method == "GET" and value.path != "/robots.txt",
+        )
 
 
 async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) -> dict:

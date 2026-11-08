@@ -31,7 +31,7 @@ async def test_pdf_suffix_and_query_are_preserved_on_the_wire(monkeypatch, url):
     def reply(request):
         seen.append(str(request.url))
         return httpx.Response(200, content=(
-            b"User-agent: *\nDisallow:\n" if request.url.path == "/robots.txt" else b"%PDF fake"
+            b"User-agent: *\nDisallow:\n" if request.url.path == "/robots.txt" else b"%PDF-1.7 fake"
         ))
     async def pdf(raw, checked):
         return {"url": checked, "verified": True, "sourceType": "pdf"}
