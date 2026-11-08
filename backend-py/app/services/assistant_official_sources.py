@@ -1,6 +1,27 @@
 """Bounded official guidance alternatives, never URL extension rewriting."""
 import re
 
+
+def discovered_english_urls(home, sources):
+    """Only actual links from verified official pages, never guessed paths."""
+    from app.services.scrape_assistant_tools import official_url
+    links = []
+    for source in sources[:20]:
+        if source.get("verified") is not True:
+            continue
+        try:
+            official_url(source.get("url"), home)
+        except (ValueError, TypeError, AttributeError):
+            continue
+        for candidate in (source.get("englishLinks") or [])[:8]:
+            try:
+                candidate = official_url(candidate, home)
+            except (ValueError, TypeError, AttributeError):
+                continue
+            if candidate not in links:
+                links.append(candidate)
+    return links[:5]
+
 def is_english_guidance(source):
     return source.get("guidanceTopic") == "english" or source.get("sourceType") == "pdf" and bool(re.search(
         r"eng(?:lish)?[-_ ]?lang|english-language", source.get("url", ""), re.I,

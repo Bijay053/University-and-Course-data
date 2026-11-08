@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import uuid
 import hashlib
@@ -27,6 +28,7 @@ REVIEW_STATUSES = {"pending", "review", "review_ready"}
 SOURCE_ACCESS_REGISTRY = True
 ACTIVE = {"queued", "researching"}
 RESEARCH_TIMEOUT = 75
+logger = logging.getLogger(__name__)
 
 
 def now():
@@ -338,6 +340,10 @@ async def investigate(thread_id: str, turn_id: str):
             await db.commit()
         raise
     except Exception as exc:
+        logger.exception(
+            "Assistant investigation failed thread=%s turn=%s run=%s engine=%s",
+            thread_id, turn_id, run_id, "v2" if v2 else "legacy",
+        )
         if v2 and isinstance(exc,TimeoutError):
             from app.services.scrape_agent_v2.continuation import enqueue
             await enqueue(thread_id,turn_id,run_id)

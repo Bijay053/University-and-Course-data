@@ -87,9 +87,39 @@ async def observe(db, url, home, result):
             "sourceRequestAttempted", "sourceType",
         ) if k in result
     } | {"checkedAt": now.isoformat()}
+    if result.get("verified") is True:
+        # Link discovery is not document verification or permission. Each
+        # candidate must still pass the ordinary reader before it can be used.
+        links = []
+        for candidate in (result.get("englishLinks") or [])[:8]:
+            try:
+                link = identity(candidate, home)[1]
+            except (ValueError, TypeError):
+                continue
+            if link not in links:
+                links.append(link)
+        record.observation["englishLinks"] = links
     if result.get("verified"):
         record.last_success_at = now
     record.updated_at = now
+
+
+async def discovered_guidance_urls(db, home):
+    """Bounded, provider-owned links learned from successfully read pages.
+
+    No network search, policy mutation or inference of course applicability.
+    """
+    origin, _ = identity(home, home)
+    observations = (await db.execute(
+        select(UniversitySourceAccess).where(
+            UniversitySourceAccess.origin == origin,
+            UniversitySourceAccess.observation["verified"].as_boolean().is_(True),
+        ).order_by(UniversitySourceAccess.updated_at.desc()).limit(20)
+    )).scalars().all()
+    from app.services.assistant_official_sources import discovered_english_urls
+    return discovered_english_urls(home, [
+        {"url": record.url, **record.observation} for record in observations
+    ])
 
 
 def refusal(record, now=None):
