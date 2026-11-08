@@ -14,12 +14,14 @@ import httpx
 import pytest
 import pytest_asyncio
 from sqlalchemy import select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.database import Base
 from app.models import Course, ScrapedCourse, ScrapeRuntimeJob, University
 from app.models.scrape_assistant import ScrapeAssistantThread
+from app.models.source_access import UniversitySourceAccess
 from tests.test_hsu_facts import hsu_postgres  # noqa: F401 -- owned private cluster
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -153,7 +155,26 @@ async def process_store(hsu_postgres, tmp_path):
                 RAISE EXCEPTION 'Read-only research attempted a course-data write';
                 END $$'''))
             for table in Base.metadata.sorted_tables:
-                if table.name != "scrape_assistant_threads":
+                if table.name == "university_source_access":
+                    # Shared access observations are operational metadata, not
+                    # course edits. Keep policies/history protected, including
+                    # rolled-back attempts, while exercising the real registry.
+                    await conn.execute(text(f'''CREATE FUNCTION "{schema}".allow_access_observation_insert()
+                        RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+                        IF NEW.policy IS DISTINCT FROM '{{}}'::jsonb
+                           OR NEW.history IS DISTINCT FROM '[]'::jsonb THEN
+                            PERFORM nextval('"{schema}".forbidden_writes');
+                            RAISE EXCEPTION 'Read-only research attempted an access-policy write';
+                        END IF;
+                        RETURN NEW;
+                        END $$'''))
+                    await conn.execute(text(f'''CREATE TRIGGER deny_access_policy_insert
+                        BEFORE INSERT ON "{schema}"."{table.name}"
+                        FOR EACH ROW EXECUTE FUNCTION "{schema}".allow_access_observation_insert()'''))
+                    await conn.execute(text(f'''CREATE TRIGGER deny_access_policy_write
+                        BEFORE UPDATE OF policy, history OR DELETE ON "{schema}"."{table.name}"
+                        FOR EACH STATEMENT EXECUTE FUNCTION "{schema}".deny_course_write()'''))
+                elif table.name != "scrape_assistant_threads":
                     await conn.execute(text(f'''CREATE TRIGGER deny_research_write
                         BEFORE INSERT OR UPDATE OR DELETE ON "{schema}"."{table.name}"
                         FOR EACH STATEMENT EXECUTE FUNCTION "{schema}".deny_course_write()'''))
@@ -188,7 +209,39 @@ async def assert_read_only(store):
         assert (await db.get(Course, 1)).name == "Published sentinel"
         assert (await db.get(Course, 1)).status == "active"
         assert len((await db.execute(select(ScrapeRuntimeJob))).scalars().all()) == 1
+        access = (await db.execute(select(UniversitySourceAccess))).scalars().all()
+        assert len(access) == 1
+        assert access[0].policy == {} and access[0].history == []
+        assert access[0].observation.get("verified") is True
         assert not await db.scalar(text(f'SELECT is_called FROM "{store.schema}".forbidden_writes'))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["policy", "history", "delete", "insert_policy"])
+async def test_observation_exception_does_not_permit_access_policy_writes(process_store, operation):
+    """Allowing cache telemetry must not weaken the settings write fence."""
+    async with process_store.factory() as db:
+        db.add(UniversitySourceAccess(
+            origin="https://www.example.edu", url="https://www.example.edu/course",
+            policy={}, observation={"verified": True}, history=[],
+        ))
+        await db.commit()
+        statements = {
+            "policy": "UPDATE university_source_access SET policy='{\"method\":\"authorization_required\"}'::jsonb",
+            "history": "UPDATE university_source_access SET history=jsonb_build_array(jsonb_build_object('actorId', 1))",
+            "delete": "DELETE FROM university_source_access",
+            "insert_policy": """INSERT INTO university_source_access (origin,url,policy,observation,history)
+                VALUES ('https://www.example.edu','https://www.example.edu/other',
+                '{"method":"authorization_required"}'::jsonb,'{}'::jsonb,'[]'::jsonb)""",
+        }
+        with pytest.raises(DBAPIError, match="Read-only research attempted"):
+            await db.execute(text(statements[operation]))
+        await db.rollback()
+        # The sequence is non-transactional, so even rolled-back attempts are
+        # detected. Normal recovery tests require it to remain unused.
+        assert await db.scalar(text(f'SELECT is_called FROM "{process_store.schema}".forbidden_writes'))
+        access = (await db.execute(select(UniversitySourceAccess))).scalars().one()
+        assert access.policy == {} and access.history == []
 
 
 async def await_answer(api):

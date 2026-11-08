@@ -15,13 +15,21 @@ BANDS = ("ielts_overall", "ielts_reading", "ielts_writing", "ielts_listening", "
 
 
 def requested(message):
+    content = message["content"]
+    # "Prepare a preview; do not apply it" requests document research, not an
+    # immediate write. A later commit prohibition must not discard an earlier
+    # positive request. Conversely, a solely negated edit is not a bulk request.
+    intent = re.sub(r"https://\S+", " ", content)
+    positive = " ".join(
+        re.split(r"\b(?:do not|don't|never)\b", clause, maxsplit=1, flags=re.I)[0]
+        for clause in re.split(r"[.;!?\n]|\b(?:but|then|however)\b", intent, flags=re.I)
+    )
     return bool(message.get("_documentToken") or (
-        re.search(r"\b(english|ielts)\b", message["content"], re.I)
-        and re.search(r"\b(applicability|match.*guidance|guidance.*each course)\b", message["content"], re.I)
+        re.search(r"\b(english|ielts)\b", content, re.I)
+        and re.search(r"\b(applicability|match.*guidance|guidance.*each course)\b", content, re.I)
     ) or (
-        re.search(r"https://\S+\.pdf(?:\b|[?#])", message["content"], re.I)
-        and re.search(r"\b(add|update|set|apply|fill|fix|check|match|applicability)\b", message["content"], re.I)
-        and not re.search(r"\b(?:do not|don't|never)\s+(?:\w+\s+){0,2}(?:update|change|apply|fix|write)", message["content"], re.I)
+        re.search(r"https://\S+\.pdf(?:\b|[?#])", content, re.I)
+        and re.search(r"\b(add|update|set|apply|fill|fix|check|match|applicability|preview)\b", positive, re.I)
     ))
 
 
