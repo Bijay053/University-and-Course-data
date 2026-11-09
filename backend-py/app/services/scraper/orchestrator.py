@@ -101,6 +101,31 @@ async def _iter_surrey_extraction_batches(
                 yield remaining[index:index + batch_size]
 
 
+def _surrey_preparation_failure(link):
+    """Keep unavailable sources out of extraction, staging and recovery fetches."""
+    reason = link.get("_surrey_prepare_error")
+    if not reason:
+        return None
+    return {
+        "url": link.get("url"), "name": link.get("name") or "?",
+        "error": f"prepare: {reason}",
+        "_surrey_prepare_error": reason,
+    }
+
+
+def _preparation_failure_guard(summary):
+    count = summary.get("preparation_failed", 0)
+    if not count:
+        return None
+    return {
+        "status": "completed_with_warnings" if summary.get("staged", 0) else "failed_degraded",
+        "message": (
+            f"{count} source page(s) could not be prepared; other sources were processed. "
+            "Saved pending rows are preserved. See source-preparation errors for URLs and reasons."
+        ),
+    }
+
+
 def _record_surrey_prepared_group(
     job, group, *, links, checkpoints, pending_rows, source_count,
 ):
@@ -400,6 +425,12 @@ def _extraction_failure_details(
     normalized = raw.lower()
     result = result or {}
 
+    if result.get("_surrey_prepare_error"):
+        return {
+            "reason": "source_preparation_failed",
+            "detail": str(result["_surrey_prepare_error"]),
+            "retryable": False,
+        }
     error_type = str(result.get("error_type") or "").lower()
     if result.get("_scrape_do_auth_error") or "scrapedoaccount" in error_type:
         return {
@@ -6655,6 +6686,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         seen_pdf_urls: set[str] = set()
 
         async def _bounded(link: dict) -> dict:
+            preparation_failure = _surrey_preparation_failure(link)
+            if preparation_failure:
+                return preparation_failure
             # Loop supports at most one 429-cooldown retry per URL.
             # When extract_course returns {"_retry_after": N, ...} the
             # semaphore is released (we've exited the `async with sem:` block)
@@ -6840,8 +6874,13 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             from app.services.scraper.extractors.uk_course_facts import expand_links as expand_surrey_links
             from urllib.parse import urlsplit as _option_urlsplit
             async def _surrey_prepare_progress(**observation):
+                message = (
+                    f"[OPTIONS] Source unavailable: {observation['url']} — {observation['error']}. Continuing with other sources."
+                    if observation["kind"] == "course_prepare_error"
+                    else f"Preparing course options: {observation['completed']}/{observation['total']} — {observation['url']}"
+                )
                 await emit("status",
-                    f"Preparing course options: {observation['completed']}/{observation['total']} — {observation['url']}",
+                    message,
                     phase="prepare", **observation)
             # Bounded verification freezes a deterministic sample before any
             # extraction. Full Surrey catalogues can stream completion order;
@@ -7734,6 +7773,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     )
                     continue
                 if r.get("error"):
+                    if r.get("_surrey_prepare_error"):
+                        summary["preparation_failed"] = summary.get("preparation_failed", 0) + 1
                     _settled_outcome = (
                         "skipped"
                         if r["error"].startswith(("rejected:", "skipped:"))
@@ -9316,6 +9357,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         _forced_status: str | None = (
             "failed" if _targeted_retry_filter_diagnostic else None
         )
+        _preparation_guard = _preparation_failure_guard(summary)
+        if _preparation_guard and _forced_status is None:
+            _forced_status = _preparation_guard["status"]
         if _discovered_n > 0 and _fetch_failure_rate > _fg_threshold:
             _forced_status = "failed_degraded"
             log.warning(
@@ -9545,6 +9589,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             job.error_message = _targeted_retry_filter_diagnostic["message"][:1000]
         elif _catalogue_guard:
             job.error_message = _catalogue_guard["message"][:1000]
+        elif _preparation_guard:
+            job.error_message = _preparation_guard["message"][:1000]
         elif finished_cleanly:
             job.error_message = None  # clear any stale message
         else:
@@ -9968,7 +10014,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 runtime_job_id, _rec_exc,
             )
 
-        return {"ok": finished_cleanly, **summary}
+        return {"ok": finished_cleanly, "status": job.status, **summary}
     except VerificationBudgetExceeded:
         # The bounded wrapper records failed_degraded AFTER our finally block
         # releases locks and background tasks. Never run recovery on exhaustion.
@@ -9999,7 +10045,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             return {"ok": False, "reason": f"already_{job.status}", **summary}
         job.status = "failed"
         job.completed_at = datetime.now(timezone.utc)
-        job.error_message = str(exc)[:1000]
+        job.error_message = (str(exc).strip() or type(exc).__name__)[:1000]
         try:
             await db.commit()
         except Exception:  # noqa: BLE001
@@ -10016,7 +10062,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             scrape_url=scrape_url, summary=summary,
             staging_failures=_selected_staging_failures,
         )
-        return {"ok": False, "reason": str(exc), **summary}
+        return {"ok": False, "reason": job.error_message, **summary}
     finally:
         if "_batch_stream" in locals():
             await _batch_stream.aclose()

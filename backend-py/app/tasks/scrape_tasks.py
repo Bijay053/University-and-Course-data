@@ -230,7 +230,7 @@ def set_initial_dispatch_lock(job_id: str) -> None:
                         )
 
 
-async def _async_scrape(runtime_job_id: str) -> None:
+async def _async_scrape(runtime_job_id: str) -> dict:
     from app.services.scraper.browser_pool import pool as _browser_pool
     from app.services.scraper.http_fetcher import close_shared_client_for_current_loop
     from app.services.scraper.scrape_do_semaphore import close_client_for_current_loop
@@ -261,7 +261,7 @@ async def _async_scrape(runtime_job_id: str) -> None:
 
     try:
         async with AsyncSessionLocal() as db:
-            await run_scrape(db, runtime_job_id)
+            return await run_scrape(db, runtime_job_id)
     finally:
         # Always close the Playwright browser pool before the event loop
         # tears down.  Without this, when SoftTimeLimitExceeded (or any
@@ -585,8 +585,9 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
     log.info("Celery task scrape_university start id=%s", runtime_job_id)
     _sync_dispose()
     try:
-        asyncio.run(_async_scrape(runtime_job_id))
-        return {"ok": True, "id": runtime_job_id}
+        result = asyncio.run(_async_scrape(runtime_job_id))
+        return {**(result or {}), "ok": bool(result and result.get("ok")),
+                "id": runtime_job_id}
     except RuntimeJobClaimError as exc:
         log.exception("Task failed before claim id=%s: %s", runtime_job_id, exc)
         _handle_preclaim_failure(runtime_job_id, exc)

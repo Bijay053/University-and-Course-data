@@ -280,13 +280,13 @@ def test_prepared_group_metadata_does_not_count_unextracted_options_as_processed
 
 
 @pytest.mark.asyncio
-async def test_late_preparation_error_drains_siblings_and_preserves_completed_batch():
+async def test_late_unexpected_preparation_error_drains_siblings_and_preserves_completed_batch():
     release = asyncio.Event()
     cancelled = asyncio.Event()
     async def fetch(url):
         if url.endswith("bad"):
             await release.wait()
-            raise TimeoutError("failed source")
+            raise RuntimeError("unexpected parser failure")
         if url.endswith("slow"):
             try:
                 await asyncio.Event().wait()
@@ -297,6 +297,71 @@ async def test_late_preparation_error_drains_siblings_and_preserves_completed_ba
     async with aclosing(pipeline(sources, fetch, parallel=3)) as stream:
         staged = await asyncio.wait_for(anext(stream), 2)
         release.set()
-        with pytest.raises(TimeoutError, match="failed source"):
+        with pytest.raises(RuntimeError, match="unexpected parser failure"):
             await anext(stream)
     assert cancelled.is_set() and len(staged) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["connect", "timeout", "blocked"])
+async def test_failed_source_is_reported_once_and_other_sources_continue(failure):
+    import httpx
+    from app.services.scrape_assistant_tools import SourceReadError
+    errors = {
+        "connect": httpx.ConnectTimeout(""),
+        "timeout": TimeoutError(),
+        "blocked": SourceReadError("robots access denied", access_issue="robots_unavailable"),
+    }
+    calls, events, batches = [], [], []
+    async def fetch(url):
+        calls.append(url)
+        if url.endswith("bad"):
+            raise errors[failure]
+        return page(url)
+    async def observe(**event):
+        events.append(event)
+    async with aclosing(pipeline(
+        [{"url": BASE + tail} for tail in ("first", "bad", "last")],
+        fetch, parallel=1, on_progress=observe,
+    )) as stream:
+        async for batch in stream:
+            batches.extend(batch)
+    assert calls == [BASE + tail for tail in ("first", "bad", "last")]
+    assert len(batches) == 5  # Four good options plus one failure outcome.
+    failures = [orch._surrey_preparation_failure(link) for link in batches
+                if link.get("_surrey_prepare_error")]
+    assert len(failures) == 1
+    assert failures[0]["url"] == BASE + "bad"
+    assert failures[0]["error"].startswith("prepare: ")
+    assert len([e for e in events if e["kind"] == "course_prepare_error"]) == 1
+    assert max(e["completed"] for e in events) == 3
+    # This result cannot enter the extraction fallback or recovery sweep.
+    details = orch._extraction_failure_details(failures[0]["error"], result=failures[0])
+    assert details["reason"] == "source_preparation_failed"
+    assert details["retryable"] is False
+    assert not orch._queue_recovery_sweep_candidate(
+        failures[0], counter="errors", links=[], url_keys=set(), details=details,
+    )
+
+
+@pytest.mark.asyncio
+async def test_collector_preserves_failed_source_identity_and_order():
+    async def fetch(url):
+        if url.endswith("bad"):
+            raise TimeoutError()
+        return page(url)
+    result = await facts.expand_links(
+        [{"url": BASE + "bad"}, {"url": BASE + "good"}], 10, fetch, parallel=2,
+    )
+    assert result[0]["url"] == BASE + "bad"
+    assert "_surrey_prepare_error" in result[0]
+    assert all("/good?" in link["url"] for link in result[1:])
+
+
+@pytest.mark.parametrize("staged, expected", [(0, "failed_degraded"), (50, "completed_with_warnings")])
+def test_source_failures_cannot_be_reported_as_clean_completion(staged, expected):
+    summary = {"preparation_failed": 1, "errors": 1, "staged": staged}
+    guard = orch._preparation_failure_guard(summary)
+    assert guard["status"] == expected
+    assert "pending rows are preserved" in guard["message"]
+    assert orch._preparation_failure_guard({"staged": 50}) is None

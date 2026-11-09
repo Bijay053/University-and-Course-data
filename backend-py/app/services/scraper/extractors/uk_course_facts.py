@@ -29,7 +29,9 @@ async def iter_expanded_links(links,max_courses,fetch=None,*,parallel=1,on_progr
     work happens in preparation tasks; extraction/staging remain consumer-owned.
     """
     import asyncio
+    import httpx
     from contextlib import nullcontext
+    from app.services.scrape_assistant_tools import SourceReadError
     if fetch is None:
         from app.services.scrape_assistant_tools import public_request
         fetch=public_request
@@ -62,7 +64,18 @@ async def iter_expanded_links(links,max_courses,fetch=None,*,parallel=1,on_progr
             async with fetch_gate if fetch_gate is not None else nullcontext():
                 if stop_flag and stop_flag[0]:
                     raise asyncio.CancelledError()
-                raw=await asyncio.wait_for(fetch(url),15)
+                try:
+                    raw=await asyncio.wait_for(fetch(url),15)
+                except (TimeoutError, httpx.TransportError, SourceReadError) as exc:
+                    # A failed source is a recorded outcome, not permission to
+                    # extract another option or retry through a different route.
+                    completed+=1
+                    reason=f"{type(exc).__name__}: source preparation failed"
+                    if isinstance(exc, SourceReadError):
+                        reason=f"{type(exc).__name__}: {exc}"
+                    await observe("course_prepare_error",url,error=reason,
+                                  durationSeconds=time.monotonic()-started)
+                    return [{**link,"_surrey_prepare_error":reason} for link in groups[url]]
             html=raw.decode("utf-8",errors="replace") if isinstance(raw,bytes) else raw
             await observe("course_source_fetched",url,durationSeconds=time.monotonic()-started)
             if stop_flag and stop_flag[0]:

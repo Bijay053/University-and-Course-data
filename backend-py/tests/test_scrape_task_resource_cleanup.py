@@ -66,6 +66,36 @@ async def test_async_scrape_closes_loop_resources_when_scrape_raises():
     mock_engine.dispose.assert_awaited_once()
 
 
+@pytest.mark.asyncio
+async def test_async_scrape_preserves_failed_orchestrator_result():
+    from app.tasks import scrape_tasks
+    result = {"ok": False, "reason": "ConnectTimeout", "staged": 50}
+    with (
+        patch.object(scrape_tasks, "AsyncSessionLocal") as factory,
+        patch.object(scrape_tasks, "run_scrape", AsyncMock(return_value=result)),
+        patch.object(scrape_tasks, "engine") as engine,
+        patch("app.services.scraper.browser_pool.pool.close", AsyncMock()),
+        patch("app.services.scraper.http_fetcher.close_shared_client_for_current_loop", AsyncMock()),
+        patch("app.services.scraper.scrape_do_semaphore.close_client_for_current_loop", AsyncMock()),
+    ):
+        factory.return_value.__aenter__ = AsyncMock(return_value=object())
+        factory.return_value.__aexit__ = AsyncMock(return_value=False)
+        engine.dispose = AsyncMock()
+        assert await scrape_tasks._async_scrape("job_test") == result
+
+
+@pytest.mark.parametrize("ok", [True, False])
+def test_celery_wrapper_reports_orchestrator_result_not_unconditional_success(ok):
+    from app.tasks import scrape_tasks
+    result = {"ok": ok, "reason": "test", "staged": 50}
+    with (
+        patch.object(scrape_tasks, "_async_scrape", AsyncMock(return_value=result)),
+        patch.object(scrape_tasks, "_sync_dispose"),
+        patch.object(scrape_tasks, "_immediate_requeue_hook"),
+    ):
+        assert scrape_tasks.scrape_university.run("job_test") == {**result, "id": "job_test"}
+
+
 def test_production_worker_bounds_descriptor_pressure():
     service = (
         Path(__file__).resolve().parents[1] / "deploy" / "uni-celery.service"
