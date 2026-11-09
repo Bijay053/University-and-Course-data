@@ -4,7 +4,7 @@ import re
 import pytest
 
 from app.services.scraper.config.context import current_uni_config
-from app.services.scraper.config.loader import load_uni_config
+from app.services.scraper.config.loader import _hostname_to_slug, get_config_for_host
 from app.services.scraper.extractors.acadia_html import scope_programme_html
 from app.services.scraper.guards import should_stage_course
 
@@ -12,14 +12,28 @@ URL = "https://www2.acadiau.ca/academics/undergraduate/computer-science.html"
 
 
 def config():
-    return load_uni_config(
-        slug="acadiau", name="Acadia University", scrape_url="https://www2.acadiau.ca",
+    return get_config_for_host(
+        hostname="www2.acadiau.ca", name="Acadia University", scrape_url="https://www2.acadiau.ca",
         university_id=104, create_missing_stub=False,
         db_scrape_config={"admin_config": {"discovery": {
             "seed_urls": [], "allow_url_patterns": [], "block_url_patterns": [],
         }, "extraction": {"skip_browser_rescue": False,
                          "skip_per_course_browser": False}}},
     )
+
+
+@pytest.mark.parametrize("hostname,slug", [
+    ("www2.acadiau.ca", "acadiau"),
+    ("WWW2.ACADIAU.CA", "acadiau"),
+    ("www1.cbu.ca", "cbu"),
+    ("www42.cbu.ca", "cbu"),
+    ("www2.study.csu.edu.au", "csu"),
+    ("www2academic.cbu.ca", "www2academic"),
+    ("www2.ca", "www2"),
+    ("courses.hud.ac.uk", "hud"),
+])
+def test_numbered_www_hosts_use_institution_recipe_without_stripping_real_names(hostname, slug):
+    assert _hostname_to_slug(hostname) == slug
 
 
 def test_subject_named_programme_survives_staging_without_invented_award():

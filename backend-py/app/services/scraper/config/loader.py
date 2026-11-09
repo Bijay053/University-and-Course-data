@@ -112,7 +112,10 @@ def _hostname_to_slug(hostname: str) -> str:
     """
     parts = hostname.lower().split(".")
     # Strip leading generic subdomain labels (keep at least 2 parts).
-    while len(parts) > 2 and parts[0] in _GENERIC_SUBDOMAINS:
+    while len(parts) > 2 and (
+        parts[0] in _GENERIC_SUBDOMAINS
+        or re.fullmatch(r"www[0-9]+", parts[0]) is not None
+    ):
         parts = parts[1:]
     for part in parts:
         if part not in _TLD_TOKENS:
