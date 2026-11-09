@@ -1,0 +1,45 @@
+# Acadia University
+# Hostname: www2.acadiau.ca
+# Subject programme pages use bare subject H1s. Do not invent an award or
+# reject these as category pages; the verified URL boundary excludes admin.
+hostname_guard: www2.acadiau.ca
+locked_config_paths:
+  - discovery.seed_urls
+  - discovery.skip_auto_api_discovery
+  - discovery.allow_url_patterns
+  - discovery.course_detail_url_patterns
+  - discovery.listing_only_patterns
+  - discovery.block_url_patterns
+  - discovery.expected_min_courses
+  - extraction.skip_browser_rescue
+  - extraction.skip_per_course_browser
+  - extraction.staging.skip_degree_qualifier_check
+  - extraction.staging.require_international_fee
+  - extraction.staging.dedup_use_full_url
+  - extraction.fees.default_currency
+discovery:
+  skip_auto_api_discovery: true
+  seed_urls:
+    - https://www2.acadiau.ca/academics.html
+    - https://www2.acadiau.ca/academics/graduate.html
+  allow_url_patterns:
+    - '^https://www2\.acadiau\.ca/academics/(?:undergraduate|graduate)/[a-z0-9-]+\.html$'
+  course_detail_url_patterns:
+    - '^https://www2\.acadiau\.ca/academics/(?:undergraduate|graduate)/[a-z0-9-]+\.html$'
+  listing_only_patterns:
+    - '^https://www2\.acadiau\.ca/academics(?:/(?:undergraduate|graduate))?\.html$'
+  block_url_patterns:
+    - '/(?:honours|money-matters|current-students|forms|supervisor-information|frequently-asked-questions)(?:/|\.html$)'
+    - '/(?:admissions|student-services|news|events|research)(?:/|\.html$)'
+  expected_min_courses: 35
+extraction:
+  # Verified static pages contain the same programme content as the browser.
+  # Missing English/duration facts are not a reason to render them repeatedly.
+  skip_browser_rescue: true
+  skip_per_course_browser: true
+  fees:
+    default_currency: CAD
+  staging:
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+    dedup_use_full_url: true

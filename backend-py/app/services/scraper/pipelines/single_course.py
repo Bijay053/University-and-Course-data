@@ -3677,6 +3677,8 @@ async def extract_course(
     from app.services.scraper.unicode_text import scalar_text
     if html is not None:
         html = scalar_text(html)
+        from app.services.scraper.extractors.acadia_html import scope_programme_html
+        html = scope_programme_html(html, url)
         from app.services.scraper.extractors.uk_course_facts import scope_option_html
         html = scope_option_html(html,url)
 

@@ -361,7 +361,9 @@ _JUNK_LAST_SEG_RE = re.compile(
     r"accommodation|sport|news|events?|blogs?|faq|help|support|overview|"
     r"guide|information|handbook|tips|process|pathway|pathways?|"
     r"class(?:es)?|fair|expo|hub|community|connect|network|info-night|"
-    r"open-day|keydates?|key-dates?|story|stories|testimonials?|"
+    # "story" must be a slug word, not the suffix of a subject such as
+    # "history". Keep editorial /student-story and /stories excluded.
+    r"open-day|keydates?|key-dates?|(?<![a-z0-9])stor(?:y|ies)|testimonials?|"
     r"two-specialisations?|two-specializations?|specialisations?|specializations?|"
     # Application / enrolment admin pages — never real course detail pages.
     r"refund|refund-request|refund-request-form|"

@@ -35,7 +35,15 @@ def fingerprint(value):
 def cache_key(url, html, scope):
     if not html or not scope.get("config") or not scope.get("parser"):
         return None
-    return fingerprint({"url": url, "source": hashlib.sha256(html.encode()).hexdigest(),
+    try:
+        source_bytes = html.encode("utf-8")
+    except UnicodeEncodeError:
+        # Browser/JSON transports can expose UTF-16 code units rather than
+        # Unicode scalars. The parser repairs these, but cache proof must use
+        # the *unmodified* transport source. Do not repair/hash a different
+        # source here or let an optional cache abort fresh extraction.
+        return None
+    return fingerprint({"url": url, "source": hashlib.sha256(source_bytes).hexdigest(),
                         "scope": scope, "schema": 1})
 
 

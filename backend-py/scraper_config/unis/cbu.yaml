@@ -1,0 +1,39 @@
+# Cape Breton University
+# Hostname: www.cbu.ca
+# The programme finder is client-paginated. Its static navigation was being
+# mistaken for courses; the official programme sitemap enumerates all pages.
+hostname_guard: www.cbu.ca
+locked_config_paths:
+  - discovery.skip_auto_api_discovery
+  - discovery.seed_urls
+  - discovery.sitemap_url
+  - discovery.skip_sitemap_fallback
+  - discovery.allow_url_patterns
+  - discovery.block_url_patterns
+  - discovery.course_detail_url_patterns
+  - discovery.listing_only_patterns
+  - discovery.expected_min_courses
+discovery:
+  skip_auto_api_discovery: true
+  seed_urls:
+    - https://www.cbu.ca/academics/programs/
+  sitemap_url: https://www.cbu.ca/academic-programs-sitemap.xml
+  skip_sitemap_fallback: false
+  allow_url_patterns:
+    - '^https://www\.cbu\.ca/academics/programs/[a-z0-9-]+/?$'
+  course_detail_url_patterns:
+    - '^https://www\.cbu\.ca/academics/programs/[a-z0-9-]+/?$'
+  block_url_patterns:
+    - '/faculty-staff(?:/|$)'
+    - '/future-students(?:/|$)'
+    - '/current-students(?:/|$)'
+    - '/academics/program-types(?:/|$)'
+    - '/academics/program-fields(?:/|$)'
+    - '/academics/schools(?:/|$)'
+    - '/(?:newsroom|news|events|blogs?)(?:/|$)'
+  listing_only_patterns:
+    - '^https://www\.cbu\.ca/academics/programs/?$'
+  expected_min_courses: 50
+extraction:
+  fees:
+    default_currency: CAD
