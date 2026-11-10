@@ -3212,17 +3212,11 @@ async def run_ai_repair_loop(
                     # identical work. Let the next diagnosis address other gates.
                     deterministic_patterns = None
             if ctx.get("provider_failure") or ctx.get("catalogue_recovery"):
+                from app.services.scraper.official_catalogue_repair import discovery_patches
                 ai_data = {
                     "diagnosis": "Validate an independent official catalogue source before field repair.",
                     "root_cause": "catalogue_coverage_unverified", "confidence": 100,
-                    "patches": [
-                        {"section": "discovery", "field": "official_catalogue_fallback", "value": True},
-                        {"section": "discovery", "field": "sitemap_url", "value": live.fallback["source"] or ""},
-                        *[
-                            {"section": "discovery", "field": field, "value": value}
-                            for field, value in live.fallback.get("filter_patch", {}).items()
-                        ],
-                    ] if live.fallback.get("source") else [],
+                    "patches": discovery_patches(live.fallback),
                 }
             elif deterministic_patterns:
                 ai_data = {

@@ -287,10 +287,15 @@ async def test_live_repair_replays_directory_tree_before_config_apply(monkeypatc
     })
     await evidence.probe()
     assert len(evidence.fallback["candidates"]) == 2
-    patch = {
-        "official_catalogue_fallback": True, "sitemap_url": ROOT,
-        **evidence.fallback["filter_patch"],
-    }
+    from app.services.scraper.official_catalogue_repair import discovery_patches
+    from app.services.scraper.ai_repair_agent import _validated_ai_patches
+    plan = discovery_patches(evidence.fallback)
+    assert len(_validated_ai_patches({"patches": plan})) == 3
+    patch = {p["field"]: p["value"] for p in plan}
+    assert "sitemap_url" not in patch
+    for invalid in ({**patch, "seed_urls": [OTHER]}, {**patch, "bfs_page_budget": 1},
+                    {**patch, "sitemap_url": ROOT}):
+        assert not evidence.discovery_validation(CFG.discovery.model_dump(), invalid)["accepted"]
     if changed:
         pages[ROOT + "/business"] = page(course())
     validation = await evidence.validate(CFG.discovery.model_dump(), patch, {})
@@ -396,7 +401,7 @@ async def test_one_unavailable_course_does_not_discard_complete_directory_or_get
     })
     await e.probe()
     assert len(e.catalogue_sample) == 2
-    patch = {"official_catalogue_fallback": True, "sitemap_url": ROOT,
+    patch = {"official_catalogue_fallback": True,
              **e.fallback["filter_patch"]}
     validation = await e.validate(CFG.discovery.model_dump(), patch, {})
     assert validation["accepted"], validation

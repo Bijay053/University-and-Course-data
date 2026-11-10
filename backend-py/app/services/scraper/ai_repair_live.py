@@ -1244,6 +1244,15 @@ class LiveRepairEvidence:
             )
         )
         fallback_source = fallback.get("source")
+        from app.services.scraper.directory_catalogue import directory_roots
+        roots = directory_roots((fallback.get("filter_patch") or {}).get("seed_urls") or [])
+        directory = (
+            fallback.get("coverage_scope") == "configured_subject_directories"
+            and bool(roots) and fallback_source == roots[0]
+        )
+        strategy_fields = {"official_catalogue_fallback", *fallback.get("filter_patch", {})}
+        if not directory:
+            strategy_fields.add("sitemap_url")
         if patch.get("sitemap_url") and not official_url(
             patch["sitemap_url"], self.ctx["scrape_url"], self.extra_hosts
         ):
@@ -1251,13 +1260,12 @@ class LiveRepairEvidence:
         fallback_patch = (
             (self.ctx.get("provider_failure") or self.ctx.get("catalogue_recovery"))
             and patch.get("official_catalogue_fallback") is True
-            and set(patch) == {"official_catalogue_fallback", "sitemap_url",
-                               *fallback.get("filter_patch", {})}
+            and set(patch) == strategy_fields
             and all(patch.get(key) == value for key, value in
                     fallback.get("filter_patch", {}).items())
             and isinstance(fallback_source, str) and bool(fallback_source)
             and official_url(fallback_source, self.ctx["scrape_url"], self.extra_hosts)
-            and patch.get("sitemap_url") == fallback_source
+            and (directory or patch.get("sitemap_url") == fallback_source)
             and len(new) >= 2
             and fallback_sample_safe
         )

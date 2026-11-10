@@ -1419,6 +1419,96 @@ async def test_worker_preserves_approved_sources_when_rebuilding_running_session
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("durable_delivery", [False, True])
+async def test_queued_directory_worker_builds_plan_that_passes_real_envelope_guard(
+    monkeypatch, durable_delivery,
+):
+    roots = ["https://university.example/undergraduate/subjects",
+             "https://university.example/postgraduate/taught-degrees/subjects"]
+    chat = mock_loop(monkeypatch, context(), {"patches": []})
+    queued = {
+        "job_id": "job-live", "session_id": "directory-plan", "university_id": 1,
+        "requested_course_urls": roots,
+        "autonomous": {"enabled": True, "worker_claim": "delivery",
+                       "catalogue_problem": True, "limits": {"max_attempts": 1}},
+    }
+    monkeypatch.setattr(agent, "read_session", lambda _job: {} if durable_delivery else queued)
+    async def probe(evidence):
+        assert evidence.ctx["requested_course_urls"] == roots
+        evidence.initial = {url: live.inspect_page(url, course(), evidence.config)
+                            for url in (ONE, TWO)}
+        evidence.records = list(evidence.initial.values())
+        evidence.fallback = {
+            "source": roots[0], "candidates": [ONE, TWO], "sample": [ONE, TWO],
+            "coverage_scope": "configured_subject_directories",
+            "directory_pages": roots,
+            "filter_patch": {"seed_urls": roots, "bfs_page_budget": 48},
+        }
+        return evidence.audit()
+    monkeypatch.setattr(live.LiveRepairEvidence, "probe", probe)
+    original = agent._validated_ai_patches
+    observed = []
+    def validated(data):
+        patches = original(data)
+        observed.append(patches)
+        raise RuntimeError("Test boundary after real envelope validation; no writes")
+    monkeypatch.setattr(agent, "_validated_ai_patches", validated)
+    db = FakeDb()
+    await agent.run_ai_repair_loop(
+        "job-live", db, lease_token="directory-plan",
+        **({"durable_session": queued} if durable_delivery else {}),
+    )
+    assert len(observed) == 1
+    assert {p["field"] for p in observed[0]} == {
+        "official_catalogue_fallback", "seed_urls", "bfs_page_budget",
+    }
+    assert len(observed[0]) == 3
+    assert not db.writes
+    chat.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_directory_worker_runs_queue_probe_envelope_fresh_replay_and_fenced_apply(monkeypatch):
+    from app.services.scraper.config.schema import UniConfig
+    roots = ["https://university.example/undergraduate/subjects",
+             "https://university.example/postgraduate/taught-degrees/subjects"]
+    cfg = UniConfig(slug="directory-test", name="University",
+                    base_url="https://university.example", scrape_url=SEED)
+    ctx = context(effective_config=cfg, effective_discovery=cfg.discovery.model_dump())
+    chat = mock_loop(monkeypatch, ctx, {"patches": []})
+    queued = {
+        "job_id": "job-live", "session_id": "full-directory", "university_id": 1,
+        "requested_course_urls": roots,
+        "autonomous": {"enabled": True, "worker_claim": "delivery",
+                       "catalogue_problem": True, "limits": {"max_attempts": 1}},
+    }
+    calls = []
+    async def fetch(url, config, timeout):
+        calls.append(url)
+        if url.endswith("/robots.txt"):
+            return "User-agent: *\nDisallow: /private\n", "", ""
+        if url in roots:
+            target = ONE if url == roots[0] else TWO
+            return ('<main><h1>Course subjects</h1><a href="' + target +
+                    '">Bachelor of Science</a></main>'), "", ""
+        assert url in (ONE, TWO)
+        return course(), "", ""
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    monkeypatch.setattr(agent, "renew_repair_lease", lambda *_args: True)
+    monkeypatch.setattr(agent, "_assert_effective_discovery_patch", AsyncMock())
+    db = FakeDb()
+    result = await agent.run_ai_repair_loop(
+        "job-live", db, lease_token="full-directory", durable_session=queued,
+    )
+    assert any(a.get("patch_applied_ok") for a in result["attempts"]), result
+    assert result["attempts"][-1]["live_validation"]["accepted"]
+    assert all(calls.count(root) >= 2 for root in roots)
+    assert db.writes
+    assert result["autonomous"]["verified"] is False  # Child scrape still required.
+    chat.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_mismatched_durable_claim_fails_before_any_work(monkeypatch):
     write = Mock()
     monkeypatch.setattr(agent, "_write_session", write)

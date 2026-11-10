@@ -22,6 +22,25 @@ _SITEMAP_NAVIGATION_INTERMEDIATE = re.compile(
 )
 
 
+def discovery_patches(fallback: dict) -> list[dict]:
+    """Keep directory plans within the existing three-change safety limit."""
+    if not fallback.get("source"):
+        return []
+    from app.services.scraper.directory_catalogue import directory_roots
+    extra = fallback.get("filter_patch") or {}
+    roots = directory_roots(extra.get("seed_urls") or [])
+    directory = (
+        fallback.get("coverage_scope") == "configured_subject_directories"
+        and bool(roots) and fallback["source"] == roots[0]
+    )
+    fields = {"official_catalogue_fallback": True}
+    if not directory:
+        fields["sitemap_url"] = fallback["source"]
+    fields.update(extra)
+    return [{"section": "discovery", "field": field, "value": value}
+            for field, value in fields.items()]
+
+
 def _catalogue_hints(record: dict, source: str, seed: str, extra_hosts) -> list[str]:
     """Follow university-published catalogue navigation, never search queries."""
     from app.services.scraper.guards import _sanitized_visible_document
