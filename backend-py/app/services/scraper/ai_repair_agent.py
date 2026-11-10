@@ -2996,6 +2996,7 @@ async def run_ai_repair_loop(
         "university_id":   queued_session.get("university_id"),
         "uni_name":        None,
         "queued_at":       queued_session.get("queued_at"),
+        "requested_course_urls": deepcopy(queued_session.get("requested_course_urls") or [])[:3],
         "started_at":      datetime.now(timezone.utc).isoformat(),
         "completed_at":    None,
         "error":           None,

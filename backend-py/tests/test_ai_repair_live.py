@@ -1382,6 +1382,43 @@ async def test_durable_claim_keeps_live_gates_when_cache_is_lost_or_stale(monkey
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("durable_delivery", [False, True])
+@pytest.mark.parametrize("sources,expected_limit", [
+    (["https://university.example/undergraduate/subjects",
+      "https://university.example/postgraduate/taught-degrees/subjects"], 128),
+    ([ONE], 12),
+])
+async def test_worker_preserves_approved_sources_when_rebuilding_running_session(
+    monkeypatch, durable_delivery, sources, expected_limit,
+):
+    chat = mock_loop(monkeypatch, context(), {"patches": []})
+    queued = {
+        "job_id": "job-live", "session_id": "requested-sources", "university_id": 1,
+        "requested_course_urls": list(sources),
+        "autonomous": {"enabled": True, "worker_claim": "delivery",
+                       "catalogue_problem": True, "limits": {"max_attempts": 1}},
+    }
+    monkeypatch.setattr(agent, "read_session", lambda _job: {} if durable_delivery else queued)
+    observed = []
+    async def probe(evidence):
+        observed.append(list(evidence.ctx["requested_course_urls"]))
+        assert evidence.max_pages == expected_limit
+        raise RuntimeError("Test boundary: no network or configuration writes")
+    monkeypatch.setattr(live.LiveRepairEvidence, "probe", probe)
+    db = FakeDb()
+    result = await agent.run_ai_repair_loop(
+        "job-live", db, lease_token="requested-sources",
+        **({"durable_session": queued} if durable_delivery else {}),
+    )
+    assert observed == [sources]
+    assert result["requested_course_urls"] == sources
+    result["requested_course_urls"].append("https://not-an-approved-source.example")
+    assert queued["requested_course_urls"] == sources
+    assert not db.writes
+    chat.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_mismatched_durable_claim_fails_before_any_work(monkeypatch):
     write = Mock()
     monkeypatch.setattr(agent, "_write_session", write)
