@@ -631,7 +631,15 @@ def inspect_page(url: str, html: str, config=None) -> dict:
         elif node.get("class"):
             selector += "".join("." + cls for cls in node["class"][:2] if re.fullmatch(r"[\w-]+", cls))
         if text not in {f["text"] for f in fields}:
-            fields.append({"selector": selector, "text": text[:400]})
+            field = {"selector": selector, "text": text[:400]}
+            actual_text = node.get_text(" ", strip=True)
+            if text != actual_text:
+                field["selector_text"] = actual_text[:400]
+                field["text_scope"] = "label_and_next_sibling"
+                if (node.get("id") and re.fullmatch(r"[A-Za-z_][\w-]*", node["id"])
+                        and len(region.find_all(id=node["id"])) == 1):
+                    field["value_selector"] = selector + " + *"
+            fields.append(field)
     owned_html = str(region)
     page = classify_page(owned_html, url)
     course_links = list(page["course_links"])
@@ -854,6 +862,19 @@ class LiveRepairEvidence:
         return record
 
     async def probe(self) -> dict:
+        if self.ctx.get("catalogue_recovery") and not self.ctx.get("provider_failure"):
+            from app.services.scraper.official_catalogue_repair import discover_official_catalogue
+            # Three source checks plus two course checks leave at least half
+            # the ordinary twelve-page budget for independent fresh validation.
+            self.fallback = await discover_official_catalogue(self)
+            candidates = self.fallback["sample"] or list(dict.fromkeys(
+                list(self.ctx.get("requested_course_urls") or [])
+                + list(self.ctx.get("repair_course_url_sample") or [])
+            ))
+            for url in candidates[:2]:
+                if official_url(url, self.ctx["scrape_url"], self.extra_hosts):
+                    self.initial[url] = await self.fetch(url)
+            return self.audit()
         if self.ctx.get("provider_failure"):
             from app.services.scraper.official_catalogue_repair import discover_official_catalogue
             self.fallback = await discover_official_catalogue(self)
@@ -1035,7 +1056,8 @@ class LiveRepairEvidence:
     def discovery_needed(self, discovery: dict) -> bool:
         known = self.ctx.get("passed_sample") or []
         return (
-            bool(self.ctx.get("provider_failure") and not discovery.get("official_catalogue_fallback"))
+            bool((self.ctx.get("provider_failure") or self.ctx.get("catalogue_recovery"))
+                 and not discovery.get("official_catalogue_fallback"))
             or
             not any(r["classification"] == "course" and not is_intentionally_excluded_course_url(url)
                     for url, r in self.initial.items())
@@ -1097,7 +1119,8 @@ class LiveRepairEvidence:
         ):
             reasons.append("Proposed sitemap is not an official configured university source")
         fallback_patch = (
-            self.ctx.get("provider_failure") and patch.get("official_catalogue_fallback") is True
+            (self.ctx.get("provider_failure") or self.ctx.get("catalogue_recovery"))
+            and patch.get("official_catalogue_fallback") is True
             and set(patch) == {"official_catalogue_fallback", "sitemap_url",
                                *fallback.get("filter_patch", {})}
             and all(patch.get(key) == value for key, value in

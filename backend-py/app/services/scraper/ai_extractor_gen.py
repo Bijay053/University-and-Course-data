@@ -78,9 +78,14 @@ RULE TYPES (in preference order):
 3. regex     — Python regex with ONE capture group applied to the full page text
 4. attribute — HTML attribute name to read from the matched element (default: inner text)
 5. transform — optional post-processing hint: "currency", "number", "list", "month_list"
+6. regex_scope — set to "selected" to apply regex ONLY inside the css/xpath result.
+   Without it, css, xpath and regex are independent fallbacks, not a chain.
 
 REQUIREMENTS:
 - Prefer css over xpath; prefer xpath over regex.
+- For a block containing Home and International amounts, select the course-owned
+  fee block and use regex_scope="selected" with an International-labelled regex.
+  Never select just a heading and expect its sibling's price to be included.
 - Provide at most ONE rule type per field (the best you found).
 - quoted_text MUST be a verbatim substring from the HTML I gave you that your rule would match.
   This is used as a sanity check. If you cannot find a clear match, set confidence < 0.5.
@@ -144,6 +149,11 @@ def _validate_rule(field: str, rule: dict, html: str) -> bool:
     # Must have at least one actionable rule
     if not any(rule.get(k) for k in ("css", "xpath", "regex")):
         log.debug("[EXTRACTOR_GEN] %s: no css/xpath/regex key — rejected", field)
+        return False
+    if "regex_scope" in rule and (
+        rule["regex_scope"] != "selected"
+        or not rule.get("regex") or not (rule.get("css") or rule.get("xpath"))
+    ):
         return False
     return True
 
@@ -249,7 +259,7 @@ def _build_seeded_prompt(learned_patterns: dict[str, Any]) -> str:
         "If a selector doesn't match the current page, generate a new one instead.",
         json.dumps(
             {
-                fk: {k: v for k, v in rule.items() if k in ("css", "xpath", "regex", "attribute", "transform")}
+                fk: {k: v for k, v in rule.items() if k in ("css", "xpath", "regex", "attribute", "transform", "regex_scope")}
                 for fk, rule in learned_patterns.items()
             },
             indent=2,

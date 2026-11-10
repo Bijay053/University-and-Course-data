@@ -865,6 +865,13 @@ def _validate_extraction_patch(field: str, value: Any) -> None:
             item = value.get(key)
             if item is not None and (not isinstance(item, str) or len(item) > 1000):
                 raise PatchValidationError(f"extraction.{field}.{key} must be a string ≤1000 chars.")
+        if "regex_scope" in value and (
+            value["regex_scope"] != "selected"
+            or not value.get("regex") or not (value.get("css") or value.get("xpath"))
+        ):
+            raise PatchValidationError(
+                f"extraction.{field}.regex_scope requires 'selected', regex and CSS/XPath."
+            )
         pattern = value.get("regex")
         if pattern:
             try:
@@ -2779,6 +2786,14 @@ def _build_user_message(ctx: dict, previous_attempts: list[dict], phase: str = "
             "  extraction_rules.course_location, extraction_rules.course_name. "
             "Each value must be a rule object\n"
             "  with confidence >= 0.85 and at least one of css, xpath, or regex."
+            " CSS/XPath and regex are independent fallbacks unless regex_scope='selected'."
+            " For mixed Home/International prices, select a course-owned fee block and"
+            " use regex_scope='selected' with a labelled international price regex."
+            " A heading selector cannot read its neighbouring price."
+            " Live fields may include selector_text and value_selector: text can include"
+            " adjacent context, but selector_text is the selector's actual output."
+            " Prefer a verified value_selector for label/value layouts."
+            " Do not invent prices when the current applicable fee is under review."
         )
         diag_priority = (
             "DIAGNOSIS PRIORITY (extraction phase — pick the lowest-fill field first):\n"
@@ -3003,11 +3018,12 @@ async def run_ai_repair_loop(
             autonomous["phase"] = "live_probe"
             _write_session(job_id, session)
             ctx["requested_course_urls"] = list(session.get("requested_course_urls") or [])[:3]
+            ctx["catalogue_recovery"] = autonomous.get("catalogue_problem") is True
             live = LiveRepairEvidence(ctx, autonomous["limits"])
             from app.services.scraper.config.context import current_uni_config
             uni_config_token = current_uni_config.set(live.config)
             session["live_probe"] = await live.probe()
-            if ctx.get("provider_failure"):
+            if ctx.get("provider_failure") or ctx.get("catalogue_recovery"):
                 from app.services.scraper.official_catalogue_repair import NEXT_ACTION
                 autonomous["discovery_repair"] = {
                     "status": "validating", "strategy": "official_sitemap" if (live.fallback["source"] or "").endswith(".xml") else "official_catalogue",
@@ -3029,7 +3045,7 @@ async def run_ai_repair_loop(
             if not ctx["repair_url_sample"]:
                 session.update(status="failed", error=session["live_probe"]["reason"],
                                final_verdict="No config changed: positive live course evidence is unavailable.")
-                if ctx.get("provider_failure"):
+                if ctx.get("provider_failure") or ctx.get("catalogue_recovery"):
                     session["error"] = "No changes were made: official course pages could not be verified. " + NEXT_ACTION
                     autonomous["discovery_repair"].update(status="blocked", message=session["error"])
                 return session
@@ -3144,7 +3160,9 @@ async def run_ai_repair_loop(
             # the exact same candidate simulation, live validation and fences.
             deterministic_patterns = None
             deterministic_detail_patterns = None
-            if live and phase == "discovery" and not ctx.get("provider_failure"):
+            if live and phase == "discovery" and not (
+                ctx.get("provider_failure") or ctx.get("catalogue_recovery")
+            ):
                 from app.services.scraper.verified_url_patterns import proposed_allow_patterns
                 disc = ctx.get("effective_discovery") or {}
                 known_courses = ctx.get("repair_url_sample") or []
@@ -3180,10 +3198,10 @@ async def run_ai_repair_loop(
                     # A rejected proposal must not consume every retry with
                     # identical work. Let the next diagnosis address other gates.
                     deterministic_patterns = None
-            if ctx.get("provider_failure"):
+            if ctx.get("provider_failure") or ctx.get("catalogue_recovery"):
                 ai_data = {
-                    "diagnosis": "Course search access denied; validate official sitemap alternative.",
-                    "root_cause": "provider_access_denied", "confidence": 100,
+                    "diagnosis": "Validate an independent official catalogue source before field repair.",
+                    "root_cause": "catalogue_coverage_unverified", "confidence": 100,
                     "patches": [
                         {"section": "discovery", "field": "official_catalogue_fallback", "value": True},
                         {"section": "discovery", "field": "sitemap_url", "value": live.fallback["source"] or ""},
@@ -3191,7 +3209,7 @@ async def run_ai_repair_loop(
                             {"section": "discovery", "field": field, "value": value}
                             for field, value in live.fallback.get("filter_patch", {}).items()
                         ],
-                    ],
+                    ] if live.fallback.get("source") else [],
                 }
             elif deterministic_patterns:
                 ai_data = {
@@ -3292,7 +3310,9 @@ async def run_ai_repair_loop(
                     log.info("ai_repair: blocked discovery patches in extraction phase: %s", blocked)
 
             disc_patch, extr_patch, validation_errors = _validate_and_build_config_patch(patches_raw)
-            if "official_catalogue_fallback" in disc_patch and not (live and ctx.get("provider_failure")):
+            if "official_catalogue_fallback" in disc_patch and not (
+                live and (ctx.get("provider_failure") or ctx.get("catalogue_recovery"))
+            ):
                 disc_patch = {}
                 validation_errors.append("Provider strategy changes require bounded official-source validation.")
             # A model's mention of IELTS/international fees does not establish
@@ -3867,7 +3887,7 @@ async def run_ai_repair_loop(
                 pending_extraction_rollback = None
                 break
 
-            if ctx.get("provider_failure"):
+            if ctx.get("provider_failure") or ctx.get("catalogue_recovery"):
                 accepted = patch_applied_ok and session.get("live_probe", {}).get("accepted") is True
                 message = ("Official discovery saved; bounded review-only verification is next."
                            if accepted else "No changes were made: an official fallback could not be verified. " + NEXT_ACTION)

@@ -90,6 +90,9 @@ def _sitemap_sample(urls: list[str], titles: dict[str, str], sample_cap: int) ->
 async def discover_official_catalogue(evidence) -> dict:
     from app.services.scraper.guards import classify_course_candidate, OBVIOUS_NON_DEGREE, is_blocked_page
     seed = evidence.ctx["scrape_url"]
+    sample_cap = 2 if (
+        evidence.ctx.get("catalogue_recovery") and not evidence.ctx.get("provider_failure")
+    ) else 4
     discovery = evidence.config.discovery.model_dump()
     configured = discovery.get("sitemap_url")
     canonicalizations = discovery.get("sitemap_loc_host_canonicalizations") or []
@@ -168,7 +171,7 @@ async def discover_official_catalogue(evidence) -> dict:
                 "candidates": sitemap_urls,
                 "sample": _sitemap_sample(
                     sitemap_urls, sitemap_titles,
-                    max(0, min(4, (evidence.max_pages - 2) // 2)),
+                    max(0, min(sample_cap, (evidence.max_pages - 2) // 2)),
                 ),
             }
 
@@ -227,7 +230,7 @@ async def discover_official_catalogue(evidence) -> dict:
             and not record.get("has_pagination")
         ):
             result = {"source": source, "candidates": candidates,
-                      "sample": candidates[:max(0, min(4, (evidence.max_pages - 2 * (source_index + 1)) // 2))]}
+                      "sample": candidates[:max(0, min(sample_cap, (evidence.max_pages - 2 * (source_index + 1)) // 2))]}
             if filter_patch:
                 result["filter_patch"] = filter_patch
             return result

@@ -31,6 +31,21 @@ afterEach(() => {
 });
 
 describe("ScrapePromptAssistant", () => {
+  it.each(["j1", "verification-1"])("only links a verification review when a child exists: %s", async (target) => {
+    const thread: AssistantThread = {...empty, status: "ready", messages: [
+      {role: "assistant", content: "Repair stopped.", createdAt: "2024-01-01T00:00:00Z", actions: [
+        {id: "repair", label: "Repair scraper", kind: "repair_catalogue", state: "error",
+         courseCount: 50, fields: [], jobId: target,
+         error: "Rule validation rejected the proposal; no verification launched."},
+      ]},
+    ]};
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => json(thread));
+    render(<ScrapePromptAssistant jobId="j1" onReviewJob={vi.fn()} />);
+    await screen.findByTestId("assistant-action-repair");
+    expect(!!screen.queryByTestId("button-open-review-repair")).toBe(target !== "j1");
+    expect(!!screen.queryByText(/Some courses may already have been updated/)).toBe(target !== "j1");
+  });
+
   it("confirms a large selected-failure retry and shows exact limits without claiming repair", async () => {
     const thread: AssistantThread = {...empty, status: "ready", messages: [
       {role: "assistant", content: "Selected failures only.", createdAt: "2024-01-01T00:00:00Z", actions: [

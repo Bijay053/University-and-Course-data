@@ -302,21 +302,35 @@ def apply_extraction_rules(
         regex = rule.get("regex") or ""
         attr = rule.get("attribute") or None
         transform = rule.get("transform") or None
+        regex_scope = rule.get("regex_scope")
 
         raw: str | None = None
         method = "ai_rule:miss"
 
-        if css:
+        # Opt-in composition only: historic rules use independent fallbacks.
+        # A scoped regex must never escape its selected course-owned block.
+        if regex_scope is not None:
+            if regex_scope != "selected" or not regex or not (css or xpath):
+                results[field] = (None, "ai_rule:miss")
+                continue
+            selected = _apply_css(soup, css, attr) if css else _apply_xpath(html, xpath, attr)
+            if selected is None and css and xpath:
+                selected = _apply_xpath(html, xpath, attr)
+            if selected is not None:
+                raw = _apply_regex(selected, regex)
+                if raw is not None:
+                    method = "ai_rule:regex"
+        if regex_scope is None and css:
             raw = _apply_css(soup, css, attr)
             if raw is not None:
                 method = "ai_rule:css"
 
-        if raw is None and xpath:
+        if regex_scope is None and raw is None and xpath:
             raw = _apply_xpath(html, xpath, attr)
             if raw is not None:
                 method = "ai_rule:xpath"
 
-        if raw is None and regex:
+        if regex_scope is None and raw is None and regex:
             raw = _apply_regex(page_text, regex)
             if raw is not None:
                 method = "ai_rule:regex"

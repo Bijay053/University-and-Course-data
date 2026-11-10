@@ -533,7 +533,13 @@ async def queue_verification(session: dict, db) -> dict:
         return await finish(session, db, "blocked", "Repair lease lost before verification.", failed=True)
     if not accepted_live_probe(session):
         last_attempt = (session.get("attempts") or [{}])[-1]
-        validation_errors = last_attempt.get("validation_errors") or []
+        # A model's subsequent "no change" must not conceal the actual
+        # rejected proposal that prevented configuration acceptance.
+        rejected = next((
+            attempt for attempt in reversed(session.get("attempts") or [])
+            if attempt.get("validation_errors")
+        ), last_attempt)
+        validation_errors = rejected.get("validation_errors") or []
         detail = "; ".join(str(error) for error in validation_errors if error)
         detail = detail or str(last_attempt.get("patch_error") or "")
         if detail:

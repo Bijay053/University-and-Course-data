@@ -42,6 +42,25 @@ def session(**state):
     }
 
 
+@pytest.mark.asyncio
+async def test_no_change_reply_does_not_hide_previous_patch_rejection(memory, monkeypatch):
+    evidence = session(worker_claim="delivery", config_loop_done=True)
+    evidence.update(
+        status="failed", live_probe={"accepted": False, "status": "needs_review"},
+        attempts=[
+            {"outcome": "rejected", "validation_errors": ["international_fee: selector returned a heading"]},
+            {"outcome": "no_change", "validation_errors": []},
+        ],
+    )
+    memory.evidence = copy.deepcopy(evidence)
+    dispatch = AsyncMock()
+    monkeypatch.setattr(workflow, "dispatch_verification", dispatch)
+    result = await workflow.queue_verification(evidence, DB(memory))
+    assert "selector returned a heading" in result["autonomous"]["reason"]
+    assert "No verification scrape was launched" in result["autonomous"]["reason"]
+    dispatch.assert_not_awaited()
+
+
 class Result:
     def __init__(self, value=None):
         self.value = value

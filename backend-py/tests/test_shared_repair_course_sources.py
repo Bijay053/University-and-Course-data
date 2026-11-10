@@ -178,3 +178,63 @@ async def test_real_bounded_probe_accepts_owned_headers_not_catalogue_or_broken_
     assert result["accepted"]
     assert evidence.pages_checked <= 6
     assert not hasattr(evidence, "db")  # The proof collector never writes rows.
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("host", HOSTS)
+async def test_explicit_catalogue_recovery_checks_independent_source_before_fees(host, monkeypatch):
+    from app.services.scraper import official_catalogue_repair
+    home = f"https://{host}/courses"
+    urls = [home + "/computing", home + "/engineering"]
+    fallback = {"source": f"https://{host}/sitemap.xml", "candidates": urls, "sample": urls}
+    discover = AsyncMock(return_value=fallback)
+    monkeypatch.setattr(official_catalogue_repair, "discover_official_catalogue", discover)
+    fetch = AsyncMock(return_value=(page("<p>International fees are under review</p>"), "", ""))
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    evidence = live.LiveRepairEvidence({
+        "scrape_url": home, "effective_config": config(), "catalogue_recovery": True,
+        "effective_discovery": {}, "critical_quality": {"affected_course_count": 6},
+    })
+    result = await evidence.probe()
+    discover.assert_awaited_once()
+    assert result["course_pages"] == 2
+    assert evidence.discovery_needed({})
+    assert not evidence.discovery_needed({"official_catalogue_fallback": True})
+    proposal = {"official_catalogue_fallback": True, "sitemap_url": fallback["source"]}
+    report = evidence.discovery_validation({}, proposal)
+    assert not report["reasons"]
+    assert fetch.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_missing_catalogue_source_does_not_become_permission_to_repeat_old_discovery(monkeypatch):
+    from app.services.scraper import official_catalogue_repair
+    monkeypatch.setattr(official_catalogue_repair, "discover_official_catalogue",
+                        AsyncMock(return_value={"source": None, "candidates": [], "sample": []}))
+    monkeypatch.setattr(live, "_fetch_official", AsyncMock(return_value=(page(), "", "")))
+    evidence = live.LiveRepairEvidence({
+        "scrape_url": "https://uni.example/", "effective_config": config(),
+        "catalogue_recovery": True, "repair_course_url_sample": ["https://uni.example/courses/computing"],
+    })
+    await evidence.probe()
+    assert evidence.discovery_needed({})
+    assert evidence.discovery_validation({}, {"official_catalogue_fallback": True})["reasons"]
+
+
+@pytest.mark.asyncio
+async def test_real_catalogue_planner_limits_sample_to_two_for_fresh_replay(monkeypatch):
+    from app.services.scraper.config.schema import UniConfig
+    from app.services.scraper.official_catalogue_repair import discover_official_catalogue
+    home = "https://uni.example"
+    cfg = UniConfig(slug="test", name="Test", base_url=home, scrape_url=home)
+    evidence = live.LiveRepairEvidence({
+        "scrape_url": home, "effective_config": cfg, "catalogue_recovery": True,
+    })
+    urls = [home + f"/courses/pg/computing-{i}" for i in range(6)]
+    evidence.fetch = AsyncMock(return_value={
+        "classification": "sitemap",
+        "links": [{"url": url, "name": "Computing MSc"} for url in urls],
+    })
+    fallback = await discover_official_catalogue(evidence)
+    assert len(fallback["candidates"]) == 6
+    assert len(fallback["sample"]) == 2
