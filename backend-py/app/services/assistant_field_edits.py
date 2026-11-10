@@ -33,7 +33,9 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt):
         # implicit add-course operation. Explicit add-course requests retain
         # their separate discovery path.
         explicit_course = re.search(r"\badd\s+(?:this\s+)?course\b", prompt, re.I)
-        if rows and not explicit_course and re.search(r"\b(?:add|set|change|update|edit)\s+\w+", prompt, re.I):
+        from app.services.scrape_assistant_autorun import execution_requested
+        if (rows and not explicit_course and execution_requested(prompt)
+                and re.search(r"\b(?:add|set|change|update|edit)\s+\w+", prompt, re.I)):
             field = "unsupported"
         else:
             return False

@@ -29,6 +29,29 @@ from app.services.scraper.page_type import classify_page
 _MAX_PROBE_HTML_BYTES = 1_000_000
 
 
+def _incomplete_course_template(html: str) -> bool:
+    """Recognize visible CMS failures, not hidden scripts or incidental prose."""
+    soup = _sanitized_visible_document(html)
+    region = soup.select_one("main, [role=main], article")
+    if region is None:
+        return False
+    errors = {
+        match.group(1).lower()
+        for node in region.select("output, [role=alert], .alert-danger")
+        for match in re.finditer(
+            r'Failed to render\s+["\']([^"\']+)["\']', node.get_text(" ", strip=True), re.I,
+        )
+    }
+    return len(errors) >= 2 and (
+        region.find("h1") is None
+        or any(re.search(r"(?:hero|fees?|requirements?|details|facts)", value) for value in errors)
+    )
+
+
+def _needs_rendered_evidence(html: str) -> bool:
+    return _is_javascript_disabled_shell(html) or _incomplete_course_template(html)
+
+
 def _is_javascript_disabled_shell(html: str) -> bool:
     """Detect a short JS-only placeholder without matching real course pages."""
     if not html or len(html) > 20_000:
@@ -118,7 +141,8 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
             geo_code=getattr(extraction, "scrape_do_geo", None) or None,
         )
         if html:
-            if _is_javascript_disabled_shell(html):
+            if _needs_rendered_evidence(html):
+                template_failed = _incomplete_course_template(html)
                 if not render:
                     remaining = timeout - (time.monotonic() - fetch_started)
                     if remaining > 0:
@@ -130,8 +154,10 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                             super_mode=bool(getattr(discovery, "scrape_do_super", False)),
                             geo_code=getattr(extraction, "scrape_do_geo", None) or None,
                         )
-                        if rendered and not _is_javascript_disabled_shell(rendered):
+                        if rendered and not _needs_rendered_evidence(rendered):
                             return _bounded_html(rendered), "", ""
+                if template_failed:
+                    return "", "source_render_failure", "Official page components failed to render; fresh course evidence unavailable"
                 return "", "challenge", "JavaScript-disabled shell; live course HTML unavailable"
             return _bounded_html(html), "", ""
         failure = get_last_fetch_failure() or {}
@@ -181,11 +207,14 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                 if size >= _MAX_PROBE_HTML_BYTES:
                     return "", "unsupported_content", "Sitemap exceeds bounded evidence size"
                 return html, "", ""
-            if _is_javascript_disabled_shell(html):
+            if _needs_rendered_evidence(html):
+                template_failed = _incomplete_course_template(html)
                 remaining = timeout - (time.monotonic() - fetch_started)
                 rendered = await _render_direct_shell(url, remaining)
-                if rendered and not _is_javascript_disabled_shell(rendered):
+                if rendered and not _needs_rendered_evidence(rendered):
                     return _bounded_html(rendered), "", ""
+                if template_failed:
+                    return "", "source_render_failure", "Official page components failed to render; browser could not obtain complete course evidence"
                 return "", "challenge", "JavaScript-disabled shell; browser rendering unavailable"
             return html, "", ""
 
@@ -198,7 +227,7 @@ _AWARD = re.compile(
     r"\b(bachelor|master|doctor|phd|bsc|ba|beng|msc|ma|meng|mba|llb|llm|diploma|certificate)\b",
     re.I,
 )
-_FAILURES = {"network_failure", "challenge", "unsafe_url", "budget_exhausted", "unsupported_content"}
+_FAILURES = {"network_failure", "challenge", "unsafe_url", "budget_exhausted", "unsupported_content", "source_render_failure"}
 _REJECTED = {"listing", "non_course", "non_degree", "ineligible", "not_published"}
 _RELATED_COURSE_SELECTOR = (
     ".related-courses, .related, .course-list, .course-card, .partners, "
@@ -532,6 +561,9 @@ def inspect_page(url: str, html: str, config=None) -> dict:
               "links": [], "html": html, "owned_html": ""}
     if is_challenge_shell(html):
         return {**result, "classification": "challenge", "reason": "Challenge shell, not course evidence"}
+    if _incomplete_course_template(html):
+        return {**result, "classification": "source_render_failure",
+                "reason": "Official course components failed to render; not listing or course evidence"}
     soup = _sanitized_visible_document(html)
     result["has_pagination"] = bool(
         soup.select('[rel=next], .pagination, [class*=load-more], [id*=load-more]')
@@ -543,6 +575,11 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     # page is owned by another host. Keep on-host visible evidence in play;
     # request eligibility and link eligibility are still enforced separately.
     for node in soup.select("nav, footer, header, aside, [role=navigation]"):
+        # A header inside primary content can own the course H1 and facts.
+        # Shared site headers/navigation still cannot supply course authority.
+        if (node.name == "header" and node.find("h1")
+                and node.find_parent(["main", "article"])):
+            continue
         node.decompose()
     # Prefer the page's primary content over article cards that happen to
     # precede it in document order. Some course sites use a body-level

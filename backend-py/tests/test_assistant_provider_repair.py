@@ -49,6 +49,9 @@ def test_bradford_diagnosis_is_evidence_based_not_a_crash_claim():
 @pytest.mark.parametrize("prompt", [
     "fix this scraping bug", "repair this university scraper", "diagnose the discovery issue",
     "why has this scrape failed?", "fix the extraction pipeline",
+    "there is bug in this scapting code fix this\nall courses are not listed",
+    "fix this scaping bug", "why scrapping keeps finding 52 courses",
+    "fix the scraper: IELTS is missing across all courses",
 ])
 def test_scraper_level_requests_use_provider_repair(prompt):
     assert requested(prompt)
@@ -60,6 +63,15 @@ def test_scraper_level_requests_use_provider_repair(prompt):
     "retry failed URLs", "show row 56064", "fix this",
 ])
 def test_unrelated_requests_are_not_reinterpreted_as_scraper_repair(prompt):
+    assert not requested(prompt)
+
+
+@pytest.mark.parametrize("prompt", [
+    "update IELTS from this PDF, the scraper missed the bands",
+    "scrape course name is wrong", "add Sydney as the course location",
+    "use this document to repair IELTS",
+])
+def test_documents_and_individual_field_requests_stay_on_their_routes(prompt):
     assert not requested(prompt)
 
 
@@ -97,13 +109,18 @@ def test_log_sample_is_bounded():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("engine", ["legacy", "v2"])
-async def test_real_prompt_dispatch_prepares_existing_ui_action_in_both_engines(monkeypatch, engine):
+@pytest.mark.parametrize("prompt", [
+    "fix this scraping bug",
+    "there is bug in this scapting code fix this\nall courses are not listed",
+    "fix the scraper: IELTS is missing across all courses",
+])
+async def test_real_prompt_dispatch_prepares_existing_ui_action_in_both_engines(monkeypatch, engine, prompt):
     from app.models import ScrapeRuntimeJob
     from app.models.scrape_assistant import ScrapeAssistantThread
     from app.services import scrape_assistant as service
     from app.services.scrape_agent_v2.tools import DataTools
     thread = SimpleNamespace(
-        job_id="bradford-job", messages=[{"role": "user", "content": "fix this scraping bug",
+        job_id="bradford-job", messages=[{"role": "user", "content": prompt,
                                         "_engine": engine}], actor_id=1,
     )
     class DB:

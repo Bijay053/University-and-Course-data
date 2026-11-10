@@ -34,3 +34,19 @@ async def test_document_update_reaches_research_without_actions(prompt):
 ])
 def test_literal_staff_edits_remain_on_existing_route(prompt):
     assert not document_research_requested(prompt)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prompt", [
+    "Read only these official course pages. Do not run discovery, add courses, change data or start any operation.",
+    "Check the course award, duration, fees and requirements. Do not change data.",
+    "Investigate this official page. Do not update any rows.",
+    "Only explain the academic requirements; never change data.",
+])
+async def test_negated_edits_do_not_hijack_research(prompt, monkeypatch):
+    from app.services import assistant_eligibility
+    row = {"id": 1, "name": "MSc Engineering", "url": "https://university.example/engineering"}
+    monkeypatch.setattr(assistant_eligibility, "scope", lambda *args: [row])
+    service = SimpleNamespace(save_research_reply=AsyncMock())
+    assert await handle_field_edit(service, "thread", "turn", "run", {"samples": [row]}, prompt) is False
+    service.save_research_reply.assert_not_awaited()

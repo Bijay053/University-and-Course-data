@@ -4,12 +4,19 @@ from app.models import ScrapeRuntimeJob
 from app.models.scrape_assistant import ScrapeAssistantThread
 
 
+_SCRAPER = r"\b(?:scrap(?:e|er|ing|ping)|scap(?:e|er|ing|ting)|discovery|extraction pipeline)\b"
+_PROVIDER_TARGET = r"\b(?:scraper|scaper|scraping|scaping|scapting|scrapping|discovery|extraction pipeline)\b"
+
+
 def requested(prompt, messages=()):
     # A field edit or document request must never become a discovery repair.
-    if re.search(r"\b(?:pdf|document|upload|intakes?|ielts|location|course name)\b", prompt, re.I):
+    if re.search(r"\b(?:pdf|document|upload)\b", prompt, re.I):
         return False
-    if re.search(r"\b(?:scrap(?:e|er|ing)|discovery|extraction pipeline)\b", prompt, re.I):
-        return bool(re.search(r"\b(?:fix|repair|bug|wrong|diagnose|fail\w*|issue|missing|problem)\b", prompt, re.I))
+    if (re.search(r"\b(?:intakes?|ielts|location|course name)\b", prompt, re.I)
+            and not re.search(_PROVIDER_TARGET, prompt, re.I)):
+        return False
+    if re.search(_SCRAPER, prompt, re.I):
+        return bool(re.search(r"\b(?:fix|repair|bug|wrong|why|diagnose|fail\w*|issue|missing|problem)\b", prompt, re.I))
     if re.fullmatch(r"\s*(?:fix (?:this|it)|repair (?:this|it)|do it|still broken)[.!? ]*", prompt, re.I):
         previous = next((m for m in reversed(messages) if m.get("role") == "assistant"), {})
         return bool(previous.get("providerRepair"))
