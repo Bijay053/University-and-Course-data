@@ -18,6 +18,9 @@ def definition(name, description, properties, required=()):
 
 class DataTools:
     schemas = [
+        definition("diagnose_scraper", "Diagnose this job from persisted candidate, staging, skip and error evidence. No web fetch or writes. Use before university scraper repair.", {}),
+        definition("repair_scraper", "Prepare a guarded provider configuration repair with isolated fresh verification. Never edit application code. Up to 50 courses requires confirmation; no repair runs until approved.", {}),
+        definition("read_scraper_repair", "Read durable provider-repair progress and verification state without restarting work. Queued or configured does not mean fixed.", {}),
         definition("list_failed_urls", "Read settled retryable failures for this exact job, without web research.", {}),
         definition("retry_failed", "Retry selected settled failures only when the user explicitly requested a retry. Limits and backoff come from the actual prompt. Batches over ten require confirmation.",
                    {"urls": {"type": "array", "items": {"type": "string"}}}),
@@ -106,6 +109,9 @@ class DataTools:
             if not actor or not actor.is_active or not user_has_permission(_payload_for(actor,_perm_keys(actor)), "scraping.trigger"):
                 raise ValueError("Permission denied")
             base = select(ScrapedCourse).where(ScrapedCourse.university_id == self.ctx["university_id"])
+            if name in {"diagnose_scraper", "repair_scraper", "read_scraper_repair"}:
+                from .repair import execute
+                return await execute(self, db, thread, name, call_id)
             if name in {"list_failed_urls", "retry_failed"}:
                 from app.services.selective_retry import inventory, prepare_for_turn, retry_requested, scope_from_prompt
                 if name == "list_failed_urls":

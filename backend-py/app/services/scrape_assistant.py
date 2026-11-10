@@ -297,6 +297,12 @@ async def investigate(thread_id: str, turn_id: str):
             from app.services.live_scrape_diagnostics import handle as live_diagnostics
             from app.services import scrape_assistant as service
             from app.services.selective_retry import retry_requested
+            from app.services.assistant_provider_repair import handle as provider_repair
+            if not retry_requested(requested["content"]) and await provider_repair(
+                service, thread_id, turn_id, run_id,
+                {"job": {"id": claimed_thread.job_id}}, requested["content"],
+            ):
+                return
             # A request to retry settled failures belongs to the fenced retry
             # handler below, not to a read-only diagnostic matching "retry".
             if not retry_requested(requested["content"]) and await live_diagnostics(service, thread_id, turn_id, run_id,

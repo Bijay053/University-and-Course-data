@@ -19,6 +19,12 @@ For literal staff values use edit_staff_values, not page evidence or web researc
 Values and atomic unit bundles are derived from the actual user instruction, never tool arguments.
 Do not claim missing tools or blocked changes were completed. Do not create a course for a field edit.
 For source-backed missing intakes, use start_batch_check with the requested row_ids first.
+For a new university scraper failing, missing courses or repeatedly returning bad fields,
+use diagnose_scraper before repeating page fetches or field extraction.
+When repair is requested, use repair_scraper for the existing validated configuration repair
+and isolated verification workflow. Its batch confirmation is mandatory.
+Use read_scraper_repair for progress; never say a queued or merely configured repair is fixed.
+Do not imply these tools can edit application code or bypass source access restrictions.
 That tool creates verified evidence IDs for edit_field or bulk_edit; fetch_page alone does not.
 Use one atomic bulk_edit for up to ten supported rows. Never repeat a denied operation unchanged.
 Give concise progress explanations, not private reasoning. Confirm completion from the tool results."""
@@ -91,9 +97,15 @@ async def investigate(service, thread_id, turn_id, run_id):
         answer = (f"Completed {changed} recorded changes. The request is not fully completed: "
                   + "; ".join(str(r.get("reason") or r.get("error") or "tool blocked") for r in blocked)
                   if blocked else result["answer"])
+        from .repair import repair_proposals
+        proposals = repair_proposals(receipts)
+        if any(a.get("kind") == "repair_catalogue" for a in proposals):
+            answer = ("University repair is prepared and awaiting your batch approval "
+                      "(up to 50 fresh verification courses). No repair has run yet; "
+                      "no courses have been published.\n\n" + answer)
         await service.save_research_reply(thread_id,turn_id,run_id,{
             "role":"assistant","turnId":turn_id,"createdAt":service.now().isoformat(),
-            "content":answer,"actions":[r["proposal"] for r in receipts if r.get("proposal")],"sources":[],
+            "content":answer,"actions":proposals,"sources":[],
         },detail="Agent loop finished; see tool receipts for verified outcomes.",
             phase="Agent finished — see recorded outcomes")
     except SpendLimit as exc:
