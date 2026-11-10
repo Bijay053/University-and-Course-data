@@ -125,6 +125,82 @@ async def discover_official_catalogue(evidence) -> dict:
     except (TypeError, ValueError):
         configured_cap = _SITEMAP_MAX_CANDIDATES
     max_candidates = min(_SITEMAP_MAX_CANDIDATES, max(0, configured_cap))
+    from app.services.scraper.directory_catalogue import (
+        collect_directory_catalogue, directory_roots,
+    )
+    roots = (
+        getattr(evidence, "directory_roots", [])
+        or directory_roots(discovery.get("seed_urls") or [])
+    )
+    if roots:
+        async def read_directory(url, _config, _timeout):
+            record = await evidence.fetch(url)
+            body = record.get("_source_html")
+            if body:
+                # Directory pages are navigation evidence even if a generic
+                # inspector sees degree words in several result cards.
+                record["classification"] = "robots" if urlsplit(url).path == "/robots.txt" else "listing"
+                record["reference_only"] = True
+                record["fields"] = []
+                record["owned_html"] = ""
+            return (body, "" if body else record.get("classification", "source_unavailable"),
+                    record.get("reason", ""))
+        directory = await collect_directory_catalogue(
+            roots, seed, evidence.config, fetch=read_directory,
+            max_pages=max(0, evidence.max_pages // 2 - 2),
+            max_candidates=max_candidates,
+            max_seconds=max(0, evidence.max_seconds / 2),
+        )
+        urls, titles = [], {}
+        for item in directory.candidates:
+            url, title = item["url"], item["name"]
+            if (
+                classify_course_candidate(url, title)[0] != OBVIOUS_NON_DEGREE
+                and not is_blocked_page(url)[0]
+                and not is_intentionally_excluded_course_url(url)
+                and passes(url, discovery)
+            ):
+                urls.append(url)
+                titles[url] = title
+        accepted = directory.complete and len(urls) >= 2
+        preferred_samples = [
+            url for url in urls
+            if directory.international_sample_hints.get(url.rstrip("/"))
+        ]
+        result = {
+            "source": roots[0] if accepted else None,
+            "candidates": urls if accepted else [],
+            "sample": _sitemap_sample(
+                preferred_samples if len(preferred_samples) >= 2 else urls,
+                titles, min(2, sample_cap),
+            ),
+            "coverage_scope": directory.scope,
+            "university_coverage": "unverified",
+            "directory_pages": directory.pages,
+        }
+        sample_pool = preferred_samples if len(preferred_samples) >= 2 else urls
+        alternative_pool = [
+            url for url in _sitemap_sample(sample_pool, titles, 4)
+            if url not in result["sample"]
+        ]
+        result["sample_alternatives"] = _sitemap_sample(alternative_pool, titles, 2)
+        if result["source"]:
+            result["filter_patch"] = {
+                "seed_urls": roots,
+                "bfs_page_budget": max(
+                    len(directory.pages) + len({urlsplit(url).netloc for url in roots}),
+                    discovery.get("bfs_page_budget") or 25,
+                ),
+            }
+        else:
+            result.update(
+                partial_candidates=urls,
+                partial_sources=[{"url": row["url"], "reason": row["reason"],
+                                  "candidate_count": len(urls)}
+                                 for row in directory.failures],
+                remaining_sources=directory.remaining,
+            )
+        return result
     if configured and canonicalizations and official_url(
         configured, seed, evidence.extra_hosts
     ):

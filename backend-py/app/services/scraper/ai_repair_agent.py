@@ -635,6 +635,7 @@ def _set_dotpath(dotpath: str, value: Any) -> dict:
 # ── Strict patch validation ───────────────────────────────────────────────────
 
 _ALLOWED_DISCOVERY_FIELDS: dict[str, type | tuple] = {
+    "seed_urls": list,
     "official_catalogue_fallback": bool,
     "allow_url_patterns":   list,
     "block_url_patterns":   list,
@@ -783,6 +784,15 @@ def _validate_discovery_patch(field: str, value: Any) -> None:
                 re.compile(pat)
             except re.error as exc:
                 raise PatchValidationError(f"'{field}[{i}]' invalid regex: {exc} ({pat!r})") from exc
+    if field == "seed_urls":
+        from urllib.parse import urlsplit
+        if not 1 <= len(value) <= 8 or any(
+            not isinstance(url, str) or len(url) > 2000
+            or urlsplit(url).scheme != "https" or not urlsplit(url).hostname
+            or urlsplit(url).username or urlsplit(url).password
+            for url in value
+        ):
+            raise PatchValidationError("seed_urls requires 1–8 public HTTPS source URLs.")
     if field == "bfs_page_budget" and not (5 <= value <= 300):
         raise PatchValidationError(f"'bfs_page_budget' must be 5–300, got {value}.")
     if field == "sitemap_url" and not value.startswith(("http://", "https://")):
@@ -1114,6 +1124,8 @@ def _validate_patch(patch: dict) -> dict:
                 f"Discovery field '{field}' must be {expected_type.__name__}, "
                 f"got {type(value).__name__}."
             )
+        if field == "seed_urls":
+            _validate_discovery_patch(field, value)
         if field in (
             "allow_url_patterns",
             "block_url_patterns",

@@ -45,15 +45,37 @@ def proposal(tools, university, report, call_id):
     # Stable within one turn, including replay after a checkpoint.
     import hashlib
     identity = hashlib.sha256(f"{tools.turn_id}:provider-repair".encode()).hexdigest()[:32]
+    from app.services.scraper.directory_catalogue import directory_roots
+    from app.services.scraper.ai_repair_live import official_url
+    import re
+    source_roots = []
+    for match in re.findall(r"https?://[^\s<>\"']+", tools.prompt):
+        url = match.rstrip(").,;")
+        if directory_roots([url]) and official_url(
+            url, university.scrape_url or university.website or ""
+        ):
+            source_roots.append(url)
+    source_roots = list(dict.fromkeys(source_roots))
+    if len(source_roots) > 3:
+        return {"ok": False, "changed": False,
+                "reason": "This repair accepts at most three official directory roots; "
+                          "no supplied sources were silently dropped."}
+    action = {
+        "id": identity, "kind": "repair_catalogue", "state": "proposed",
+        "label": "Diagnose, test and repair this university scraper",
+        "courseCount": 50, "fields": [], "_ids": [],
+        "_configVersion": tools.service.fingerprint(university.scrape_config or {}),
+        "requiresConfirmation": True,
+    }
+    if source_roots:
+        # Existing authenticated action dispatch preserves these sources in
+        # the fenced repair session. They are hints, not approved facts.
+        action["_evidenceUrls"] = source_roots
+        action["sourceUrls"] = source_roots
+        action["sourceReadLimit"] = 128
     return {
         "ok": True, "changed": False, "requiresConfirmation": True,
-        "proposal": {
-            "id": identity, "kind": "repair_catalogue", "state": "proposed",
-            "label": "Diagnose, test and repair this university scraper",
-            "courseCount": 50, "fields": [], "_ids": [],
-            "_configVersion": tools.service.fingerprint(university.scrape_config or {}),
-            "requiresConfirmation": True,
-        },
+        "proposal": action,
         "reason": "Up to 50 fresh verification courses require batch approval. No repair has run yet.",
         "verificationRequired": True,
         "limits": {"maxVerificationCourses": 50, "publishesCourses": False},

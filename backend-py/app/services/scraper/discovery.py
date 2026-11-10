@@ -806,6 +806,35 @@ async def discover_course_links(
 
     parsed = urlparse(start_url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
+    from app.services.scraper.directory_catalogue import (
+        collect_directory_catalogue, directory_roots, DirectoryCatalogueIncomplete,
+    )
+    _directory_roots = (
+        directory_roots(getattr(discovery_config, "seed_urls", None) or [])
+        if getattr(discovery_config, "official_catalogue_fallback", False) else []
+    )
+    if _directory_roots:
+        from app.services.scraper.config.schema import UniConfig
+        directory_config = UniConfig(
+            slug="official-directory", name="Official subject directories",
+            base_url=scrape_url or origin, scrape_url=scrape_url or origin,
+            discovery=discovery_config,
+        )
+        directory = await collect_directory_catalogue(
+            _directory_roots, scrape_url or origin, directory_config,
+            max_pages=max_pages, max_candidates=max_courses, emit=emit,
+        )
+        if not directory.complete:
+            raise DirectoryCatalogueIncomplete(directory)
+        if emit:
+            await emit(
+                "status",
+                f"[DIRECTORY] Complete configured-directory traversal: "
+                f"{len(directory.pages)} pages, {len(directory.candidates)} candidates. "
+                "University-wide coverage outside these directories is not established.",
+                phase="discover", kind="directory_complete",
+            )
+        return directory.candidates
 
     # Time-budget tracking (Cardiff job_72d3725aea12, 2026-07-06): this
     # function is wrapped in `asyncio.wait_for(..., timeout=discovery_phase_

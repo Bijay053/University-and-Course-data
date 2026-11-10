@@ -184,6 +184,11 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
             if response.status_code in (401, 403, 429):
                 return "", "challenge", f"HTTP {response.status_code}; access not verified"
             if response.is_redirect:
+                canonical = canonical_slash_redirect(url, response.headers.get("location", ""))
+                if canonical:
+                    # Return the publisher's Location; never guess or rewrite
+                    # a course URL. The caller must verify policy before GET.
+                    return "", "canonical_redirect", canonical
                 return "", "network_failure", "Redirect refused; destination not verified"
             response.raise_for_status()
             content_type = response.headers.get("content-type", "").lower()
@@ -291,6 +296,11 @@ def _course_links_in_region(region, url: str, extra_hosts=()) -> list[dict]:
         href = anchor.get("href", "").strip()
         text = anchor.get_text(" ", strip=True)
         candidate = urldefrag(urljoin(url, href))[0]
+        if re.search(r"/s/(?:redirect|search)", urlsplit(candidate).path, re.I):
+            # Decode university-published search-result links locally. Never
+            # request the tracking endpoint or inherit its host as authority.
+            from app.services.scraper.discovery import _unwrap_funnelback_redirect
+            candidate = urldefrag(_unwrap_funnelback_redirect(candidate))[0]
         path = urlsplit(candidate).path
         if (
             len(text) < 5 or not official_url(candidate, url, extra_hosts)
@@ -818,12 +828,40 @@ def field_authority_html(field: str, html: str) -> str:
     return "\n".join(selected)
 
 
+def canonical_slash_redirect(original: str, location: str) -> str | None:
+    """Only a publisher-declared, same-origin HTTPS trailing-slash canonicalisation."""
+    try:
+        target = urldefrag(urljoin(original, location))[0]
+        before, after = urlsplit(original), urlsplit(target)
+        if (
+            before.scheme == after.scheme == "https"
+            and before.netloc == after.netloc
+            and not before.query and not after.query
+            and before.path not in {"", "/"}
+            and before.path != after.path
+            and before.path.rstrip("/") == after.path.rstrip("/")
+            and official_url(target, original)
+        ):
+            return target
+    except ValueError:
+        pass
+    return None
+
+
 class LiveRepairEvidence:
     def __init__(self, ctx: dict, limits: dict | None = None):
         limits = limits or {}
         self.ctx = ctx
         self.max_pages = bounded_limit(limits, "max_live_pages", 12)
         self.max_seconds = bounded_limit(limits, "max_live_seconds", 180)
+        from app.services.scraper.directory_catalogue import directory_roots
+        self.directory_roots = directory_roots(ctx.get("requested_course_urls") or [])
+        if self.directory_roots and (ctx.get("catalogue_recovery") or ctx.get("provider_failure")):
+            # Explicit directory-source repair is a distinct read-only scope.
+            # Count every physical request, including robots and fresh replay,
+            # against the same durable worker ledger; ordinary repairs stay 12/180.
+            self.max_pages = bounded_limit(limits, "max_directory_pages", 128)
+            self.max_seconds = bounded_limit(limits, "max_directory_seconds", 600)
         self.fetch_seconds = bounded_limit(limits, "fetch_timeout_seconds", 20)
         self.fetch_elapsed_seconds = 0.0
         self.pages_checked = 0
@@ -841,8 +879,13 @@ class LiveRepairEvidence:
                 create_missing_stub=False,
             )
         self.extra_hosts = getattr(self.config.discovery, "allowed_extra_hostnames", ())
+        if not self.directory_roots and getattr(self.config.discovery, "official_catalogue_fallback", False):
+            self.directory_roots = directory_roots(getattr(self.config.discovery, "seed_urls", []))
+            if self.directory_roots:
+                self.max_pages = bounded_limit(limits, "max_directory_pages", 128)
+                self.max_seconds = bounded_limit(limits, "max_directory_seconds", 600)
 
-    async def fetch(self, url: str) -> dict:
+    async def fetch(self, url: str, *, _canonical_followed: bool = False) -> dict:
         # The live-evidence time budget covers network activity only. AI
         # deliberation and deterministic rule replay must not consume the
         # remaining fetch allowance between probe and validation.
@@ -876,6 +919,25 @@ class LiveRepairEvidence:
                 current_uni_config.reset(token)
                 await refund_live_fetch(timeout, elapsed)
         self.records.append(record)
+        if record.get("classification") == "canonical_redirect":
+            target = canonical_slash_redirect(url, record.get("reason", ""))
+            policy_url = urljoin(url, "/robots.txt")
+            policy = next((row.get("_source_html") for row in reversed(self.records)
+                           if row.get("url") == policy_url and row.get("_source_html")), None)
+            allowed = False
+            if self.directory_roots and policy and target and not _canonical_followed:
+                from app.services.scraper.directory_catalogue import robots_policy
+                permits, delay = robots_policy(policy)
+                allowed = permits(url) and permits(target) and delay <= self.fetch_seconds
+                if allowed and delay:
+                    await asyncio.sleep(delay)
+            if allowed:
+                record.update(classification="canonical_alias", reference_only=True,
+                              reason="Publisher canonical URL; both paths permitted by verified robots.txt")
+                checked = await self.fetch(target, _canonical_followed=True)
+                return {**checked, "url": url, "canonical_url": target}
+            record.update(classification="network_failure",
+                          reason="Canonical redirect refused: verified source policy required, or redirect loop")
         return record
 
     async def probe(self) -> dict:
@@ -888,15 +950,33 @@ class LiveRepairEvidence:
                 list(self.ctx.get("requested_course_urls") or [])
                 + list(self.ctx.get("repair_course_url_sample") or [])
             ))
-            for url in candidates[:2]:
+            alternatives = self.fallback.get("sample_alternatives") or []
+            candidates = list(dict.fromkeys(candidates + alternatives))
+            for url in candidates[:4 if alternatives else 2]:
                 if official_url(url, self.ctx["scrape_url"], self.extra_hosts):
                     self.initial[url] = await self.fetch(url)
+                if self.directory_roots:
+                    selected = [url for url, record in self.initial.items()
+                                if record["classification"] == "course"
+                                and not is_intentionally_excluded_course_url(url)]
+                    if len(selected) >= 2:
+                        self.catalogue_sample = selected[:2]
+                        break
             return self.audit()
         if self.ctx.get("provider_failure"):
             from app.services.scraper.official_catalogue_repair import discover_official_catalogue
             self.fallback = await discover_official_catalogue(self)
-            for url in self.fallback["sample"]:
+            for url in list(dict.fromkeys(
+                self.fallback["sample"] + (self.fallback.get("sample_alternatives") or [])
+            ))[:4]:
                 self.initial[url] = await self.fetch(url)
+                if self.directory_roots:
+                    selected = [url for url, record in self.initial.items()
+                                if record["classification"] == "course"
+                                and not is_intentionally_excluded_course_url(url)]
+                    if len(selected) >= 2:
+                        self.catalogue_sample = selected[:2]
+                        break
             return self.audit()
         # Reserve half the entire session budget for fresh, pre-apply validation.
         limit = min(6, self.max_pages // 2)
@@ -1071,7 +1151,24 @@ class LiveRepairEvidence:
             "samples": [{k: r.get(k) for k in ("url", "classification", "reason", "title", "snippet", "fields", "audience_evidence", "fee_source_links", "reference_only", "linked_from", "url_gate_override_required")}
                         for r in self.records],
         }
-        if partial and not fallback.get("source"):
+        if fallback.get("coverage_scope"):
+            result["catalogue_coverage"] = {
+                "status": "configured_directories_checked" if fallback.get("source") else "partial",
+                "scope": fallback["coverage_scope"],
+                "candidate_count": len(fallback.get("candidates") or partial),
+                "university_coverage": fallback.get("university_coverage", "unverified"),
+                "directory_pages": len(fallback.get("directory_pages") or []),
+                "sources": fallback.get("partial_sources") or [],
+            }
+            result["reason"] = (
+                "Configured subject-directory coverage checked; university-wide "
+                "coverage and full course extraction remain unverified."
+            )
+            result["source_read_limits"] = {
+                "scope": "explicit_official_subject_directories",
+                "max_pages": self.max_pages, "max_seconds": self.max_seconds,
+            }
+        if partial and not fallback.get("source") and not fallback.get("coverage_scope"):
             result["catalogue_coverage"] = {
                 "status": "partial", "candidate_count": len(partial),
                 "sources": fallback.get("partial_sources") or [],
@@ -1127,7 +1224,7 @@ class LiveRepairEvidence:
             ):
                 reasons.append("Live course needs a scoped course_detail_url_patterns exception")
         fallback = getattr(self, "fallback", {})
-        fallback_sample = fallback.get("sample", [])
+        fallback_sample = getattr(self, "catalogue_sample", None) or fallback.get("sample", [])
         fallback_sample_records = [(url, self.initial.get(url)) for url in fallback_sample]
         fallback_sample_courses = {
             url for url, record in fallback_sample_records
