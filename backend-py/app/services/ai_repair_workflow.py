@@ -32,6 +32,10 @@ ACTIVE = {"queued", "running", "starting"}
 CHILD_ACTIVE = {"queued", "running", "awaiting_approval"}
 RECOVERING = "recovering"
 VERIFY_SECONDS = 600
+# The coroutine's source-work budget must expire before Celery interrupts it.
+# Allow cancellation, partial-row reconciliation and ownership acknowledgement
+# to finish; this does not extend the verification's work or spending budget.
+VERIFY_CLEANUP_SECONDS = 60
 MAX_VERIFICATION_RUNS = 2
 TOTAL_VERIFY_SECONDS = VERIFY_SECONDS * MAX_VERIFICATION_RUNS
 TOTAL_VERIFY_COST_USD = 2.0
@@ -664,7 +668,8 @@ async def dispatch_verification(session: dict, db) -> dict:
         set_initial_dispatch_lock(child.runtime_job_id)
         scrape_university.apply_async(
             args=[child.runtime_job_id], queue="scrape",
-            soft_time_limit=VERIFY_SECONDS, time_limit=VERIFY_SECONDS + 60,
+            soft_time_limit=VERIFY_SECONDS + VERIFY_CLEANUP_SECONDS,
+            time_limit=VERIFY_SECONDS + 2 * VERIFY_CLEANUP_SECONDS,
         )
     except Exception as exc:
         child.error_message = f"Verification queue delivery deferred: {exc}"

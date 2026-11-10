@@ -852,8 +852,25 @@ async def test_duplicate_dispatch_is_fenced_by_durable_round(memory, monkeypatch
         workflow.dispatch_verification(copy.deepcopy(memory.evidence), DB(memory)),
     )
     assert dispatch.call_count == 1
-    assert dispatch.call_args.kwargs["soft_time_limit"] == 600
-    assert dispatch.call_args.kwargs["time_limit"] == 660
+    assert dispatch.call_args.kwargs["soft_time_limit"] == 660
+    assert dispatch.call_args.kwargs["time_limit"] == 720
+    assert workflow.VERIFY_SECONDS < dispatch.call_args.kwargs["soft_time_limit"]
+
+
+@pytest.mark.parametrize("work_seconds", [600, 30])
+def test_worker_cleanup_grace_does_not_increase_verification_work_or_spending(work_seconds):
+    parent = SimpleNamespace(
+        runtime_job_id="parent", university_id=3, university_name="University",
+        url="https://university.example",
+    )
+    payload = workflow.verification_payload(
+        session(), parent, time_budget_seconds=work_seconds,
+    )
+    limits = payload["autonomousVerification"]
+    assert limits["time_budget_seconds"] == work_seconds
+    assert limits["cost_cap_usd"] == workflow.TOTAL_VERIFY_COST_USD
+    assert limits["max_courses"] == 50
+    assert workflow.TOTAL_VERIFY_SECONDS == workflow.MAX_VERIFICATION_RUNS * 600
 
 
 @pytest.mark.asyncio

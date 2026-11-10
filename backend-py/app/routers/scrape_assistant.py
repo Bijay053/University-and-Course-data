@@ -190,11 +190,12 @@ async def response(thread, db, job_id=None):
                 continue
             if action["kind"] == "repair_catalogue" and action.get("_sessionId"):
                 from app.services import ai_repair_workflow
-                session = await ai_repair_workflow.load(thread.job_id, db, action["_sessionId"])
+                session = await ai_repair_workflow.reconcile(thread.job_id, action["_sessionId"], db)
                 status = session.get("status", "queued")
                 state = session.get("autonomous") or {}
                 if state.get("verification_job_id"):
                     action["jobId"] = state["verification_job_id"]
+                    target = await db.get(ScrapeRuntimeJob, state["verification_job_id"])
                 if not session:
                     action["state"] = "error"
                     action["error"] = "The repair audit could not be loaded. Check job progress before retrying."
@@ -202,7 +203,8 @@ async def response(thread, db, job_id=None):
                     action["state"] = "completed"
                 elif status == "completed":
                     action["state"] = "error"
-                    action["error"] = "Verification finished but still needs human review. No approval or publication was performed."
+                    reason = state.get("reason") or session.get("final_verdict") or "Verification still needs human review."
+                    action["error"] = str(reason)[:700] + " No approval or publication was performed."
                 elif status in {"failed", "error", "blocked", "cancelled", "stopped"}:
                     action["state"] = "error"
                     reason = state.get("reason") or session.get("error") or session.get("final_verdict")
@@ -216,6 +218,12 @@ async def response(thread, db, job_id=None):
                     action["error"] = (str(reason or "Repair stopped before verification.")[:700]
                                        + " No verified recovery was completed.")
                 action["progress"] = {"current": session.get("current_attempt", 0), "total": 5, "status": status}
+                if state.get("verification_job_id") and target is not None:
+                    action["progress"] = {
+                        "current": target.current or 0,
+                        "total": target.total_found or action.get("courseCount", 0),
+                        "status": target.status,
+                    }
                 changed = True
             elif target is not None:
                 action["progress"] = {"current": target.current or 0, "total": target.total_found or action["courseCount"], "status": target.status}

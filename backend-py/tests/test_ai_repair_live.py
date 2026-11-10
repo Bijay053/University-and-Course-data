@@ -1468,13 +1468,14 @@ async def test_queued_directory_worker_builds_plan_that_passes_real_envelope_gua
 
 
 @pytest.mark.asyncio
-async def test_directory_worker_runs_queue_probe_envelope_fresh_replay_and_fenced_apply(monkeypatch):
+async def test_directory_worker_runs_queue_probe_envelope_fresh_replay_and_fenced_apply(monkeypatch, tmp_path):
     from app.services.scraper.config.schema import UniConfig
     roots = ["https://university.example/undergraduate/subjects",
              "https://university.example/postgraduate/taught-degrees/subjects"]
     cfg = UniConfig(slug="directory-test", name="University",
                     base_url="https://university.example", scrape_url=SEED)
-    ctx = context(effective_config=cfg, effective_discovery=cfg.discovery.model_dump())
+    ctx = context(effective_config=cfg, effective_discovery=cfg.discovery.model_dump(),
+                  unis_dir=tmp_path)
     chat = mock_loop(monkeypatch, ctx, {"patches": []})
     queued = {
         "job_id": "job-live", "session_id": "full-directory", "university_id": 1,
