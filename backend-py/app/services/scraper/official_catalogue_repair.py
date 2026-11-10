@@ -22,6 +22,30 @@ _SITEMAP_NAVIGATION_INTERMEDIATE = re.compile(
 )
 
 
+def _catalogue_hints(record: dict, source: str, seed: str, extra_hosts) -> list[str]:
+    """Follow university-published catalogue navigation, never search queries."""
+    from app.services.scraper.guards import _sanitized_visible_document
+    html = record.get("_source_html") or record.get("html") or ""
+    if not html or record.get("classification") in {"sitemap", "robots"}:
+        return []
+    soup = _sanitized_visible_document(html)
+    hints = []
+    for anchor in soup.select("a[href]"):
+        target = urljoin(source, anchor.get("href", "")).split("#", 1)[0]
+        parsed = urlsplit(target)
+        if (
+            parsed.query or not official_url(target, seed, extra_hosts)
+            or not re.search(
+                r"/(?:courses?|course-finder|programmes?|programs?|degrees?)"
+                r"(?:/(?:ug|pg|undergraduate|postgraduate))?/?$", parsed.path, re.I,
+            )
+            or target in hints
+        ):
+            continue
+        hints.append(target)
+    return hints
+
+
 def _sitemap_candidate_rank(url: str, title: str = "") -> tuple[int, int, int, str]:
     """Rank sitemap URLs without excluding otherwise eligible unknown pages."""
     from app.services.scraper.guards import classify_course_candidate, LIKELY_DEGREE
@@ -176,12 +200,17 @@ async def discover_official_catalogue(evidence) -> dict:
             }
 
     sources = list(dict.fromkeys(filter(None, [
-        configured, urljoin(seed, "/sitemap.xml"), seed,
+        configured, *(discovery.get("seed_urls") or []), urljoin(seed, "/sitemap.xml"), seed,
     ])))[:3]
+    partial_sources = []
+    partial_candidates = {}
     for source_index, source in enumerate(sources):
         if not official_url(source, seed, evidence.extra_hosts):
             continue
         record = await evidence.fetch(source)
+        for hint in _catalogue_hints(record, source, seed, evidence.extra_hosts):
+            if len(sources) < 3 and hint not in sources:
+                sources.append(hint)
         if record.get("classification") not in {"sitemap", "listing"}:
             continue
         candidates = list(dict.fromkeys(
@@ -221,6 +250,12 @@ async def discover_official_catalogue(evidence) -> dict:
                 ]
         candidates = [url for url in candidates if passes(url, {**discovery, **filter_patch})]
         candidates = candidates[:max_candidates]
+        if candidates and record.get("has_pagination"):
+            partial_sources.append({"url": source, "candidate_count": len(candidates),
+                                    "reason": "Pagination not verified; not a complete catalogue"})
+            for link in record.get("links") or []:
+                if isinstance(link, dict) and link.get("url") in candidates:
+                    partial_candidates.setdefault(link["url"], link.get("name", ""))
         # Never persist an explicitly paginated first page as a whole strategy.
         # Neither a complete sitemap nor an unpaginated listing proves every
         # course is eligible: normal extraction and the floor guard still run.
@@ -234,4 +269,12 @@ async def discover_official_catalogue(evidence) -> dict:
             if filter_patch:
                 result["filter_patch"] = filter_patch
             return result
-    return {"source": None, "candidates": [], "sample": []}
+    result = {"source": None, "candidates": [], "sample": []}
+    if partial_candidates:
+        result.update(
+            partial_sources=partial_sources,
+            partial_candidates=list(partial_candidates),
+            sample=_sitemap_sample(list(partial_candidates), partial_candidates,
+                                   min(sample_cap, max(0, (evidence.max_pages - 6) // 2))),
+        )
+    return result

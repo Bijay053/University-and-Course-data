@@ -547,6 +547,11 @@ async def queue_verification(session: dict, db) -> dict:
                 f"Repair validation did not pass: {detail[:1200]} "
                 "No verification scrape was launched."
             )
+        elif ((session.get("live_probe") or {}).get("catalogue_coverage") or {}).get("status") == "partial":
+            reason = (
+                str(session["live_probe"].get("reason") or "Official catalogue coverage is only partial.")
+                + " No verification scrape was launched."
+            )
         elif (session.get("live_probe") or {}).get("accepted") is True:
             reason = (
                 "Live course pages were confirmed, but no accepted repair or "

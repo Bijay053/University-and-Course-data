@@ -61,6 +61,24 @@ async def test_no_change_reply_does_not_hide_previous_patch_rejection(memory, mo
     dispatch.assert_not_awaited()
 
 
+@pytest.mark.asyncio
+async def test_partial_catalogue_refusal_preserves_source_counts(memory, monkeypatch):
+    evidence = session(worker_claim="delivery", config_loop_done=True)
+    evidence.update(status="failed", live_probe={
+        "accepted": False, "status": "needs_review",
+        "catalogue_coverage": {"status": "partial", "candidate_count": 8},
+        "reason": "Read 8 official course links; 1 course page verified. Pagination remains unverified.",
+    })
+    memory.evidence = copy.deepcopy(evidence)
+    dispatch = AsyncMock()
+    monkeypatch.setattr(workflow, "dispatch_verification", dispatch)
+    result = await workflow.queue_verification(evidence, DB(memory))
+    assert "Read 8 official course links" in result["autonomous"]["reason"]
+    assert "Pagination remains unverified" in result["autonomous"]["reason"]
+    assert "No verification scrape was launched" in result["autonomous"]["reason"]
+    dispatch.assert_not_awaited()
+
+
 class Result:
     def __init__(self, value=None):
         self.value = value

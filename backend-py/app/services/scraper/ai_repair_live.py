@@ -295,13 +295,14 @@ def _course_links_in_region(region, url: str, extra_hosts=()) -> list[dict]:
         if (
             len(text) < 5 or not official_url(candidate, url, extra_hosts)
             or not re.fullmatch(
-                r"(?:/study/(?:undergraduate|postgraduate)/[^/]+|/courses/[^/]+)/?",
+                r"(?:/study/(?:undergraduate|postgraduate)/[^/]+|/courses/(?:[^/]+/)*[^/]+)/?",
                 path, re.I,
             )
         ):
             continue
         if (
             re.search(r"/(?:course-search|courses?|subjects?|index)/?$", path, re.I)
+            or re.search(r"/courses/(?:ug|pg|cpd|undergraduate|postgraduate)/?$", path, re.I)
             or _NON_COURSE_CATALOGUE_ROUTE.search(path)
             or _NON_COURSE_CATALOGUE_ROUTE.search(text)
         ):
@@ -571,6 +572,22 @@ def inspect_page(url: str, html: str, config=None) -> dict:
                for node in soup.select("button, a"))
     )
     extra_hosts = getattr(getattr(config, "discovery", None), "allowed_extra_hostnames", ())
+    # Preserve result-card titles before removing shared header/navigation
+    # elements. These links are candidates, never single-course field proof.
+    primary = soup.select_one("main, [role=main]")
+    heading = primary.find("h1") if primary else None
+    if heading and re.search(
+        r"^(?:search(?: for)?|find(?: your)?|browse|explore|all)\b.{0,150}"
+        r"\b(?:courses?|programmes?|degrees?)\b",
+        heading.get_text(" ", strip=True), re.I,
+    ):
+        candidates = {}
+        for card in primary.select("article, .course-card, .course-result, .search-result"):
+            for link in _course_links_in_region(card, url, extra_hosts):
+                candidates.setdefault(link["url"], link)
+        if len(candidates) >= 2:
+            return {**result, "classification": "listing", "links": list(candidates.values()),
+                    "reason": "Course-finder result cards; candidates only, not course-owned facts"}
     # A canonical is advisory metadata, not proof that the fetched official
     # page is owned by another host. Keep on-host visible evidence in play;
     # request eligibility and link eligibility are still enforced separately.
@@ -1041,7 +1058,9 @@ class LiveRepairEvidence:
         courses = sum(r["classification"] == "course" for r in self.records)
         failures = sum(r["classification"] in _FAILURES for r in self.records)
         adequate = courses > 0 and not self.discovery_needed(self.ctx.get("effective_discovery") or {})
-        return {
+        fallback = getattr(self, "fallback", None) or {}
+        partial = fallback.get("partial_candidates") or []
+        result = {
             "status": "accepted" if adequate else "blocked" if failures and not courses else "needs_review",
             "accepted": adequate,
             "pages_checked": self.pages_checked, "course_pages": courses,
@@ -1052,10 +1071,24 @@ class LiveRepairEvidence:
             "samples": [{k: r.get(k) for k in ("url", "classification", "reason", "title", "snippet", "fields", "audience_evidence", "fee_source_links", "reference_only", "linked_from", "url_gate_override_required")}
                         for r in self.records],
         }
+        if partial and not fallback.get("source"):
+            result["catalogue_coverage"] = {
+                "status": "partial", "candidate_count": len(partial),
+                "sources": fallback.get("partial_sources") or [],
+            }
+            result["reason"] = (
+                f"Read {len(partial)} official course links from a partial catalogue; "
+                f"{courses} course page(s) verified. Pagination and full catalogue "
+                "coverage remain unverified; partial results cannot authorize catalogue repair."
+            )
+        return result
 
     def discovery_needed(self, discovery: dict) -> bool:
         known = self.ctx.get("passed_sample") or []
         return (
+            bool((self.ctx.get("provider_failure") or self.ctx.get("catalogue_recovery"))
+                 and hasattr(self, "fallback") and not self.fallback.get("source"))
+            or
             bool((self.ctx.get("provider_failure") or self.ctx.get("catalogue_recovery"))
                  and not discovery.get("official_catalogue_fallback"))
             or
