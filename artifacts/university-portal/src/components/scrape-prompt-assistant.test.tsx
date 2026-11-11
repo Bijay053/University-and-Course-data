@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const auth = vi.hoisted(() => ({ user: { id: 1, email: "a@uni.test", name: "A", role: "staff" } as null | { id: number; email: string; name: string; role: string } }));
@@ -31,6 +31,39 @@ afterEach(() => {
 });
 
 describe("ScrapePromptAssistant", () => {
+  it("shows exact scope and five IELTS comparisons, then cancels without executing", async () => {
+    const thread: AssistantThread = { ...empty, threadId: "checked", status: "ready",
+      messages: [{ role: "assistant", content: "Prepared exactly 1 course; 138 are not included.",
+        createdAt: "2026-11-11T00:00:00Z", actions: [{
+          id: "ielts-preview", kind: "fix_fields", label: "Re-extract these review fields",
+          fields: ["ielts_overall"], state: "proposed", courseCount: 1, requiresConfirmation: true,
+          courseScope: [{id: 59504, name: "Physiotherapy", url: "https://www.bradford.ac.uk/physio"}],
+          repairPreview: [{id: 59504, name: "Physiotherapy", url: "https://www.bradford.ac.uk/physio",
+            status: "supported", reason: "", changes: [
+              {field: "ielts_overall", oldValue: 6.5, newValue: 6.5},
+              ...["listening", "reading", "writing", "speaking"].map(part => ({
+                field: `ielts_${part}`, oldValue: null, newValue: 6,
+              })),
+            ], source: {url: "https://www.bradford.ac.uk/physio",
+              quote: "English language requirements 6.5 overall with no sub-test less than 6.0."}}],
+        }] }],
+    };
+    const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(json(thread));
+    render(<ScrapePromptAssistant jobId="checked-review" />);
+    const preview = await screen.findByTestId("repair-preview-ielts-preview");
+    expect(within(preview).getByText("Exact course scope: 1")).toBeTruthy();
+    expect(within(preview).getAllByText("Missing")).toHaveLength(4);
+    expect(within(preview).getByText("Unchanged")).toBeTruthy();
+    expect(within(preview).getByRole("table").querySelectorAll("tbody tr")).toHaveLength(5);
+    fireEvent.click(screen.getByTestId("button-run-action-ielts-preview"));
+    const dialog = await screen.findByTestId("dialog-confirm-action");
+    expect(within(dialog).getByTestId("confirmation-repair-preview")).toBeTruthy();
+    expect(within(dialog).getByRole("table").querySelectorAll("tbody tr")).toHaveLength(5);
+    expect(within(dialog).getByText("Speaking")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("button-cancel-action"));
+    await waitFor(() => expect(screen.queryByTestId("dialog-confirm-action")).toBeNull());
+    expect(fetcher.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(0);
+  });
   it.each(["j1", "verification-1"])("only links a verification review when a child exists: %s", async (target) => {
     const thread: AssistantThread = {...empty, status: "ready", messages: [
       {role: "assistant", content: "Repair stopped.", createdAt: "2024-01-01T00:00:00Z", actions: [
@@ -286,7 +319,7 @@ describe("ScrapePromptAssistant", () => {
     expect((await screen.findByTestId("assistant-load-error")).textContent).toMatch(/permission/i);
   });
 
-  it.each(["fix_fields", "review_courses"] as const)("runs legacy %s without another confirmation", async (kind) => {
+  it.each(["fix_fields", "review_courses"] as const)("handles legacy %s with conservative repair consent", async (kind) => {
     const thread: AssistantThread = { ...empty, status: "ready", messages: [
       { role: "assistant", content: "Fees can be refetched.", createdAt: "2024-01-01T00:00:00Z",
         actions: [{ id: "a1", kind, label: kind === "review_courses" ? "Fetch requested courses" : "Refetch fees", courseCount: 4, fields: kind === "review_courses" ? [] : ["internationalFee"], state: "proposed" }] },
@@ -296,6 +329,12 @@ describe("ScrapePromptAssistant", () => {
     const onChanged = vi.fn();
     render(<ScrapePromptAssistant jobId="j1" onChanged={onChanged} />);
     fireEvent.click(await screen.findByTestId("button-run-action-a1"));
+    if (kind === "fix_fields") {
+      expect(await screen.findByTestId("dialog-confirm-action")).toBeTruthy();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByTestId("button-confirm-action"));
+      await waitFor(() => expect(screen.queryByTestId("dialog-confirm-action")).toBeNull());
+    }
     expect(screen.queryByTestId("dialog-confirm-action")).toBeNull();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const [url, init] = fetchMock.mock.calls[1];

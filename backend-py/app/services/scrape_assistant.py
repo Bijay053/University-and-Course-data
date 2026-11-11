@@ -864,6 +864,10 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                 "course has been changed or added. Confirm the proposed check to run it. "
                 "Each selected course will use its own applicable evidence, not the example's scores."
             )
+    from app.services.assistant_repair_proposals import finalize_field_proposal
+    authoritative_summary = finalize_field_proposal(action, prompt, ctx, sources)
+    if authoritative_summary:
+        result["answer"] = authoritative_summary
     reply = {
         "role": "assistant", "content": result["answer"][:7000],
         "createdAt": now().isoformat(), "sources": citations, "turnId": turn_id,

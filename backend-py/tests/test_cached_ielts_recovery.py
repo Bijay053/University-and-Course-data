@@ -93,7 +93,8 @@ async def test_unquoted_or_unavailable_fact_does_not_prepare_a_plan():
 
 
 @pytest.mark.asyncio
-async def test_exact_conversation_overrides_wrong_model_refusal_and_keeps_course_unchanged(store, monkeypatch):
+@pytest.mark.parametrize("model_proposes_action", [False, True])
+async def test_exact_conversation_overrides_wrong_model_refusal_and_keeps_course_unchanged(store, monkeypatch, model_proposes_action):
     from app.models import ScrapedCourse
     from app.models.scrape_assistant import ScrapeAssistantThread
     from tests.test_assistant_eligibility import seed_thread
@@ -117,6 +118,8 @@ async def test_exact_conversation_overrides_wrong_model_refusal_and_keeps_course
     monkeypatch.setattr(service, "SOURCE_ACCESS_REGISTRY", False)
     ctx = await service.context("source")
     ctx["home"] = HOME
+    ctx["samples"] += [{**ctx["samples"][0], "id":i, "name":f"Other course {i}", "url":HOME+f"/other-{i}",
+                       "ieltsBands":{}} for i in range(2, 140)]
     monkeypatch.setattr(service, "context", AsyncMock(return_value=ctx))
     monkeypatch.setattr(service, "inspect_source", AsyncMock(
         side_effect=AssertionError("Must reuse the retained course source")))
@@ -125,8 +128,13 @@ async def test_exact_conversation_overrides_wrong_model_refusal_and_keeps_course
         import json
         inputs = json.loads(kwargs["user"])
         assert inputs["sources"][0]["facts"][0]["normalized"]["ielts_listening"] == 6.0
-        return {"answer":"Individual IELTS bands are unsupported; no repair is possible.",
-                "citations":[],"action":None}
+        return {
+            "answer":"Run the IELTS repair for all 139 rows, pending your confirmation."
+                if model_proposes_action else "Individual IELTS bands are unsupported; no repair is possible.",
+            "citations":[{"url":URL,"quoteId":"q0"}] if model_proposes_action else [],
+            "action":{"kind":"fix_fields","fields":["ielts_listening"]}
+                if model_proposes_action else None,
+        }
     monkeypatch.setattr(service, "chat_json", answer)
     await service.investigate("eligibility", "turn")
     async with store() as db:
@@ -138,7 +146,13 @@ async def test_exact_conversation_overrides_wrong_model_refusal_and_keeps_course
         assert reply["actions"][0]["_ids"] == [1]
         assert reply["actions"][0]["requiresConfirmation"] is True
         assert reply["actions"][0]["state"] == "proposed"
-        assert reply["sources"][0]["excerpt"] == TEXT.rstrip(".")
+        assert reply["actions"][0]["courseCount"] == 1
+        assert "all 139" not in reply["content"]
+        assert "138 are not included" in reply["content"]
+        assert len(reply["actions"][0]["repairPreview"][0]["changes"]) == 5
+        assert reply["actions"][0]["repairPreview"][0]["changes"][1] == {
+            "field":"ielts_listening", "oldValue":None, "newValue":6.0}
+        assert reply["sources"][0]["excerpt"].rstrip(".") == TEXT.rstrip(".")
         row = await db.get(ScrapedCourse, 1)
         assert row.ielts_listening is None and row.ielts_overall == 6.5
     service.inspect_source.assert_not_awaited()

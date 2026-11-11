@@ -12,6 +12,7 @@ import { useAuth } from "@/context/auth";
 import { safeSourceUrl } from "./assistant-safe-url";
 import { AssistantMarkdown, CodeBlock } from "./assistant-markdown";
 import { CatalogueComparisonView, type CatalogueComparison } from "./assistant-catalogue-comparison";
+import { AssistantRepairPreview, type RepairCourseScope, type RepairPreview } from "./assistant-repair-preview";
 
 export { safeSourceUrl };
 
@@ -32,6 +33,8 @@ export type AssistantAction = {
   progress?: { current: number; total: number; status: string };
   /** recover_catalogue only: server-owned not-recorded candidates (eligibility unverified). */
   courses?: { url: string; title: string }[];
+  courseScope?: RepairCourseScope[];
+  repairPreview?: RepairPreview[];
 };
 export const RECOVER_MAX = 20;
 export type AssistantActivity = {
@@ -84,7 +87,9 @@ export const ASSISTANT_POLL_MS = 1000;
 export const MAX_DOCUMENT_BYTES = 2_000_000;
 /** Kinds that must never run without an explicit confirmation dialog. */
 export function actionNeedsConfirmation(a: AssistantAction): boolean {
-  return !!a.requiresConfirmation || ["runtime_tuning", "staff_edit", "staff_location", "undo_staff_location", "document_update"].includes(a.kind);
+  return !!a.requiresConfirmation
+    || (a.kind === "fix_fields" && a.requiresConfirmation !== false)
+    || ["runtime_tuning", "staff_edit", "staff_location", "undo_staff_location", "document_update"].includes(a.kind);
 }
 export function validateDocument(file: File): string | null {
   const isPdf = file.type === "application/pdf" && /\.pdf$/i.test(file.name);
@@ -526,6 +531,8 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
           <p className="mt-1 text-[12px] text-amber-900">
             {a.courseCount} course{a.courseCount === 1 ? "" : "s"}{a.fields.length ? ` · ${a.fields.map(fieldLabel).join(", ")}` : ""}
           </p>
+          {a.courseScope && <AssistantRepairPreview scope={a.courseScope}
+            previews={a.repairPreview} testId={`repair-preview-${a.id}`} />}
           {a.progress && (a.state === "starting" || a.state === "running") && (
             <div className="mt-2">
               <div className="h-1.5 overflow-hidden rounded-full bg-amber-100" role="progressbar" aria-valuemin={0} aria-valuemax={a.progress.total} aria-valuenow={a.progress.current}>
@@ -880,6 +887,8 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                   </fieldset>
                 )}
                 {!!confirming?.fields.length && <p>Fields: {confirming.fields.map(fieldLabel).join(", ")}</p>}
+                {confirming?.courseScope && <AssistantRepairPreview scope={confirming.courseScope}
+                  previews={confirming.repairPreview} testId="confirmation-repair-preview" />}
                 <p>It does not approve or publish any course. Results are not guaranteed to be accurate; review every changed value and its source afterwards.</p>
               </div>
             </AlertDialogDescription>
