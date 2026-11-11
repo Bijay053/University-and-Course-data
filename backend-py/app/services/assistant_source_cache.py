@@ -7,6 +7,32 @@ from app.models.scrape_assistant import ScrapeAssistantThread
 
 ACCESS_ISSUES = frozenset({"robots_unavailable", "robots_disallowed", "source_access_denied"})
 FAILURE_REUSE_SECONDS = 120
+IELTS_FACTS_VERSION = 1
+
+
+async def refresh_ielts_facts(source, url):
+    """Reparse retained verified text after parser changes, without another fetch.
+
+    This refreshes derived facts, not the age or authority of the source.
+    Historic messages and their evidence remain unchanged.
+    """
+    if (not source.get("verified") or source.get("sourceType") == "pdf"
+            or source.get("_ieltsFactsVersion") == IELTS_FACTS_VERSION):
+        return source
+    from html import escape
+    from app.services.scraper.extractors.english_test import extract
+    text = source.get("_fullText") or source.get("text") or ""
+    results = await extract("<main>" + escape(text) + "</main>", url) if text else []
+    facts = [
+        {"field": r.field_key, "value": r.value, "normalized": r.normalized,
+         "quote": r.snippet, "method": r.method}
+        for r in results if r.field_key == "ielts_overall"
+    ]
+    if facts:
+        source["facts"] = [f for f in source.get("facts", [])
+                           if not str(f.get("field", "")).startswith("ielts_")] + facts
+    source["_ieltsFactsVersion"] = IELTS_FACTS_VERSION
+    return source
 
 
 async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect, timeout, *, fresh=False):
@@ -47,7 +73,7 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                             cached.setdefault("failureStage", "robots")
                             cached.setdefault("sourceRequestAttempted", False)
                         cached["_sourceCacheHit"] = True
-                        return cached
+                        return await refresh_ielts_facts(cached, url)
                     # An expired latest failure cannot revive an older success.
                     break
     if registry_enabled:
@@ -67,6 +93,7 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                 # Keep cited text, not a second unbounded copy of the whole page.
                 saved = {k: v for k, v in result.items() if k != "_fullText"}
                 saved["_sourceScopeVersion"] = 2
+                saved["_ieltsFactsVersion"] = IELTS_FACTS_VERSION
                 saved["_sourceCheckedAt"] = wall_time()
                 saved["_fullText"] = result.get("text", "") + "\n" + "\n".join(
                     item.get("text", "") for item in result.get("excerpts", [])

@@ -24,6 +24,7 @@ from app.services.scrape_assistant_tools import (
 )
 
 FIELDS = {"international_fee", "ielts_overall", "duration", "course_location"}
+IELTS_COMPONENTS = {"ielts_listening", "ielts_reading", "ielts_writing", "ielts_speaking"}
 REVIEW_STATUSES = {"pending", "review", "review_ready"}
 SOURCE_ACCESS_REGISTRY = True
 ACTIVE = {"queued", "researching"}
@@ -90,9 +91,11 @@ def action_proposal(data: dict, eligible_ids: list[int]) -> dict | None:
     if kind not in {"fix_fields", "repair_catalogue"}:
         raise ValueError("Unsupported proposed operation.")
     fields = data.get("fields", [])
-    if not isinstance(fields, list) or any(not isinstance(f, str) or f not in FIELDS for f in fields):
+    if not isinstance(fields, list) or any(not isinstance(f, str) or f not in FIELDS | IELTS_COMPONENTS for f in fields):
         raise ValueError("Unsupported target fields.")
-    fields = sorted(set(fields))
+    # The backend's IELTS recovery bundle includes overall AND all components.
+    # Component requests must not be rejected or silently treated as overall-only.
+    fields = sorted({"ielts_overall" if f in IELTS_COMPONENTS else f for f in fields})
     if kind == "fix_fields" and (not fields or not eligible_ids):
         return None
     return {
@@ -717,7 +720,11 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             "Only propose a correction if the user requested one and evidence supports investigation. "
             "Actions never approve/publish/delete or directly write model-generated numbers. "
             "fix_fields reruns the validated extraction for ALL unapproved rows in THIS review only; "
-            "allowed fields: international_fee,ielts_overall,duration,course_location. "
+            "allowed fields: international_fee,ielts_overall,ielts_listening,ielts_reading,"
+            "ielts_writing,ielts_speaking,duration,course_location. "
+            "IELTS fields are a single supported repair bundle: targeting ielts_overall "
+            "re-extracts and persists overall AND Listening, Reading, Writing and Speaking. "
+            "Never say individual bands are unsupported or that overall recovery cannot fix bands. "
             "repair_catalogue uses the existing bounded, audited discovery repair and isolated verification. "
             "In confirmation mode require confirmation; in automatic_pending_only mode run supported work without asking again. Verify success after the queued job finishes. "
             "Do not claim an operation has run or a value has changed."
@@ -844,6 +851,19 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         action["_versions"] = ctx["versions"]
         action["_configVersion"] = ctx["config_version"]
         action["_evidenceUrls"] = [value for value in recent_user_urls[:3] if value in verified]
+    if not action:
+        from app.services.assistant_ielts_recovery import proposal_for_missing_bands
+        supported = proposal_for_missing_bands(this_service, prompt, ctx, sources)
+        if supported:
+            action = supported
+            citations = action.pop("_supportingSources")
+            result["answer"] = (
+                "IELTS recovery supports the overall score and all four individual bands. "
+                "The official course evidence confirms component requirements that "
+                "are missing in the stored row. Prepared an existing-row IELTS repair; no "
+                "course has been changed or added. Confirm the proposed check to run it. "
+                "Each selected course will use its own applicable evidence, not the example's scores."
+            )
     reply = {
         "role": "assistant", "content": result["answer"][:7000],
         "createdAt": now().isoformat(), "sources": citations, "turnId": turn_id,
