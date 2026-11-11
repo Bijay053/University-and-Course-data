@@ -4,7 +4,39 @@ from sqlalchemy import select
 from app.models import ScrapedCourse, University
 
 
+async def saved_ielts_status(service, thread_id, turn_id, run_id, ctx, prompt):
+    """Explicit saved-value reads must not fall through to web research."""
+    if not (
+        re.match(r"^\s*(?:please\s+)?(?:show|list|what\s+(?:are|is))\b", prompt, re.I)
+        and re.search(r"\bielts\b", prompt, re.I)
+        and re.search(r"\b(saved|stored|database[- ]only)\b", prompt, re.I)
+    ) or re.search(r"\b(?:and|then|also)\s+(?:fix|update|change|set|repair|apply)\b", prompt, re.I):
+        return False
+    from app.services.assistant_eligibility import scope
+    rows = scope(prompt, ctx["samples"])
+    def score(value):
+        return "Missing" if value is None else f"{value:.1f}"
+    lines = []
+    for row in rows[:20]:
+        values = [f"IELTS overall {score(row.get('ielts'))}"] + [
+            f"{part.title()} {score((row.get('ieltsBands') or {}).get(part))}"
+            for part in ("listening", "reading", "writing", "speaking")
+        ]
+        lines.append(f"{row['name']} (row {row['id']}): " + "; ".join(values) + ".")
+    content = "\n".join(lines) if rows else "No matching pending course was found in this review."
+    if len(rows) > 20:
+        content += f"\nShowing 20 of {len(rows)} matching pending rows."
+    content += "\nSaved database values only. No website was fetched and no changes or repairs were run."
+    await service.save_research_reply(thread_id, turn_id, run_id, {
+        "role": "assistant", "turnId": turn_id, "createdAt": service.now().isoformat(),
+        "content": content, "sources": [], "actions": [],
+    }, detail="Saved IELTS values read from the review database only.")
+    return True
+
+
 async def handle_read_or_rule(service, thread_id, turn_id, run_id, ctx, prompt, messages):
+    if await saved_ielts_status(service, thread_id, turn_id, run_id, ctx, prompt):
+        return True
     from app.services.assistant_staff_locations import handle as staff_locations
     if await staff_locations(service,thread_id,turn_id,run_id,ctx,prompt,messages):
         return True

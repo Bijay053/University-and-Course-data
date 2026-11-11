@@ -89,6 +89,30 @@ def plan_targets(issues, requested, forced=()):
     return sorted(selected | set(forced))
 
 
+async def include_requested_ielts_bands(analysis, requested, db, course_id):
+    """An explicit IELTS repair targets the complete five-score bundle.
+
+    Overall-only completeness must not suppress missing component recovery.
+    This detects missing data, not evidence that a source publishes a score.
+    The normal extractor must still establish each value's applicability.
+    """
+    if "ielts_overall" not in requested or not analysis.get("total") or not hasattr(db, "get"):
+        return analysis
+    from app.models import ScrapedCourse
+    row = await db.get(ScrapedCourse, course_id)
+    if row is None:
+        return analysis
+    fields = ("ielts_overall", "ielts_listening", "ielts_reading", "ielts_writing", "ielts_speaking")
+    missing = [field for field in fields if getattr(row, field, None) is None]
+    if not missing:
+        return analysis
+    return {**analysis, "issues": [
+        *(issue for issue in analysis["issues"] if issue.get("field") != "ielts_overall"),
+        {"field": "ielts_overall", "missing": 1, "missing_fields": missing,
+         "label": "IELTS overall and individual bands"},
+    ]}
+
+
 async def run_smart_batch(body, db):
     from app.routers.scrape import ReExtractBody, analyze_staged, re_extract_staged
 
@@ -97,7 +121,8 @@ async def run_smart_batch(body, db):
     for course_id in body.ids:
         scope = ReExtractBody(ids=[course_id], universityId=body.university_id)
         try:
-            before = await analyze_staged(scope, db)
+            before = await include_requested_ielts_bands(
+                await analyze_staged(scope, db), body.target_fields, db, course_id)
         except Exception:
             await db.rollback()
             results.append({
@@ -204,7 +229,8 @@ async def run_smart_batch(body, db):
             results.append(item)
             continue
         try:
-            after = await analyze_staged(scope, db)
+            after = await include_requested_ielts_bands(
+                await analyze_staged(scope, db), targets, db, course_id)
             if after.get("total") != 1:
                 item.update({
                     "ok": False, "reason_code": "course_changed_during_fix",
