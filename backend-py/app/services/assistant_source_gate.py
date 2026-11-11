@@ -2,6 +2,40 @@
 from app.services.assistant_source_cache import ACCESS_ISSUES
 
 
+def same_course_url(left, right):
+    """Only tolerate a path's trailing slash; never merge query variants/hosts."""
+    from urllib.parse import urlsplit
+    try:
+        a, b = urlsplit(left), urlsplit(right)
+        return (a.scheme.lower() == b.scheme.lower() == "https"
+                and not any((a.username, a.password, b.username, b.password))
+                and a.hostname == b.hostname and a.port == b.port
+                and a.path.rstrip("/") == b.path.rstrip("/")
+                and a.query == b.query)
+    except (TypeError, ValueError):
+        return False
+
+
+def repair_probe_urls(rows, action):
+    """Use a plan's checked source for that same row, not an unchecked variant.
+
+    These URLs come from the server-stored action, never the confirmation body.
+    The ordinary cache/registry/robots checks still apply to the selected URL.
+    """
+    urls = []
+    for row in rows:
+        supported = [
+            p["source"]["url"] for p in action.get("repairPreview", [])
+            if p.get("id") == row.id and p.get("status") == "supported"
+            and (p.get("source") or {}).get("url")
+        ]
+        candidates = supported + list(action.get("_evidenceUrls") or [])
+        urls.append(next((u for u in candidates
+                          if same_course_url(u, row.course_website)),
+                         row.course_website))
+    return urls
+
+
 def access_blocked_answer(sources):
     """Explain this check's access failure, not an invented historical cause."""
     if not sources or any(s.get("verified") for s in sources):
@@ -33,11 +67,16 @@ async def require_reachable_sources(urls,home,inspect=None):
         inspect=inspect_source
     async def check(url):
         try:return await asyncio.wait_for(inspect(url,home),12)
-        except (Exception,):return {"verified":False}
+        except (Exception,):return {"verified":False, "error":"Verification did not finish within the source-check budget."}
     samples=list(dict.fromkeys(u for u in urls if u))[:3]
     results=await asyncio.gather(*(check(u) for u in samples))
     if not any(s.get("verified") for s in results):
-        raise ValueError("No sampled official page could be verified; bulk repair was not queued. Restore permitted source access before retrying.")
+        details = "; ".join(
+            f"{url}: {str(result.get('error') or 'No verified source was returned.')[:300]}"
+            for url, result in zip(samples, results))
+        raise ValueError(
+            "No sampled official page could be verified; bulk repair was not queued. "
+            + details + " Provide a permitted official course URL or authorised document.")
     return results
 
 def gate_unreachable_repair(reply,sources):
