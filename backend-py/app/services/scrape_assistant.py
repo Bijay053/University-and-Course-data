@@ -607,6 +607,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                     "error": "Source check reached its time budget; this source remains unchecked.",
                 }
         await record_activity(thread_id, turn_id, run_id, event(
+            "Retained official course text checked" if result.get("sourceOrigin") == "retained_scrape_page_text" else
             "Source access verification failed" if result.get("failureStage") == "robots" else
             ("Saved official source reused" if result.get("verified") else "Recent failed source check reused")
             if result.get("_sourceCacheHit") else
@@ -615,6 +616,10 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             ("Official page checked" if result.get("verified") else "Official page unavailable"),
             status="completed" if result.get("verified") else "error", url=url, event_id=identifier,
             detail=(
+                ("No new university-page request. " if result.get("_sourceCacheHit") else "Live read incomplete. ")
+                + f"Used this review's saved page text, captured "
+                f"{result.get('sourceCapturedAt')}. {len(result.get('facts', []))} extracted field facts."
+                if result.get("sourceOrigin") == "retained_scrape_page_text" else
                 f"Read {result.get('pagesRead')}/{result.get('pageCount')} PDF pages. {result.get('note', '')}"
                 if result.get("sourceType") == "pdf" else
                 f"{len(result.get('facts', []))} extracted field facts."
@@ -719,7 +724,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             "Never propose bulk correction of unrelated rows when the requested course is outside this review. "
             "Only propose a correction if the user requested one and evidence supports investigation. "
             "Actions never approve/publish/delete or directly write model-generated numbers. "
-            "fix_fields reruns the validated extraction for ALL unapproved rows in THIS review only; "
+            "fix_fields reruns validated extraction only for the server-scoped existing pending rows "
+            "in this request. A named course URL is not proof or authority for changing every row; "
             "allowed fields: international_fee,ielts_overall,ielts_listening,ielts_reading,"
             "ielts_writing,ielts_speaking,duration,course_location. "
             "IELTS fields are a single supported repair bundle: targeting ielts_overall "

@@ -613,7 +613,9 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
         ):
             raise HTTPException(409, "Review records changed. Investigate again before applying this plan.")
     action["state"] = "starting"
-    thread.messages, thread.updated_at = messages, service.now()
+    # Detach the operation's local tree before flushing the ORM JSON. Later
+    # in-place edits must not mutate the ORM's already-flushed baseline.
+    thread.messages, thread.updated_at = deepcopy(messages), service.now()
     await db.flush()
     try:
         if action["kind"] == "fix_fields":
@@ -626,17 +628,24 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
                 return await cached_source(service,thread.id,thread.turn_id,thread.run_id,
                     url,home,service.inspect_source,12)
             try:
-                await require_reachable_sources(repair_probe_urls(sample_rows, action),
+                verified_sources = await require_reachable_sources(repair_probe_urls(sample_rows, action),
                     sample_rows[0].course_website if sample_rows else "",inspect_cached)
             except ValueError as exc:
                 raise HTTPException(status_code=409,detail=str(exc))
-            result = await start_bulk_fix_job(StartBulkFixBody(
-                ids=action["_ids"], universityId=job.university_id, sourceJobId=job_id,
-                targetFields=action["fields"], smart=True,
-            ), db, actor)
-            action["jobId"] = result.get("jobId") or result.get("job_id")
-            if not action["jobId"]:
-                raise ValueError("No durable correction job returned.")
+            from app.services.assistant_retained_repair import apply_retained_ielts
+            try:
+                applied = await apply_retained_ielts(
+                    service,db,thread,action,sample_rows,verified_sources,job.university_id,actor)
+            except ValueError as exc:
+                raise HTTPException(status_code=409,detail=str(exc))
+            if not applied:
+                result = await start_bulk_fix_job(StartBulkFixBody(
+                    ids=action["_ids"], universityId=job.university_id, sourceJobId=job_id,
+                    targetFields=action["fields"], smart=True,
+                ), db, actor)
+                action["jobId"] = result.get("jobId") or result.get("job_id")
+                if not action["jobId"]:
+                    raise ValueError("No durable correction job returned.")
         elif action["kind"] in {"review_courses", "recover_catalogue"}:
             from app.routers.scrape import start_scrape
             from app.schemas.scrape import StartScrapeBody
@@ -671,7 +680,8 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
             action["_sessionId"], action["jobId"] = result["session_id"], job_id
         else:
             raise ValueError("Unsupported operation.")
-        action["state"] = "running"
+        if action["state"] != "completed":
+            action["state"] = "running"
         thread.messages = deepcopy(messages)
         await db.commit()
     except Exception as exc:

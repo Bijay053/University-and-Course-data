@@ -185,5 +185,9 @@ async def test_incomplete_response_never_triggers_proxy(monkeypatch, status):
     async with httpx.AsyncClient(transport=httpx.MockTransport(
         lambda request: httpx.Response(status, stream=BrokenStream())
     )) as client:
-        with pytest.raises(tools.SourceReadError):
+        with pytest.raises(tools.SourceReadError) as failure:
             await retrieval.read_permitted_source(client, URL, robots_allowed=True)
+        assert failure.value.http_status == status
+        assert failure.value.failure_stage == "source_body"
+        assert failure.value.restriction_kind == "incomplete_response"
+        assert "Partial content was not used" in str(failure.value)

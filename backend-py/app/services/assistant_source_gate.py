@@ -40,8 +40,6 @@ def access_blocked_answer(sources):
     """Explain this check's access failure, not an invented historical cause."""
     if not sources or any(s.get("verified") for s in sources):
         return None
-    if not all(s.get("accessIssue") in ACCESS_ISSUES for s in sources):
-        return None
     failures = "\n".join(
         f"- {s.get('url', 'Official source')}: {s.get('error', 'Access unavailable')}"
         + (" The document itself was not requested; its URL has not been diagnosed as wrong."
@@ -54,9 +52,16 @@ def access_blocked_answer(sources):
         + failures
         + "\n\nThis does not establish why the stored field was originally missing. "
         "No source-dependent correction was queued or applied, and existing values were left unchanged. "
-        "I will not bypass access restrictions or invent a value. "
-        "A permitted official source, or a value you explicitly supply as staff-provided, "
-        "is needed to continue. Staff-provided updates still follow the normal confirmation rules."
+        + (
+            "I will not bypass access restrictions or invent a value. "
+            "A permitted official source, or a value you explicitly supply as staff-provided, "
+            "is needed to continue. Staff-provided updates still follow the normal confirmation rules."
+            if any(s.get("accessIssue") in ACCESS_ISSUES for s in sources) else
+            "This is an incomplete or unsuccessful source check, not proof that the university "
+            "has no requirement or that the original extraction failed for the same reason. "
+            "No wider course repair is promised from this failed check. "
+            "A complete, permitted official source is still required before source-dependent values can be verified."
+        )
     )
 
 

@@ -199,7 +199,10 @@ def test_saved_access_failure_is_disclosed_and_valid_source_is_not_overridden():
     assert "no new fetch" in access_blocked_answer([source])
     assert access_blocked_answer([source, {"verified": True}]) is None
     assert access_blocked_answer([]) is None
-    assert access_blocked_answer([{"verified": False, "error": "timeout"}]) is None
+    timeout = access_blocked_answer([{"verified": False, "error": "timeout"}])
+    assert "does not establish why" in timeout
+    assert "No wider course repair is promised" in timeout
+    assert "access restrictions" not in timeout
 
 
 @pytest.mark.asyncio

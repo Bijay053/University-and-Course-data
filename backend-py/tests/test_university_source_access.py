@@ -236,6 +236,25 @@ async def test_document_budget_schema_fences_real_missing_ledger_and_migration(s
 
 
 @pytest.mark.asyncio
+async def test_verified_page_links_are_discovered_without_changing_access_policy(store):
+    candidate = HOME + "/assets/english-requirements.pdf.pdf"
+    async with store() as db:
+        await registry.observe(db, HOME + "/admissions", HOME, {
+            "verified": True, "englishLinks": [candidate, "https://evil.test/fake.pdf"],
+        })
+        await registry.observe(db, HOME + "/failed", HOME, {
+            "verified": False, "englishLinks": [HOME + "/not-read.pdf"],
+        })
+        await registry.observe(db, "https://other.edu/page", "https://other.edu", {
+            "verified": True, "englishLinks": ["https://other.edu/english.pdf"],
+        })
+        await db.commit()
+        assert await registry.discovered_guidance_urls(db, HOME) == [candidate]
+        learned = await registry.entry(db, HOME + "/admissions", HOME)
+        assert learned.policy == {} and learned.history == []
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("home", [HOME, "https://second.example.edu"])
 async def test_registered_official_pdf_alternative_full_approval_flow(store, monkeypatch, home):
     import json
@@ -268,8 +287,10 @@ async def test_registered_official_pdf_alternative_full_approval_flow(store, mon
     async def source(url, owner):
         calls.append(url)
         if url == primary:
-            return {"url": url, "verified": False, "failureStage": "robots",
-                    "accessIssue": "robots_unavailable", "httpStatus": 403}
+            # Only this document is refused. An unavailable origin-wide robots
+            # policy must not be bypassed by changing the path on the same host.
+            return {"url": url, "verified": False, "failureStage": "source_http",
+                    "accessIssue": "source_access_denied", "httpStatus": 403}
         assert url == alternative
         return await tools.inspect_source(url, owner, raw_body=raw)
     async def complete(client, messages, *args, **kwargs):

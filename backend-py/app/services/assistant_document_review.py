@@ -369,6 +369,8 @@ async def apply(db, thread, action, university_id, actor):
                 new_value=str(change["newValue"]), actor=str(actor["id"]),
                 reason=json.dumps({"source": action["_source"], "objectKey": action.get("_objectKey"),
                                    "provenance": action["_provenance"],
+                                   "sourceCapturedAt": action.get("_sourceCapturedAt"),
+                                   "sourceSnapshotId": action.get("_sourceSnapshotId"),
                                    "quote": change["quote"], "page": change.get("page"),
                                    "applicabilityEvidence": change.get("applicabilityEvidence")}, default=str)))
             setattr(row, change["field"], change["newValue"])
@@ -383,7 +385,8 @@ async def apply(db, thread, action, university_id, actor):
             db.add(ScrapedFieldEvidence(
                 scraped_course_id=row.id, field_key=change["field"],
                 candidate_value=str(change["newValue"]), normalized_value=str(change["newValue"]),
-                source_url=action["_source"], extraction_method=method, page_type="pdf",
+                source_url=action["_source"], extraction_method=method,
+                page_type="html" if action.get("_sourceType") == "html" else "pdf",
                 snippet=change["quote"], raw_text=change["quote"], selected=True,
                 validation_status="approved", decision_status="selected",
                 confidence=None if action["_provenance"] == "staff-uploaded-document" else 0.95,

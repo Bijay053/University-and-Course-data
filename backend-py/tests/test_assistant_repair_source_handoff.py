@@ -88,5 +88,10 @@ async def test_real_confirmation_reuses_saved_source_and_reaches_queue_without_r
         await confirm_action("source",action["id"],ConfirmBody(confirm=True),db,{"id":7})
         row=await db.get(ScrapedCourse,1)
         assert service.row_version(row)==before
+    async with store() as db:
+        thread=await db.get(ScrapeAssistantThread,"ready")
+        saved=next(a for m in thread.messages for a in m.get("actions",[]) if a["id"]==action["id"])
+        assert saved["jobId"]=="handoff-fix" and saved["state"]=="running"
+        await confirm_action("source",action["id"],ConfirmBody(confirm=True),db,{"id":7})
     assert len(queued)==1
     inspect.assert_not_awaited()

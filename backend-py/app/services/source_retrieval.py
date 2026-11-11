@@ -112,7 +112,16 @@ async def read_permitted_source(client, url, *, method="GET", body=None,
             response_received = True
             # Only plain temporary origin failures qualify for a transport
             # fallback. Read the body first to reject disguised challenges.
-            raw = await _bounded(response)
+            try:
+                raw = await _bounded(response)
+            except (httpx.TimeoutException, httpx.NetworkError, httpx.ProtocolError,
+                    httpx.DecodingError):
+                raise _error(
+                    f"Official source returned HTTP {response.status_code}, but its response body "
+                    "could not be read completely. Partial content was not used and no proxy bypass was attempted.",
+                    http_status=response.status_code, failure_stage="source_body",
+                    restriction_kind="incomplete_response",
+                ) from None
             if response.status_code not in (502, 503, 504) or _challenge(response, raw):
                 return await _read_response(response, target, raw=raw)
             if not (robots_allowed and method == "GET" and os.environ.get("SCRAPE_DO_TOKEN")):

@@ -59,6 +59,10 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                     result = message.get("_sourceChecks", {}).get(url)
                     if not result or result.get("_sourceScopeVersion") != 2:
                         continue
+                    if result.get("sourceOrigin") == "retained_scrape_page_text":
+                        from app.services.assistant_retained_source import recent_capture
+                        if not recent_capture(result.get("sourceCapturedAt")):
+                            break
                     checked_at = result.get("_sourceCheckedAt")
                     age = wall_time() - checked_at if isinstance(checked_at, (int, float)) else None
                     reusable_failure = (
@@ -73,6 +77,13 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                             cached.setdefault("failureStage", "robots")
                             cached.setdefault("sourceRequestAttempted", False)
                         cached["_sourceCacheHit"] = True
+                        if reusable_failure:
+                            from app.services.assistant_retained_source import retained_course_source
+                            retained = await retained_course_source(
+                                service, thread_id, turn_id, run_id, url, cached)
+                            if retained:
+                                retained["_sourceCacheHit"] = True
+                                return retained
                         return await refresh_ielts_facts(cached, url)
                     # An expired latest failure cannot revive an older success.
                     break
@@ -81,6 +92,11 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
         result = await guarded_read(service.AsyncSessionLocal, url, home, inspect, timeout)
     else:
         result = await asyncio.wait_for(inspect(url, home), timeout=timeout)
+    if not fresh:
+        from app.services.assistant_retained_source import retained_course_source
+        retained = await retained_course_source(service, thread_id, turn_id, run_id, url, result)
+        if retained:
+            result = retained
     if isinstance(result.get("verified"), bool) and result.get("failureStage") != "access_in_progress":
         async with service.AsyncSessionLocal() as db:
             thread = (await db.execute(select(ScrapeAssistantThread).where(
