@@ -318,6 +318,18 @@ async def investigate(thread_id: str, turn_id: str):
                 if await handle_staff(service, thread_id, turn_id, run_id, ctx,
                                       requested["content"], claimed_thread.messages):
                     return
+            # IELTS component recovery is an executable existing-row operation,
+            # including a field-only follow-up to the previous user prompt.
+            # Share this control across engines; do not let the legacy generic
+            # edit fallback or the model turn it into discovery or copy a score.
+            from app.services.assistant_field_edits import evidence_edit_field, handle_field_edit
+            if (not document_requested(requested)
+                    and evidence_edit_field(requested["content"], claimed_thread.messages) == "ielts"):
+                ctx = await context(claimed_thread.job_id)
+                if await handle_field_edit(service, thread_id, turn_id, run_id, ctx,
+                                           requested["content"], claimed_thread.messages):
+                    await run_automatic_action(thread_id, turn_id)
+                    return
             if document_requested(requested):
                 research_deadline.reschedule(asyncio.get_running_loop().time() + 1800)
                 await review_document(thread_id, turn_id, run_id, claimed_thread, requested)

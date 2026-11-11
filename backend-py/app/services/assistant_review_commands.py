@@ -9,7 +9,7 @@ async def handle_read_or_rule(service, thread_id, turn_id, run_id, ctx, prompt, 
     if await staff_locations(service,thread_id,turn_id,run_id,ctx,prompt,messages):
         return True
     from app.services.assistant_field_edits import handle_field_edit
-    if await handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt):
+    if await handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, messages):
         return True
     from app.services.selective_retry import handle as retry_failures
     if await retry_failures(service, thread_id, turn_id, run_id, ctx, prompt):

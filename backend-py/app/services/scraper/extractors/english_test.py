@@ -55,7 +55,7 @@ field_keys = (
 
 _PER_BAND_FLOOR_RE = re.compile(
     r"no\s+(?:individual\s+|sub[\s-]?score\s+|skill\s+)?"
-    r"(?:band|score|skill|section|component|element)\s+"
+    r"(?:band|score|skill|section|component|element|sub[\s-]?test)\s+"
     r"(?:less\s+than|below|lower\s+than|under)\s+"
     r"(\d+(?:\.\d)?)",
     re.IGNORECASE,
@@ -130,8 +130,27 @@ def _try_named_ielts_components(
     return found
 
 
+_ENGLISH_SUBTEST_REQUIREMENT_RE = re.compile(
+        r"\bEnglish language requirements\s*:?\s*"
+        r"([4-9](?:\.[05])?)\s+overall\s+with\s+"
+        r"no\s+(?:individual\s+)?sub[\s-]?test\s+"
+        r"(?:less\s+than|below|lower\s+than|under)\s+"
+        r"([4-9](?:\.[05])?)(?!\d|\.\d)",
+        re.I,
+)
+
+
 # --- IELTS (overall + subscores 4.0-9.0) -------------------------------------
 def _ielts(text: str) -> dict[str, float] | None:
+    # Some course pages label IELTS prose only as English language
+    # requirements. Require an adjacent explicit overall + uniform floor;
+    # never borrow an unlabelled number or a score from another test.
+    heading = _ENGLISH_SUBTEST_REQUIREMENT_RE.search(text)
+    if heading:
+        overall, floor = map(float, heading.groups())
+        if 4 <= floor <= overall <= 9:
+            return dict(overall=overall, listening=floor, reading=floor,
+                        writing=floor, speaking=floor)
     # "Overall Academic IELTS band score of 6.0, with no band less than 6.0"
     # — common in embedded course JSON where "overall" precedes the test name.
     m = re.search(
@@ -1465,8 +1484,14 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                     _suppress_pte = True
         except Exception:
             pass
+    ielts_values = _ielts(text)
+    ielts_heading = _ENGLISH_SUBTEST_REQUIREMENT_RE.search(text)
+    ielts_quote = (ielts_heading.group(0) if ielts_values and ielts_heading
+                   and ielts_values.get("overall") == float(ielts_heading.group(1))
+                   and ielts_values.get("listening") == float(ielts_heading.group(2))
+                   else snippet)
     results: list[ExtractionResult] = [
-        *_emit("ielts", _ielts(text), snippet),
+        *_emit("ielts", ielts_values, ielts_quote),
         *(_emit("pte", _pte(text), snippet) if not _suppress_pte else []),
         *_emit("toefl", _toefl(text), snippet),
         *_emit("cambridge", _cambridge(text), snippet),

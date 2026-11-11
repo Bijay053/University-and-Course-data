@@ -19,7 +19,30 @@ def edit_field(prompt):
     return match.group(1).lower() if match else None
 
 
-async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt):
+def evidence_edit_field(prompt, messages=()):
+    """Resolve a field-only follow-up, never reuse an assistant's numeric claim."""
+    direct = edit_field(prompt)
+    if direct:
+        return direct
+    if not re.search(r"\b(?:add|set|change|update|edit|fix|correct)\b", prompt, re.I):
+        return None
+    if re.search(r"\b(?:don't|do not|never|only explain|read.only)\b", prompt, re.I):
+        return None
+    if not re.search(r"\b(?:each|all|individual|missing)\s+(?:ielts\s+)?bands?\b", prompt, re.I):
+        return None
+    if re.search(r"\bielts\b", prompt, re.I):
+        return "ielts"
+    # Only the immediately preceding user topic can supply the test identity.
+    # Page/assistant text is not an instruction or a staff-provided value.
+    previous = [m.get("content", "") for m in messages if m.get("role") == "user"]
+    if previous and previous[-1] == prompt:
+        previous.pop()
+    if previous and re.search(r"\bielts\b", previous[-1], re.I):
+        return "ielts"
+    return None
+
+
+async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, messages=()):
     # A document is evidence to investigate, not a literal replacement value.
     # In particular "update each band IELTS" used to fall into unsupported
     # manual editing before the source reader ever saw the supplied PDF.
@@ -27,7 +50,7 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt):
         return False
     from app.services.assistant_eligibility import scope
     rows = scope(prompt, ctx["samples"])
-    field = edit_field(prompt)
+    field = evidence_edit_field(prompt, messages)
     if not field:
         # On an existing course, an unrecognised field must not become an
         # implicit add-course operation. Explicit add-course requests retain
@@ -82,7 +105,14 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt):
                           requiresConfirmation=len(rows) > 10)
             await service.save_research_reply(thread_id, turn_id, run_id, {
                 "role": "assistant", "turnId": turn_id, "createdAt": service.now().isoformat(),
-                "content": "Checking and correcting the requested field on existing pending rows from official evidence. No new course will be created.",
+                "content": (
+                    "Prepared IELTS recovery for existing pending rows. Each course will be checked "
+                    "against its own applicable official requirements, including Listening, Reading, "
+                    "Writing and Speaking; the example course's scores will not be copied to other "
+                    "courses. Unavailable or conflicting requirements remain unresolved."
+                    if field == "ielts" else
+                    "Checking and correcting the requested field on existing pending rows from official evidence. No new course will be created."
+                ) + (" Confirm the batch before it runs." if len(rows) > 10 else ""),
                 "actions": [action], "sources": [],
             }, detail="Existing-row field correction prepared.")
             return True
