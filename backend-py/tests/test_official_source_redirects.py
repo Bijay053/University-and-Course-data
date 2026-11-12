@@ -175,3 +175,38 @@ async def test_previous_parser_cache_is_refreshed_without_refetching():
     fact = refreshed["facts"][0]
     assert fact["normalized"]["ielts_listening"] == 5.5
     assert tools.quote_in_source(fact["quote"], refreshed)
+
+
+@pytest.mark.asyncio
+async def test_failed_first_three_do_not_hide_other_existing_courses():
+    urls = [HOME + f"/courses/ug/course-{i}" for i in range(139)]
+    seen = []
+    async def inspect(url, home):
+        seen.append(url)
+        return {"url": url, "verified": url == urls[-1], "failureStage": "source_body",
+                "error": "Incomplete body"}
+    results = await require_reachable_sources(urls, HOME, inspect)
+    assert any(r["verified"] for r in results)
+    assert len(seen) == len(set(seen)) == 6
+    assert seen[:3] == urls[:3] and seen[-1] == urls[-1]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("issue", ["robots_unavailable", "robots_disallowed", "source_access_denied"])
+async def test_access_refusal_does_not_trigger_more_requests(issue):
+    seen = []
+    async def inspect(url, home):
+        seen.append(url)
+        return {"verified": False, "accessIssue": issue, "error": "Access refused"}
+    with pytest.raises(ValueError, match="not queued"):
+        await require_reachable_sources([HOME + f"/course-{i}" for i in range(139)], HOME, inspect)
+    assert len(seen) == 3
+
+
+@pytest.mark.asyncio
+async def test_no_verified_course_still_means_no_bulk_write_job():
+    inspect = AsyncMock(return_value={"verified": False, "failureStage": "source_body",
+                                     "error": "Incomplete body"})
+    with pytest.raises(ValueError, match="not queued"):
+        await require_reachable_sources([HOME + f"/course-{i}" for i in range(139)], HOME, inspect)
+    assert inspect.await_count == 6

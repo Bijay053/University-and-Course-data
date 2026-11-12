@@ -95,7 +95,7 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
             from app.services.assistant_source_cache import cached_source
             async def inspect(url,home):
                 return await cached_source(service,thread_id,turn_id,run_id,url,home,
-                                           service.inspect_source,12)
+                                           service.inspect_source,16)
             try:
                 await require_reachable_sources([r.get("url") for r in rows],ctx["home"],inspect)
             except ValueError as exc:

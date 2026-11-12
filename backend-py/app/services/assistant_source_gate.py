@@ -1,6 +1,8 @@
 """Never queue a source-dependent bulk repair on zero verified pages."""
 from app.services.assistant_source_cache import ACCESS_ISSUES
 
+SOURCE_CHECK_SECONDS = 18  # 12s reader + registry/cache persistence, not three nested 12s timers.
+
 
 def same_course_url(left, right):
     """Only tolerate a path's trailing slash; never merge query variants/hosts."""
@@ -71,10 +73,20 @@ async def require_reachable_sources(urls,home,inspect=None):
         from app.services.scrape_assistant_tools import inspect_source
         inspect=inspect_source
     async def check(url):
-        try:return await asyncio.wait_for(inspect(url,home),12)
+        try:return await asyncio.wait_for(inspect(url,home),SOURCE_CHECK_SECONDS)
         except (Exception,):return {"verified":False, "error":"Verification did not finish within the source-check budget."}
-    samples=list(dict.fromkeys(u for u in urls if u))[:3]
+    candidates=list(dict.fromkeys(u for u in urls if u))
+    samples=candidates[:3]
     results=await asyncio.gather(*(check(u) for u in samples))
+    if (not any(s.get("verified") for s in results) and len(candidates)>3
+            and not any(s.get("accessIssue") in ACCESS_ISSUES for s in results)):
+        # Three unreadable course pages do not establish a provider-wide outage.
+        # Try at most three *different* pages, spread across the existing review.
+        # Never retry a refusal, rediscover a catalogue, or invent field values.
+        remaining=candidates[3:]
+        extra=list(dict.fromkeys(remaining[i] for i in (0,len(remaining)//2,len(remaining)-1)))
+        samples.extend(extra)
+        results.extend(await asyncio.gather(*(check(u) for u in extra)))
     if not any(s.get("verified") for s in results):
         details = "; ".join(
             f"{url}: {str(result.get('error') or 'No verified source was returned.')[:300]}"
@@ -82,6 +94,7 @@ async def require_reachable_sources(urls,home,inspect=None):
         raise ValueError(
             "No sampled official page could be verified; bulk repair was not queued. "
             + details + " Provide a permitted official course URL or authorised document.")
+    return results
     return results
 
 def gate_unreachable_repair(reply,sources):
