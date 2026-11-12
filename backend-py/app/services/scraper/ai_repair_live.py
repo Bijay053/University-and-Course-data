@@ -98,6 +98,13 @@ def _bounded_html(html: str, maximum: int = _MAX_PROBE_HTML_BYTES) -> str:
     return encoded[:maximum].decode("utf-8", errors="ignore")
 
 
+def _bounded_source(url: str, html: str) -> tuple[str, str, str]:
+    from app.services.scraper.repair_source_urls import is_catalogue_source
+    if is_catalogue_source(url) and len(html.encode("utf-8")) >= _MAX_PROBE_HTML_BYTES:
+        return "", "unsupported_content", "Catalogue exceeds bounded evidence size; coverage is incomplete"
+    return _bounded_html(html), "", ""
+
+
 def official_url(url: str, seed: str, extra_hosts=()) -> bool:
     """Exact university host (and its www alias), never arbitrary suffixes."""
     try:
@@ -155,11 +162,11 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                             geo_code=getattr(extraction, "scrape_do_geo", None) or None,
                         )
                         if rendered and not _needs_rendered_evidence(rendered):
-                            return _bounded_html(rendered), "", ""
+                            return _bounded_source(url, rendered)
                 if template_failed:
                     return "", "source_render_failure", "Official page components failed to render; fresh course evidence unavailable"
                 return "", "challenge", "JavaScript-disabled shell; live course HTML unavailable"
-            return _bounded_html(html), "", ""
+            return _bounded_source(url, html)
         failure = get_last_fetch_failure() or {}
         kind = failure.get("kind")
         classification = ("challenge" if kind == "challenge_page" else
@@ -185,6 +192,8 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                 return "", "challenge", f"HTTP {response.status_code}; access not verified"
             if response.is_redirect:
                 canonical = canonical_slash_redirect(url, response.headers.get("location", ""))
+                if not canonical:
+                    canonical = official_course_redirect(url, response.headers.get("location", ""))
                 if canonical:
                     # Return the publisher's Location; never guess or rewrite
                     # a course URL. The caller must verify policy before GET.
@@ -205,6 +214,9 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                 if len(chunk) > remaining:
                     break
             html = b"".join(chunks).decode(response.encoding or "utf-8", errors="replace")
+            from app.services.scraper.repair_source_urls import is_catalogue_source
+            if size >= _MAX_PROBE_HTML_BYTES and is_catalogue_source(url):
+                return "", "unsupported_content", "Catalogue exceeds bounded evidence size; coverage is incomplete"
             if is_robots:
                 return html, "", ""
             if "xml" in content_type:
@@ -217,7 +229,7 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                 remaining = timeout - (time.monotonic() - fetch_started)
                 rendered = await _render_direct_shell(url, remaining)
                 if rendered and not _needs_rendered_evidence(rendered):
-                    return _bounded_html(rendered), "", ""
+                    return _bounded_source(url, rendered)
                 if template_failed:
                     return "", "source_render_failure", "Official page components failed to render; browser could not obtain complete course evidence"
                 return "", "challenge", "JavaScript-disabled shell; browser rendering unavailable"
@@ -541,6 +553,15 @@ def audience_scoped_recipe_proposals(evidence: dict) -> dict:
 
 def inspect_page(url: str, html: str, config=None) -> dict:
     if urlsplit(url).path == "/robots.txt":
+        lines = [line.strip() for line in html.splitlines()
+                 if line.strip() and not line.lstrip().startswith("#")]
+        if re.search(r"<[a-z!/]", html, re.I) or (
+            lines and not any(re.match(
+                r"(?i)(?:user-agent|allow|disallow|sitemap|crawl-delay)\s*:", line
+            ) for line in lines)
+        ):
+            return {"url": url, "classification": "unsupported_content",
+                    "reason": "robots.txt did not return a verifiable robots policy"}
         extra_hosts = getattr(getattr(config, "discovery", None), "allowed_extra_hostnames", ())
         sources = [
             value.strip() for value in re.findall(r"(?im)^sitemap:\s*(\S+)", html)
@@ -732,11 +753,35 @@ def inspect_page(url: str, html: str, config=None) -> dict:
             facts.add("mode")
         if re.search(r"\bielts\b.{0,50}\b[4-9](?:\.\d)?\b", text, re.I):
             facts.add("english")
-        if re.search(r"\binternational\b.{0,40}\b(?:fee|tuition)\b.{0,40}\d", text, re.I):
+        if (re.search(r"\binternational\b.{0,40}\b(?:fee|tuition)\b.{0,40}\d", text, re.I)
+                or re.search(
+                    r"\b(?:tuition\s+fees?|fees?)\b.{0,60}\binternational\b.{0,180}"
+                    r"(?:[£$€]\s*\d|\b(?:GBP|AUD|USD|EUR)\s*\d)", text, re.I,
+                )):
             facts.add("fee")
         if re.search(r"\b(?:campus|location)\b\s*:\s*[A-Z][a-z]{2,}", text):
             facts.add("location")
     owned_award = "award" in facts
+    # Some course heroes split the subject, award and UCAS code into siblings.
+    # Bound ownership to the title's small wrapper; never scan the whole page
+    # or use this to waive a shared URL/category gate.
+    owner = title_node.parent if title_node else None
+    for _ in range(4):
+        if (owner is None or blocked or is_generic_course_category_name(title)
+                or not facts.intersection({"duration", "mode", "english", "fee", "location"})):
+            break
+        text = owner.get_text(" ", strip=True)
+        if len(text) > 900 or len(owner.select("h1")) != 1:
+            break
+        if (_AWARD.search(text) and re.search(
+            r"\bUCAS\s+(?:course\s+)?code\s*:?\s*[A-Z0-9]{4}\b", text, re.I
+        )):
+            owned_award = True
+            facts.update(("award", "course_code"))
+            break
+        if owner is region:
+            break
+        owner = owner.parent
     # Some degree templates present the award in H1 and the UCAS identifier,
     # duration and delivery together in a compact header, without repeating
     # "Qualification:" or "Study mode:". This is course-owned identity, not
@@ -848,6 +893,29 @@ def canonical_slash_redirect(original: str, location: str) -> str | None:
     return None
 
 
+def official_course_redirect(original: str, location: str) -> str | None:
+    """Publisher-declared course/catalogue move, never an arbitrary redirect."""
+    try:
+        from app.services.scraper.repair_source_urls import is_catalogue_source
+        target = urldefrag(urljoin(original, location))[0]
+        before, after = urlsplit(original), urlsplit(target)
+        if (
+            before.scheme == after.scheme == "https"
+            and before.netloc == after.netloc
+            and before.query == after.query
+            and before.path != after.path
+            and not before.username and not after.username
+            and (all(re.search(r"/(?:courses?|programmes?|programs?)/[^/]+", p.path, re.I)
+                     for p in (before, after))
+                 or all(is_catalogue_source(value) for value in (original, target)))
+            and official_url(target, original)
+        ):
+            return target
+    except ValueError:
+        pass
+    return None
+
+
 class LiveRepairEvidence:
     def __init__(self, ctx: dict, limits: dict | None = None):
         limits = limits or {}
@@ -920,12 +988,20 @@ class LiveRepairEvidence:
                 await refund_live_fetch(timeout, elapsed)
         self.records.append(record)
         if record.get("classification") == "canonical_redirect":
-            target = canonical_slash_redirect(url, record.get("reason", ""))
+            target = (canonical_slash_redirect(url, record.get("reason", ""))
+                      or official_course_redirect(url, record.get("reason", "")))
             policy_url = urljoin(url, "/robots.txt")
             policy = next((row.get("_source_html") for row in reversed(self.records)
-                           if row.get("url") == policy_url and row.get("_source_html")), None)
+                           if row.get("url") == policy_url and row.get("classification") == "robots"
+                           and row.get("_source_html")), None)
             allowed = False
-            if self.directory_roots and policy and target and not _canonical_followed:
+            if target and not _canonical_followed and not policy:
+                known = any(row.get("url") == policy_url for row in self.records)
+                if not known:
+                    checked_policy = await self.fetch(policy_url, _canonical_followed=True)
+                    if checked_policy.get("classification") == "robots":
+                        policy = checked_policy.get("_source_html")
+            if policy and target and not _canonical_followed:
                 from app.services.scraper.directory_catalogue import robots_policy
                 permits, delay = robots_policy(policy)
                 allowed = permits(url) and permits(target) and delay <= self.fetch_seconds

@@ -5,6 +5,7 @@ from urllib.parse import urljoin, urlsplit
 
 from app.services.scraper.ai_repair_live import official_url, passes
 from app.services.scraper.auto_repair_candidates import is_intentionally_excluded_course_url
+from app.services.scraper.repair_source_urls import is_catalogue_source, catalogue_allow_proposal
 
 NEXT_ACTION = "Provide an official university course catalogue or course page URL and try Repair discovery again."
 _SITEMAP_DISCOVERY_TIMEOUT_S = 20
@@ -54,10 +55,7 @@ def _catalogue_hints(record: dict, source: str, seed: str, extra_hosts) -> list[
         parsed = urlsplit(target)
         if (
             parsed.query or not official_url(target, seed, extra_hosts)
-            or not re.search(
-                r"/(?:courses?|course-finder|programmes?|programs?|degrees?)"
-                r"(?:/(?:ug|pg|undergraduate|postgraduate))?/?$", parsed.path, re.I,
-            )
+            or not is_catalogue_source(target)
             or target in hints
         ):
             continue
@@ -280,12 +278,14 @@ async def discover_official_catalogue(evidence) -> dict:
                 filter_patch["allow_url_patterns"] = [
                     "^https?://[^/]+" + p[1:] for p in allows
                 ]
+        if evidence.ctx.get("catalogue_recovery"):
+            filter_patch.update(catalogue_allow_proposal(sitemap_urls, {**discovery, **filter_patch}))
         sitemap_urls = [
             url for url in sitemap_urls if passes(url, {**discovery, **filter_patch})
         ]
         sitemap_urls = _bounded_sitemap_urls(sitemap_urls, sitemap_titles, max_candidates)
         if max_candidates > 0 and len(sitemap_urls) >= min(2, max_candidates):
-            return {
+            result = {
                 "source": configured,
                 "candidates": sitemap_urls,
                 "sample": _sitemap_sample(
@@ -293,8 +293,12 @@ async def discover_official_catalogue(evidence) -> dict:
                     max(0, min(sample_cap, (evidence.max_pages - 2) // 2)),
                 ),
             }
+            if filter_patch:
+                result["filter_patch"] = filter_patch
+            return result
 
     sources = list(dict.fromkeys(filter(None, [
+        *(url for url in evidence.ctx.get("requested_course_urls", []) if is_catalogue_source(url)),
         configured, *(discovery.get("seed_urls") or []), urljoin(seed, "/sitemap.xml"), seed,
     ])))[:3]
     partial_sources = []
@@ -343,6 +347,8 @@ async def discover_official_catalogue(evidence) -> dict:
                 filter_patch["allow_url_patterns"] = [
                     "^https?://[^/]+" + p[1:] for p in allows
                 ]
+        if evidence.ctx.get("catalogue_recovery"):
+            filter_patch.update(catalogue_allow_proposal(candidates, {**discovery, **filter_patch}))
         candidates = [url for url in candidates if passes(url, {**discovery, **filter_patch})]
         candidates = candidates[:max_candidates]
         if candidates and record.get("has_pagination"):

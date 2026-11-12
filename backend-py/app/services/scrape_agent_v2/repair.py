@@ -63,14 +63,16 @@ def proposal(tools, university, report, call_id):
     source_roots = []
     for match in re.findall(r"https?://[^\s<>\"']+", tools.prompt):
         url = match.rstrip(").,;")
-        if directory_roots([url]) and official_url(
+        if not url.startswith("https://") or not official_url(
             url, university.scrape_url or university.website or ""
         ):
-            source_roots.append(url)
+            return {"ok": False, "changed": False,
+                    "reason": "Repair sources must use this university's official HTTPS URLs; no source was silently ignored."}
+        source_roots.append(url)
     source_roots = list(dict.fromkeys(source_roots))
     if len(source_roots) > 3:
         return {"ok": False, "changed": False,
-                "reason": "This repair accepts at most three official directory roots; "
+                "reason": "This repair accepts at most three official source URLs; "
                           "no supplied sources were silently dropped."}
     action = {
         "id": identity, "kind": "repair_catalogue", "state": "proposed",
@@ -84,7 +86,7 @@ def proposal(tools, university, report, call_id):
         # the fenced repair session. They are hints, not approved facts.
         action["_evidenceUrls"] = source_roots
         action["sourceUrls"] = source_roots
-        action["sourceReadLimit"] = 128
+        action["sourceReadLimit"] = 128 if directory_roots(source_roots) else 12
     return {
         "ok": True, "changed": False, "requiresConfirmation": True,
         "proposal": action,
