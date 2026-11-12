@@ -1,7 +1,8 @@
 """Never queue a source-dependent bulk repair on zero verified pages."""
 from app.services.assistant_source_cache import ACCESS_ISSUES
 
-SOURCE_CHECK_SECONDS = 18  # 12s reader + registry/cache persistence, not three nested 12s timers.
+SOURCE_CACHE_SECONDS = 16
+SOURCE_CHECK_SECONDS = SOURCE_CACHE_SECONDS + 2  # Reader plus registry/cache persistence.
 
 
 def same_course_url(left, right):

@@ -620,13 +620,14 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
     try:
         if action["kind"] == "fix_fields":
             from app.routers.scrape import StartBulkFixBody, start_bulk_fix_job
-            from app.services.assistant_source_gate import require_reachable_sources, repair_probe_urls
+            from app.services.assistant_source_gate import require_reachable_sources, repair_probe_urls, SOURCE_CACHE_SECONDS
             from app.services.assistant_source_cache import cached_source
-            sample_rows=(await db.execute(select(ScrapedCourse).where(
-                ScrapedCourse.id.in_(action["_ids"])).order_by(ScrapedCourse.id).limit(3))).scalars().all()
+            # Pass the entire already-locked approved cohort. The source gate
+            # bounds network sampling; pre-truncating here defeats its fallback.
+            sample_rows = sorted(rows, key=lambda row: row.id)
             async def inspect_cached(url,home):
                 return await cached_source(service,thread.id,thread.turn_id,thread.run_id,
-                    url,home,service.inspect_source,12)
+                    url,home,service.inspect_source,SOURCE_CACHE_SECONDS)
             try:
                 verified_sources = await require_reachable_sources(repair_probe_urls(sample_rows, action),
                     sample_rows[0].course_website if sample_rows else "",inspect_cached)

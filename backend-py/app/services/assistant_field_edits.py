@@ -91,11 +91,11 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
                      "ielts": "ielts_overall", "duration": "duration", "location": "course_location", "campus": "course_location"}
         if field in field_map:
             action = service.action_proposal({"kind": "fix_fields", "fields": [field_map[field]]}, [r["id"] for r in rows])
-            from app.services.assistant_source_gate import require_reachable_sources
+            from app.services.assistant_source_gate import require_reachable_sources, SOURCE_CACHE_SECONDS
             from app.services.assistant_source_cache import cached_source
             async def inspect(url,home):
                 return await cached_source(service,thread_id,turn_id,run_id,url,home,
-                                           service.inspect_source,16)
+                                           service.inspect_source,SOURCE_CACHE_SECONDS)
             try:
                 await require_reachable_sources([r.get("url") for r in rows],ctx["home"],inspect)
             except ValueError as exc:
