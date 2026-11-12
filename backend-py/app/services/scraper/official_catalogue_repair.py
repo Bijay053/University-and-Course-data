@@ -5,7 +5,7 @@ from urllib.parse import urljoin, urlsplit
 
 from app.services.scraper.ai_repair_live import official_url, passes
 from app.services.scraper.auto_repair_candidates import is_intentionally_excluded_course_url
-from app.services.scraper.repair_source_urls import is_catalogue_source, catalogue_allow_proposal
+from app.services.scraper.repair_source_urls import is_catalogue_source, catalogue_allow_proposal, programme_identity
 
 NEXT_ACTION = "Provide an official university course catalogue or course page URL and try Repair discovery again."
 _SITEMAP_DISCOVERY_TIMEOUT_S = 20
@@ -111,9 +111,25 @@ def _sitemap_sample(urls: list[str], titles: dict[str, str], sample_cap: int) ->
     """Choose a deterministic, likelihood-stratified sample spread across URLs."""
     if sample_cap <= 0 or not urls:
         return []
-    strata: dict[int, list[str]] = {index: [] for index in range(5)}
+    strata: dict[int, list[str]] = {index: [] for index in range(-1, 5)}
+    identities = set()
     for url in urls:
-        strata[_sitemap_candidate_rank(url, titles.get(url, ""))[0]].append(url)
+        identity = programme_identity(url)
+        if identity in identities:
+            continue
+        identities.add(identity)
+        rank = _sitemap_candidate_rank(url, titles.get(url, ""))[0]
+        # Explicit degree awards are safer template probes than ambiguous
+        # professional certificates. This is a sample preference, not an
+        # exclusion or a claim that every remaining link is a degree.
+        if rank < 4 and re.search(
+            r"\b(?:BSc|BEng|BAcc|BA|BS|BBA|BEd|BCom|BTech|BSW|BFA|LLB|"
+            r"MSc|MEng|MA|MS|MBA|MRes|MEd|MPhil|MCom|MSW|MFA|LLM|PhD|DPhil|"
+            r"PGCert|PGDip|Bachelor|Master|Doctor)\b",
+            titles.get(url, "") + " " + urlsplit(url).path.replace("-", " "), re.I,
+        ):
+            rank = -1
+        strata[rank].append(url)
 
     sample: list[str] = []
     for stratum in strata.values():
@@ -126,6 +142,21 @@ def _sitemap_sample(urls: list[str], titles: dict[str, str], sample_cap: int) ->
             position = min(len(stratum) - 1, ((2 * slot + 1) * len(stratum)) // (2 * slots))
             sample.append(stratum[position])
     return sample
+
+
+def _repair_sample(urls, titles, cap, discovery, patch):
+    from app.services.scraper.ai_repair_live import passes
+    if patch.get("allow_url_patterns"):
+        gained = [url for url in urls if not passes(url, discovery)]
+        sample = _sitemap_sample(gained, titles, cap)
+        if len(sample) >= 2:
+            return sample
+    return _sitemap_sample(urls, titles, cap)
+
+
+def _sample_alternatives(urls, titles, sample):
+    identities = {programme_identity(url) for url in sample}
+    return _sitemap_sample([url for url in urls if programme_identity(url) not in identities], titles, 2)
 
 
 async def discover_official_catalogue(evidence) -> dict:
@@ -288,13 +319,15 @@ async def discover_official_catalogue(evidence) -> dict:
             result = {
                 "source": configured,
                 "candidates": sitemap_urls,
-                "sample": _sitemap_sample(
+                "sample": _repair_sample(
                     sitemap_urls, sitemap_titles,
                     max(0, min(sample_cap, (evidence.max_pages - 2) // 2)),
+                    discovery, filter_patch,
                 ),
             }
             if filter_patch:
                 result["filter_patch"] = filter_patch
+            result["sample_alternatives"] = _sample_alternatives(sitemap_urls, sitemap_titles, result["sample"])
             return result
 
     sources = list(dict.fromkeys(filter(None, [
@@ -365,10 +398,15 @@ async def discover_official_catalogue(evidence) -> dict:
             and len(candidates) >= min(2, max_candidates)
             and not record.get("has_pagination")
         ):
+            source_titles = {link["url"]: link.get("name", "") for link in record.get("links", [])
+                             if isinstance(link, dict) and link.get("url")}
             result = {"source": source, "candidates": candidates,
-                      "sample": candidates[:max(0, min(sample_cap, (evidence.max_pages - 2 * (source_index + 1)) // 2))]}
+                      "sample": _repair_sample(candidates, source_titles,
+                          max(0, min(sample_cap, (evidence.max_pages - 2 * (source_index + 1)) // 2)),
+                          discovery, filter_patch)}
             if filter_patch:
                 result["filter_patch"] = filter_patch
+            result["sample_alternatives"] = _sample_alternatives(candidates, source_titles, result["sample"])
             return result
     result = {"source": None, "candidates": [], "sample": []}
     if partial_candidates:

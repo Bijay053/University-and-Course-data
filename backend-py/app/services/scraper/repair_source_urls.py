@@ -3,6 +3,16 @@ import re
 from collections import defaultdict
 from urllib.parse import urlsplit
 
+_ENTRY = r"(?:20\d{2}|(?:january|february|march|april|may|june|july|august|september|october|november|december)-20\d{2})"
+
+
+def programme_identity(url: str) -> str:
+    parsed = urlsplit(url)
+    path = parsed.path.rstrip("/")
+    if re.search(r"/(?:courses?|programmes?|programs?)/.+/" + _ENTRY + r"$", path, re.I):
+        path = path.rsplit("/", 1)[0]
+    return parsed._replace(path=path, fragment="").geturl()
+
 
 def is_catalogue_source(url: str) -> bool:
     try:
@@ -31,9 +41,11 @@ def catalogue_allow_proposal(urls: list[str], discovery: dict) -> dict:
     from app.services.scraper.ai_repair_live import passes
 
     allows = discovery.get("allow_url_patterns") or []
-    if not allows or sum(passes(url, discovery) for url in urls) >= 2:
+    before = sum(passes(url, discovery) for url in urls)
+    if not allows or before == len(urls):
         return {}
     groups = defaultdict(set)
+    dates = set()
     for url in urls:
         if not passes(url, {**discovery, "allow_url_patterns": []}):
             continue
@@ -43,14 +55,22 @@ def catalogue_allow_proposal(urls: list[str], discovery: dict) -> dict:
         path = parsed.path.rstrip("/")
         if not re.search(r"/(?:courses?|programmes?|programs?)/.+", path, re.I):
             continue
-        parent = path.rsplit("/", 1)[0] + "/"
-        groups[(parsed.netloc, parent)].add(path)
+        identity = programme_identity(url)
+        identity_path = urlsplit(identity).path
+        parent = identity_path.rsplit("/", 1)[0] + "/"
+        key = (parsed.netloc, parent)
+        groups[key].add(identity_path)
+        if identity_path != path:
+            dates.add(key)
     patterns = []
     for (host, parent), paths in sorted(groups.items(), key=lambda item: (-len(item[1]), item[0])):
         if len(paths) >= 2:
-            patterns.append(r"^https://" + re.escape(host + parent) + r"[^/?#]+/?$")
+            entry = "(?:/" + _ENTRY + ")?" if (host, parent) in dates else ""
+            patterns.append(r"^https://" + re.escape(host + parent) + r"[^/?#]+" + entry + r"/?$")
         if len(patterns) == 3:
             break
     proposed = list(dict.fromkeys([*allows, *patterns]))
     patch = {"allow_url_patterns": proposed}
-    return patch if patterns and sum(passes(url, {**discovery, **patch}) for url in urls) >= 2 else {}
+    gained = [url for url in urls if not passes(url, discovery)
+              and passes(url, {**discovery, **patch})]
+    return patch if patterns and len({programme_identity(url) for url in gained}) >= 2 else {}

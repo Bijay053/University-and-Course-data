@@ -148,6 +148,16 @@ async def owned_thread(job_id: str, actor: dict, db, *, lock=False):
     return job, (await db.execute(stmt.execution_options(populate_existing=True))).scalar_one_or_none()
 
 
+async def reconcile_repair_status(job_id, session_id):
+    # A historical repair can legitimately roll back its lifecycle transaction.
+    # Keep that rollback away from the caller's locked conversation: otherwise
+    # SQLAlchemy expires it and the next attribute access performs implicit IO.
+    from app.database import AsyncSessionLocal
+    from app.services import ai_repair_workflow
+    async with AsyncSessionLocal() as repair_db:
+        return await ai_repair_workflow.reconcile(job_id, session_id, repair_db)
+
+
 async def response(thread, db, job_id=None):
     if thread is None:
         from app.services.review_counts import pending_counts
@@ -189,13 +199,12 @@ async def response(thread, db, job_id=None):
                 changed = True
                 continue
             if action["kind"] == "repair_catalogue" and action.get("_sessionId"):
-                from app.services import ai_repair_workflow
-                session = await ai_repair_workflow.reconcile(thread.job_id, action["_sessionId"], db)
+                session = await reconcile_repair_status(thread.job_id, action["_sessionId"])
                 status = session.get("status", "queued")
                 state = session.get("autonomous") or {}
                 if state.get("verification_job_id"):
                     action["jobId"] = state["verification_job_id"]
-                    target = await db.get(ScrapeRuntimeJob, state["verification_job_id"])
+                    target = await db.get(ScrapeRuntimeJob, state["verification_job_id"], populate_existing=True)
                 if not session:
                     action["state"] = "error"
                     action["error"] = "The repair audit could not be loaded. Check job progress before retrying."

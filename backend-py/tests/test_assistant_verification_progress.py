@@ -43,8 +43,9 @@ async def test_card_uses_current_child_counts_but_only_audited_acceptance_comple
     original_source = deepcopy(vars(source))
     class Db:
         commits = 0
-        async def get(self, model, key):
+        async def get(self, model, key, **kwargs):
             assert model is ScrapeRuntimeJob
+            assert not kwargs or (key == "verification-child" and kwargs == {"populate_existing": True})
             return {"source": source, "verification-child": child}.get(key)
         async def commit(self):
             self.commits += 1
@@ -67,7 +68,10 @@ async def test_card_uses_current_child_counts_but_only_audited_acceptance_comple
         "current": current, "total": total or 50, "status": child_status,
     }
     assert action["state"] == expected_state
-    reconciler.assert_awaited_once_with("source", "session", db)
+    reconciler.assert_awaited_once()
+    args = reconciler.await_args.args
+    assert args[:2] == ("source", "session")
+    assert args[2] is not db, "Lifecycle rollback must not expire the conversation"
     if child_status == "failed_degraded":
         assert "time budget" in action["error"]
         assert "Verification finished" not in action["error"]

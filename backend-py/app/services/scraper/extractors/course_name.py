@@ -25,6 +25,8 @@ _PREPOSITIONS = {"of", "in", "and", "for", "the", "with", "to", "on", "by"}
 _ACRONYMS = {
     "MBA", "BBA", "BA", "MA", "BS", "BSc", "MSc", "PhD", "ICT", "IT", "AI",
     "MD", "JD", "LLM", "LLB", "ME", "MEng", "MPH", "EMBA", "GDip", "GCert",
+    "BEng", "BAcc", "BEd", "BCom", "BTech", "MEd", "MPhil", "MRes", "MCom",
+    "DPhil", "PGCert", "PGDip",
     "MIT", "USQ", "CSU", "UTS", "ANU", "UNSW", "UoN", "RMIT",
     # Issue 3b: Roman numerals used in AQF course names (Certificate III,
     # Certificate IV, Diploma etc.). Without these, _smart_case title-cases
@@ -452,7 +454,10 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     else:
         h1 = soup.find("h1")
     if h1:
-        candidates.append(("h1", h1.get_text(" ", strip=True), 0.9))
+        from app.services.scraper.course_title_identity import complete_owned_course_title
+        raw = h1.get_text(" ", strip=True)
+        completed = complete_owned_course_title(html, url, raw)
+        candidates.append(("h1_owned_award" if completed else "h1", completed or raw, 0.9))
     title = soup.find("title")
     if title:
         candidates.append(("title", title.get_text(" ", strip=True), 0.6))

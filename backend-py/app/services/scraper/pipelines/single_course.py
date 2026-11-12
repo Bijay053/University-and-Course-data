@@ -4665,6 +4665,11 @@ async def extract_course(
                         normalise_generated_course_name_with_config as _normalise_s0_name,
                     )
                     _s0_value = _normalise_s0_name(_s0_value)
+                    from app.services.scraper.course_title_identity import complete_owned_course_title
+                    _owned_title = complete_owned_course_title(html or "", url, _s0_value)
+                    if _owned_title:
+                        _s0_value = _owned_title
+                        _s0_method = "course_name.owned_award_identity"
                 if _s0_value is not None and _s0_field not in payload:
                     payload[_s0_field] = _s0_value
                     _stage0_covered.add(_s0_field)

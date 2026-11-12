@@ -979,6 +979,13 @@ class LiveRepairEvidence:
                           if failure else inspect_page(url, html, self.config))
                 if not failure:
                     record["_source_html"] = html
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code
+                record = {"url": url,
+                          "classification": ("challenge" if status in {401, 403, 429}
+                                             else "not_published" if status in {404, 410}
+                                             else "network_failure"),
+                          "reason": f"HTTP {status}; official source access could not be verified"}
             except Exception as exc:
                 record.update(classification="network_failure", reason=type(exc).__name__)
             finally:
@@ -1031,13 +1038,14 @@ class LiveRepairEvidence:
             for url in candidates[:4 if alternatives else 2]:
                 if official_url(url, self.ctx["scrape_url"], self.extra_hosts):
                     self.initial[url] = await self.fetch(url)
-                if self.directory_roots:
-                    selected = [url for url, record in self.initial.items()
-                                if record["classification"] == "course"
-                                and not is_intentionally_excluded_course_url(url)]
-                    if len(selected) >= 2:
-                        self.catalogue_sample = selected[:2]
-                        break
+                from app.services.scraper.repair_source_urls import programme_identity
+                selected = {}
+                for candidate, record in self.initial.items():
+                    if record["classification"] == "course" and not is_intentionally_excluded_course_url(candidate):
+                        selected.setdefault(programme_identity(candidate), candidate)
+                if len(selected) >= 2:
+                    self.catalogue_sample = list(selected.values())[:2]
+                    break
             return self.audit()
         if self.ctx.get("provider_failure"):
             from app.services.scraper.official_catalogue_repair import discover_official_catalogue
@@ -1047,11 +1055,13 @@ class LiveRepairEvidence:
             ))[:4]:
                 self.initial[url] = await self.fetch(url)
                 if self.directory_roots:
-                    selected = [url for url, record in self.initial.items()
-                                if record["classification"] == "course"
-                                and not is_intentionally_excluded_course_url(url)]
+                    from app.services.scraper.repair_source_urls import programme_identity
+                    selected = {}
+                    for candidate, record in self.initial.items():
+                        if record["classification"] == "course" and not is_intentionally_excluded_course_url(candidate):
+                            selected.setdefault(programme_identity(candidate), candidate)
                     if len(selected) >= 2:
-                        self.catalogue_sample = selected[:2]
+                        self.catalogue_sample = list(selected.values())[:2]
                         break
             return self.audit()
         # Reserve half the entire session budget for fresh, pre-apply validation.
