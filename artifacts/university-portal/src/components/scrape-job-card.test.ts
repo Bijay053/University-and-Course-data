@@ -6,6 +6,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const permissionState = vi.hoisted(() => ({ canTriggerRepair: true }));
+const cardAuth = vi.hoisted(() => ({ user: null as null | { id: number; email: string; name: string; role: string } }));
+vi.mock("@/context/auth", () => ({
+  useAuth: () => ({ user: cardAuth.user }),
+}));
 vi.mock("@/components/can", () => ({
   useCan: () => ({
     can: (permission: string) => permission === "scraping.trigger" && permissionState.canTriggerRepair,
@@ -37,6 +41,7 @@ afterEach(() => {
   cleanup();
   sessionStorage.clear();
   permissionState.canTriggerRepair = true;
+  cardAuth.user = null;
   vi.unstubAllGlobals();
 });
 
@@ -567,6 +572,9 @@ async function renderFailedFilterCollapseCard(kept = 0): Promise<void> {
       });
     }
     if (url === "/api/scrape/staged/job-filter-collapse?view=summary") return jsonResponse([]);
+    if (url === "/api/scrape/jobs/job-filter-collapse/assistant") {
+      return jsonResponse({ threadId: null, status: "idle", phase: "", error: null, messages: [] });
+    }
     if (url.includes("/auto-repair-candidates")) return jsonResponse({ ok: true, candidates: [] });
     if (url.includes("/ai-repair-status")) return jsonResponse({ status: "not_started" });
     return jsonResponse({});
@@ -587,6 +595,35 @@ async function renderFailedFilterCollapseCard(kept = 0): Promise<void> {
     }
   });
 }
+
+it("keeps a usable job-scoped assistant on a failed zero-course URL-filter run", async () => {
+  cardAuth.user = { id: 1, email: "staff@example.test", name: "Staff", role: "staff" };
+  await renderFailedFilterCollapseCard();
+  const prompt = await screen.findByRole("textbox", { name: "Message the scrape assistant" });
+  expect(prompt.id).toBe("assistant-prompt-job-filter-collapse");
+  const fetchMock = vi.mocked(globalThis.fetch);
+  fetchMock.mockClear();
+  fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input) === "/api/scrape/jobs/job-filter-collapse/assistant") {
+      return jsonResponse({
+        threadId: "failed-run-chat", status: "ready", turnId: "diagnose-filter",
+        events: [], actions: [],
+        messages: init?.method === "POST"
+          ? [{ role: "assistant", content: "The URL allow rules excluded all candidates; no courses were changed.", createdAt: "2026-11-12T00:00:00Z" }]
+          : [],
+      });
+    }
+    return jsonResponse({});
+  });
+  fireEvent.change(prompt, { target: { value: "Diagnose this filter failure and prepare a safe repair" } });
+  fireEvent.click(screen.getByTestId("button-assistant-submit"));
+  await screen.findByText("The URL allow rules excluded all candidates; no courses were changed.");
+  const posts = fetchMock.mock.calls.filter(([, init]) => init?.method === "POST");
+  expect(posts).toHaveLength(1);
+  expect(posts[0][0]).toBe("/api/scrape/jobs/job-filter-collapse/assistant");
+  expect(JSON.parse(String(posts[0][1]?.body)).prompt).toBe("Diagnose this filter failure and prepare a safe repair");
+  expect(posts.some(([url]) => /\/(start|ai-repair)$/.test(String(url)))).toBe(false);
+});
 
 describe("runtimeProgressFromStatus", () => {
   it("rejects empty or incomplete repair snapshots instead of rendering missing attempts", () => {

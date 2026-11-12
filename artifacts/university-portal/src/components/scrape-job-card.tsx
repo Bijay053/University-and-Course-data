@@ -1600,7 +1600,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
   // Refresh job-scoped data after an assistant action reaches a terminal
   // state. Only refetches derived counts/quality; never resets form state.
   const handleAssistantChanged = useCallback(() => {
-    const jobId = completedJobId;
+    const jobId = completedJobId ?? activeJobId;
     if (!jobId) return;
     void fetchQualityData(jobId);
     pendingReviewCountJobRef.current = jobId;
@@ -1613,7 +1613,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
         if (count !== null && pendingReviewCountJobRef.current === jobId) setPendingReviewCount(count);
       })
       .catch(() => { /* keep previous count */ });
-  }, [completedJobId, fetchQualityData]);
+  }, [completedJobId, activeJobId, fetchQualityData]);
 
   const handleRunOptimizer = useCallback(async () => {
     if (!completedJobId || qualityStatus === "queued" || qualityStatus === "polling") return;
@@ -2781,6 +2781,14 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
               <LiveScrapeAssistant
                 key={activeJobId}
                 jobId={activeJobId}
+                onChanged={handleAssistantChanged}
+                onReviewJob={id => onReviewReady(id, uniName, true)}
+              />
+            )}
+            {(phase === "error" || phase === "waiting") && (repairJobId ?? activeJobId) && (
+              <ScrapePromptAssistant
+                key={repairJobId ?? activeJobId}
+                jobId={(repairJobId ?? activeJobId)!}
                 onChanged={handleAssistantChanged}
                 onReviewJob={id => onReviewReady(id, uniName, true)}
               />
