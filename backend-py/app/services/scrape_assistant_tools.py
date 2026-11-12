@@ -188,6 +188,7 @@ async def public_request(url: str, *, method="GET", body=None, params=None, user
 
 async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) -> dict:
     requested_url = url
+    redirects = []
     stage = "url_validation"
     source_type = "pdf" if urlsplit(url).path.lower().endswith(".pdf") else "html"
     try:
@@ -196,7 +197,19 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
             "preserved" if url == requested_url else "fragment_removed"
         )}
         stage = "source_fetch"
-        raw = raw_body if raw_body is not None else await asyncio.wait_for(public_request(url), timeout=12)
+        if raw_body is not None:
+            raw = raw_body
+        else:
+            from app.services.official_source_redirects import read_official_source, same_path_redirect
+            original_url = url
+            raw, url, redirects = await asyncio.wait_for(
+                read_official_source(url, home, public_request, redirects=redirects), timeout=12,
+            )
+            if redirects:
+                identity.update(urlHandling="redirect_followed", finalUrl=url,
+                                redirectChain=redirects)
+                if same_path_redirect(redirects):
+                    identity["url"] = original_url
         stage = "content_validation"
         if len(raw) > MAX_BYTES:
             raise SourceReadError("Source exceeds the safe research size limit.")
@@ -277,6 +290,8 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
                 "preserved" if url == requested_url else "fragment_removed"
             )} if stage != "url_validation" else {}),
             "failureStage": failure_stage,
+            **({"redirectChain": redirects, "finalUrl": redirects[-1]["to"],
+                "urlHandling": "redirect_followed"} if redirects else {}),
             "sourceRequestAttempted": (
                 False if failure_stage in {"robots", "url_validation"} else
                 True if failure_stage in {"source_http", "content_validation", "pdf_parse"} else None

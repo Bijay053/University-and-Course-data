@@ -38,7 +38,8 @@ async def _read_response(response, url, *, raw=None):
     # Both provider and target redirects must be checked at a fresh permission
     # boundary, never followed automatically by either HTTP client.
     if response.is_redirect or response.headers.get("Scrape.do-Target-Redirected-Location"):
-        error = _error("Source redirects; provide its final official URL.")
+        error = _error("Source redirects; provide its final official URL.",
+                       failure_stage="source_redirect")
         # Expose only a direct Location for a separate checked request. Provider
         # redirects remain blocked and are never treated as university authority.
         if (response.is_redirect and getattr(response, "_request", None) is not None
@@ -110,6 +111,10 @@ async def read_permitted_source(client, url, *, method="GET", body=None,
         async with client.stream(method, url, json=body if method == "POST" else None,
                                  params=params or None) as response:
             response_received = True
+            if response.is_redirect or response.headers.get("Scrape.do-Target-Redirected-Location"):
+                # Inspect Location without consuming a possibly stalled redirect
+                # body. The caller must check ownership and robots for each hop.
+                return await _read_response(response, target, raw=b"")
             # Only plain temporary origin failures qualify for a transport
             # fallback. Read the body first to reject disguised challenges.
             try:

@@ -7,7 +7,7 @@ from app.models.scrape_assistant import ScrapeAssistantThread
 
 ACCESS_ISSUES = frozenset({"robots_unavailable", "robots_disallowed", "source_access_denied"})
 FAILURE_REUSE_SECONDS = 120
-IELTS_FACTS_VERSION = 1
+IELTS_FACTS_VERSION = 2
 
 
 async def refresh_ielts_facts(source, url):

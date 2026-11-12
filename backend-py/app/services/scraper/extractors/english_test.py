@@ -132,6 +132,7 @@ def _try_named_ielts_components(
 
 _ENGLISH_SUBTEST_REQUIREMENT_RE = re.compile(
         r"\bEnglish language requirements\s*:?\s*"
+        r"(?:IELTS\s*(?:\(Academic\)\s*)?)?"
         r"([4-9](?:\.[05])?)\s+overall\s+with\s+"
         r"no\s+(?:individual\s+)?sub[\s-]?test\s+"
         r"(?:less\s+than|below|lower\s+than|under)\s+"
