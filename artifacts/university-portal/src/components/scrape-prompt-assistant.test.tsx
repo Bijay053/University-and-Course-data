@@ -16,7 +16,7 @@ vi.mock("./assistant-import-status", async () => {
   }};
 });
 
-import { ScrapePromptAssistant, type AssistantThread } from "./scrape-prompt-assistant";
+import { ScrapePromptAssistant, ASSISTANT_IDLE_POLL_MS, type AssistantThread } from "./scrape-prompt-assistant";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -31,6 +31,29 @@ afterEach(() => {
 });
 
 describe("ScrapePromptAssistant", () => {
+  it("discovers a repair started in another session without posting another prompt", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const latest: AssistantThread = { ...empty, threadId: "same", status: "ready",
+      messages: [{ role: "assistant", content: "Checking the approved 139-course repair.",
+        createdAt: "2026-11-12T02:00:00Z", actions: [{
+          id: "bulk", kind: "fix_fields", label: "IELTS repair", courseCount: 139,
+          fields: ["ielts_overall"], state: "running", jobId: "fix-bulk",
+          progress: { current: 50, total: 139, status: "running" },
+        }] }] };
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json(empty)).mockImplementation(async () => json(latest));
+    try {
+      render(<ScrapePromptAssistant jobId="j1" />);
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      await vi.advanceTimersByTimeAsync(ASSISTANT_IDLE_POLL_MS + 1);
+      await screen.findByText("Checking the approved 139-course repair.");
+      expect(fetchMock.mock.calls.every(([, options]) => !options?.method || options.method === "GET")).toBe(true);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
   it("shows exact scope and five IELTS comparisons, then cancels without executing", async () => {
     const thread: AssistantThread = { ...empty, threadId: "checked", status: "ready",
       messages: [{ role: "assistant", content: "Prepared exactly 1 course; 138 are not included.",

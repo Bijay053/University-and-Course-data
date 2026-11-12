@@ -37,6 +37,7 @@ import {
 } from "@/components/review-scraped-courses-table";
 import { ScrapeJobCard } from "@/components/scrape-job-card";
 import { ScrapePromptAssistant } from "@/components/scrape-prompt-assistant";
+import { preferFreshRepair, startVisiblePolling } from "@/lib/visible-polling";
 import { CourseReport, type CourseReportPrefillCourse } from "@/components/course-report";
 import { DurationReviewNotice, type DurationReviewStatus } from "@/components/duration-review-status";
 import { TargetedRetryAllFilteredNotice, type TargetedRetryDiagnostic } from "@/components/targeted-retry-diagnostic";
@@ -604,6 +605,7 @@ interface FixResults {
   requestedFields: string[];
 }
 interface BulkFixJob {
+  createdAt?: string | null;
   smart?: boolean;
   universityId?: number;
   attempted?: number;
@@ -2875,6 +2877,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [fixAnalysis, setFixAnalysis] = useState<FixAnalysis | null>(null);
   const [fixResults, setFixResults] = useState<FixResults | null>(null);
   const [bulkFixJob, setBulkFixJob] = useState<BulkFixJob | null>(null);
+  const bulkFixJobRef = useRef<BulkFixJob | null>(null);
+  bulkFixJobRef.current = bulkFixJob;
+  const [bulkFixRefreshError, setBulkFixRefreshError] = useState<string | null>(null);
   const [forceFields, setForceFields] = useState<string[]>([]);
   const [forceReasons, setForceReasons] = useState<Record<string, string>>({});
   const [cleaningNames, setCleaningNames] = useState(false);
@@ -3200,7 +3205,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       .then((res) => res.ok ? res.json() : null)
       .then((job: BulkFixJob | null) => {
         if (cancelled || !job?.jobId || !job.status || (reviewJobId && job.sourceJobId !== reviewJobId)) return;
-        setBulkFixJob(job);
+        setBulkFixJob(current => preferFreshRepair(current, job));
         if (["queued", "running"].includes(job.status)) {
           setFixingSelected(true);
           setFixProgress({ completed: job.processed, total: job.total });
@@ -3212,41 +3217,49 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
   useEffect(() => {
     if (!reviewJobId || stagedCourses.length === 0) return;
-    let cancelled = false;
     setBulkFixJob((current) => current?.sourceJobId === reviewJobId ? current : null);
+    setBulkFixRefreshError(null);
     const universityId = stagedCourses[0]?.universityId;
     if (!universityId) return;
-    fetch(`/api/scrape/staged/fix-jobs?universityId=${universityId}&sourceJobId=${encodeURIComponent(reviewJobId)}`, {
-      credentials: "include",
-      cache: "no-store",
-    })
-      .then((res) => res.ok ? res.json() : null)
-      .then((job: BulkFixJob | null) => {
-        if (!cancelled && job?.jobId && job.status && job.sourceJobId === reviewJobId) {
-          setBulkFixJob(job);
+    return startVisiblePolling(async signal => {
+        const res = await fetch(`/api/scrape/staged/fix-jobs?universityId=${universityId}&sourceJobId=${encodeURIComponent(reviewJobId)}`, {
+          credentials: "include", cache: "no-store", signal,
+        });
+        if (!res.ok) throw new Error("Could not refresh the latest repair progress. Showing the last known result.");
+        const job: BulkFixJob | null = await res.json();
+        if (signal.aborted) return;
+        setBulkFixRefreshError(null);
+        if (job?.jobId && job.status && job.sourceJobId === reviewJobId) {
+          setBulkFixJob(current => preferFreshRepair(current, job));
           localStorage.setItem("activeBulkFixJob", job.jobId);
-          if (["queued", "running"].includes(job.status)) {
-            setFixingSelected(true);
-            setFixProgress({ completed: job.processed, total: job.total });
-          }
         }
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [reviewJobId, stagedCourses.length]);
+      }, 15000, () => setBulkFixRefreshError(
+        "Could not refresh the latest repair progress. Showing the last known result."), true);
+  }, [reviewJobId, stagedCourses.length, stagedCourses[0]?.universityId]);
+
+  useEffect(() => {
+    if (!bulkFixJob) return;
+    const running = ["queued", "running"].includes(bulkFixJob.status);
+    setFixingSelected(running);
+    setFixProgress(running ? { completed: bulkFixJob.processed, total: bulkFixJob.total } : null);
+  }, [bulkFixJob?.jobId, bulkFixJob?.status, bulkFixJob?.processed, bulkFixJob?.total]);
 
   useEffect(() => {
     if (!bulkFixJob || !["queued", "running"].includes(bulkFixJob.status)) return;
+    const controller = new AbortController();
     const timer = window.setInterval(async () => {
       try {
         const res = await fetch(`/api/scrape/staged/fix-jobs/${bulkFixJob.jobId}`, {
           credentials: "include",
           cache: "no-store",
+          signal: controller.signal,
         });
         if (!res.ok) return;
         const job: BulkFixJob = await res.json();
-        setBulkFixJob(job);
-        setFixProgress({ completed: job.processed, total: job.total });
+        if (controller.signal.aborted || job.sourceJobId !== bulkFixJob.sourceJobId
+          || job.jobId !== bulkFixJobRef.current?.jobId
+          || preferFreshRepair(bulkFixJobRef.current, job) !== job) return;
+        setBulkFixJob(current => preferFreshRepair(current, job));
         if (!["queued", "running"].includes(job.status)) {
           window.clearInterval(timer);
           await openCompletedFixResults(job);
@@ -3260,7 +3273,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         // The durable worker continues; polling resumes on the next tick.
       }
     }, 2000);
-    return () => window.clearInterval(timer);
+    return () => { controller.abort(); window.clearInterval(timer); };
   }, [bulkFixJob?.jobId, bulkFixJob?.status, fixAnalysis?.issues, loadFixAnalysis, loadStagedCourses, reviewJobId]);
 
   const handleDedupPending = async () => {
@@ -4170,6 +4183,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   onReviewJob={handleAssistantOpenReview}
                   disabled={reviewRefreshing}
                 />
+                {bulkFixRefreshError && (
+                  <p role="status" className="mt-2 text-xs text-amber-800">{bulkFixRefreshError}</p>
+                )}
               </div>
             )}
             <DatedCatalogueReview courses={stagedCourses} />

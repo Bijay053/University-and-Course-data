@@ -13,6 +13,7 @@ import { safeSourceUrl } from "./assistant-safe-url";
 import { AssistantMarkdown, CodeBlock } from "./assistant-markdown";
 import { CatalogueComparisonView, type CatalogueComparison } from "./assistant-catalogue-comparison";
 import { AssistantRepairPreview, type RepairCourseScope, type RepairPreview } from "./assistant-repair-preview";
+import { startVisiblePolling } from "@/lib/visible-polling";
 
 export { safeSourceUrl };
 
@@ -84,6 +85,7 @@ export type ScrapePromptAssistantProps = {
 };
 
 export const ASSISTANT_POLL_MS = 1000;
+export const ASSISTANT_IDLE_POLL_MS = 15000;
 export const MAX_DOCUMENT_BYTES = 2_000_000;
 /** Kinds that must never run without an explicit confirmation dialog. */
 export function actionNeedsConfirmation(a: AssistantAction): boolean {
@@ -343,25 +345,19 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
 
   // Poll while active.
   useEffect(() => {
-    if (!active || !viewKey) return;
+    if (!viewKey) return;
     const forKey = viewKey;
-    const ctrl = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const tick = async () => {
-      try {
-        const res = await fetch(base, { credentials: "include", signal: ctrl.signal });
+    return startVisiblePolling(async signal => {
+        const res = await fetch(base, { credentials: "include", signal });
         if (!res.ok) throw new Error(await errorFor(res));
         const t = await readResponseJson<AssistantThread>(res);
-        if (t && !ctrl.signal.aborted) accept(forKey, t);
-      } catch (err) {
-        if (ctrl.signal.aborted) return;
+        if (t && !signal.aborted) {
+          setLoadError(null);
+          accept(forKey, t);
+        }
+      }, active ? ASSISTANT_POLL_MS : ASSISTANT_IDLE_POLL_MS, err => {
         setLoadError({ key: forKey, msg: err instanceof Error ? err.message : String(err) });
-        return;
-      }
-      if (!ctrl.signal.aborted) timer = setTimeout(tick, ASSISTANT_POLL_MS);
-    };
-    timer = setTimeout(tick, ASSISTANT_POLL_MS);
-    return () => { ctrl.abort(); if (timer) clearTimeout(timer); };
+      });
   }, [active, base, viewKey, accept]);
 
   useEffect(() => () => mutateAbort.current?.abort(), []);

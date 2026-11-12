@@ -1780,7 +1780,7 @@ describe("Scraping repair reviewer", () => {
     }));
     render(<ScrapingForTest initialReviewState={review} />);
     await userEvent.setup().click(screen.getByTitle("Reload staged courses and refresh quality scores"));
-    await waitFor(() => expect(screen.getByText("142 pending entries")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("142 pending entries in this review")).toBeTruthy());
     expect(screen.getByRole("button", { name: "Approve (142 courses)" })).toBeTruthy();
     expect(screen.getAllByText("Same programme")).toHaveLength(142);
     expect(screen.queryByText("Unrelated")).toBeNull();
@@ -1820,7 +1820,7 @@ describe("Scraping repair reviewer", () => {
     render(<ScrapingForTest initialReviewState={review} />);
     await user.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
     expect(await screen.findByText("1 course groups")).toBeTruthy();
-    expect(screen.getByText("2 pending entries")).toBeTruthy();
+    expect(screen.getByText("2 pending entries in this review")).toBeTruthy();
     expect(screen.getAllByTestId("row-logical-course-101")).toHaveLength(1);
     const group = screen.getByTestId("row-logical-course-101");
     expect(group.textContent).toContain("Manchester: GBP 18,000");
@@ -1861,7 +1861,7 @@ describe("Scraping repair reviewer", () => {
     }
     await userEvent.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
     await waitFor(() => expect(screen.getByRole("button", { name: `Approve (${deselect ? 0 : 1} course${deselect ? "s" : ""})` })).toBeTruthy());
-    expect(screen.getByText("1 pending entries")).toBeTruthy();
+    expect(screen.getByText("1 pending entries in this review")).toBeTruthy();
     expect(screen.getByText("London, Leeds")).toBeTruthy();
     await userEvent.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
     await waitFor(() => expect(loaded).toBe(2));
@@ -2004,6 +2004,47 @@ describe("Scraping repair reviewer", () => {
       forceReasons: {},
     });
   }, 10_000);
+
+  it("refreshes an old one-course result to the running cross-session repair without starting work", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const review = initialReview();
+    localStorage.setItem("activeBulkFixJob", "old-fix");
+    const old = {
+      jobId: "old-fix", sourceJobId: "repair-job", targetFields: ["ielts_overall"],
+      status: "completed", total: 1, processed: 1, queued: 0, running: 0,
+      completed: 1, noProgress: 0, failed: 0, results: [],
+      createdAt: "2026-11-12T01:00:00Z",
+    };
+    const current = { ...old, jobId: "new-fix", status: "running", total: 139,
+      processed: 50, completed: 43, queued: 84, running: 5, noProgress: 5,
+      alreadyResolved: 2, createdAt: "2026-11-12T02:00:00Z" };
+    let lookups = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _options?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) {
+        return jsonResponse(++lookups === 1 ? old : current);
+      }
+      if (url.endsWith("/old-fix")) return jsonResponse(old);
+      if (url.endsWith("/new-fix")) return jsonResponse(current);
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse(review.courses);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      render(<ScrapingForTest initialReviewState={review} />);
+      await screen.findByText("1/1 processed");
+      await vi.advanceTimersByTimeAsync(15001);
+      await screen.findByText("50/139 processed");
+      expect(localStorage.getItem("activeBulkFixJob")).toBe("new-fix");
+      expect(fetchMock.mock.calls.every((call) => !(call[1] as RequestInit | undefined)?.method
+        || (call[1] as RequestInit).method === "GET")).toBe(true);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
 
   it("restores a completed background Fix with errors and opens its detailed results", async () => {
     const review = initialReview();
