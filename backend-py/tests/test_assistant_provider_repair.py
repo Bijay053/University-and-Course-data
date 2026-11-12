@@ -81,6 +81,48 @@ def test_short_followup_requires_same_thread_repair_context():
 
 
 @pytest.mark.parametrize("prompt", [
+    "why it fail fix the bug", "why did this fail?", "fix this bug",
+    "fix this", "why is it still not working", "please repair it",
+    "what went wrong fix this now",
+])
+def test_short_failure_request_uses_verified_failed_job_context(prompt):
+    assert not requested(prompt)
+    assert requested(prompt, failed_job=True)
+
+
+@pytest.mark.parametrize("prompt", [
+    "fix IELTS for all courses", "change online to Blended",
+    "set duration 4 years", "fix the course name",
+    "https://www.aston.ac.uk/course fix this", "read this PDF", "retry failed URLs",
+])
+def test_failed_state_does_not_hijack_explicit_field_or_source_requests(prompt):
+    assert not requested(prompt, failed_job=True)
+
+
+def test_zero_rows_and_zero_errors_still_expose_structured_filter_collapse():
+    job = SimpleNamespace(
+        runtime_job_id="aston-job", status="failed_degraded", university_id=100,
+        discovered_config={"pipeline_stats":{"raw_discovered":655,"after_filter":0,"filter_drop_count":655}},
+        gate_skip_counts={"catalogue_guard":{"kind":"discovery_filter_collapse"}},
+        total_found=0, current=0, imported=0, skipped=0, errors=0,
+        release_revision="test")
+    result = diagnosis(job, missing_fields=0)
+    assert result["repairAvailable"] is True
+    text = answer(result)
+    assert "655 raw candidates" in text and "0 extractable URLs" in text
+    assert "discovery/filter collapse" in text and "zero per-course extraction errors" in text
+    assert "every excluded URL is a valid course" in text
+
+
+@pytest.mark.parametrize("prompt", [
+    "why it fail only explain the bug", "do not fix this bug", "don't fix this bug",
+])
+def test_shorthand_read_only_diagnosis_preserves_no_repair_rule(prompt):
+    assert requested(prompt, failed_job=True)
+    assert not wants_repair(prompt)
+
+
+@pytest.mark.parametrize("prompt", [
     "only explain this scraper issue", "do not fix the scraping bug", "diagnose the discovery issue",
 ])
 def test_read_only_diagnosis_does_not_prepare_mutation(prompt):
@@ -113,6 +155,7 @@ def test_log_sample_is_bounded():
     "fix this scraping bug",
     "there is bug in this scapting code fix this\nall courses are not listed",
     "fix the scraper: IELTS is missing across all courses",
+    "why it fail fix the bug",
 ])
 async def test_real_prompt_dispatch_prepares_existing_ui_action_in_both_engines(monkeypatch, engine, prompt):
     from app.models import ScrapeRuntimeJob
@@ -132,7 +175,7 @@ async def test_real_prompt_dispatch_prepares_existing_ui_action_in_both_engines(
             if model is ScrapeAssistantThread:
                 return thread
             assert model is ScrapeRuntimeJob
-            return SimpleNamespace(university_id=116)
+            return SimpleNamespace(university_id=116, status="failed_degraded")
     calls, replies = [], []
     async def execute(tools, name, args, call_id):
         calls.append(name)

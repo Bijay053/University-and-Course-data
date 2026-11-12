@@ -22,7 +22,7 @@ def diagnosis(job, *, missing_fields, imports_paused=False):
     )
     if imports_paused:
         allowed, reason = False, "Provider imports are paused until consolidation is complete."
-    return {
+    report = {
         "ok": True, "changed": False, "jobId": job.runtime_job_id,
         "status": job.status, "releaseRevision": job.release_revision,
         "counts": {"candidates": job.total_found, "processed": job.current,
@@ -33,6 +33,18 @@ def diagnosis(job, *, missing_fields, imports_paused=False):
         "scope": "Validated provider configuration repair and isolated pending-only verification; not application-code editing.",
         "accessPolicy": "No robots disallow or bot-protection bypass. Access failure alone does not prove a parser bug.",
     }
+    pipeline = config.get("pipeline_stats") or {}
+    keys = ("raw_discovered", "after_filter", "filter_drop_count")
+    # Only structured non-negative stored counters establish this observation.
+    # Neither source prose nor model-generated explanations can supply it.
+    if isinstance(pipeline, dict) and all(type(pipeline.get(key)) is int and pipeline[key] >= 0
+                                          for key in keys):
+        report["pipelineEvidence"] = {
+            "rawCandidates":pipeline["raw_discovered"],
+            "extractableCandidates":pipeline["after_filter"],
+            "filterDropped":pipeline["filter_drop_count"],
+        }
+    return report
 
 
 def proposal(tools, university, report, call_id):
