@@ -640,9 +640,11 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
             except ValueError as exc:
                 raise HTTPException(status_code=409,detail=str(exc))
             if not applied:
+                from app.services.assistant_delivery_review import delivery_recheck_options
                 result = await start_bulk_fix_job(StartBulkFixBody(
                     ids=action["_ids"], universityId=job.university_id, sourceJobId=job_id,
                     targetFields=action["fields"], smart=True,
+                    **delivery_recheck_options(action),
                 ), db, actor)
                 action["jobId"] = result.get("jobId") or result.get("job_id")
                 if not action["jobId"]:

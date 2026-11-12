@@ -23,7 +23,7 @@ from app.services.scrape_assistant_tools import (
     inspect_catalogue, inspect_source, official_url, quote_in_source,
 )
 
-FIELDS = {"international_fee", "ielts_overall", "duration", "course_location"}
+FIELDS = {"international_fee", "ielts_overall", "duration", "course_location", "study_mode"}
 IELTS_COMPONENTS = {"ielts_listening", "ielts_reading", "ielts_writing", "ielts_speaking"}
 REVIEW_STATUSES = {"pending", "review", "review_ready"}
 SOURCE_ACCESS_REGISTRY = True
@@ -70,7 +70,7 @@ def row_version(row):
         "id", "status", "course_name", "course_website", "international_fee",
         "currency", "fee_term", "fee_year", "ielts_overall", "ielts_listening",
         "ielts_speaking", "ielts_reading", "ielts_writing", "duration",
-        "duration_term", "course_location", "intake_months",
+        "duration_term", "course_location", "intake_months", "study_mode",
     )})
 
 
@@ -157,6 +157,7 @@ async def context(job_id: str) -> dict:
         samples = [{
             "id": row.id, "name": row.course_name,
             "url": row.course_website, "degreeLevel": row.degree_level,
+            "studyMode": row.study_mode,
             "fee": row.international_fee, "currency": row.currency,
             "feeTerm": row.fee_term, "feeYear": row.fee_year,
             "ielts": row.ielts_overall,
@@ -550,8 +551,11 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         # An open review is context, not the referent of "this course".
         urls, check_catalogue = recent_user_urls[:3], False
         if not all(urlsplit(value).path.lower().endswith(".pdf") for value in recent_user_urls):
-            sampled = [item for item in sampled if item.get("url", "").rstrip("/") in
-                       {value.rstrip("/") for value in recent_user_urls}]
+            # Resolve explicit URLs against the full pending cohort, not the
+            # already-truncated 40-row relevance sample. Otherwise generic
+            # words such as "course" can push the linked row out of context.
+            sampled = [item for item in ctx["samples"] if item.get("url", "").rstrip("/") in
+                       {value.rstrip("/") for value in recent_user_urls}][:40]
     inventory = await inventory_for_urls(ctx["university_id"], recent_user_urls[:3])
     if not urls:
         await progress(thread_id, turn_id, "Locating official source pages", run_id)
@@ -727,7 +731,11 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             "fix_fields reruns validated extraction only for the server-scoped existing pending rows "
             "in this request. A named course URL is not proof or authority for changing every row; "
             "allowed fields: international_fee,ielts_overall,ielts_listening,ielts_reading,"
-            "ielts_writing,ielts_speaking,duration,course_location. "
+            "ielts_writing,ielts_speaking,duration,course_location,study_mode. "
+            "A delivery-mode correction plus 'review all courses' requests a delivery check of "
+            "the entire existing pending review, not a catalogue-status summary or new discovery. "
+            "Do not copy Online/Blended from the example to other courses; conflicting delivery "
+            "evidence is not permission to choose a mode. "
             "IELTS fields are a single supported repair bundle: targeting ielts_overall "
             "re-extracts and persists overall AND Listening, Reading, Writing and Speaking. "
             "Never say individual bands are unsupported or that overall recovery cannot fix bands. "
@@ -851,6 +859,11 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
                 "or cannot be verified, the result will say so. Nothing has been added yet, and this action "
                 "does not create a duplicate published course or approve changes."
             )
+    from app.services.assistant_delivery_review import delivery_review_proposal
+    delivery_action = delivery_review_proposal(this_service, prompt, ctx, sources)
+    if delivery_action:
+        action = delivery_action
+        citations = action.pop("_supportingSources")
     if action and not citations and any(source.get("verified") for source in sources):
         raise ValueError("Corrections require at least one verified source excerpt.")
     if action:
@@ -873,7 +886,10 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
     from app.services.assistant_repair_proposals import finalize_field_proposal
     authoritative_summary = finalize_field_proposal(action, prompt, ctx, sources)
     if authoritative_summary:
-        result["answer"] = authoritative_summary
+        if delivery_action:
+            result["answer"] = (result["answer"].rstrip() + "\n\n" + authoritative_summary).strip()
+        else:
+            result["answer"] = authoritative_summary
     reply = {
         "role": "assistant", "content": result["answer"][:7000],
         "createdAt": now().isoformat(), "sources": citations, "turnId": turn_id,

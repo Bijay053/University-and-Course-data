@@ -2492,6 +2492,7 @@ def _targeted_reextract_fields(target_fields: list[str]) -> set[str] | None:
 
 _FORCEABLE_REEXTRACT_FIELDS = frozenset({
     "course_location",
+    "study_mode",
     "duration",
     "english_requirements",
     "international_fee",

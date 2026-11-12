@@ -52,6 +52,19 @@ def finalize_field_proposal(action, prompt, ctx, sources):
         f"{total - len(ids)} are not included in this action. "
         "Only the courses listed in the proposal can be processed."
     )
+    if "study_mode" in action["fields"]:
+        # This path has not yet produced a deterministic before/after delivery
+        # comparison. Model confidence is not proof that conflicting wording
+        # can be resolved, even for a single pending row.
+        action["requiresConfirmation"] = True
+        summary += (
+            "\n\nThis is a delivery-mode recheck, not new course discovery. Each course "
+            "must use its own official delivery evidence. Online modules or an Online "
+            "start-date label alone do not establish online-only delivery when teaching "
+            "evidence conflicts. No review-wide Online value will be copied. Unavailable "
+            "or inconclusive evidence must remain unresolved; staging counts do not prove "
+            "these course checks have completed."
+        )
     if "ielts_overall" in action["fields"]:
         previews = []
         for row, scope in zip(rows, action["courseScope"]):
