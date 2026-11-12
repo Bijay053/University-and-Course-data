@@ -6914,6 +6914,24 @@ async def extract_course(
             row for row in browser_evidence
             if row not in _ignored_aru_browser_rows
         )
+        # A sparse initial response may contain the subject but omit its award.
+        # Recheck the owned hero after rendering rather than retaining that
+        # incomplete title while accepting other fields from the new DOM.
+        if rendered_html:
+            from app.services.scraper.course_title_identity import complete_owned_course_title
+            _rendered_title = complete_owned_course_title(
+                rendered_html, url, payload.get("course_name"),
+            )
+            if _rendered_title:
+                payload["course_name"] = _rendered_title
+                evidence.append({
+                    "field_key": "course_name",
+                    "value": _rendered_title,
+                    "confidence": 0.95,
+                    "method": "course_name.rendered_owned_award_identity",
+                    "source_url": url,
+                    "snippet": f"Course-owned rendered heading and award: {_rendered_title}",
+                })
 
         # ── YAML: fee rejection (reject_keywords) ─────────────────────────────
         # Discards international_fee when the winning evidence snippet contains

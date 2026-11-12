@@ -813,8 +813,7 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     # Explicit, course-owned negative availability is never repaired away.
     from app.services.scraper.pipelines.single_course import _is_domestic_only_page, _is_parttime_only_page
     from app.services.scraper.guards import is_confirmed_host_online_only_page
-    if (_is_domestic_only_page(owned_html, url) or _is_parttime_only_page(owned_html)
-            or is_confirmed_host_online_only_page(owned_html, url)):
+    if _is_domestic_only_page(owned_html, url):
         return {**result, "classification": "ineligible", "reason": "Shared international course eligibility gate"}
     from app.services.scraper.extractors.eligibility import _NEG
     from bs4 import BeautifulSoup
@@ -822,11 +821,17 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     eligibility_region = BeautifulSoup(eligibility_html(str(region), url), "html.parser")
     if _NEG.search(eligibility_region.get_text(" ", strip=True)):
         return {**result, "classification": "ineligible", "reason": "Explicit international-audience exclusion"}
-    if re.search(r"\b(?:study mode|mode of study|delivery)\b\s*[:\-]?\s*online\s+only\b", region.get_text(" ", strip=True), re.I):
-        return {**result, "classification": "ineligible", "reason": "Explicit online-only delivery"}
-    if re.search(r"\b(?:duration|study mode|mode of study)\b.{0,50}\b(?:part.time only|only (?:available )?part.time)\b", field_text, re.I):
-        return {**result, "classification": "ineligible", "reason": "Explicit part-time-only route"}
+    review_warnings = []
+    if (is_confirmed_host_online_only_page(owned_html, url) or re.search(
+            r"\b(?:study mode|mode of study|delivery)\b\s*[:\-]?\s*online\s+only\b",
+            region.get_text(" ", strip=True), re.I)):
+        review_warnings.append("online_only")
+    if (_is_parttime_only_page(owned_html) or re.search(
+            r"\b(?:duration|study mode|mode of study)\b.{0,50}\b(?:part.time only|only (?:available )?part.time)\b",
+            field_text, re.I)):
+        review_warnings.append("part_time_only")
     return {**result, "classification": "course",
+            "review_only": bool(review_warnings), "review_warnings": review_warnings,
             "url_gate_override_required": bool(url_override),
             "reason": "Visible course-owned award/identity and multiple course fields"}
 

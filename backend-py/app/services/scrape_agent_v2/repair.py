@@ -10,15 +10,16 @@ from app.models import ScrapedCourse, ScrapeRuntimeJob, University
 def diagnosis(job, *, missing_fields, imports_paused=False):
     """Report measured job state, not a website-access guess."""
     config = dict(job.discovered_config or {})
-    from app.services.ai_repair_workflow import has_catalogue_evidence
+    from app.services.ai_repair_workflow import has_catalogue_evidence, needs_empty_discovery_probe
     from app.services.scraper.ai_repair_agent import validate_ai_repair_target
 
     config["catalogue_floor_guard"] = (job.gate_skip_counts or {}).get("catalogue_guard") or {}
     shortfall = has_catalogue_evidence(config) or (
         (job.total_found or 0) > 0 and (job.imported or 0) < job.total_found * .5
     )
+    empty_discovery = needs_empty_discovery_probe(job.status, job.total_found, job.imported)
     allowed, reason = validate_ai_repair_target(
-        job.status, config, has_extraction_gap=bool(missing_fields or shortfall),
+        job.status, config, has_extraction_gap=bool(missing_fields or shortfall or empty_discovery),
     )
     if imports_paused:
         allowed, reason = False, "Provider imports are paused until consolidation is complete."
@@ -28,7 +29,8 @@ def diagnosis(job, *, missing_fields, imports_paused=False):
         "counts": {"candidates": job.total_found, "processed": job.current,
                    "staged": job.imported, "skipped": job.skipped, "errors": job.errors,
                    "rowsWithMissingRepairableFields": missing_fields},
-        "catalogueShortfall": shortfall, "skipReasons": job.gate_skip_counts or {},
+        "catalogueShortfall": shortfall, "needsDiscoveryProbe": empty_discovery,
+        "skipReasons": job.gate_skip_counts or {},
         "repairAvailable": allowed, "blockedReason": reason or None,
         "scope": "Validated provider configuration repair and isolated pending-only verification; not application-code editing.",
         "accessPolicy": "No robots disallow or bot-protection bypass. Access failure alone does not prove a parser bug.",

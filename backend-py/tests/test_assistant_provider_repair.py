@@ -84,6 +84,8 @@ def test_short_followup_requires_same_thread_repair_context():
     "why it fail fix the bug", "why did this fail?", "fix this bug",
     "fix this", "why is it still not working", "please repair it",
     "what went wrong fix this now",
+    "why this scraoying is not working fix it",
+    "why is this university not working fix it", "fix the scrayping",
 ])
 def test_short_failure_request_uses_verified_failed_job_context(prompt):
     assert not requested(prompt)
@@ -94,6 +96,7 @@ def test_short_failure_request_uses_verified_failed_job_context(prompt):
     "fix IELTS for all courses", "change online to Blended",
     "set duration 4 years", "fix the course name",
     "https://www.aston.ac.uk/course fix this", "read this PDF", "retry failed URLs",
+    "fix scoring", "fix Scranton University values",
 ])
 def test_failed_state_does_not_hijack_explicit_field_or_source_requests(prompt):
     assert not requested(prompt, failed_job=True)

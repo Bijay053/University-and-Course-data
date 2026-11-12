@@ -97,13 +97,16 @@ def test_compact_ucas_evidence_requires_current_course_identity(html):
     assert live.inspect_page(ONE, html, config())["classification"] != "course"
 
 
-@pytest.mark.parametrize("negative", [
-    "<p>This course is not available to international students.</p>",
-    "<p>Delivery: Online only</p>",
-    "<p>Study mode: Part-time only</p>",
+@pytest.mark.parametrize("negative,warning", [
+    ("<p>This course is not available to international students.</p>", None),
+    ("<p>Delivery: Online only</p>", "online_only"),
+    ("<p>Study mode: Part-time only</p>", "part_time_only"),
 ])
-def test_compact_ucas_header_does_not_bypass_eligibility(negative):
-    assert live.inspect_page(ONE, compact_course_header(extra=negative), config())["classification"] == "ineligible"
+def test_compact_ucas_header_respects_eligibility_and_review_policy(negative, warning):
+    result=live.inspect_page(ONE, compact_course_header(extra=negative), config())
+    assert result["classification"] == ("ineligible" if warning is None else "course")
+    if warning:
+        assert result["review_only"] and warning in result["review_warnings"]
 
 
 @pytest.mark.asyncio
@@ -416,7 +419,7 @@ def test_cross_host_canonical_does_not_discard_official_aru_listing_evidence():
 
 
 def test_cross_host_canonical_does_not_bypass_course_eligibility_or_non_degree_gates():
-    ineligible = course(extra="<p>Study mode: Online only</p>").replace(
+    ineligible = course(extra="<p>This course is not available to international students.</p>").replace(
         "<html>", f'<html><head><link rel="canonical" href="{ARU_CANONICAL_HOST}/x"></head>',
         1,
     )
@@ -553,13 +556,16 @@ def test_wlv_course_length_is_owned_duration_evidence(award):
     assert result["classification"] == "course"
 
 
-@pytest.mark.parametrize("extra", [
-    "<p>Domestic students only</p>",
-    "<p>Study mode: Online only</p>",
-    "<p>Duration: 3 years, part time only</p>",
+@pytest.mark.parametrize("extra,warning", [
+    ("<p>Domestic students only</p>", None),
+    ("<p>Study mode: Online only</p>", "online_only"),
+    ("<p>Duration: 3 years, part time only</p>", "part_time_only"),
 ])
-def test_explicit_course_owned_ineligibility_is_not_repaired_away(extra):
-    assert live.inspect_page(ONE, course(extra=extra), config())["classification"] == "ineligible"
+def test_course_owned_exclusions_and_flagged_delivery_are_kept_distinct(extra, warning):
+    result=live.inspect_page(ONE, course(extra=extra), config())
+    assert result["classification"] == ("ineligible" if warning is None else "course")
+    if warning:
+        assert result["review_only"] and warning in result["review_warnings"]
 
 
 @pytest.mark.asyncio
@@ -1213,12 +1219,24 @@ def test_unverified_opaque_urls_do_not_count_as_proven_courses():
 @pytest.mark.parametrize("html", [
     "<main><h1>Bachelor of Laws</h1><p>Our programmes</p></main>",
     course(extra="<p>This course is available to domestic students only.</p>"),
-    course(extra="<p>Delivery: Online only</p>"),
-    course(extra="<p>Study mode: part-time only</p>"),
 ])
 def test_url_exception_never_uses_title_alone_or_overrides_eligibility(html):
     result = live.inspect_page("https://university.example/study-at-example/awards/law", html, config())
     assert result["classification"] != "course"
+
+
+@pytest.mark.parametrize("extra,warning", [
+    ("<p>Delivery: Online only</p>", "online_only"),
+    ("<p>Study mode: part-time only</p>", "part_time_only"),
+])
+def test_verified_course_url_exception_retains_delivery_review_flags(extra, warning):
+    result=live.inspect_page("https://university.example/study-at-example/awards/law",
+                             course(extra=extra), config())
+    assert result["classification"]=="course"
+    assert result["url_gate_override_required"]
+    assert result["review_only"] and warning in result["review_warnings"]
+    domestic=live.inspect_page(ONE,course(extra=extra+"<p>Domestic students only</p>"),config())
+    assert domestic["classification"]=="ineligible"
 
 
 @pytest.mark.asyncio

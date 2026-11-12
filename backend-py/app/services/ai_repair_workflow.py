@@ -97,6 +97,14 @@ def merge_live_progress(session: dict, live: dict) -> dict:
     return session
 
 
+def needs_empty_discovery_probe(status, total_found, staged) -> bool:
+    """A failed job with no recorded output needs diagnosis, not a guessed cause."""
+    return status in {"failed", "failed_degraded", "failed_provider", "error"} and all(
+        value is None or (type(value) is int and value == 0)
+        for value in (total_found, staged)
+    )
+
+
 def has_catalogue_evidence(config: dict) -> bool:
     """Require measured shortfall/contamination, never a university allowlist."""
     stats = (config or {}).get("pipeline_stats") or {}

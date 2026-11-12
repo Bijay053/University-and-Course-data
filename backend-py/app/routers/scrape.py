@@ -9465,7 +9465,8 @@ async def start_ai_repair(
     except WorkerFencingPrerequisiteError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    # Require a terminal job with concrete URL-filter failure evidence.
+    # Require a terminal repair target; empty failures may enter diagnosis,
+    # but still need fresh positive evidence before any configuration write.
     row = (await db.execute(
         _text(
             "SELECT runtime_job_id, status, university_id, discovered_config, "
@@ -9509,7 +9510,10 @@ async def start_ai_repair(
     if provider_failure:
         evidence_config["provider_failure"] = provider_failure
     evidence_config["catalogue_floor_guard"] = (row["gate_skip_counts"] or {}).get("catalogue_guard") or {}
-    catalogue_problem = workflow.has_catalogue_evidence(evidence_config) or (
+    empty_discovery = workflow.needs_empty_discovery_probe(
+        row["status"], row["total_found"], row["imported"],
+    )
+    catalogue_problem = workflow.has_catalogue_evidence(evidence_config) or empty_discovery or (
         int(row["total_found"] or 0) > 0
         and int(row["imported"] or 0) < int(row["total_found"]) * 0.5
     )
@@ -9527,13 +9531,21 @@ async def start_ai_repair(
     await workflow.lock(db, university_id)
     locked_source = (await db.execute(
         _text(
-            "SELECT status, university_id FROM scrape_runtime_jobs "
+            "SELECT status, university_id, total_found, imported FROM scrape_runtime_jobs "
             "WHERE runtime_job_id = :j FOR UPDATE"
         ),
         {"j": job_id},
     )).mappings().first()
     if not locked_source or locked_source["university_id"] != university_id:
         raise HTTPException(status_code=409, detail="Source job ownership changed; refresh before repair.")
+    if empty_discovery:
+        # Do not admit a now-healthy source using a stale pre-lock zero count.
+        catalogue_problem = workflow.has_catalogue_evidence(evidence_config) or (
+            int(locked_source["total_found"] or 0) > 0
+            and int(locked_source["imported"] or 0) < int(locked_source["total_found"]) * 0.5
+        ) or workflow.needs_empty_discovery_probe(
+            locked_source["status"], locked_source["total_found"], locked_source["imported"],
+        )
     still_terminal, reason = validate_ai_repair_target(
         str(locked_source["status"] or ""), evidence_config,
         has_extraction_gap=missing_repairable > 0 or catalogue_problem,

@@ -26,7 +26,8 @@ async def test_owned_award_is_used_by_real_name_extractor_without_waiving_degree
 
 
 @pytest.mark.asyncio
-async def test_generated_h1_rule_does_not_mask_owned_award_in_normal_scrapes(monkeypatch):
+@pytest.mark.parametrize("rendered", [False, True])
+async def test_generated_h1_rule_does_not_mask_owned_award_in_normal_scrapes(monkeypatch, rendered):
     from app.services.scraper.config.context import current_uni_config
     from app.services.scraper.config.schema import UniConfig
     from app.services.scraper.pipelines import single_course
@@ -46,6 +47,19 @@ async def test_generated_h1_rule_does_not_mask_owned_award_in_normal_scrapes(mon
     html=HTML.replace("</main>", "<p>International tuition fee: £25,000 per year.</p>"
         "<p>IELTS 6.5 with no component below 6.0.</p><p>Full-time on campus.</p>"
         + "<p>Detailed curriculum and international admissions information.</p>"*60+"</main>")
+    if rendered:
+        from app.services.scraper import per_course_browser
+        monkeypatch.setattr(per_course_browser, "maybe_browser_refetch",
+                            AsyncMock(return_value=({"international_fee":25000,
+                                                     "fee_currency":"GBP","fee_term":"Annual",
+                                                     "ielts_overall":6.5,"duration":1,"duration_term":"Year"},
+                                                    [{"field_key":"international_fee","value":25000,
+                                                      "confidence":0.95,"method":"browser:international_fee",
+                                                      "source_url":URL,
+                                                      "snippet":"International tuition fee: £25,000 per year."}],
+                                                    html,True)))
+        html="<html><head><title>Advanced Computer Science</title></head>" \
+             "<body><h1>Advanced Computer Science</h1></body></html>"
     token=current_uni_config.set(cfg)
     try:
         result=await single_course.extract_course(URL,html=html,use_ai_fallback=False,
@@ -53,9 +67,18 @@ async def test_generated_h1_rule_does_not_mask_owned_award_in_normal_scrapes(mon
     finally:
         current_uni_config.reset(token)
     assert result["payload"]["course_name"]=="Advanced Computer Science MSc"
-    assert any(e["method"]=="course_name.owned_award_identity" for e in result["evidence"])
+    expected="course_name.rendered_owned_award_identity" if rendered else "course_name.owned_award_identity"
+    assert any(e["method"]==expected for e in result["evidence"])
     from app.services.scraper.guards import should_stage_course
-    assert should_stage_course(result["payload"]["course_name"],result["payload"],source_url=URL)[0]
+    eligible,reason=should_stage_course(result["payload"]["course_name"],result["payload"],source_url=URL)
+    assert eligible,reason
+
+
+def test_professional_doctorate_is_a_visible_award_not_a_degree_inferred_from_url():
+    html=HTML.replace("Advanced Computer Science","Hearing Therapy").replace("MSc","Professional Doctorate")
+    assert complete_owned_course_title(html,URL,"Hearing Therapy")=="Hearing Therapy Professional Doctorate"
+    assert complete_owned_course_title(html.replace("Professional Doctorate","Professional Certificate"),
+                                       URL,"Hearing Therapy") is None
 
 
 @pytest.mark.parametrize("body",[

@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 _ATOM = re.compile(
     r"(?:BSc|BEng|BAcc|BA|BBA|BEd|BCom|BTech|MSc|MEng|MA|MBA|MRes|MEd|MPhil|"
-    r"MCom|LLB|LLM|PhD|DPhil|PGCert|PGDip)(?:\s*\(Hons\))?", re.I,
+    r"MCom|LLB|LLM|PhD|DPhil|PGCert|PGDip|Professional\s+Doctorate)(?:\s*\(Hons\))?", re.I,
 )
 
 

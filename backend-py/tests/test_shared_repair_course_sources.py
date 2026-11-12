@@ -48,13 +48,16 @@ def test_course_owned_header_is_not_removed_as_site_navigation(host):
 
 
 @pytest.mark.parametrize("host", HOSTS)
-@pytest.mark.parametrize("extra", [
-    "<p>This course is not available to international students.</p>",
-    "<p>Study mode: Part-time only</p>",
-    "<p>Delivery: Online only</p>",
+@pytest.mark.parametrize("extra,warning", [
+    ("<p>This course is not available to international students.</p>", None),
+    ("<p>Study mode: Part-time only</p>", "part_time_only"),
+    ("<p>Delivery: Online only</p>", "online_only"),
 ])
-def test_header_recognition_never_waives_eligibility(host, extra):
-    assert live.inspect_page(f"https://{host}/courses/applied-computing", page(extra), config())["classification"] == "ineligible"
+def test_header_recognition_preserves_domestic_exclusions_and_delivery_review_flags(host, extra, warning):
+    result=live.inspect_page(f"https://{host}/courses/applied-computing", page(extra), config())
+    assert result["classification"] == ("ineligible" if warning is None else "course")
+    if warning:
+        assert result["review_only"] and warning in result["review_warnings"]
 
 
 @pytest.mark.parametrize("html", [

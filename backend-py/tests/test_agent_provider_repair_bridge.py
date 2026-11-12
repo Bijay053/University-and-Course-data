@@ -41,6 +41,19 @@ def test_healthy_scrape_not_needlessly_repaired():
     assert not diagnosis(job(), missing_fields=0)["repairAvailable"]
 
 
+@pytest.mark.parametrize("status", ["failed", "failed_degraded", "failed_provider", "error"])
+def test_failed_empty_output_allows_bounded_discovery_diagnosis_without_inventing_a_cause(status):
+    result=diagnosis(job(status=status,total_found=0,current=0,imported=0),missing_fields=0)
+    assert result["repairAvailable"] and result["needsDiscoveryProbe"]
+    assert not result["catalogueShortfall"] and not result.get("pipelineEvidence")
+
+
+@pytest.mark.parametrize("status", ["queued", "running", "completed", "stopped"])
+def test_empty_output_does_not_restart_active_healthy_or_stopped_jobs(status):
+    result=diagnosis(job(status=status,total_found=0,current=0,imported=0),missing_fields=0)
+    assert not result["repairAvailable"] and not result["needsDiscoveryProbe"]
+
+
 def test_provider_pause_preserved():
     result = diagnosis(job(), missing_fields=4, imports_paused=True)
     assert not result["repairAvailable"]

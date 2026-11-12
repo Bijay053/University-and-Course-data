@@ -1,5 +1,6 @@
 """Engine-independent chat entry point for supported university scraper repairs."""
 import re
+from difflib import SequenceMatcher
 from app.models import ScrapeRuntimeJob
 from app.models.scrape_assistant import ScrapeAssistantThread
 
@@ -12,6 +13,15 @@ _FAILED_JOB_STATUSES = {"failed", "failed_degraded", "failed_provider", "interru
 def failed_job_followup(prompt):
     """Recognise shorthand only; the caller must separately verify failed state."""
     words = re.findall(r"[a-z]+", prompt.casefold())
+    # Tolerate close misspellings of "scraping" only in this restricted
+    # failed-job vocabulary. Never fuzzy-match course names or field edits.
+    words = [
+        "scraping" if 6 <= len(word) <= 12 and re.match(r"(?:scra|scap)", word) and any(
+            SequenceMatcher(None, word, target).ratio() >= 0.8
+            for target in ("scraping", "scraper")
+        ) else word
+        for word in words
+    ]
     allowed = {
         "why", "how", "what", "did", "does", "is", "has", "it", "this", "that",
         "the", "job", "run", "fail", "failed", "failing", "failure", "fix",
@@ -20,6 +30,7 @@ def failed_job_followup(prompt):
         "please", "can", "you", "do", "just", "only", "explain", "diagnose",
         "don", "t", "dont", "never", "now", "went", "wrong", "happened",
         "happens", "happening", "to", "with", "here",
+        "scraping", "scraper", "university", "provider",
     }
     return bool(words and set(words) <= allowed
                 and set(words) & {"why", "how", "what", "fix", "repair", "resolve", "diagnose", "explain"})
@@ -69,6 +80,10 @@ def answer(report):
                 " This is a discovery/filter collapse, even though the job recorded zero "
                 "per-course extraction errors. Zero pending rows do not prevent provider-level diagnosis."
             )
+    if (report["status"] in _FAILED_JOB_STATUSES and counts["staged"] == 0
+            and not (pipeline.get("rawCandidates", 0) > 0
+                     and pipeline.get("extractableCandidates") == 0)):
+        text += "\n\nZero pending rows do not prevent provider-level diagnosis."
     for observation in report.get("logEvidence", {}).get("observations", []):
         text += "\n\n" + observation["detail"]
         for url in observation.get("urls", []):
