@@ -31,6 +31,27 @@ afterEach(() => {
 });
 
 describe("ScrapePromptAssistant", () => {
+  it("shows partial recovery as needs review without a failed or successful repair claim", async () => {
+    const thread: AssistantThread = {...empty, status:"ready", messages:[
+      {role:"assistant",content:"Verification finished.",createdAt:"2024-01-01T00:00:00Z",actions:[
+        {id:"partial",kind:"repair_catalogue",label:"Repair scraper",courseCount:50,fields:[],
+          state:"needs_review",jobId:"verification-child",
+          verificationOutcome:{staged:40,processed:50,skipped:3,unresolved:7,criticalIssues:44,
+            incompleteFields:["fee_pct","ielts_pct"]},
+          resultSummary:"Partial recovery: 40 courses staged. 7 unresolved attempts; 44 critical quality issues. Nothing was approved or published."}
+      ]}]};
+    vi.spyOn(globalThis,"fetch").mockResolvedValue(json(thread));
+    const review=vi.fn();
+    render(<ScrapePromptAssistant jobId="j1" onReviewJob={review}/>);
+    const card=await screen.findByTestId("assistant-action-partial");
+    expect(within(card).getByTestId("status-action-partial").textContent).toBe("Needs review");
+    expect(within(card).queryByRole("alert")).toBeNull();
+    expect(within(card).getByRole("status").textContent).toContain("40 courses staged");
+    expect(within(card).queryByRole("button",{name:"Run now"})).toBeNull();
+    fireEvent.click(within(card).getByRole("button",{name:"Open verification review"}));
+    expect(review).toHaveBeenCalledWith("verification-child");
+  });
+
   it("discovers a repair started in another session without posting another prompt", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const latest: AssistantThread = { ...empty, threadId: "same", status: "ready",

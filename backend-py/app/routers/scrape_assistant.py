@@ -179,7 +179,8 @@ async def response(thread, db, job_id=None):
                 changed = True
                 continue
             if action["state"] not in {"starting", "running"} and not (
-                action["kind"] == "repair_catalogue" and action.get("_sessionId") and action["state"] == "error"
+                action["kind"] == "repair_catalogue" and action.get("_sessionId")
+                and action["state"] in {"error", "needs_review"}
             ):
                 continue
             target = await db.get(ScrapeRuntimeJob, action.get("jobId")) if action.get("jobId") else None
@@ -211,9 +212,16 @@ async def response(thread, db, job_id=None):
                 elif status == "completed" and state.get("phase") == "verified":
                     action["state"] = "completed"
                 elif status == "completed":
-                    action["state"] = "error"
-                    reason = state.get("reason") or session.get("final_verdict") or "Verification still needs human review."
-                    action["error"] = str(reason)[:700] + " No approval or publication was performed."
+                    from app.services.assistant_repair_outcome import partial_recovery
+                    outcome = partial_recovery(session)
+                    if outcome:
+                        action.update(state="needs_review", resultSummary=outcome.pop("summary"),
+                                      verificationOutcome=outcome)
+                        action.pop("error", None)
+                    else:
+                        action["state"] = "error"
+                        reason = state.get("reason") or session.get("final_verdict") or "Verification still needs human review."
+                        action["error"] = str(reason)[:700] + " No approval or publication was performed."
                 elif status in {"failed", "error", "blocked", "cancelled", "stopped"}:
                     action["state"] = "error"
                     reason = state.get("reason") or session.get("error") or session.get("final_verdict")
@@ -294,7 +302,7 @@ async def response(thread, db, job_id=None):
             live_phase = "Research complete — work is running. Results are not yet verified."
         elif actions and actions[-1]["state"] == "completed":
             live_phase = actions[-1].get("resultSummary") or "Confirmed job finished. Open its review to inspect the results."
-        elif actions and actions[-1]["state"] == "error":
+        elif actions and actions[-1]["state"] in {"error", "needs_review"}:
             live_phase = "Confirmed work needs attention. See the action result above."
         elif actions and actions[-1]["state"] == "proposed":
             automatic = (not actions[-1].get("requiresConfirmation")

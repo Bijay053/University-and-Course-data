@@ -26,8 +26,10 @@ export type AssistantAction = {
   courseCount: number;
   publishedCount?: number;
   fields: string[];
-  state: "proposed" | "starting" | "running" | "completed" | "error" | "superseded";
+  state: "proposed" | "starting" | "running" | "completed" | "needs_review" | "error" | "superseded";
   resultSummary?: string;
+  verificationOutcome?: { staged: number; processed?: number; skipped?: number; unresolved?: number;
+    criticalIssues: number; incompleteFields: string[] };
   courseResults?: { url: string; status: string; message: string }[];
   jobId?: string;
   error?: string;
@@ -174,7 +176,7 @@ function isActiveThread(t: AssistantThread | null): boolean {
 function completedActionIds(t: AssistantThread | null): Set<string> {
   const ids = new Set<string>();
   t?.messages.forEach(m => m.actions?.forEach(a => {
-    if (a.state === "completed" || (a.state === "error" && a.jobId)) ids.add(`${a.id}:${a.state}`);
+    if (a.state === "completed" || (["error", "needs_review"].includes(a.state) && a.jobId)) ids.add(`${a.id}:${a.state}`);
   }));
   return ids;
 }
@@ -522,7 +524,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
           <div className="flex items-center gap-2 text-[13px]">
             <Wrench className="h-3.5 w-3.5 text-amber-700" aria-hidden />
             <span className="flex-1 font-medium text-amber-950">{a.label}</span>
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 font-mono text-[10.5px] text-amber-900" data-testid={`status-action-${a.id}`}>{a.state}</span>
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 font-mono text-[10.5px] text-amber-900" data-testid={`status-action-${a.id}`}>{a.state === "needs_review" ? "Needs review" : a.state}</span>
           </div>
           <p className="mt-1 text-[12px] text-amber-900">
             {a.courseCount} course{a.courseCount === 1 ? "" : "s"}{a.fields.length ? ` · ${a.fields.map(fieldLabel).join(", ")}` : ""}
@@ -543,6 +545,9 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             </p>
           )}
           {a.state === "completed" && <p className="mt-1.5 text-[12px] text-green-800">{a.resultSummary || "Job finished. Updated pending data was refreshed. Nothing was published."}</p>}
+          {a.state === "needs_review" && <p role="status" className="mt-1.5 text-[12px] text-amber-900">
+            {a.resultSummary || "Partial recovery completed. Quality checks still require review; nothing was published."}
+          </p>}
           {!!a.courseResults?.length && (
             <ul className="mt-2 space-y-2 text-[12px] text-amber-950" data-testid={`course-results-${a.id}`}>
               {a.courseResults.map(result => (
@@ -553,7 +558,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
               ))}
             </ul>
           )}
-          {(a.state === "completed" || a.state === "error") && a.jobId && onReviewJob && (a.kind !== "repair_catalogue" || a.jobId !== jobId) && (
+          {(["completed", "error", "needs_review"].includes(a.state)) && a.jobId && onReviewJob && (a.kind !== "repair_catalogue" || a.jobId !== jobId) && (
             <Button size="sm" variant="outline" className="mt-2 h-8 text-[12px]"
               onClick={() => onReviewJob(a.jobId!)} data-testid={`button-open-review-${a.id}`}>
               <ExternalLink className="mr-1 h-3 w-3" aria-hidden />

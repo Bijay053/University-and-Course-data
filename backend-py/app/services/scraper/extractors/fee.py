@@ -309,6 +309,17 @@ _ADDITIONAL_TRAINING_COST_CTX = re.compile(
 )
 
 
+def _selected_amount_is_placement_fee(amount: int, ctx: str) -> bool:
+    for match in _AMOUNT_RE.finditer(ctx):
+        if _parse_amount(match.group(2) or match.group(3)) != amount:
+            continue
+        label = ctx[max(0, match.start() - 120):match.start()]
+        if re.search(r"\bplacement(?:\s+year)?(?:\s+(?:tuition\s+)?fees?)?"
+                     r"\s*[:–-]?\s*$", label, re.I):
+            return True
+    return False
+
+
 def _selected_amount_is_scholarship(amount: int, ctx: str) -> bool:
     """Return whether the selected currency amount belongs to a scholarship clause.
 
@@ -2793,6 +2804,11 @@ async def extract(
             )
         ]
 
+    from .year_one_fee_table import extract_year_one_fee
+    year_one_known, year_one_fee = extract_year_one_fee(html, url)
+    if year_one_known:
+        return [year_one_fee] if year_one_fee is not None else []
+
     # Structural pre-pass FIRST — see _extract_strong_label_value for
     # the rationale. When the page publishes the international tuition
     # fee as an unambiguous `<strong>International tuition fees</strong>`
@@ -3515,6 +3531,8 @@ async def extract(
         return []
     best: tuple[int, int, int, str] | None = None  # (score, year, amount, ctx)
     for amount, _cur, ctx in _candidates(text):
+        if _selected_amount_is_placement_fee(amount, ctx):
+            continue
         sc = _score(amount, ctx, prefer_year_one=prefer_yr1)
         candidate_year = _extract_year_for_amount(ctx, amount) or -1
         if best is None or sc > best[0]:

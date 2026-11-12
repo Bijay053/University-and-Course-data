@@ -12,7 +12,8 @@ from app.models.scrape_assistant import ScrapeAssistantThread
 
 
 @pytest.mark.asyncio
-async def test_historical_repair_rollback_does_not_expire_chat_or_duplicate_dispatch(monkeypatch):
+@pytest.mark.parametrize("outcome",["running","partial","empty"])
+async def test_historical_repair_rollback_does_not_expire_chat_or_duplicate_dispatch(monkeypatch,outcome):
     from app import database
     from app.routers import scrape_assistant as router
     from app.services import ai_repair_workflow, review_counts
@@ -42,6 +43,11 @@ async def test_historical_repair_rollback_does_not_expire_chat_or_duplicate_disp
             assert db is not caller, "Repair lifecycle rollback must not release the chat transaction"
             await db.rollback()
             reconciled.append((job_id,session_id))
+            if session_id=="new-session" and outcome!="running":
+                return {"status":"completed","autonomous":{"phase":"needs_review","comparison":{
+                    "verification":{"total_staged":40 if outcome=="partial" else 0},
+                    "counters":{"current":50,"imported":40,"skipped":3},
+                    "critical_quality_count":44,"unresolved_fields":["fee_pct","ielts_pct"]}}}
             return {"status":"failed" if session_id=="old-session" else "running",
                     "current_attempt":1,"autonomous":{"phase":"blocked" if session_id=="old-session" else "verifying"}}
         monkeypatch.setattr(ai_repair_workflow,"reconcile",reconcile)
@@ -53,10 +59,15 @@ async def test_historical_repair_rollback_does_not_expire_chat_or_duplicate_disp
         result=await router.response(thread,caller,"failed-job")
         assert not inspect(thread).expired_attributes
         assert result["turnId"]=="current-turn" and result["status"]=="ready"
-        assert result["messages"][-1]["actions"][0]["state"]=="running"
+        action=result["messages"][-1]["actions"][0]
+        assert action["state"]=={"running":"running","partial":"needs_review","empty":"error"}[outcome]
+        if outcome=="partial":
+            assert not action.get("error")
+            assert action["verificationOutcome"]["unresolved"]==7
+            assert action["verificationOutcome"]["criticalIssues"]==44
         assert result["messages"][0]["actions"][0]["state"]=="error"
         assert reconciled==[("failed-job","old-session"),("failed-job","new-session")]
-        assert "work is running" in result["phase"]
+        assert ("work is running" if outcome=="running" else "needs attention") in result["phase"]
         caller.commit.assert_awaited_once()
 
 
