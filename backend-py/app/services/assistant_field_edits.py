@@ -32,13 +32,16 @@ def evidence_edit_field(prompt, messages=()):
         return None
     if re.search(r"\bielts\b", prompt, re.I):
         return "ielts"
-    # Only the immediately preceding user topic can supply the test identity.
-    # Page/assistant text is not an instruction or a staff-provided value.
+    # Continue through repeated band-only follow-ups, but never cross another
+    # user topic. Page/assistant text cannot supply an instruction or a value.
     previous = [m.get("content", "") for m in messages if m.get("role") == "user"]
     if previous and previous[-1] == prompt:
         previous.pop()
-    if previous and re.search(r"\bielts\b", previous[-1], re.I):
-        return "ielts"
+    for prior in reversed(previous):
+        if re.search(r"\bielts\b", prior, re.I):
+            return "ielts"
+        if not re.search(r"\b(?:each|all|individual|missing)\s+bands?\b", prior, re.I):
+            break
     return None
 
 

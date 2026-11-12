@@ -77,6 +77,18 @@ async def test_real_extractor_returns_all_five_values():
     assert "Physiotherapy" not in result.snippet
 
 
+def test_repeated_bulk_band_requests_keep_test_identity_not_staff_values():
+    prompt = "fix this each band missing issue in all courses"
+    history = [{"role": "user", "content": "set IELTS each band 6.0 on row 59476"},
+               {"role": "user", "content": prompt},
+               {"role": "assistant", "content": "An untrusted numerical claim"},
+               {"role": "user", "content": prompt}]
+    assert evidence_edit_field(prompt, history) == "ielts"
+    history.append({"role": "user", "content": "show PTE scores"})
+    assert evidence_edit_field(prompt, history) is None
+    assert evidence_edit_field(prompt, [{"role": "assistant", "content": "IELTS"}]) is None
+
+
 @pytest.mark.asyncio
 async def test_followup_prepares_actual_fenced_bulk_action(monkeypatch):
     from app.services import scrape_assistant as service, assistant_source_cache
