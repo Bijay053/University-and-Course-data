@@ -1,8 +1,20 @@
 import asyncio
 
+import pytest
+
 from app.services.scraper.config import set_uni_config
+from app.services.scraper.config.context import current_uni_config
 from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.extractors import study_mode
+
+
+@pytest.fixture(autouse=True)
+def preserve_provider_context():
+    token = current_uni_config.set(current_uni_config.get())
+    try:
+        yield
+    finally:
+        current_uni_config.reset(token)
 
 
 def _richmond_config():

@@ -185,6 +185,7 @@ def has_authoritative_online_location_evidence(
             "study_mode:label",
             "study_mode:title_keyword",
             "study_mode:apu_course_authority",
+            "study_mode:course_header_fact",
         }:
             return True
     return False
@@ -847,6 +848,17 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                     snippet=_utas_snippet,
                 )
             ]
+    from app.services.scraper.extractors.course_header_delivery import course_header_delivery
+
+    header_fact = course_header_delivery(html)
+    if header_fact is not None:
+        mode, quote = header_fact
+        if mode is None:
+            return []  # Conflicting owned facts must not fall back to keyword guesses.
+        return [ExtractionResult(
+            field_key=field_key, value=mode, normalized={"study_mode": mode},
+            confidence=0.99, method="study_mode:course_header_fact", snippet=quote,
+        )]
     # Suppress rule-based study-mode classification when:
     # 1. Per-uni YAML extraction.study_mode.suppress_nav_rule: true (preferred)
     # 2. Host is in the hardcoded _STUDY_MODE_RULE_SUPPRESSED_HOSTS list

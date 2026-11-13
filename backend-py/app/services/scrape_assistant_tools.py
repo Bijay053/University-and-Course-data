@@ -248,6 +248,17 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
         if len(text) < 150 or re.search(r"^(?:Just a moment|Access denied|Attention Required)", text, re.I):
             raise ValueError("The source returned a challenge or an empty page.")
         facts = []
+        if "course-page-header-wrapper" in html:
+            from app.services.scraper.extractors.study_mode import extract as extract_delivery
+            for delivery in await extract_delivery(html, url):
+                quote = delivery.snippet or ""
+                if (delivery.method == "study_mode:course_header_fact" and quote
+                        and " ".join(quote.split()).casefold() in " ".join(text.split()).casefold()):
+                    facts.append({
+                        "field": "study_mode", "value": delivery.value,
+                        "normalized": delivery.normalized, "quote": quote,
+                        "method": delivery.method,
+                    })
         for extractor in (extract_fee, extract_english):
             for result in (await extractor(html, url))[:8]:
                 facts.append({
