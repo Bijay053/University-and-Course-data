@@ -105,8 +105,8 @@ async def document_content(job_id: str, request: Request, db: Database, actor: A
         raise HTTPException(422, "Invalid document attachment.")
     try:
         data = verify(token, int(actor["id"]), job_id)
-        if request.headers.get("content-type", "").split(";")[0].lower() != "application/pdf":
-            raise ValueError("Upload a PDF document.")
+        if request.headers.get("content-type", "").split(";")[0].lower() != data.get("contentType", "application/pdf"):
+            raise ValueError("Uploaded file type does not match the prepared attachment.")
         length = request.headers.get("content-length")
         if length is not None and int(length) != data["size"]:
             raise ValueError("Uploaded file size does not match the prepared attachment.")

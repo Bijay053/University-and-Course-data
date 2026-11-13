@@ -91,6 +91,57 @@ async function setup(postResult: () => Response) {
 }
 
 describe("document upload", () => {
+  it.each(["items", "files"])("pastes an image via clipboard %s and sends its private token", async (transport) => {
+    const create = vi.fn(() => "blob:screenshot");
+    const revoke = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: create });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revoke });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      if (String(url).endsWith("/documents/upload-url")) return json({transport:"portal",documentToken:"image-token"});
+      if (String(url).endsWith("/documents/content")) return json({uploaded:true}, 201);
+      if (init?.method === "POST") return json({...empty, status:"queued"});
+      return json(empty);
+    });
+    render(<ScrapePromptAssistant jobId="j1" />);
+    const box = await screen.findByTestId("input-assistant-prompt");
+    const image = new File(["png-data"], "", {type:"image/png"});
+    fireEvent.paste(box, {clipboardData: transport === "items"
+      ? {items:[{kind:"file",getAsFile:()=>image}],files:[]}
+      : {items:[],files:[image]}});
+    await waitFor(() => expect(screen.getByTestId("assistant-attachment").getAttribute("data-status")).toBe("ready"));
+    expect(screen.getByAltText("Attached image preview").getAttribute("src")).toBe("blob:screenshot");
+    const metadata = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/documents/upload-url"))!;
+    expect(JSON.parse(String(metadata[1]?.body))).toMatchObject({filename:"pasted-image.png", contentType:"image/png"});
+    const uploaded = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/documents/content"))!;
+    expect(uploaded[1]?.headers).toEqual({"Content-Type":"image/png","X-Document-Token":"image-token"});
+    expect((screen.getByTestId("button-assistant-submit") as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByTestId("button-assistant-submit"));
+    await waitFor(() => expect(screen.queryByTestId("assistant-attachment")).toBeNull());
+    const sent = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/assistant") && init?.method==="POST")!;
+    expect(JSON.parse(String(sent[1]?.body))).toEqual({
+      prompt:"Explain the attached image in the context of this scrape.",documentToken:"image-token"});
+    expect(revoke).toHaveBeenCalledWith("blob:screenshot");
+  });
+
+  it("leaves ordinary text paste native and does not upload anything", async () => {
+    const {fetchMock} = await setup(() => json(empty));
+    const calls = fetchMock.mock.calls.length;
+    const event = new Event("paste", {bubbles:true,cancelable:true});
+    Object.defineProperty(event,"clipboardData",{value:{items:[],files:[]}});
+    fireEvent(screen.getByTestId("input-assistant-prompt"),event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(fetchMock.mock.calls.length).toBe(calls);
+  });
+
+  it("rejects multiple pasted images without silently replacing an attachment", async () => {
+    const {fetchMock} = await setup(() => json(empty));
+    const calls = fetchMock.mock.calls.length;
+    const image = new File(["png"],"image.png",{type:"image/png"});
+    fireEvent.paste(screen.getByTestId("input-assistant-prompt"),
+      {clipboardData:{items:[],files:[image,image]}});
+    expect(screen.getByTestId("assistant-submit-error").textContent).toContain("one image at a time");
+    expect(fetchMock.mock.calls.length).toBe(calls);
+  });
   it("uploads through the authenticated portal without cross-origin S3 requests", async () => {
     const { fetchMock } = await setup(() => json({ ...empty, status: "ready" }));
     const original = fetchMock.getMockImplementation()!;
@@ -143,7 +194,7 @@ describe("document upload", () => {
     fireEvent.change(screen.getByTestId("input-assistant-document"), { target: { files: [pdf(2_000_001)] } });
     expect(screen.getByTestId("text-attachment-status").textContent).toMatch(/2 MB/);
     fireEvent.change(screen.getByTestId("input-assistant-document"), { target: { files: [new File(["x"], "a.txt", { type: "text/plain" })] } });
-    expect(screen.getByTestId("text-attachment-status").textContent).toMatch(/Only PDF/);
+    expect(screen.getByTestId("text-attachment-status").textContent).toMatch(/PDF, PNG or JPEG/);
     expect(fetchMock.mock.calls.length).toBe(calls);
   });
 });

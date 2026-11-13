@@ -11,6 +11,22 @@ from app.config import settings
 from app.services import snapshot_store
 
 MAX_BYTES = 2_000_000
+UPLOAD_TYPES = {
+    "application/pdf": (".pdf",),
+    "image/png": (".png",),
+    "image/jpeg": (".jpg", ".jpeg"),
+}
+
+
+def validate_bytes(raw, content_type):
+    if content_type == "application/pdf":
+        if not raw.lstrip().startswith(b"%PDF-"):
+            raise ValueError("Upload a valid PDF document.")
+    elif content_type in {"image/png", "image/jpeg"}:
+        from app.services.assistant_image_review import validate_image
+        validate_image(raw, content_type)
+    else:
+        raise ValueError("Attach a PDF, PNG or JPEG file.")
 
 
 def sign(payload):
@@ -36,15 +52,15 @@ def verify(token, actor_id, job_id):
 
 
 async def request_upload(actor_id, job_id, filename, size, content_type, *, direct=False):
-    if not filename.lower().endswith(".pdf") or content_type != "application/pdf":
-        raise ValueError("Upload a PDF document.")
+    if content_type not in UPLOAD_TYPES or not filename.lower().endswith(UPLOAD_TYPES[content_type]):
+        raise ValueError("Attach a PDF, PNG or JPEG file.")
     if not 0 < size <= MAX_BYTES:
         raise ValueError("PDF must be between 1 byte and 2 MB.")
     if not snapshot_store.is_enabled():
         raise ValueError("Private document storage is unavailable.")
-    key = f"assistant-documents/{actor_id}/{job_id}/{uuid.uuid4().hex}.pdf"
+    key = f"assistant-documents/{actor_id}/{job_id}/{uuid.uuid4().hex}{UPLOAD_TYPES[content_type][0]}"
     data = dict(key=key, actor=actor_id, job=job_id, filename=filename[:180],
-                size=size, expires=time.time() + 3600)
+                size=size, contentType=content_type, expires=time.time() + 3600)
     if not direct:
         # Same-origin authenticated transport requires no browser access to S3.
         # The bucket, object permissions and existing private read path stay unchanged.
@@ -54,8 +70,8 @@ async def request_upload(actor_id, job_id, filename, size, content_type, *, dire
         try:
             return client.generate_presigned_post(
                 Bucket=snapshot_store._bucket(), Key=key,
-                Fields={"Content-Type": "application/pdf"},
-                Conditions=[{"Content-Type": "application/pdf"}, ["content-length-range", size, size]],
+                Fields={"Content-Type": content_type},
+                Conditions=[{"Content-Type": content_type}, ["content-length-range", size, size]],
                 ExpiresIn=900,
             )
         finally:
@@ -68,8 +84,8 @@ async def store_uploaded(token, actor_id, job_id, raw):
     data = verify(token, actor_id, job_id)
     if not isinstance(raw, bytes) or len(raw) != data["size"] or not 0 < len(raw) <= MAX_BYTES:
         raise ValueError("Uploaded file size does not match the prepared attachment.")
-    if not raw.lstrip().startswith(b"%PDF-"):
-        raise ValueError("Upload a valid PDF document.")
+    content_type = data.get("contentType", "application/pdf")
+    validate_bytes(raw, content_type)
     if not snapshot_store.is_enabled():
         raise ValueError("Private document storage is unavailable.")
     def upload():
@@ -79,7 +95,7 @@ async def store_uploaded(token, actor_id, job_id, raw):
             # already read, matched or included in an approval preview.
             client.put_object(
                 Bucket=snapshot_store._bucket(), Key=data["key"], Body=raw,
-                ContentType="application/pdf", IfNoneMatch="*",
+                ContentType=content_type, IfNoneMatch="*",
             )
         finally:
             client.close()
@@ -100,12 +116,21 @@ async def read_uploaded(token, actor_id, job_id):
                 raw = body.read(MAX_BYTES + 1)
             finally:
                 body.close()
-            if len(raw) != data["size"] or not raw.lstrip().startswith(b"%PDF"):
-                raise ValueError("Uploaded file is not the declared PDF.")
+            if len(raw) != data["size"]:
+                raise ValueError("Uploaded file size changed.")
+            validate_bytes(raw, data.get("contentType", "application/pdf"))
             return raw
         finally:
             client.close()
     raw = await asyncio.to_thread(download)
+    content_type = data.get("contentType", "application/pdf")
+    if content_type.startswith("image/"):
+        return {
+            "sourceType": "image", "verified": False,
+            "officialProvenanceVerified": False, "provenance": "staff-uploaded-image",
+            "filename": data["filename"], "_objectKey": data["key"],
+            "_imageDataUrl": f"data:{content_type};base64," + base64.b64encode(raw).decode(),
+        }
     from app.services.scrape_assistant_tools import inspect_pdf
     source = await inspect_pdf(raw, "uploaded-document:" + hashlib.sha256(raw).hexdigest())
     source.update(provenance="staff-uploaded-document", filename=data["filename"],

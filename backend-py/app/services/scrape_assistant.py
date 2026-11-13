@@ -300,6 +300,12 @@ async def investigate(thread_id: str, turn_id: str):
             # the same preview/acknowledgement contract, including legacy users.
             from app.services.live_scrape_diagnostics import handle as live_diagnostics
             from app.services import scrape_assistant as service
+            if requested.get("_documentToken"):
+                from app.services.assistant_image_review import image_read_requested, review as review_image
+                if image_read_requested(requested, claimed_thread.actor_id, claimed_thread.job_id,
+                                        claimed_thread.messages):
+                    await review_image(service, thread_id, turn_id, run_id, claimed_thread, requested)
+                    return
             from app.services.selective_retry import retry_requested
             from app.services.assistant_provider_repair import handle as provider_repair
             if not retry_requested(requested["content"]) and await provider_repair(

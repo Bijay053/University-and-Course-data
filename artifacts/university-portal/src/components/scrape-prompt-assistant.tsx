@@ -98,12 +98,16 @@ export function actionNeedsConfirmation(a: AssistantAction): boolean {
 }
 export function validateDocument(file: File): string | null {
   const isPdf = file.type === "application/pdf" && /\.pdf$/i.test(file.name);
-  if (!isPdf) return "Only PDF documents can be attached.";
+  const isImage = (file.type === "image/png" && /\.png$/i.test(file.name))
+    || (file.type === "image/jpeg" && /\.jpe?g$/i.test(file.name));
+  if (!isPdf && !isImage) return "Attach a PDF, PNG or JPEG file.";
+  if (isImage && file.size <= 0) return "The selected image is empty.";
+  if (isImage && file.size > MAX_DOCUMENT_BYTES) return "Image is larger than the 2 MB (2,000,000 bytes) limit.";
   if (file.size <= 0) return "The selected PDF is empty.";
   if (file.size > MAX_DOCUMENT_BYTES) return "PDF is larger than the 2 MB (2,000,000 bytes) limit.";
   return null;
 }
-type Attachment = { key: string; seq: number; name: string; size: number; status: "uploading" | "ready" | "error"; token: string | null; error: string | null };
+type Attachment = { key: string; seq: number; name: string; size: number; file?: File; status: "uploading" | "ready" | "error"; token: string | null; error: string | null };
 export const AUTO_CORRECTABLE_FIELDS = ["international_fee", "ielts_overall", "duration", "course_location"] as const;
 const FIELD_LABELS: Record<string, string> = {
   international_fee: "International fee",
@@ -288,6 +292,16 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
   const uploadSeq = useRef(0);
   const [attachState, setAttachState] = useState<Attachment | null>(null);
   const attachment = attachState && attachState.key === viewKey ? attachState : null;
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (attachment?.status !== "ready" || !attachment?.file?.type.startsWith("image/") || !URL.createObjectURL) {
+      setImagePreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(attachment.file);
+    setImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [attachment?.file, attachment?.status]);
 
   const base = `/api/scrape/jobs/${encodeURIComponent(jobId)}/assistant`;
 
@@ -407,7 +421,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     if (!viewKey) return;
     const forKey = viewKey;
     const seq = ++uploadSeq.current;
-    const baseAtt = { key: forKey, seq, name: file.name, size: file.size, token: null };
+    const baseAtt = { key: forKey, seq, name: file.name, size: file.size, file, token: null };
     const invalid = validateDocument(file);
     if (invalid) { setAttachState({ ...baseAtt, status: "error", error: invalid }); return; }
     setAttachState({ ...baseAtt, status: "uploading", error: null });
@@ -415,7 +429,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     try {
       const res = await fetch(`${base}/documents/upload-url`, {
         method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, size: file.size, contentType: "application/pdf" }),
+        body: JSON.stringify({ filename: file.name, size: file.size, contentType: file.type }),
       });
       if (!res.ok) throw new Error(await errorFor(res));
       const grant = await readResponseJson<{ transport?: string; uploadUrl?: string; fields?: Record<string, string>; documentToken: string }>(res);
@@ -425,7 +439,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
       if (grant.transport === "portal") {
         up = await fetch(`${base}/documents/content`, {
           method: "POST", credentials: "include", body: file,
-          headers: { "Content-Type": "application/pdf", "X-Document-Token": grant.documentToken },
+          headers: { "Content-Type": file.type, "X-Document-Token": grant.documentToken },
         });
       } else {
         const form = new FormData();
@@ -433,7 +447,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
         form.append("file", file);
         up = await fetch(grant.uploadUrl!, { method: "POST", body: form });
       }
-      if (!up.ok) throw new Error(`Document upload failed (${up.status}).`);
+      if (!up.ok) throw new Error(await errorFor(up));
       if (!current()) return;
       setAttachState({ ...baseAtt, status: "ready", token: grant.documentToken, error: null });
     } catch (err) {
@@ -441,7 +455,8 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     }
   };
 
-  const trimmed = prompt.trim();
+  const trimmed = prompt.trim() || (attachment?.file?.type.startsWith("image/")
+    ? "Explain the attached image in the context of this scrape." : "");
   const lengthOk = trimmed.length > 0;
   const busy = submitting || active;
   const attachBlocks = !!attachment && attachment.status !== "ready";
@@ -780,6 +795,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
           {attachment && (
             <div className={`mb-2 flex items-center gap-2 rounded-xl border px-3 py-1.5 text-[12px] ${attachment.status === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-teal-200 bg-teal-50/60 text-teal-950"}`} data-testid="assistant-attachment" data-status={attachment.status}>
               {attachment.status === "uploading" ? <Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin" aria-hidden /> : <FileText className="h-3.5 w-3.5" aria-hidden />}
+              {imagePreview && <img src={imagePreview} alt="Attached image preview" className="h-12 w-16 rounded object-contain" />}
               <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
               <span className="shrink-0 font-mono text-[11px]" role="status" data-testid="text-attachment-status">
                 {attachment.status === "uploading" ? "Uploading" : attachment.status === "ready" ? `${(attachment.size / 1_000_000).toFixed(2)} MB · Ready` : attachment.error}
@@ -790,7 +806,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
               </button>
             </div>
           )}
-          <input ref={fileRef} type="file" accept="application/pdf,.pdf" className="hidden" data-testid="input-assistant-document"
+          <input ref={fileRef} type="file" accept="application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg" className="hidden" data-testid="input-assistant-document"
             onChange={e => { const f = e.target.files?.[0]; if (f) void attach(f); e.target.value = ""; }} />
           <div className="flex items-end gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 focus-within:border-teal-600 focus-within:ring-2 focus-within:ring-teal-600/20 motion-safe:transition-shadow">
             <textarea
@@ -798,6 +814,22 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
               id={`assistant-prompt-${jobId}`}
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
+              onPaste={e => {
+                if (disabled || submitting) return;
+                const items = Array.from(e.clipboardData.items ?? []);
+                const files = items.filter(item => item.kind === "file").map(item => item.getAsFile())
+                  .filter((file): file is File => !!file);
+                const images = (files.length ? files : Array.from(e.clipboardData.files ?? []))
+                  .filter(file => file.type.startsWith("image/"));
+                if (!images.length) return; // Keep ordinary text paste native.
+                e.preventDefault();
+                if (images.length > 1) { setSubmitError("Paste one image at a time."); return; }
+                const image = images[0];
+                const suffix = image.type === "image/png" ? ".png" : image.type === "image/jpeg" ? ".jpg" : "";
+                const named = suffix && !/\.(png|jpe?g)$/i.test(image.name)
+                  ? new File([image], `pasted-image${suffix}`, {type: image.type}) : image;
+                void attach(named);
+              }}
               onKeyDown={e => {
                 if (e.key !== "Enter" || e.shiftKey) return;
                 if (e.nativeEvent.isComposing || e.keyCode === 229) return;
@@ -811,7 +843,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
               className="max-h-60 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[13.5px] leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-60"
               data-testid="input-assistant-prompt"
             />
-            <Button type="button" size="icon" variant="ghost" aria-label="Attach PDF (max 2 MB)"
+            <Button type="button" size="icon" variant="ghost" aria-label="Attach PDF or image (max 2 MB)"
               className="h-8 w-8 shrink-0 rounded-full text-teal-800 hover:bg-teal-50"
               disabled={disabled || submitting} onClick={() => fileRef.current?.click()} data-testid="button-attach-document">
               <Paperclip className="h-4 w-4" aria-hidden />
@@ -822,7 +854,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
               {busy ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden /> : <ArrowUp className="h-4 w-4" aria-hidden />}
             </Button>
           </div>
-          <p id={`assistant-hint-${jobId}`} className="mt-1.5 text-[11px] text-slate-500">Enter to send, Shift+Enter for a new line. Attach one PDF up to 2 MB.</p>
+          <p id={`assistant-hint-${jobId}`} className="mt-1.5 text-[11px] text-slate-500">Enter to send, Shift+Enter for a new line. Paste an image or attach one PDF, PNG or JPEG up to 2 MB.</p>
           {submitError && (
             <p role="alert" className="mt-1 text-[12px] text-red-700" data-testid="assistant-submit-error">{submitError}</p>
           )}
