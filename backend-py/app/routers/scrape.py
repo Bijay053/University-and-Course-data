@@ -4588,12 +4588,9 @@ async def staged_one(
             for row in deduped_rows
             if getattr(row, "auto_publish_status", None) == "data_quality_failure"
         )
-        review_rows = [
-            row
-            for row in deduped_rows
-            if getattr(row, "auto_publish_status", None) != "data_quality_failure"
-        ]
-        courses = [_staged_row_to_dict(s) for s in review_rows]
+        # Failed quality checks block publication, not access to review/repair.
+        # Keep every pending row visible without changing its decision or status.
+        courses = [_staged_row_to_dict(s) for s in deduped_rows]
         if view == "summary":
             # Score the very same loaded ORM rows used for the displayed Level.
             # A separate university-wide quality request can observe a different

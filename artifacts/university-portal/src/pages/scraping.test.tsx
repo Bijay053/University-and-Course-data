@@ -365,6 +365,68 @@ function initialReview(): ScrapingInitialReviewState {
   };
 }
 
+describe("quality-blocked pending review visibility", { timeout: 20_000 }, () => {
+  function mockReview(courses: ScrapingInitialReviewState["courses"]) {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    }));
+  }
+
+  it("shows all 182 entries and flags the 119 needing fixes without changing their state", () => {
+    const review = initialReview();
+    review.courses = Array.from({ length: 182 }, (_, index) => ({
+      ...review.courses[0],
+      id: index + 1,
+      courseName: `Course ${index + 1}`,
+      courseWebsite: `https://example.test/courses/${index + 1}`,
+      autoPublishStatus: index < 119 ? "data_quality_failure" : "review",
+    }));
+    mockReview(review.courses);
+    render(<ScrapingForTest initialReviewState={review} />);
+    expect(screen.getByTestId("text-review-entry-count").textContent).toContain("182 pending entries");
+    expect(screen.getByTestId("text-review-logical-course-count").textContent).toContain("182 course groups");
+    expect(screen.getByTestId("text-review-quality-blocked-count").textContent).toContain("119 need data-quality fixes");
+    expect(screen.getByTestId("text-review-quality-warning").textContent).toContain("Approval and publication checks still apply");
+    expect(screen.getAllByTestId(/^row-logical-course-/)).toHaveLength(182);
+    expect(screen.getAllByText("⛔ Data Quality Failure")).toHaveLength(119);
+    expect(review.courses.every(course => course.status === "pending")).toBe(true);
+  });
+
+  it("does not show a quality-failure warning when no rows have that decision", () => {
+    const review = initialReview();
+    review.courses = [review.courses[0]];
+    mockReview(review.courses);
+    render(<ScrapingForTest initialReviewState={review} />);
+    expect(screen.queryByTestId("text-review-quality-blocked-count")).toBeNull();
+    expect(screen.queryByTestId("text-review-quality-warning")).toBeNull();
+  });
+
+  it("flags a campus group even when only its non-representative member needs fixes", () => {
+    const review = initialReview();
+    review.courses = [1, 2].map(id => ({
+      ...review.courses[0], id, courseName: "Shared course", degreeLevel: "Master",
+      courseWebsite: "https://example.test/shared",
+      courseLocation: id === 1 ? "Manchester" : "Birmingham",
+      autoPublishStatus: id === 1 ? "review" : "data_quality_failure",
+      extraction_method: {
+        campus_fee_scope: { split_from_id: 10, original_name: "Shared course" },
+        fee_variants: { selected: [{ study_variant: "Standard" }] },
+      },
+    })) as ScrapingInitialReviewState["courses"];
+    mockReview(review.courses);
+    render(<ScrapingForTest initialReviewState={review} />);
+    expect(screen.getByTestId("text-review-entry-count").textContent).toContain("2 pending entries");
+    expect(screen.getByTestId("text-review-logical-course-count").textContent).toContain("1 course groups");
+    expect(within(screen.getByTestId("row-logical-course-1")).getByText("⛔ Data Quality Failure")).toBeTruthy();
+  });
+});
+
 // These full-page tests perform multiple editor/report transitions. Keep a
 // bounded allowance for JSDOM layout work while backend tests share the CPU.
 describe("unfinished course recovery report navigation", { timeout: 15_000 }, () => {

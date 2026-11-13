@@ -3938,6 +3938,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       )}
       {showReview && stagedCourses.length > 0 && (() => {
         const logicalGroups = groupLegacyCampusRows(stagedCourses);
+        const qualityBlockedCount = stagedCourses.filter(
+          course => course.autoPublishStatus === "data_quality_failure",
+        ).length;
         const displayedGroups = qualitySortDesc
           ? [...logicalGroups].sort((a, b) => {
               const qa = courseQualityMap[a.course.id]?.score ?? 100;
@@ -3998,6 +4001,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   <Badge variant="outline" data-testid="text-review-entry-count">
                     {stagedCourses.length} pending entries in this review
                   </Badge>
+                  {qualityBlockedCount > 0 && (
+                    <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800" data-testid="text-review-quality-blocked-count">
+                      {qualityBlockedCount} need data-quality fixes
+                    </Badge>
+                  )}
                   <span className="text-xs text-muted-foreground">Campus-specific rows stay separate for approval and evidence.</span>
                   {selectedUniversityName && (
                     <Badge
@@ -4029,6 +4037,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                     {lastScrapeInfo.staged > lastScrapeInfo.totalFound && (
                       <> &bull; {lastScrapeInfo.totalFound} source courses expanded into campus-specific entries; these are not {lastScrapeInfo.staged} distinct courses</>
                     )}
+                  </p>
+                )}
+                {qualityBlockedCount > 0 && (
+                  <p className="mt-2 text-xs text-red-800" role="status" data-testid="text-review-quality-warning">
+                    All {stagedCourses.length} pending entries are included below, including {qualityBlockedCount} with data-quality failures.
+                    {" "}These records remain pending for correction. Approval and publication checks still apply.
                   </p>
                 )}
               </div>
@@ -4320,6 +4334,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                       const groupSelected = ids.every(id => selectedIds.has(id));
                       const selectedFeeLines = legacyCampusReviewFees(members);
                       const groupName = legacyCampusGroupName(members);
+                      const groupPublishStatus = members.some(member => member.autoPublishStatus === "data_quality_failure")
+                        ? "data_quality_failure" : course.autoPublishStatus;
                       return (<Fragment key={course.id}>
                       <tr className={`hover:bg-gray-50 ${groupSelected ? "bg-blue-50/50" : ""}`} data-testid={`row-logical-course-${course.id}`}>
                         <td className="p-2">
@@ -4353,16 +4369,16 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                             <div className="text-xs text-gray-400 break-words">{course.category}</div>
                           )}
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {course.autoPublishStatus && (
+                            {groupPublishStatus && (
                               <Badge variant="outline" title="Auto-publish decision" className={`text-[10px] ${
-                                course.autoPublishStatus === "approved" ? "text-green-700 border-green-200" :
-                                course.autoPublishStatus === "rejected" ? "text-red-700 border-red-200" :
-                                course.autoPublishStatus === "data_quality_failure" ? "text-red-800 border-red-400 bg-red-50 font-semibold" :
+                                groupPublishStatus === "approved" ? "text-green-700 border-green-200" :
+                                groupPublishStatus === "rejected" ? "text-red-700 border-red-200" :
+                                groupPublishStatus === "data_quality_failure" ? "text-red-800 border-red-400 bg-red-50 font-semibold" :
                                 "text-amber-700 border-amber-200"
                               }`}>
-                                {course.autoPublishStatus === "data_quality_failure"
+                                {groupPublishStatus === "data_quality_failure"
                                   ? "⛔ Data Quality Failure"
-                                  : `Publish: ${course.autoPublishStatus === "approved" ? "ready" : course.autoPublishStatus === "pending_review" ? "review" : course.autoPublishStatus}`}
+                                  : `Publish: ${groupPublishStatus === "approved" ? "ready" : groupPublishStatus === "pending_review" ? "review" : groupPublishStatus}`}
                               </Badge>
                             )}
                             {course.eligibilityStatus && (

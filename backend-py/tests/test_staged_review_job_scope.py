@@ -1,6 +1,8 @@
 import asyncio
 from types import SimpleNamespace
 
+import pytest
+
 from app.routers import scrape
 
 
@@ -66,7 +68,8 @@ def test_job_review_preserves_campus_siblings_but_deduplicates_same_scope(monkey
     assert result["courses"] == [{"id": 144}, {"id": 143}]
 
 
-def test_job_review_does_not_include_older_pending_rows(monkeypatch):
+@pytest.mark.parametrize("view", ["full", "summary"])
+def test_job_review_does_not_include_older_pending_rows(monkeypatch, view):
     """A completed scrape's review request is strictly scoped to its job ID."""
     async def _no_op(*_args, **_kwargs):
         return None
@@ -74,21 +77,55 @@ def test_job_review_does_not_include_older_pending_rows(monkeypatch):
     monkeypatch.setattr(
         scrape,
         "_staged_row_to_dict",
-        lambda row: {"id": row.id, "courseName": row.course_name},
+        lambda row: {"id": row.id, "courseName": row.course_name,
+                     "autoPublishStatus": row.auto_publish_status},
     )
     monkeypatch.setattr(scrape, "_attach_evidence_bulk", _no_op)
+    monkeypatch.setattr(scrape, "_attach_evidence_counts_bulk", _no_op)
     monkeypatch.setattr(scrape, "_attach_recovery_counts_bulk", _no_op)
+    monkeypatch.setattr(scrape, "_staged_summary", lambda row: row)
+    monkeypatch.setattr(scrape, "_score_quality_rows", lambda rows: {
+        "courses": [{"id": row["id"], "score": 0} for row in rows],
+    })
 
     db = _FakeDb()
-    response = asyncio.run(scrape.staged_one("job_current", db))
+    response = asyncio.run(scrape.staged_one("job_current", db, view=view))
 
     query = str(db.statement)
     where_clause = query.split("WHERE", maxsplit=1)[1]
     assert "scraped_courses.scrape_job_id" in where_clause
     assert "scraped_courses.university_id" not in where_clause
-    assert response["courses"] == [{"id": 101, "courseName": "Fresh course"}]
+    assert [(row["id"], row["autoPublishStatus"]) for row in response["courses"]] == [
+        (101, "review"), (102, "data_quality_failure"),
+    ]
     assert response["qualityBlocked"] == 1
     assert response["lastScrape"]["qualityBlocked"] == 1
+
+
+@pytest.mark.parametrize("blocked", [0, 1, 119, 182])
+def test_pending_review_keeps_every_quality_blocked_record_visible(monkeypatch, blocked):
+    rows = [
+        SimpleNamespace(id=i, course_name=f"Course {i}", status="pending",
+                        auto_publish_status="data_quality_failure" if i < blocked else "review")
+        for i in range(182)
+    ]
+    class Db(_FakeDb):
+        async def execute(self, statement):
+            return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: rows))
+
+    async def no_op(*args):
+        pass
+
+    monkeypatch.setattr(scrape, "_staged_row_to_dict", lambda row: {
+        "id": row.id, "status": row.status, "autoPublishStatus": row.auto_publish_status,
+    })
+    monkeypatch.setattr(scrape, "_attach_evidence_bulk", no_op)
+    monkeypatch.setattr(scrape, "_attach_recovery_counts_bulk", no_op)
+    result = asyncio.run(scrape.staged_one("job_current", Db()))
+    assert len(result["courses"]) == 182
+    assert result["qualityBlocked"] == result["lastScrape"]["qualityBlocked"] == blocked
+    assert sum(r["autoPublishStatus"] == "data_quality_failure" for r in result["courses"]) == blocked
+    assert all(r.status == "pending" for r in rows)
 
 
 def test_job_review_includes_explicit_unresolved_continuation_chain(monkeypatch):
