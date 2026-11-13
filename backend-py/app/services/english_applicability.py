@@ -128,13 +128,18 @@ def applicability(row, candidate, source, course):
         from app.services.english_html_tables import checked_profile
         profile = checked_profile(row, candidate, source, course)
         if not profile:
-            return reject("The HTML table does not explicitly identify this programme and qualification.",
+            return reject("The HTML table does not establish an unambiguous programme/cohort and qualification match.",
                           code="html_table_scope_mismatch")
         return {**result, "applicability": "verified",
-                "reason": "Explicitly named programme matched to the official IELTS table columns.",
+                "reason": ("Official programme/cohort evidence matched to the IELTS table columns."
+                           + (" Conditional band rule: " + profile["bandConstraint"]["text"]
+                              + " Only the overall score is proposed; individual bands are not interchangeable minima."
+                              if profile.get("bandConstraint") else "")),
                 "evidence": [{"url": source["url"], "quote": profile[k], "page": None}
                              for k in ("scope", "headerQuote", "quote")]
-                            + [{"url": course["url"], "quote": proof["courseQuote"]}]}
+                            + [{"url": course["url"], "quote": proof["courseQuote"]}]
+                            + [{"url": e["url"], "quote": e["quote"]} for e in course.get("cohortEvidence", [])],
+                **({"bandConstraint": profile["bandConstraint"]} if profile.get("bandConstraint") else {})}
     scope = normalized(proof.get("guidanceQuote"))
     identity = normalized(proof.get("courseQuote"))
     if not scope:

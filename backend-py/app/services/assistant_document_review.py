@@ -186,7 +186,13 @@ async def review(thread_id, turn_id, run_id, thread, message):
     results, targets, diagnostics = [], [], []
     client = None
     # One read per distinct course URL, reused across campus/review duplicates.
-    pages = {}
+    pages, cohort_cache, raw_pages, source_locks = {}, {}, {}, {}
+
+    async def shared_source(url, home):
+        async with source_locks.setdefault(url, asyncio.Lock()):
+            if url not in raw_pages:
+                raw_pages[url] = await inspect_source(url, home)
+            return raw_pages[url]
     async def read(row):
         document_identity = uploaded_course_evidence(row, source)
         if document_identity:
@@ -195,8 +201,11 @@ async def review(thread_id, turn_id, run_id, thread, message):
             url = official_url(row.course_website, ctx["home"])
             if url not in pages:
                 from app.services.document_course_source import read_course
-                pages[url] = asyncio.create_task(read_course(url, ctx["home"], inspect_source, official_url))
+                pages[url] = asyncio.create_task(read_course(url, ctx["home"], shared_source, official_url))
             page = await pages[url]
+            if page.get("verified") and source.get("_englishTables"):
+                from app.services.english_course_cohorts import enrich
+                page = await enrich(page, source, ctx["home"], shared_source, official_url, cohort_cache)
             return page if page.get("verified") else uploaded_course_evidence(row, source) or page
         except Exception:
             return uploaded_course_evidence(row, source) or {
@@ -279,6 +288,16 @@ async def review(thread_id, turn_id, run_id, thread, message):
                     assessment.update(applicability="excluded",
                         reason="Health/research scope requires named course guidance; no applicable named passage in this document.",
                         diagnosticCode="protected_scope_without_named_guidance")
+                if (page.get("verified") and source.get("_englishTables")
+                        and assessment.get("applicability") != "verified"):
+                    assessment["matchingDiagnostic"] = assessment.get("reason")
+                    assessment.update(
+                        applicability="unverified",
+                        reason="The official IELTS tables were read, but this course's programme, school, "
+                               "qualification level or specific exception could not be matched unambiguously. "
+                               "No general school score was assumed.",
+                        diagnosticCode="html_table_cohort_unverified",
+                    )
                 changes = validate_changes(candidate, source, page) if (
                     candidate.get("matched") is True and assessment["applicability"] == "verified"
                 ) else []

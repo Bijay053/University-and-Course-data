@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 from bs4 import BeautifulSoup
 
-from app.services.english_html_tables import profiles, candidate, checked_profile
+from app.services.english_html_tables import profiles, candidate, checked_profile, SCHEMA
 from app.services.english_applicability import applicability, score_binding
 from app.services.assistant_document_review import validate_changes
 from app.services.document_ielts_matching import identity_matches
@@ -17,7 +17,7 @@ def fixture():
             "<p>Postgraduate Research Programmes</p><table>" + HEADER + ROW + "</table></dd></dl>")
     source = {"verified": True, "sourceType": "html", "url": "https://uni.example/english",
               "_fullText": BeautifulSoup(html, "html.parser").get_text(" ", strip=True),
-              "_englishTablesSchema": 1, "_englishTables": profiles(html)}
+              "_englishTablesSchema": SCHEMA, "_englishTables": profiles(html)}
     row = SimpleNamespace(id=1, course_name="PhD - Law and Social Sciences", degree_level="Doctorate")
     course = {"verified": True, "courseTitle": row.course_name, "url": "https://uni.example/research/law",
               "_fullText": row.course_name + ". This research programme includes several specialist fields.", "facts": []}
@@ -87,7 +87,7 @@ def test_official_programme_acronym_is_allowed_only_when_present_in_live_h1():
         "School of Law and Social Sciences", "Health and Life Sciences - OSPAP")
     source = {"verified": True, "sourceType": "html", "url": "https://uni.example/english",
               "_fullText": BeautifulSoup(html, "html.parser").get_text(" ", strip=True),
-              "_englishTablesSchema": 1, "_englishTables": profiles(html)}
+              "_englishTablesSchema": SCHEMA, "_englishTables": profiles(html)}
     row.course_name = "Overseas Pharmacists Assessment Programme (OSPAP) PGDip"
     row.degree_level = "Graduate Diploma"
     course.update(courseTitle=row.course_name, _fullText=row.course_name)

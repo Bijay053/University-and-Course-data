@@ -282,16 +282,35 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
         from app.services.scraper.excelsia_source import facts as excelsia_facts
         intake_facts = excelsia_facts(html, url)
         from app.services.english_html_tables import profiles, SCHEMA
+        from app.services.english_course_cohorts import metadata as cohort_metadata
+        cohort_data = cohort_metadata(html, url)
+        for variant in cohort_data.get("variants", []):
+            if variant["quote"] not in text:
+                text += "\n" + variant["quote"]
+        from app.services.document_course_scope import title_key
+        identity_title = cohort_data.get("identity", "")
+        awards = {"bachelor", "master", "arts", "science", "honours",
+                  "beng", "meng", "bacc", "llb", "llm", "mba", "phd", "pgdip", "pgcert"}
+        identity_words = title_key(identity_title)
+        short_words = title_key(eligibility_name)
+        course_title = eligibility_name
+        if (eligibility_name and set(identity_words) & awards
+                and tuple(w for w in identity_words if w not in awards)
+                == tuple(w for w in short_words if w not in awards)):
+            course_title = identity_title
+            if course_title not in text:
+                text = course_title + "\n" + text
         return {
             "url": url, "title": title[:200], "sourceType": "html",
             "text": text[:24000], "_fullText": text, **identity,
             "_eligibilityName": eligibility_name,
-            "courseTitle": eligibility_name,
+            "courseTitle": course_title,
             "_excelsiaIntake": {"name": intake_facts.get("course_name"), "months": intake_facts.get("intake_months"),
                                "quote": intake_facts.get("_intake_snippet")},
             "_eligibilityQuote": domestic_evidence(html, eligibility_name) if eligibility_name else None,
             "facts": facts, "excerpts": evidence_excerpts(text, facts), "verified": True,
             "_englishTablesSchema": SCHEMA, "_englishTables": profiles(str(evidence_root)),
+            "_courseCohorts": cohort_data,
             "englishLinks": english_links[:8], "feeLinks": fee_links[:8],
         }
     except asyncio.CancelledError:
