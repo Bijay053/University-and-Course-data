@@ -49,3 +49,18 @@ async def test_empty_shells_and_explicit_challenges_remain_unverified(body):
     )
     assert not result["verified"]
     assert result["failureStage"] == "content_validation"
+
+
+@pytest.mark.asyncio
+async def test_substantive_hero_article_does_not_hide_sibling_entry_requirements(monkeypatch):
+    from app.services.scraper.extractors import fee, english_test
+    monkeypatch.setattr(fee, "extract", AsyncMock(return_value=[]))
+    monkeypatch.setattr(english_test, "extract", AsyncMock(return_value=[]))
+    html = ("<article><h1>Aerospace Engineering BEng (Hons)</h1>"
+            "<p>" + "Study aerospace engineering at our city campus. " * 8 + "</p></article>"
+            "<section><h2>Entry requirements</h2>"
+            "<p>IELTS Academic 6.0 overall with no components below 5.5.</p></section>")
+    result = await inspect_source(URL, "https://uni.example", raw_body=html.encode())
+    assert result["verified"]
+    assert "Entry requirements" in result["_fullText"]
+    assert "IELTS Academic 6.0" in result["_fullText"]

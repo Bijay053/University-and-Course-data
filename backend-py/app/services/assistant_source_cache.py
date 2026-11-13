@@ -35,7 +35,8 @@ async def refresh_ielts_facts(source, url):
     return source
 
 
-async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect, timeout, *, fresh=False):
+async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect, timeout, *,
+                        fresh=False, html_table_schema=None):
     from app.services.scrape_assistant_tools import official_url
     try:
         url = official_url(url, home)
@@ -70,6 +71,12 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                         and age is not None and 0 <= age < FAILURE_REUSE_SECONDS
                     )
                     if result.get("verified") or reusable_failure:
+                        if (result.get("verified") and result.get("sourceType") != "pdf"
+                                and html_table_schema is not None
+                                and result.get("_englishTablesSchema") != html_table_schema):
+                            # Old text-only evidence cannot recover discarded
+                            # table columns. Refresh once, never a cached refusal.
+                            break
                         cached = deepcopy(result)
                         cached.setdefault("requestedUrl", url)
                         cached.setdefault("urlHandling", "preserved")

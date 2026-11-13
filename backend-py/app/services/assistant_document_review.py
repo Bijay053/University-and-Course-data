@@ -40,6 +40,9 @@ def validate_changes(candidate, source, course):
     """Require verbatim numeric evidence and a successfully checked course."""
     if not course.get("verified") or not source.get("verified"):
         return []
+    if (candidate.get("applicability") or {}).get("tableId"):
+        from app.services.english_html_tables import profile_for
+        return list(candidate.get("changes", [])) if profile_for(candidate, source) else []
     text = " ".join(source.get("_fullText", source.get("text", "")).split())
     changes = []
     seen = set()
@@ -120,10 +123,12 @@ async def review(thread_id, turn_id, run_id, thread, message):
         if not url:
             raise ValueError("Provide an official English guidance page or PDF URL; no configured guidance is available.")
         async def read_guidance(target):
+            from app.services.english_html_tables import SCHEMA
             result = await cached_source(
                 service, thread_id, turn_id, run_id, target, ctx["home"],
                 inspect_source, 10,
                 fresh=bool(re.search(r"\b(fresh|re-?scrape|re-?fetch)\b", prompt, re.I)),
+                html_table_schema=SCHEMA,
             )
             return mark_configured_guidance(result, ctx["home"], ctx.get("config"))
 
@@ -211,7 +216,8 @@ async def review(thread_id, turn_id, run_id, thread, message):
                     candidates.append(candidate)
             deterministic_ids = {c["id"] for c in candidates}
             protected_ids = {
-                r.id for r in group if category(r) in {"health", "postgraduate_research"}
+                r.id for r in group if r.id not in deterministic_ids
+                and category(r) in {"health", "postgraduate_research"}
                 and not any(named_clause(r, clause) for page in source.get("_pages", [])
                             for clause in page.get("text", "").splitlines())
             }
@@ -288,7 +294,7 @@ async def review(thread_id, turn_id, run_id, thread, message):
                     changes = []
                     assessment.update(applicability="conflict", reason="Existing course requirements differ; retained for review, not overwritten by central guidance.")
                 document_text = source.get("_fullText", source.get("text", ""))
-                if re.search(r"except.*(?:health|research)", document_text, re.I | re.S) and re.search(
+                if not (candidate.get("applicability") or {}).get("tableId") and re.search(r"except.*(?:health|research)", document_text, re.I | re.S) and re.search(
                     r"health|nurs|midwif|physiotherap|radiograph|occupational therap|ph\.?d|doctor|research|mres",
                     f"{row.course_name} {row.degree_level}", re.I,
                 ):
@@ -317,6 +323,7 @@ async def review(thread_id, turn_id, run_id, thread, message):
               "fields": sorted({c["field"] for t in targets for c in t["changes"]}),
               "requiresConfirmation": True, "_targets": targets, "_turnId": turn_id,
               "_source": source.get("url"), "_objectKey": source.get("_objectKey"),
+              "_sourceType": source.get("sourceType", "html"),
               "_provenance": source.get("provenance", "official-document")}
     not_checked = sum(row["status"] == "not_checked" for row in results)
     checked_count = len(rows) - not_checked

@@ -232,20 +232,18 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
         evidence_soup = BeautifulSoup(str(soup), "html.parser")
         for node in evidence_soup.select("nav,footer,header,aside,form,select,[class*='related'],[role='navigation'],.elementor-location-header,.elementor-location-footer,.mobile-menu-bar-div,.elementor-nav-menu"):
             node.decompose()
-        evidence_root = evidence_soup.find("main") or evidence_soup.find("article") or evidence_soup
+        # An article can be just an image or a short course hero. Without a
+        # substantive main, retain sanitized sibling sections as well.
+        evidence_root = evidence_soup.find("main") or evidence_soup
         text = evidence_root.get_text(" ", strip=True)
         if len(text) < 150 and not re.search(
             r"^(?:Just a moment|Access denied|Attention Required)", text, re.I
         ):
             # A decorative image article may precede the actual course details
             # in sibling sections. An empty subtree is not an access challenge.
-            # Prefer a substantive title-owning article, otherwise keep the
-            # already chrome-stripped document rather than losing its content.
-            articles = [
-                node for node in evidence_soup.find_all("article")
-                if node.find("h1") and len(node.get_text(" ", strip=True)) >= 150
-            ]
-            evidence_root = articles[0] if len(articles) == 1 else evidence_soup
+            # Keep the already chrome-stripped document rather than losing
+            # details in sibling sections outside a short course hero.
+            evidence_root = evidence_soup
             text = evidence_root.get_text(" ", strip=True)
         if len(text) < 150 or re.search(r"^(?:Just a moment|Access denied|Attention Required)", text, re.I):
             raise ValueError("The source returned a challenge or an empty page.")
@@ -283,6 +281,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
         eligibility_name = headings[0].get_text(" ", strip=True) if len(headings) == 1 else ""
         from app.services.scraper.excelsia_source import facts as excelsia_facts
         intake_facts = excelsia_facts(html, url)
+        from app.services.english_html_tables import profiles, SCHEMA
         return {
             "url": url, "title": title[:200], "sourceType": "html",
             "text": text[:24000], "_fullText": text, **identity,
@@ -292,6 +291,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
                                "quote": intake_facts.get("_intake_snippet")},
             "_eligibilityQuote": domestic_evidence(html, eligibility_name) if eligibility_name else None,
             "facts": facts, "excerpts": evidence_excerpts(text, facts), "verified": True,
+            "_englishTablesSchema": SCHEMA, "_englishTables": profiles(str(evidence_root)),
             "englishLinks": english_links[:8], "feeLinks": fee_links[:8],
         }
     except asyncio.CancelledError:

@@ -20,10 +20,11 @@ def identity_matches(name, quote):
     if len(normal(quote)) > 200:
         return bool(re.search(r"(?<!\w)"+re.escape(normal(name))+r"(?!\w)", normal(quote), re.I))
     left, right = title_key(name), title_key(quote)
-    awards = {"bachelor", "master", "arts", "science", "honours"}
+    awards = {"bachelor", "master", "arts", "science", "honours",
+              "beng", "meng", "bacc", "macc", "llb", "llm", "mba", "phd", "pgdip", "pgcert"}
     if left == right:
         return True
-    la, ra = set(left) & awards, set(right) & awards
+    la, ra = set(left) & (awards - {"honours"}), set(right) & (awards - {"honours"})
     return bool((not la or not ra) and tuple(x for x in left if x not in awards)
                 == tuple(x for x in right if x not in awards) and len(set(left)-awards) >= 2)
 
@@ -77,6 +78,9 @@ def corroboration(row, source, course, scope):
 
 def standard_candidate(row, source, course):
     """Build a proposal only from exact PDF text plus independent course proof."""
+    from app.services.english_html_tables import candidate as html_candidate
+    if source.get("sourceType") == "html":
+        return html_candidate(row, source, course)
     from app.services.english_applicability import category
     if not source.get("verified") or source.get("unreadablePages") or not course.get("verified"):
         return None

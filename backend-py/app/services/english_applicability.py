@@ -19,6 +19,9 @@ def score_binding(row, candidate, source):
     proof = candidate.get("applicability")
     if not isinstance(proof, dict):
         return False
+    if proof.get("tableId"):
+        from app.services.english_html_tables import profile_for
+        return profile_for(candidate, source) is not None
     scope = normalized(proof.get("guidanceQuote"))
     named = any(named_clause(row, c) for c in clauses(proof.get("guidanceQuote")))
     scoped_clauses = clauses(proof.get("guidanceQuote"))
@@ -121,12 +124,29 @@ def applicability(row, candidate, source, course):
     proof = candidate.get("applicability") or {}
     if not isinstance(proof, dict):
         return reject("No structured applicability evidence supplied.")
+    if proof.get("tableId"):
+        from app.services.english_html_tables import checked_profile
+        profile = checked_profile(row, candidate, source, course)
+        if not profile:
+            return reject("The HTML table does not explicitly identify this programme and qualification.",
+                          code="html_table_scope_mismatch")
+        return {**result, "applicability": "verified",
+                "reason": "Explicitly named programme matched to the official IELTS table columns.",
+                "evidence": [{"url": source["url"], "quote": profile[k], "page": None}
+                             for k in ("scope", "headerQuote", "quote")]
+                            + [{"url": course["url"], "quote": proof["courseQuote"]}]}
     scope = normalized(proof.get("guidanceQuote"))
     identity = normalized(proof.get("courseQuote"))
     if not scope:
         return reject("The model supplied no applicability passage.", code="guidance_quote_missing")
     if not quote_page(source, scope, proof.get("page")):
-        return reject("The guidance quote was not found on the cited PDF page.", code="guidance_page_quote_mismatch")
+        return reject(
+            "The guidance quote was not found on the cited PDF page."
+            if source.get("sourceType") == "pdf" else
+            "The guidance quote was not found in the official HTML source.",
+            code="guidance_page_quote_mismatch" if source.get("sourceType") == "pdf"
+                 else "guidance_html_quote_mismatch",
+        )
     if not quote_page(course, identity, None):
         return reject("The course identity quote was not found in its source.", code="course_quote_mismatch")
     # Reading a page is not identity proof; require the named course in its quote.
