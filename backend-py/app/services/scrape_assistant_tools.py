@@ -234,6 +234,19 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
             node.decompose()
         evidence_root = evidence_soup.find("main") or evidence_soup.find("article") or evidence_soup
         text = evidence_root.get_text(" ", strip=True)
+        if len(text) < 150 and not re.search(
+            r"^(?:Just a moment|Access denied|Attention Required)", text, re.I
+        ):
+            # A decorative image article may precede the actual course details
+            # in sibling sections. An empty subtree is not an access challenge.
+            # Prefer a substantive title-owning article, otherwise keep the
+            # already chrome-stripped document rather than losing its content.
+            articles = [
+                node for node in evidence_soup.find_all("article")
+                if node.find("h1") and len(node.get_text(" ", strip=True)) >= 150
+            ]
+            evidence_root = articles[0] if len(articles) == 1 else evidence_soup
+            text = evidence_root.get_text(" ", strip=True)
         if len(text) < 150 or re.search(r"^(?:Just a moment|Access denied|Attention Required)", text, re.I):
             raise ValueError("The source returned a challenge or an empty page.")
         facts = []
@@ -271,7 +284,8 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
         from app.services.scraper.excelsia_source import facts as excelsia_facts
         intake_facts = excelsia_facts(html, url)
         return {
-            "url": url, "title": title[:200], "text": text[:24000], "_fullText": text, **identity,
+            "url": url, "title": title[:200], "sourceType": "html",
+            "text": text[:24000], "_fullText": text, **identity,
             "_eligibilityName": eligibility_name,
             "courseTitle": eligibility_name,
             "_excelsiaIntake": {"name": intake_facts.get("course_name"), "months": intake_facts.get("intake_months"),

@@ -99,7 +99,7 @@ def standard_candidate(row, source, course):
                         for field, value in proof["scores"].items()]}
 
 
-def response_rows(raw, expected_ids):
+def response_rows(raw, expected_ids, *, source_type="pdf"):
     raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())
     parsed = json.loads(raw)
     rows = parsed.get("rows") if isinstance(parsed, dict) else None
@@ -127,8 +127,12 @@ def response_rows(raw, expected_ids):
             isinstance(candidate.get("applicability"), dict)
             and all(isinstance(candidate["applicability"].get(k), str)
                     and candidate["applicability"][k].strip() for k in ("guidanceQuote", "courseQuote"))
-            and type(candidate["applicability"].get("page")) is int
-            and candidate["applicability"]["page"] > 0
+            and (
+                type(candidate["applicability"].get("page")) is int
+                and candidate["applicability"]["page"] > 0
+                if source_type == "pdf"
+                else candidate["applicability"].get("page") is None
+            )
         ):
             errors.append("applicability_structure_invalid")
         elif not candidate["matched"] and candidate["changes"]:
@@ -144,7 +148,7 @@ def diagnostic(raw, code, ids, attempt):
             "responseChars": len(raw), "responseSha256": hashlib.sha256(raw.encode()).hexdigest()}
 
 
-async def match_batch(rows, invoke, diagnostics):
+async def match_batch(rows, invoke, diagnostics, *, source_type="pdf"):
     """Two attempts; preserve valid rows and retry only unresolved record IDs."""
     pending = {r.id: r for r in rows}
     retained = {}
@@ -166,7 +170,7 @@ async def match_batch(rows, invoke, diagnostics):
             diagnostics.append(diagnostic("", "invalid_response_envelope", ids, attempt))
             continue
         try:
-            valid, errors = response_rows(raw, set(ids))
+            valid, errors = response_rows(raw, set(ids), source_type=source_type)
         except (ValueError, TypeError):
             valid, errors = {}, ["invalid_json_or_rows"]
         retained.update(valid)

@@ -236,6 +236,7 @@ async def review(thread_id, turn_id, run_id, thread, message):
                      "Use the single applicable clause containing both the course name (or explicit level scope) "
                      "and its score; never combine a general score with a named course's different requirement. "
                      "PDF page numbers must match the supplied numbered pages. "
+                     "For an HTML document use page:null; never invent PDF page numbers for a web page. "
                      "Match this English requirements document to EACH existing course using the supplied course evidence. "
                      "Evidence may be an official page or a named-course passage in a staff-uploaded document. "
                      "Uploaded evidence is not independently authenticated as official; never claim it is. "
@@ -254,7 +255,10 @@ async def review(thread_id, turn_id, run_id, thread, message):
                                     for r, p in eligible if r.id in {x.id for x in selected}],
                     }, default=str)},
                 ], [], spend_context=(service.AsyncSessionLocal, settings, thread_id))
-                matched, unresolved = await match_batch([r for r, _ in eligible], invoke, diagnostics)
+                matched, unresolved = await match_batch(
+                    [r for r, _ in eligible], invoke, diagnostics,
+                    source_type=source.get("sourceType", "html"),
+                )
                 candidates.extend(matched.values())
                 course_pages = [
                     {"verified": False, "error": "Document matching failed after two attempts; this record remains unchecked."}

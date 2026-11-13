@@ -45,6 +45,43 @@ def test_real_standard_wording_requires_and_accepts_independent_course_corrobora
                for e in applicability(row, candidate, source, course)["evidence"])
 
 
+def test_html_proposal_uses_no_page_number_but_keeps_source_and_course_validation():
+    row, source, course = fixture()
+    candidate = standard_candidate(row, source, course)
+    assert candidate
+    source["sourceType"] = "html"
+    source.pop("_pages")
+    candidate["applicability"]["page"] = None
+    for change in candidate["changes"]:
+        change["page"] = None
+    raw = json.dumps({"rows": [candidate]})
+    accepted, errors = response_rows(raw, {row.id}, source_type="html")
+    assert accepted[row.id] == candidate and not errors
+    assert applicability(row, candidate, source, course)["applicability"] == "verified"
+    assert len(validate_changes(candidate, source, course)) == 5
+    assert score_binding(row, candidate, source)
+    # The same missing page number is still invalid for PDF proposals.
+    accepted, errors = response_rows(raw, {row.id})
+    assert not accepted and "applicability_structure_invalid" in errors
+    # HTML cannot cite an imaginary PDF page either.
+    candidate["applicability"]["page"] = 1
+    accepted, errors = response_rows(json.dumps({"rows": [candidate]}), {row.id}, source_type="html")
+    assert not accepted and "applicability_structure_invalid" in errors
+
+
+@pytest.mark.asyncio
+async def test_html_match_batch_passes_the_actual_document_type():
+    row, source, course = fixture()
+    candidate = standard_candidate(row, source, course)
+    candidate["applicability"]["page"] = None
+    invoke = AsyncMock(return_value={"message": {"content": json.dumps({"rows": [candidate]})}})
+    diagnostics = []
+    accepted, unresolved = await match_batch([row], invoke, diagnostics, source_type="html")
+    assert set(accepted) == {row.id}
+    assert not unresolved and not diagnostics
+    invoke.assert_awaited_once()
+
+
 @pytest.mark.parametrize("mutate", [
     lambda s, p: p.update(verified=False),
     lambda s, p: p.update(courseTitle="Accounting and Business"),
