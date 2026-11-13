@@ -7,6 +7,32 @@ vi.mock("./assistant-import-status", () => ({ AssistantImportStatus: () => null 
 
 import { ScrapePromptAssistant, type AssistantThread } from "./scrape-prompt-assistant";
 import { DocumentReviewView } from "./assistant-document-review";
+import { AssistantMessageAttachment } from "./assistant-message-attachment";
+
+it("keeps sent image attachments visible in user messages after remount", async () => {
+  const history: AssistantThread = {
+    threadId: "thread", status: "ready", phase: "", error: null,
+    messages: [{ role: "user", content: "Check these intakes", createdAt: "2026-11-13T00:00:00Z",
+      turnId: "saved-turn", attachment: { filename: "intakes.png", contentType: "image/png" } }],
+  };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => json(history));
+  const first = render(<ScrapePromptAssistant jobId="j1" />);
+  let image = await screen.findByAltText("Attached image: intakes.png");
+  expect(image.getAttribute("src")).toBe("/api/scrape/jobs/j1/assistant/messages/saved-turn/image");
+  expect(screen.getByText("Check these intakes")).toBeTruthy();
+  first.unmount();
+  render(<ScrapePromptAssistant jobId="j1" />);
+  image = await screen.findByAltText("Attached image: intakes.png");
+  expect(image.closest("[data-role=user]")).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Open image intakes.png" }).getAttribute("target")).toBe("_blank");
+});
+
+it("shows a useful filename fallback when a saved image was removed", () => {
+  render(<AssistantMessageAttachment src="/private/image" filename="intakes.png" />);
+  fireEvent.error(screen.getByAltText("Attached image: intakes.png"));
+  expect(screen.getByRole("status").textContent).toContain("Image unavailable");
+  expect(screen.getByRole("status").textContent).toContain("intakes.png");
+});
 
 it("renders numeric backend row IDs and distinguishes unchecked courses", () => {
   const view = render(<DocumentReviewView testId="review" review={{
@@ -109,7 +135,7 @@ describe("document upload", () => {
       ? {items:[{kind:"file",getAsFile:()=>image}],files:[]}
       : {items:[],files:[image]}});
     await waitFor(() => expect(screen.getByTestId("assistant-attachment").getAttribute("data-status")).toBe("ready"));
-    expect(screen.getByAltText("Attached image preview").getAttribute("src")).toBe("blob:screenshot");
+    expect((await screen.findByAltText("Attached image preview")).getAttribute("src")).toBe("blob:screenshot");
     const metadata = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/documents/upload-url"))!;
     expect(JSON.parse(String(metadata[1]?.body))).toMatchObject({filename:"pasted-image.png", contentType:"image/png"});
     const uploaded = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/documents/content"))!;

@@ -7,6 +7,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -314,6 +315,11 @@ async def response(thread, db, job_id=None):
         thread.updated_at = service.now()
         await db.commit()
     public = deepcopy(messages)
+    from app.services.assistant_documents import message_image
+    for original, visible in zip(messages, public):
+        image = message_image(original, thread.actor_id, thread.job_id)
+        if image:
+            visible["attachment"] = {"filename": image["filename"], "contentType": image["contentType"]}
     live_phase = thread.phase
     if thread.status == "ready":
         current_start = max((index for index, message in enumerate(messages)
@@ -398,6 +404,25 @@ async def get_assistant(job_id: str, db: Database, actor: Actor):
         from app.services.scrape_assistant_runner import schedule
         schedule(thread.id, thread.turn_id)
     return result
+
+
+@router.get("/jobs/{job_id}/assistant/messages/{turn_id}/image")
+async def message_image_content(job_id: str, turn_id: str, db: Database, actor: Actor):
+    from app.services.assistant_documents import message_image, read_bytes
+    _, thread = await owned_thread(job_id, actor, db)
+    message = next((m for m in (thread.messages if thread else [])
+                    if m.get("role") == "user" and m.get("turnId") == turn_id), None)
+    image = message_image(message or {}, int(actor["id"]), job_id)
+    if not image:
+        raise HTTPException(404, "Image attachment not found.")
+    try:
+        raw = await read_bytes(image)
+    except Exception:
+        raise HTTPException(404, "Image attachment is no longer available.") from None
+    return Response(raw, media_type=image["contentType"], headers={
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": "inline",
+    })
 
 
 @router.post("/jobs/{job_id}/assistant", status_code=202)

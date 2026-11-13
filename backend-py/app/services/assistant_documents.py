@@ -35,14 +35,14 @@ def sign(payload):
     return raw + "." + signature
 
 
-def verify(token, actor_id, job_id):
+def verify(token, actor_id, job_id, *, allow_expired=False):
     try:
         raw, signature = token.split(".")
         expected = hmac.new(settings.session_secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(signature, expected):
             raise ValueError()
         data = json.loads(base64.urlsafe_b64decode(raw))
-        if data["actor"] != actor_id or data["job"] != job_id or data["expires"] < time.time():
+        if data["actor"] != actor_id or data["job"] != job_id or (not allow_expired and data["expires"] < time.time()):
             raise ValueError()
         if not data["key"].startswith(f"assistant-documents/{actor_id}/{job_id}/"):
             raise ValueError()
@@ -103,8 +103,7 @@ async def store_uploaded(token, actor_id, job_id, raw):
     return {"uploaded": True}
 
 
-async def read_uploaded(token, actor_id, job_id):
-    data = verify(token, actor_id, job_id)
+async def read_bytes(data):
     def download():
         client = snapshot_store._make_client()
         try:
@@ -122,7 +121,25 @@ async def read_uploaded(token, actor_id, job_id):
             return raw
         finally:
             client.close()
-    raw = await asyncio.to_thread(download)
+    return await asyncio.to_thread(download)
+
+
+def message_image(message, actor_id, job_id):
+    """Only resolve a signed attachment saved on this owner's user message."""
+    if message.get("role") != "user" or not message.get("turnId") or not message.get("_documentToken"):
+        return None
+    try:
+        data = verify(message["_documentToken"], actor_id, job_id, allow_expired=True)
+    except ValueError:
+        return None
+    if data.get("contentType") not in {"image/png", "image/jpeg"}:
+        return None
+    return data
+
+
+async def read_uploaded(token, actor_id, job_id):
+    data = verify(token, actor_id, job_id)
+    raw = await read_bytes(data)
     content_type = data.get("contentType", "application/pdf")
     if content_type.startswith("image/"):
         return {

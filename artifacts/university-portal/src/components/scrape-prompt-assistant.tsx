@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AssistantImportStatus } from "./assistant-import-status";
+import { AssistantMessageAttachment } from "./assistant-message-attachment";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -55,6 +56,7 @@ export type AssistantMessage = {
   content: string;
   createdAt: string;
   turnId?: string;
+  attachment?: { filename: string; contentType: string };
   sources?: AssistantSource[];
   actions?: AssistantAction[];
   /** Archived real tool events for the turn this reply concluded. */
@@ -685,6 +687,11 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                       <li className="flex justify-end" data-testid={`assistant-message-${i}`} data-role="user">
                         <div className="max-w-[85%] rounded-2xl rounded-br-md bg-teal-900 px-3.5 py-2.5 text-[13.5px] leading-relaxed text-teal-50">
                           <span className="sr-only">You said: </span>
+                          {m.attachment && m.turnId && ["image/png", "image/jpeg"].includes(m.attachment.contentType) && (
+                            <AssistantMessageAttachment
+                              src={`${base}/messages/${encodeURIComponent(m.turnId)}/image`}
+                              filename={m.attachment.filename} />
+                          )}
                           <p className="whitespace-pre-wrap break-words">{String(m.content ?? "")}</p>
                           <time dateTime={m.createdAt} className="mt-1 block text-right text-[10.5px] text-teal-200/80">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
                         </div>
