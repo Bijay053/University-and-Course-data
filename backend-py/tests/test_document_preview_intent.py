@@ -12,6 +12,9 @@ PDF = "https://university.example/english-requirements.pdf"
     f"Show the IELTS document approval preview using {PDF}. Never write without approval.",
     f"Do not apply anything; prepare an IELTS preview from {PDF}.",
     f"I want an IELTS preview from {PDF}, do not apply it yet.",
+    "https://www.aston.ac.uk/international/english-language-requirements\n"
+    "ielts score are on this link update on all courses",
+    "Update IELTS from https://university.example/english; do not apply until approved.",
 ])
 def test_preview_and_negated_commit_still_route_to_document_review(prompt):
     assert requested({"content": prompt})

@@ -16,6 +16,9 @@ BANDS = ("ielts_overall", "ielts_reading", "ielts_writing", "ielts_listening", "
 
 def requested(message):
     content = message["content"]
+    from app.services.assistant_field_edits import html_guidance_research_requested
+    if html_guidance_research_requested(content):
+        return True
     # "Prepare a preview; do not apply it" requests document research, not an
     # immediate write. A later commit prohibition must not discard an earlier
     # positive request. Conversely, a solely negated edit is not a bulk request.
@@ -111,9 +114,11 @@ async def review(thread_id, turn_id, run_id, thread, message):
             configured_english_urls, english_guidance_alternatives, mark_configured_guidance,
         )
         configured = configured_english_urls(ctx["home"], ctx.get("config"))
-        url = url or next((u for u in urls if u in configured), None) or next(iter(configured), None)
+        # The reviewer-supplied official page takes precedence over unrelated
+        # configured guidance, even when it is HTML rather than a PDF.
+        url = url or next(iter(urls), None) or next(iter(configured), None)
         if not url:
-            raise ValueError("Provide an official English guidance PDF URL; no configured guidance is available.")
+            raise ValueError("Provide an official English guidance page or PDF URL; no configured guidance is available.")
         async def read_guidance(target):
             result = await cached_source(
                 service, thread_id, turn_id, run_id, target, ctx["home"],

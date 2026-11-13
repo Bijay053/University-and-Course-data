@@ -31,7 +31,12 @@ class ReadOnlySession:
 
 
 @pytest.mark.asyncio
-async def test_robots_403_returns_complete_document_report_without_crashing(monkeypatch):
+@pytest.mark.parametrize("supplied_url,prompt_tail", [
+    (PDF, "update each band ielts for all courses"),
+    (HOME + "/international/english-language-requirements",
+     "ielts score are on this link update on all courses"),
+])
+async def test_robots_403_returns_complete_document_report_without_crashing(monkeypatch, supplied_url, prompt_tail):
     rows = [
         SimpleNamespace(id=i, course_name=f"Course {i}", degree_level="Bachelor",
                         academic_level="Undergraduate")
@@ -47,7 +52,8 @@ async def test_robots_403_returns_complete_document_report_without_crashing(monk
     save = AsyncMock()
     monkeypatch.setattr(service, "save_research_reply", save)
     source = {
-        "url": PDF, "verified": False, "sourceType": "pdf",
+        "url": supplied_url, "verified": False,
+        "sourceType": "pdf" if supplied_url == PDF else "html",
         "failureStage": "robots", "accessIssue": "robots_unavailable",
         "httpStatus": 403, "sourceRequestAttempted": False,
         "error": "Cloudflare challenged the robots.txt request (HTTP 403); "
@@ -55,6 +61,11 @@ async def test_robots_403_returns_complete_document_report_without_crashing(monk
     }
     reader = AsyncMock(return_value=source)
     monkeypatch.setattr(assistant_source_cache, "cached_source", reader)
+    from app.services import assistant_official_sources
+    monkeypatch.setattr(assistant_official_sources, "configured_english_urls",
+                        lambda *args: [HOME + "/unrelated-configured-english.pdf"])
+    monkeypatch.setattr(assistant_official_sources, "english_guidance_alternatives",
+                        lambda *args: [])
     monkeypatch.setattr(university_source_access, "entry", AsyncMock(return_value=None))
     # Keep the actual registry-discovery symbol/import under test. Its SELECT
     # uses a separate mocked result, with no learned links.
@@ -68,9 +79,10 @@ async def test_robots_403_returns_complete_document_report_without_crashing(monk
                         AsyncMock(side_effect=AssertionError("No network retry")))
     await review_module.review("thread", "turn", "run",
                                SimpleNamespace(job_id="job", actor_id=1), {
-                                   "content": PDF + "\nupdate each band ielts for all courses",
+                                   "content": supplied_url + "\n" + prompt_tail,
                                })
     reader.assert_awaited_once()
+    assert reader.call_args.args[4] == supplied_url
     review_module.inspect_source.assert_not_awaited()
     save.assert_awaited_once()
     reply = save.call_args.args[3]
@@ -81,5 +93,5 @@ async def test_robots_403_returns_complete_document_report_without_crashing(monk
     assert (report["checked"], report["proposed"], report["notChecked"]) == (0, 0, 227)
     assert len(report["rows"]) == 227
     assert all(row["status"] == "not_checked" for row in report["rows"])
-    assert report["accessError"]["url"] == PDF
+    assert report["accessError"]["url"] == supplied_url
     assert "HTTP 403" in report["accessError"]["message"]

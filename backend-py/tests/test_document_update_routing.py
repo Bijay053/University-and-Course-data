@@ -16,6 +16,10 @@ from app.services.assistant_field_edits import (
     "Use the uploaded PDF to update fees for all applicable courses",
     "Extract intakes from this PDF",
     "Check scholarships using https://uni.example/fees.pdf?year=2027",
+    "https://www.aston.ac.uk/international/english-language-requirements\n"
+    "ielts score are on this link update on all courses",
+    "Use https://university.example/english to update IELTS overall and bands for all courses",
+    "Check English requirements at https://university.example/entry; do not apply changes",
 ])
 @pytest.mark.asyncio
 async def test_document_update_reaches_research_without_actions(prompt):
@@ -50,3 +54,13 @@ async def test_negated_edits_do_not_hijack_research(prompt, monkeypatch):
     service = SimpleNamespace(save_research_reply=AsyncMock())
     assert await handle_field_edit(service, "thread", "turn", "run", {"samples": [row]}, prompt) is False
     service.save_research_reply.assert_not_awaited()
+
+
+@pytest.mark.parametrize("prompt", [
+    "https://university.example/ielts/update/all-courses",
+    "Do not update IELTS from https://university.example/english",
+    "Read https://university.example/fees and update tuition",
+])
+def test_html_guidance_requires_an_actual_english_instruction(prompt):
+    from app.services.assistant_field_edits import html_guidance_research_requested
+    assert not html_guidance_research_requested(prompt)

@@ -186,7 +186,24 @@ def document_research_requested(prompt):
     courses merely because a document URL appears in the request.
     """
     return bool(
+        html_guidance_research_requested(prompt)
+        or
         re.search(r"https://[^\s<>`]+\.pdf(?:[?#][^\s<>`]*)?(?=[\s`)>.,]|$)", prompt, re.I)
         or re.search(r"\b(?:this|the|attached|uploaded|official)\s+(?:\w+\s+){0,3}PDF\b", prompt, re.I)
         or re.search(r"\b(?:from|using|read|check|extract)\b.{0,80}\bPDF\b", prompt, re.I)
+    )
+
+
+def html_guidance_research_requested(prompt):
+    """A supplied English-guidance page is evidence, not a literal field edit."""
+    if not re.search(r"https://[^\s<>\"'`]+", prompt, re.I):
+        return False
+    instruction = re.sub(r"https://[^\s<>\"'`]+", " ", prompt, flags=re.I)
+    positive = " ".join(
+        re.split(r"\b(?:do not|don't|never)\b", clause, maxsplit=1, flags=re.I)[0]
+        for clause in re.split(r"[.;!?\n]|\b(?:but|then|however)\b", instruction, flags=re.I)
+    )
+    return bool(
+        re.search(r"\b(?:ielts|english(?:[- ]language)?|bands?)\b", instruction, re.I)
+        and re.search(r"\b(?:add|update|set|apply|fill|fix|check|match|extract|preview|read)\b", positive, re.I)
     )
