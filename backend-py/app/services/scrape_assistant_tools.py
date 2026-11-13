@@ -320,6 +320,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
                                "quote": intake_facts.get("_intake_snippet")},
             "_eligibilityQuote": domestic_evidence(html, eligibility_name) if eligibility_name else None,
             "facts": facts, "excerpts": evidence_excerpts(text, facts), "verified": True,
+            "_deliveryFactsVersion": 1,
             "_englishTablesSchema": SCHEMA, "_englishTables": profiles(str(evidence_root)),
             "_courseCohorts": cohort_data,
             "englishLinks": english_links[:8], "feeLinks": fee_links[:8],

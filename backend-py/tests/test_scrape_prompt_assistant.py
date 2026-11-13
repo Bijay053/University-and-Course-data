@@ -573,6 +573,10 @@ async def test_confirm_reuses_guarded_fix_once_and_reports_persisted_completion(
     async with store() as db:
         job = await db.get(ScrapeRuntimeJob, "fix")
         job.status, job.current = "completed", 1
+        job.approval_summary = {"results": [{
+            "id": 1, "outcome": "updated", "made_progress": True, "ok": True,
+            "progress_fields": ["international_fee"],
+        }]}
         row = await db.get(ScrapedCourse, 1)
         row.international_fee = 18900
         await db.commit()

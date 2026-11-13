@@ -28,9 +28,10 @@ export type AssistantAction = {
   fields: string[];
   state: "proposed" | "starting" | "running" | "completed" | "needs_review" | "error" | "superseded";
   resultSummary?: string;
+  valuesChanged?: number;
   verificationOutcome?: { staged: number; processed?: number; skipped?: number; unresolved?: number;
     criticalIssues: number; incompleteFields: string[] };
-  courseResults?: { url: string; status: string; message: string }[];
+  courseResults?: { id?: number; url: string; status: string; message: string }[];
   jobId?: string;
   error?: string;
   progress?: { current: number; total: number; status: string };
@@ -530,7 +531,8 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             {a.courseCount} course{a.courseCount === 1 ? "" : "s"}{a.fields.length ? ` · ${a.fields.map(fieldLabel).join(", ")}` : ""}
           </p>
           {a.courseScope && <AssistantRepairPreview scope={a.courseScope}
-            previews={a.repairPreview} testId={`repair-preview-${a.id}`} />}
+            previews={a.repairPreview} testId={`repair-preview-${a.id}`}
+            applied={a.state === "completed" && typeof a.valuesChanged === "number"} />}
           {a.progress && (a.state === "starting" || a.state === "running") && (
             <div className="mt-2">
               <div className="h-1.5 overflow-hidden rounded-full bg-amber-100" role="progressbar" aria-valuemin={0} aria-valuemax={a.progress.total} aria-valuenow={a.progress.current}>
@@ -551,7 +553,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
           {!!a.courseResults?.length && (
             <ul className="mt-2 space-y-2 text-[12px] text-amber-950" data-testid={`course-results-${a.id}`}>
               {a.courseResults.map(result => (
-                <li key={result.url}>
+                <li key={result.id ?? result.url}>
                   <span className="block break-all font-medium">{result.url}</span>
                   <span>{result.message}</span>
                 </li>

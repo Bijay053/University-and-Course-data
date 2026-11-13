@@ -53,9 +53,8 @@ def finalize_field_proposal(action, prompt, ctx, sources):
         "Only the courses listed in the proposal can be processed."
     )
     if "study_mode" in action["fields"]:
-        # This path has not yet produced a deterministic before/after delivery
-        # comparison. Model confidence is not proof that conflicting wording
-        # can be resolved, even for a single pending row.
+        # Hold unless every exact course has a deterministic owned comparison.
+        # Model confidence alone never resolves conflicting delivery wording.
         action["requiresConfirmation"] = True
         summary += (
             "\n\nThis is a delivery-mode recheck, not new course discovery. Each course "
@@ -65,6 +64,29 @@ def finalize_field_proposal(action, prompt, ctx, sources):
             "or inconclusive evidence must remain unresolved; staging counts do not prove "
             "these course checks have completed."
         )
+        if set(action["fields"]) == {"study_mode"}:
+            from app.services.assistant_delivery_evidence import delivery_proof
+            previews = []
+            for row, scope in zip(rows, action["courseScope"]):
+                proof = delivery_proof(row.get("url"), row.get("name"), sources)
+                preview = {**scope, "status": "unverified", "changes": [],
+                           "reason": "No unambiguous course-owned delivery proof was verified."}
+                if proof:
+                    value, quote, source = proof
+                    preview.update(status="supported", reason="",
+                        source={"url": source["url"], "quote": quote},
+                        changes=[{"field": "study_mode", "oldValue": row.get("studyMode"),
+                                  "newValue": value}])
+                previews.append(preview)
+            action["repairPreview"] = previews
+            if all(p["status"] == "supported" for p in previews):
+                action["label"] = "Apply verified delivery correction"
+                action["requiresConfirmation"] = research_only(prompt) or len(ids) > 10
+                summary += (
+                    "\n\nEvery selected course has an exact course-owned delivery comparison. "
+                    "Execution will reuse this checked evidence, audit the change and read "
+                    "the saved mode back; it will not run another page extraction."
+                )
     if "ielts_overall" in action["fields"]:
         previews = []
         for row, scope in zip(rows, action["courseScope"]):

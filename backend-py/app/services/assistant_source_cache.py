@@ -36,7 +36,7 @@ async def refresh_ielts_facts(source, url):
 
 
 async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect, timeout, *,
-                        fresh=False, html_table_schema=None):
+                        fresh=False, html_table_schema=None, html_delivery_schema=None):
     from app.services.scrape_assistant_tools import official_url
     try:
         url = official_url(url, home)
@@ -64,6 +64,13 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                         from app.services.assistant_retained_source import recent_capture
                         if not recent_capture(result.get("sourceCapturedAt")):
                             break
+                    if (result.get("verified") and result.get("sourceType") != "pdf"
+                            and result.get("sourceOrigin") != "retained_scrape_page_text"
+                            and html_delivery_schema is not None
+                            and result.get("_deliveryFactsVersion") != html_delivery_schema):
+                        # Old flattened text cannot prove ownership of a
+                        # Location label. Read the permitted raw body once.
+                        break
                     checked_at = result.get("_sourceCheckedAt")
                     age = wall_time() - checked_at if isinstance(checked_at, (int, float)) else None
                     reusable_failure = (

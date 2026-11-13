@@ -181,9 +181,21 @@ async def response(thread, db, job_id=None):
             if action["state"] not in {"starting", "running"} and not (
                 action["kind"] == "repair_catalogue" and action.get("_sessionId")
                 and action["state"] in {"error", "needs_review"}
+            ) and not (
+                action["kind"] == "fix_fields" and action.get("jobId")
+                and action["state"] == "completed" and action.get("_fixOutcomeVersion") != 1
             ):
                 continue
             target = await db.get(ScrapeRuntimeJob, action.get("jobId")) if action.get("jobId") else None
+            if action["kind"] == "fix_fields" and action["state"] == "completed" and target is None:
+                action["state"] = "needs_review"
+                action["resultSummary"] = (
+                    "The historical correction results are no longer available. "
+                    "The old completion label does not verify a course correction. "
+                    "No new operation was run.")
+                action["error"] = action["resultSummary"]
+                changed = True
+                continue
             if action["kind"] == "retry_failed" and target:
                 action["progress"] = {"current": target.current or 0, "total": target.total_found or 0, "status": target.status}
                 if target.status not in {"queued", "running", "awaiting_approval"}:
@@ -258,7 +270,17 @@ async def response(thread, db, job_id=None):
                         action["error"] = summary
                 elif target.status in {"completed", "completed_with_warnings"}:
                     action["state"] = "completed"
-                    if action["kind"] == "scan_catalogue":
+                    if action["kind"] == "fix_fields":
+                        from app.services.assistant_fix_outcome import fix_outcome
+                        from app.routers.scrape import _bulk_fix_job_dict
+                        action["state"], action["resultSummary"], action["courseResults"] = fix_outcome(
+                            action, _bulk_fix_job_dict(target))
+                        action["_fixOutcomeVersion"] = 1
+                        if action["state"] == "needs_review":
+                            action["error"] = action["resultSummary"]
+                        else:
+                            action.pop("error", None)
+                    elif action["kind"] == "scan_catalogue":
                         action["resultSummary"] = f"Discovery finished: {target.total_found or 0} found, {target.imported or 0} staged, {target.skipped or 0} skipped, {target.errors or 0} errors. Nothing was published."
                         from app.services.scraper.pending_imports import attempt_summary
                         attempts = await attempt_summary(db, target.runtime_job_id, target.university_id)
@@ -644,7 +666,8 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
             sample_rows = sorted(rows, key=lambda row: row.id)
             async def inspect_cached(url,home):
                 return await cached_source(service,thread.id,thread.turn_id,thread.run_id,
-                    url,home,service.inspect_source,SOURCE_CACHE_SECONDS)
+                    url,home,service.inspect_source,SOURCE_CACHE_SECONDS,
+                    html_delivery_schema=1 if "study_mode" in action["fields"] else None)
             try:
                 verified_sources = await require_reachable_sources(repair_probe_urls(sample_rows, action),
                     sample_rows[0].course_website if sample_rows else "",inspect_cached)
@@ -652,8 +675,17 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
                 raise HTTPException(status_code=409,detail=str(exc))
             from app.services.assistant_retained_repair import apply_retained_ielts
             try:
-                applied = await apply_retained_ielts(
+                from app.services.assistant_delivery_apply import apply_verified_delivery
+                applied = await apply_verified_delivery(
                     service,db,thread,action,sample_rows,verified_sources,job.university_id,actor)
+                if not applied:
+                    applied = await apply_retained_ielts(
+                        service,db,thread,action,sample_rows,verified_sources,job.university_id,actor)
+                if applied:
+                    for message in messages:
+                        if (len(message.get("actions", [])) == 1
+                                and message["actions"][0]["id"] == action_id):
+                            message["content"] = action["resultSummary"]
             except ValueError as exc:
                 raise HTTPException(status_code=409,detail=str(exc))
             if not applied:
