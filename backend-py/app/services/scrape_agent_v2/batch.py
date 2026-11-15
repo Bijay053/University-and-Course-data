@@ -65,17 +65,11 @@ async def batch_check(tools, call_id, row_ids=None):
             if row and url and row.status in tools.service.REVIEW_STATUSES and tools.service.row_version(row)==before:
                 tools.ctx["versions"].setdefault(str(row.id),before)
                 observed["version"]=before
-                intake=source.get("_excelsiaIntake") or {}
-                import re
-                from urllib.parse import urlsplit
-                fold=lambda value:re.sub(r"[^a-z0-9]","",value.casefold())
-                course_slug=urlsplit(url).path.rstrip("/").rsplit("/",1)[-1]
-                placeholder=bool(re.fullmatch(r"(?:https?://)?(?:www\.)?excelsia\.edu\.au/?",name,re.I))
-                identity_matches=((intake.get("name") or "").casefold()==name.casefold()
-                    or (placeholder and fold(intake.get("name") or "")==fold(course_slug)))
-                if source.get("verified") and identity_matches and intake.get("months") and intake.get("quote"):
+                from app.services.assistant_intake_evidence import intake_proof
+                intake = intake_proof(source, url, name)
+                if intake:
                     import json
-                    proofs.append(("intake_months",json.dumps(intake["months"]),intake["quote"]))
+                    proofs.append(("intake_months", json.dumps(intake[0]), intake[1]))
                 if source.get("verified") and (source.get("_eligibilityName") or "").casefold()==name.casefold() and source.get("_eligibilityQuote"):
                     proofs.append(("eligibility","domestic_only",source["_eligibilityQuote"]))
                 for field,value,quote in proofs:

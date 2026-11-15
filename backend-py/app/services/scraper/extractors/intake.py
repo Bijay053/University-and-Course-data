@@ -1344,6 +1344,10 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             )
         ]
 
+    from .selected_intake import extract_selected_intake
+    selected_start = extract_selected_intake(html, url)
+    if selected_start:
+        return selected_start
     results = await _extract_raw(html, url)
     _host = (_up(url).netloc or "").lower()
     if results and _host.endswith(".ac.nz"):

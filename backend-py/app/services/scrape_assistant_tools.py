@@ -259,8 +259,17 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
                         "normalized": delivery.normalized, "quote": quote,
                         "method": delivery.method,
                     })
-        for extractor in (extract_fee, extract_english):
+        from app.services.scraper.extractors.intake import extract as extract_intake
+        for extractor in (extract_fee, extract_english, extract_intake):
             for result in (await extractor(html, url))[:8]:
+                # Some providers put the course-owned start selector before
+                # <main>. Preserve its literal DOM quote rather than losing it
+                # with navigation stripping, or inventing a citation.
+                if result.method == "intake:selected_start_option" and result.snippet:
+                    normalized_quote = " ".join(result.snippet.split()).casefold()
+                    raw_text = " ".join(soup.get_text(" ", strip=True).split()).casefold()
+                    if normalized_quote in raw_text and normalized_quote not in " ".join(text.split()).casefold():
+                        text = result.snippet + "\n" + text
                 facts.append({
                     "field": result.field_key, "value": result.value,
                     "normalized": result.normalized, "quote": result.snippet,
@@ -321,6 +330,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
             "_eligibilityQuote": domestic_evidence(html, eligibility_name) if eligibility_name else None,
             "facts": facts, "excerpts": evidence_excerpts(text, facts), "verified": True,
             "_deliveryFactsVersion": 1,
+            "_intakeFactsVersion": 1,
             "_englishTablesSchema": SCHEMA, "_englishTables": profiles(str(evidence_root)),
             "_courseCohorts": cohort_data,
             "englishLinks": english_links[:8], "feeLinks": fee_links[:8],

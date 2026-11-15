@@ -45,6 +45,13 @@ def delivery_review_proposal(service, prompt, ctx, sources):
 
 def delivery_recheck_options(action):
     """Explicit rechecks must inspect populated modes, not just missing fields."""
+    if set(action.get("fields", [])) == {"intake_months"}:
+        return {
+            "forceFields": ["intake_months"],
+            "forceReasons": {"intake_months":
+                "Staff requested an official-source intake recheck on existing pending rows. "
+                "Use each course's own start dates and selected offering; never copy the example's dates."},
+        }
     if "study_mode" not in action.get("fields", []):
         return {}
     return {

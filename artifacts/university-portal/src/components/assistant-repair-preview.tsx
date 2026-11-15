@@ -4,14 +4,21 @@ export type RepairCourseScope = { id: number; name: string; url: string };
 export type RepairPreview = RepairCourseScope & {
   status: "supported" | "unverified";
   reason: string;
-  changes: { field: string; oldValue: number | string | null; newValue: number | string }[];
+  changes: { field: string; oldValue: number | string | string[] | null; newValue: number | string | string[] }[];
   source?: { url: string; quote: string };
 };
 const labels: Record<string, string> = {
   ielts_overall: "IELTS overall", ielts_listening: "Listening",
   ielts_reading: "Reading", ielts_writing: "Writing", ielts_speaking: "Speaking",
   study_mode: "Study mode",
+  intake_months: "Intakes",
 };
+const displayValue = (value: number | string | string[] | null) =>
+  Array.isArray(value) ? value.join(", ") || "Missing"
+    : typeof value === "number" ? value.toFixed(1) : value ?? "Missing";
+const equalValues = (left: unknown, right: unknown) =>
+  Array.isArray(left) || Array.isArray(right)
+    ? JSON.stringify(left) === JSON.stringify(right) : left === right;
 
 export function AssistantRepairPreview({ scope, previews, testId, applied = false }: {
   scope: RepairCourseScope[]; previews?: RepairPreview[]; testId: string; applied?: boolean;
@@ -42,9 +49,9 @@ export function AssistantRepairPreview({ scope, previews, testId, applied = fals
               </tr></thead>
               <tbody>{preview.changes.map(change => <tr key={change.field} className="border-b last:border-0">
                 <th scope="row" className="py-1 pr-3 font-normal">{labels[change.field] ?? change.field}</th>
-                <td className="py-1 pr-3">{typeof change.oldValue === "number" ? change.oldValue.toFixed(1) : change.oldValue ?? "Missing"}</td>
-                <td className="py-1 pr-3 font-medium">{typeof change.newValue === "number" ? change.newValue.toFixed(1) : change.newValue}</td>
-                <td className="py-1">{change.oldValue === change.newValue ? "Unchanged" : applied ? "Updated" : "Proposed"}</td>
+                <td className="py-1 pr-3">{displayValue(change.oldValue)}</td>
+                <td className="py-1 pr-3 font-medium">{displayValue(change.newValue)}</td>
+                <td className="py-1">{equalValues(change.oldValue, change.newValue) ? "Unchanged" : applied ? "Updated" : "Proposed"}</td>
               </tr>)}</tbody>
             </table>
           </div>

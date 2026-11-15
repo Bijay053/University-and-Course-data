@@ -36,7 +36,8 @@ async def refresh_ielts_facts(source, url):
 
 
 async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect, timeout, *,
-                        fresh=False, html_table_schema=None, html_delivery_schema=None):
+                        fresh=False, html_table_schema=None, html_delivery_schema=None,
+                        html_intake_schema=None):
     from app.services.scrape_assistant_tools import official_url
     try:
         url = official_url(url, home)
@@ -64,6 +65,12 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                         from app.services.assistant_retained_source import recent_capture
                         if not recent_capture(result.get("sourceCapturedAt")):
                             break
+                    if (result.get("verified") and result.get("sourceType") != "pdf"
+                            and html_intake_schema is not None
+                            and result.get("_intakeFactsVersion") != html_intake_schema):
+                        # A first-option-only cached extraction cannot establish
+                        # the selected start. Refresh the permitted source once.
+                        break
                     if (result.get("verified") and result.get("sourceType") != "pdf"
                             and result.get("sourceOrigin") != "retained_scrape_page_text"
                             and html_delivery_schema is not None
