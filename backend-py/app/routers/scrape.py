@@ -3399,9 +3399,15 @@ class StartBulkFixBody(BaseModel):
 
 
 def _bulk_fix_job_dict(job: ScrapeRuntimeJob) -> dict:
+    from app.services.fix_field_changes import field_change_counts
+
     summary = dict(job.approval_summary or {})
     counts = summary.get("counts") or {}
     return {
+        "fieldChanges": field_change_counts(
+            summary.get("results") or [],
+            _targeted_reextract_fields((job.request_payload or {}).get("targetFields") or []),
+        ),
         "jobId": job.runtime_job_id,
         "smart": bool((job.request_payload or {}).get("smart")),
         "sourceJobId": (job.request_payload or {}).get("sourceJobId"),

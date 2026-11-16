@@ -291,6 +291,12 @@ async def run_smart_batch(body, db):
                 item["next_action"] = "report_official_url"
         elif resolved:
             item["reason_code"] = "issues_resolved"
+        elif set(item.get("updated_fields") or []) & set(targets):
+            item["reason_code"] = "requested_values_updated"
+            item["reason"] = (
+                "Requested field values were saved. This is a value correction, "
+                "not the resolution of a previously detected missing-field issue."
+            )
         else:
             item["reason_code"] = "correction_requires_review"
             item["reason"] = "Correction attempted; review the selected source before accepting it."

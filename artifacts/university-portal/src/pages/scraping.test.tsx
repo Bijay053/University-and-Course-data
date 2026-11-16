@@ -135,6 +135,20 @@ describe("verified unpublished duration review", () => {
 });
 
 describe("Smart Fix results contract", () => {
+  it("recognizes saved forced intake corrections even with zero missing issues resolved", () => {
+    const courseResults = Array.from({ length: 40 }, (_, id) => ({
+      id, ok: true, attempted: true, outcome: "no_progress" as const,
+      updated_fields: ["intake_months"], resolved_fields: [],
+    }));
+    const result = {
+      smart: true, total: 182, updated: 0, skipped: 0, errors: 5,
+      requestedFields: ["intake_months"], beforeIssues: [], afterIssues: [],
+      afterAnalysisComplete: true, courseResults,
+    };
+    expect(getFixResultHeading(result)).toBe("Partially successful");
+    expect(getFixResultHeading({ ...result, errors: 0 })).toBe("Field values corrected");
+    expect(getFixResultHeading({ ...result, afterAnalysisComplete: false })).toBe("Resolution not verified");
+  });
   const issue = { field: "international_fee", label: "Fee", missing: 1, total: 1, current_pct: 0, expected_fill_pct: 0 };
   const base = {
     smart: true, total: 1, updated: 1, skipped: 0, errors: 0,

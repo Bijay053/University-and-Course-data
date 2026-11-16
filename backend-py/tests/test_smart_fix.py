@@ -30,6 +30,26 @@ def test_planner_exact_field_identity_and_scope():
 
 
 @pytest.mark.asyncio
+async def test_forced_intake_value_correction_is_not_described_as_unchanged(monkeypatch):
+    monkeypatch.setattr(scrape, "analyze_staged", AsyncMock(return_value=analysis(total=1)))
+    monkeypatch.setattr(scrape, "re_extract_staged", AsyncMock(return_value={
+        "results": [{
+            "id": 1, "ok": True, "updated_fields": ["intake_months"],
+            "progress_fields": ["intake_months"], "made_progress": True,
+        }],
+    }))
+    result = (await smart_fix.run_smart_batch(
+        body(targets=["intake_months"], forceFields=["intake_months"],
+             forceReasons={"intake_months": "Official selected start date differs"}),
+        SimpleNamespace(rollback=AsyncMock()),
+    ))["results"][0]
+    assert result["reason_code"] == "requested_values_updated"
+    assert result["updated_fields"] == ["intake_months"]
+    assert result["resolved_fields"] == []
+    assert result["made_progress"] is False  # No missing-field issue was resolved.
+
+
+@pytest.mark.asyncio
 async def test_cited_unpublished_duration_skips_automatic_fix_but_forced_retry_runs(monkeypatch):
     from app.services.scraper.extractors.ulaw_sqe2_demands import REVIEW_KEY
     url = "https://www.law.ac.uk/study/postgraduate/law/sqe-2-preparation-course/"

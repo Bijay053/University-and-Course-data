@@ -2,6 +2,8 @@ import { Fragment, useEffect, useState, useRef, useCallback, useMemo } from "rea
 import { PublishedFeeVariants, feeVariantAuthority, type FeeVariantCarrier } from "@/components/published-fee-variants";
 import { shouldLoadForBackgroundJob } from "@/utils/scraping-poll-guard";
 import { mergeReextractFieldResults } from "@/utils/reextract-field-aggregation";
+import { fixFieldChanges } from "@/utils/fix-field-changes";
+import { FixFieldCounts } from "@/components/fix-field-counts";
 import { groupLegacyCampusRows, legacyCampusGroupName, legacyCampusReviewFees } from "@/utils/legacy-campus-groups";
 import { useListUniversities } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -693,6 +695,7 @@ export function SmartFixDetails({ result, onReport }: {
     unresolved_after_official_recovery: "Selected issues remain after official-source recovery",
     issues_resolved: "Selected issues resolved",
     correction_requires_review: "Correction needs manual source review",
+    requested_values_updated: "Requested field values saved; missing-issue checks are separate",
     confirmed_unpublished: "Duration verified as not published — supply a new official URL to recheck",
     initial_analysis_failed: "Initial issue analysis failed — resolution unverified; recheck",
     post_analysis_failed: "Post-fix analysis failed — changes may be saved; resolution unverified; recheck",
@@ -700,7 +703,8 @@ export function SmartFixDetails({ result, onReport }: {
   };
   const groups = new Map<string, typeof rows>();
   for (const row of rows) {
-    const state = row.attempted === false ? "Not attempted" : row.outcome === "failed" ? "Failed" : row.outcome === "no_progress" ? "Attempted — unchanged" : row.attempted ? "Attempted" : "Attempt status unavailable";
+    const changed = fixFieldChanges([row], result.requestedFields).valueUpdated > 0;
+    const state = row.attempted === false ? "Not attempted" : row.outcome === "failed" ? "Failed" : changed ? "Field values corrected" : row.outcome === "no_progress" ? "Attempted — unchanged" : row.attempted ? "Attempted" : "Attempt status unavailable";
     const reason = reasons[row.reason_code ?? ""] ?? row.reason ?? row.error ?? row.reason_code ?? "No detailed reason supplied";
     const key = `${state}: ${reason}`;
     groups.set(key, [...(groups.get(key) ?? []), row]);
@@ -709,6 +713,9 @@ export function SmartFixDetails({ result, onReport }: {
   const fieldList = (fields?: string[]) => fields?.length ? fields.map((field) => FIX_FIELD_LABELS[field] ?? field).join(", ") : "None reported";
   return (
     <div className="space-y-3 text-sm" data-testid="smart-fix-details">
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        <FixFieldCounts results={rows} requested={result.requestedFields} />
+      </div>
       <p>{result.updated} courses with at least one issue resolved — not necessarily all issues.</p>
       <p>{result.attempted ?? rows.filter((row) => row.attempted).length} attempted · {result.notAttempted ?? rows.filter((row) => row.attempted === false).length} not attempted · {result.alreadyResolved ?? 0} already resolved at start</p>
       <p>{result.afterAnalysisComplete ? `${remaining} selected issues remaining in fresh analysis` : "Remaining issues could not be verified. Refresh and review again."}</p>
@@ -793,7 +800,11 @@ export function getFixResultHeading(result: {
     const unpublishedDuration = (result.afterIssues ?? []).some((issue) => issue.field === "duration"
       && result.requestedFields?.includes("duration") && (issue.confirmed_unpublished ?? 0) > 0);
     const unsupported = (result.courseResults ?? []).some((row) => row.unsupported_fields?.length);
-    if (resolved <= 0) return result.errors > 0 ? "Failed" : "No progress";
+    if (resolved <= 0) {
+      const corrected = fixFieldChanges(result.courseResults ?? [], result.requestedFields).valueUpdated;
+      if (corrected > 0) return remaining || unsupported || result.errors ? "Partially successful" : "Field values corrected";
+      return result.errors > 0 ? "Failed" : "No progress";
+    }
     return remaining || unpublishedDuration || unsupported || result.errors ? "Partially successful" : "Successful";
   }
   if (result.afterAnalysisComplete && result.beforeIssues?.length) {
@@ -3901,8 +3912,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
               <span>{bulkFixJob.queued} queued</span>
               <span>{bulkFixJob.running} running</span>
-              <span className="text-green-700">{bulkFixJob.completed} {bulkFixJob.smart ? "with issues resolved" : "completed"}</span>
-              <span>{bulkFixJob.noProgress} {bulkFixJob.smart ? "attempted unchanged" : "no progress"}</span>
+              <FixFieldCounts results={bulkFixJob.results} requested={bulkFixJob.targetFields} />
+              <span>{bulkFixJob.completed} {bulkFixJob.smart ? "with detected issues resolved" : "completed"}</span>
               {bulkFixJob.smart && <span>{bulkFixJob.notAttempted ?? 0} not attempted · {bulkFixJob.skipped ?? 0} skipped · {bulkFixJob.alreadyResolved ?? 0} already resolved</span>}
               <span className="text-red-700">{bulkFixJob.failed} failed</span>
             </div>
@@ -4227,8 +4238,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                   <span>{bulkFixJob.queued} queued</span>
                   <span>{bulkFixJob.running} running</span>
-                  <span className="text-green-700">{bulkFixJob.completed} {bulkFixJob.smart ? "with issues resolved" : "completed"}</span>
-                  <span className="text-gray-600">{bulkFixJob.noProgress} {bulkFixJob.smart ? "attempted unchanged" : "no progress"}</span>
+                  <FixFieldCounts results={bulkFixJob.results} requested={bulkFixJob.targetFields} />
+                  <span>{bulkFixJob.completed} {bulkFixJob.smart ? "with detected issues resolved" : "completed"}</span>
                   {bulkFixJob.smart && <span>{bulkFixJob.notAttempted ?? 0} not attempted · {bulkFixJob.skipped ?? 0} skipped · {bulkFixJob.alreadyResolved ?? 0} already resolved</span>}
                   <span className="text-red-700">{bulkFixJob.failed} failed</span>
                 </div>
@@ -5124,7 +5135,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   <div>Background Fix progress: <strong>{fixProgress.completed} of {fixProgress.total}</strong> processed.</div>
                   {bulkFixJob && (
                     <div className="mt-1 text-xs">
-                      {bulkFixJob.queued} queued · {bulkFixJob.running} running · {bulkFixJob.completed} {bulkFixJob.smart ? "with issues resolved" : "completed"} · {bulkFixJob.noProgress} {bulkFixJob.smart ? "attempted unchanged" : "no progress"} · {bulkFixJob.failed} failed
+                      {bulkFixJob.queued} queued · {bulkFixJob.running} running · <FixFieldCounts results={bulkFixJob.results} requested={bulkFixJob.targetFields} /> · {bulkFixJob.failed} failed
                       {bulkFixJob.smart && ` · ${bulkFixJob.notAttempted ?? 0} not attempted`}
                     </div>
                   )}
@@ -5179,7 +5190,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   {fixResults.errors > 0 && <span className="text-red-600">· {fixResults.errors} failed</span>}
                 </div>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
-                  getFixResultHeading(fixResults) === "Successful"
+                  ["Successful", "Field values corrected"].includes(getFixResultHeading(fixResults))
                     ? "bg-green-50 text-green-700 border-green-200" :
                   getFixResultHeading(fixResults) === "Partially successful"
                     ? "bg-orange-50 text-orange-700 border-orange-200" :

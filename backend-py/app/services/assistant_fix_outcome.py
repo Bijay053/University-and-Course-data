@@ -2,6 +2,8 @@
 
 
 def fix_outcome(action, job):
+    from app.services.fix_field_changes import field_change_counts
+
     results = job.get("results") or []
     expected = set(action.get("_ids") or [])
     complete = (
@@ -22,6 +24,12 @@ def fix_outcome(action, job):
         f"{unresolved} without verified progress, {failed} failed. "
         "No courses were approved or published."
     )
+    changed = field_change_counts(results, job.get("targetFields"))["valueUpdated"]
+    if changed:
+        summary += (
+            f" Requested field values were saved on {changed} courses; "
+            "value corrections are counted separately from issue resolution."
+        )
     if not complete:
         summary += " The recorded results do not cover the exact requested scope."
     if not repaired and not clear:
