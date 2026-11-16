@@ -31,6 +31,40 @@ afterEach(() => {
 });
 
 describe("ScrapePromptAssistant", () => {
+  it("shows every intake family in one approval preview and keeps conflicting families separate", async () => {
+    const makePreview = (courseName: string, keepId: number) => ({
+      courseName, keepId, canonicalUrl: "https://www.example.edu/" + keepId,
+      entryYear: 2027, excludeIds: [keepId + 1], intakes: ["January", "April"],
+      conflicts: {},
+      rows: ["January", "April"].map((month, i) => ({
+        id: keepId + i, name: `${courseName} (${month} 2027)`,
+        url: `https://www.example.edu/${keepId}/${month.toLowerCase()}-2027`,
+        intakes: [month], fee: 24800, currency: "GBP", feeYear: 2027,
+      })),
+    });
+    const previews = [makePreview("Artificial Intelligence MSc", 1), makePreview("Business Analytics MSc", 4)];
+    const blocked = {...makePreview("Clinical Research MSc", 7),
+      conflicts: {ielts_overall: [{id: 7, value: 7}, {id: 8, value: 6.5}]}};
+    const thread: AssistantThread = {...empty, status: "ready", messages: [{
+      role: "assistant", content: "Existing intake families checked without fetching pages.",
+      createdAt: "2026-11-16T07:00:00Z", actions: [{
+        id: "intake-batch", kind: "merge_intakes", label: "Consolidate matching intake families",
+        courseCount: 12, fields: ["course_name", "intake_months"], state: "proposed",
+        requiresConfirmation: true, intakeConsolidations: previews, blockedIntakeConsolidations: [blocked],
+      }],
+    }]};
+    const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async () => json(thread));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    await screen.findByTestId("assistant-action-intake-batch");
+    expect(screen.getByText("1 intake families need review")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("button-run-action-intake-batch"));
+    const dialog = await screen.findByRole("alertdialog");
+    for (const preview of previews)
+      expect(within(dialog).getAllByText(preview.courseName, {exact: false}).length).toBeGreaterThan(0);
+    expect(within(dialog).queryByText("Clinical Research MSc", {exact: false})).toBeNull();
+    expect(fetcher.mock.calls.every(([, options]) => !options?.method || options.method === "GET")).toBe(true);
+  });
+
   it("shows partial recovery as needs review without a failed or successful repair claim", async () => {
     const thread: AssistantThread = {...empty, status:"ready", messages:[
       {role:"assistant",content:"Verification finished.",createdAt:"2024-01-01T00:00:00Z",actions:[

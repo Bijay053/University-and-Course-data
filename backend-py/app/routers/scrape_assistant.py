@@ -184,11 +184,11 @@ async def response(thread, db, job_id=None):
                 and action["state"] in {"error", "needs_review"}
             ) and not (
                 action["kind"] == "fix_fields" and action.get("jobId")
-                and action["state"] == "completed" and action.get("_fixOutcomeVersion") != 1
+                and action["state"] in {"completed", "error"} and action.get("_fixOutcomeVersion") != 1
             ):
                 continue
             target = await db.get(ScrapeRuntimeJob, action.get("jobId")) if action.get("jobId") else None
-            if action["kind"] == "fix_fields" and action["state"] == "completed" and target is None:
+            if action["kind"] == "fix_fields" and action["state"] in {"completed", "error"} and target is None:
                 action["state"] = "needs_review"
                 action["resultSummary"] = (
                     "The historical correction results are no longer available. "
@@ -269,7 +269,9 @@ async def response(thread, db, job_id=None):
                         action.pop("error", None)
                     else:
                         action["error"] = summary
-                elif target.status in {"completed", "completed_with_warnings"}:
+                elif target.status in {"completed", "completed_with_warnings"} or (
+                    action["kind"] == "fix_fields" and target.status == "completed_with_errors"
+                ):
                     action["state"] = "completed"
                     if action["kind"] == "fix_fields":
                         from app.services.assistant_fix_outcome import fix_outcome
@@ -295,6 +297,8 @@ async def response(thread, db, job_id=None):
                 elif target.status not in {"queued", "running", "awaiting_approval"}:
                     action["state"] = "error"
                     action["error"] = "The correction job stopped. Review its results before retrying."
+                    if action["kind"] == "fix_fields":
+                        action["_fixOutcomeVersion"] = 1
                 changed = True
             elif service.now() - thread.updated_at > timedelta(minutes=3):
                 action["state"] = "error"

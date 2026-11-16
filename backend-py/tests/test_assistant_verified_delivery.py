@@ -232,8 +232,9 @@ async def test_old_text_only_cache_refreshes_once_for_new_delivery_parser(store,
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("prior_state", ["running", "completed"])
-async def test_assistant_poll_reports_no_progress_instead_of_a_completed_fix(store, prior_state):
+@pytest.mark.parametrize("prior_state", ["running", "completed", "error"])
+@pytest.mark.parametrize("job_status", ["completed", "completed_with_warnings", "completed_with_errors"])
+async def test_assistant_poll_reports_no_progress_instead_of_a_completed_fix(store, prior_state, job_status):
     from app.models import ScrapeRuntimeJob
     from app.routers.scrape_assistant import get_assistant
     async with store() as db:
@@ -243,7 +244,7 @@ async def test_assistant_poll_reports_no_progress_instead_of_a_completed_fix(sto
         action.update(state=prior_state, jobId="no-progress")
         db.add(ScrapeRuntimeJob(
             runtime_job_id="no-progress", university_id=1, job_type="bulk_fix",
-            status="completed", total_found=1, current=1,
+            status=job_status, total_found=1, current=1,
             approval_summary={"results": [{
                 "id": 1, "ok": True, "outcome": "no_progress", "made_progress": False,
                 "all_updated_fields": ["scrape_warnings"],
@@ -259,3 +260,31 @@ async def test_assistant_poll_reports_no_progress_instead_of_a_completed_fix(sto
         assert saved["state"] == "needs_review"
         assert "0 repairs verified" in saved["resultSummary"]
         assert (await db.get(ScrapedCourse, 1)).study_mode == "Online"
+
+
+@pytest.mark.asyncio
+async def test_completed_with_errors_preserves_success_and_reports_exact_failed_course(store):
+    from app.models import ScrapeRuntimeJob
+    from app.routers.scrape_assistant import get_assistant
+    async with store() as db:
+        action = plan(count=2)
+        action.update(state="error", jobId="partial-result", error="The correction job stopped.")
+        db.add(ScrapeRuntimeJob(
+            runtime_job_id="partial-result", university_id=1, job_type="bulk_fix",
+            status="completed_with_errors", total_found=2, current=2,
+            request_payload={"targetFields": ["study_mode"]},
+            approval_summary={"results": [
+                {"id": 1, "ok": True, "outcome": "updated", "made_progress": True,
+                 "all_updated_fields": ["study_mode"]},
+                {"id": 2, "ok": False, "outcome": "failed", "error": "Official course page timed out"},
+            ]},
+        ))
+        db.add(ScrapeAssistantThread(id="partial", actor_id=7, job_id="source", turn_id="turn",
+            status="ready", messages=[{"role": "assistant", "content": "Repair queued", "actions": [action]}]))
+        await db.commit()
+        result = await get_assistant("source", db, {"id": 7})
+        saved = result["messages"][-1]["actions"][0]
+        assert saved["state"] == "needs_review"
+        assert "2/2" in saved["resultSummary"] and "1 repairs verified" in saved["resultSummary"]
+        assert "1 failed" in saved["resultSummary"] and "stopped" not in saved["error"]
+        assert saved["courseResults"][1]["message"] == "Official course page timed out"

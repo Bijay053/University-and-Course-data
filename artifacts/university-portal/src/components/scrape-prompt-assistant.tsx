@@ -42,6 +42,8 @@ export type AssistantAction = {
   courseScope?: RepairCourseScope[];
   repairPreview?: RepairPreview[];
   intakeConsolidation?: IntakeConsolidation;
+  intakeConsolidations?: IntakeConsolidation[];
+  blockedIntakeConsolidations?: IntakeConsolidation[];
 };
 export const RECOVER_MAX = 20;
 export type AssistantActivity = {
@@ -542,6 +544,11 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
       {m.actions.map(a => (
         <div key={a.id} className="rounded-xl border border-amber-200 bg-amber-50/80 p-3" data-testid={`assistant-action-${a.id}`}>
           {a.intakeConsolidation && <AssistantIntakeConsolidation preview={a.intakeConsolidation} />}
+          {a.intakeConsolidations?.map(preview => <AssistantIntakeConsolidation key={preview.keepId} preview={preview} />)}
+          {a.blockedIntakeConsolidations?.length ? <details>
+            <summary>{a.blockedIntakeConsolidations.length} intake families need review</summary>
+            {a.blockedIntakeConsolidations.map(preview => <AssistantIntakeConsolidation key={preview.keepId} preview={preview} />)}
+          </details> : null}
           <div className="flex items-center gap-2 text-[13px]">
             <Wrench className="h-3.5 w-3.5 text-amber-700" aria-hidden />
             <span className="flex-1 font-medium text-amber-950">{a.label}</span>
@@ -940,6 +947,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                 )}
                 {!!confirming?.fields.length && <p>Fields: {confirming.fields.map(fieldLabel).join(", ")}</p>}
                 {confirming?.intakeConsolidation && <AssistantIntakeConsolidation preview={confirming.intakeConsolidation} />}
+                {confirming?.intakeConsolidations?.map(preview => <AssistantIntakeConsolidation key={preview.keepId} preview={preview} />)}
                 {confirming?.courseScope && <AssistantRepairPreview scope={confirming.courseScope}
                   previews={confirming.repairPreview} testId="confirmation-repair-preview" />}
                 <p>It does not approve or publish any course. Results are not guaranteed to be accurate; review every changed value and its source afterwards.</p>

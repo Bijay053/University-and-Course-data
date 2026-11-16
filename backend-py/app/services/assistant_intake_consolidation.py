@@ -50,11 +50,26 @@ def family(row, home):
 
 
 def requested(prompt, messages=()):
+    examples, instructions = {}, []
+    for line in prompt.splitlines():
+        name = DATED_NAME.fullmatch(re.sub(r"^\s*(?:[-*•]|\d+[.)])\s+", "", line).strip())
+        if name:
+            examples.setdefault((name[1].strip().casefold(), name[3]), set()).add(name[2].casefold())
+        else:
+            instructions.append(line)
+    instruction = "\n".join(instructions)
     # "Same course" is also a normal follow-up in IELTS/fee conversations.
     # It is not, by itself, an instruction to consolidate intake records.
-    if (re.search(r"\b(?:ielts|english|fees?|tuition|duration|location|campus|academic)\b", prompt, re.I)
-            and not re.search(r"\b(?:intakes?|merge|consolidate|combine|course\s+name)\b", prompt, re.I)):
+    if (re.search(r"\b(?:ielts|english|fees?|tuition|duration|location|campus|academic)\b", instruction, re.I)
+            and not re.search(r"\b(?:intakes?|merge|consolidate|combine|course\s+name)\b", instruction, re.I)):
         return False
+    if (re.search(r"\b(?:add|set|change)\b.*\bintakes?\b", prompt, re.I)
+            and not re.search(r"\b(?:merge|consolidate|combine|course\s+name)\b", prompt, re.I)):
+        return False
+    if any(len(months) > 1 for months in examples.values()):
+        # Dated examples are stronger than a stale field from the conversation.
+        # This only routes to a database preview; it is not merge permission.
+        return True
     explicit = bool(re.search(
         r"\b(?:same\s+course|(?:merge|consolidate|combine)\b.*\b(?:intakes?|courses?|rows?|duplicates?)"
         r"|(?:intakes?\b.*\bcourse\s+name)|course\b.*\bmultiple\s+intakes?)", prompt, re.I))
@@ -75,6 +90,21 @@ def requested(prompt, messages=()):
             return False
         identities.append((name[1].strip().casefold(), parts.netloc, path[1], name[3]))
     return len(identities) > 1 and len(set(identities)) == 1
+
+
+def all_families_requested(prompt, *, named=False):
+    # "All intakes/rows for Course X" is still one named family. Widen named
+    # examples only when staff explicitly says all courses or calls them samples.
+    if named and not re.search(
+        r"\b(?:samples?|examples?)\b"
+        r"|\b(?:all|every)\s+(?:(?:the|other|remaining|pending|these)\s+)*courses?\b",
+        prompt, re.I,
+    ):
+        return False
+    return bool(re.search(
+        r"\b(?:all|every)\s+(?:(?:the|other|remaining|pending|these)\s+)*(?:courses?|rows?|intakes?|duplicates?|this)\b"
+        r"|\b(?:fix|repair|merge|consolidate|combine|review)\s+(?:them\s+)?all\b",
+        prompt, re.I))
 
 
 def make_plan(rows, home):
@@ -168,6 +198,8 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
             (key[1] in urls or bool(urls & {r.course_website.rstrip("/") for r in group}))
             if urls else named(key)
         )]
+        if all_families_requested(prompt, named=bool(selected)):
+            selected = [group for group in groups.values() if len(group) > 1]
         contextual = bool(re.fullmatch(
             r"\s*(?:yes|merge them|combine them|do it|[\d\s,]*(?:these |they )?(?:all )?are (?:the )?same course)[.!]?\s*",
             prompt, re.I,
@@ -180,6 +212,10 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
             selected = [group for key, group in groups.items() if len(group) > 1 and (
                 key[1] == anchor or len(urls) > 1 and urls == {r.course_website for r in group}
             )]
+        if len(selected) > 1:
+            from app.services.assistant_intake_batches import prepare
+            await prepare(service, thread_id, turn_id, run_id, ctx, prompt, selected)
+            return True
         if len(selected) != 1:
             await service.save_research_reply(thread_id, turn_id, run_id, {
                 "role": "assistant", "createdAt": service.now().isoformat(),
@@ -198,7 +234,7 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
             }, detail="Course consolidation needs review.")
             return True
         from app.services.scrape_assistant_autorun import execution_requested
-        imperative = bool(re.search(r"\b(?:remove|merge|combine|consolidate|make)\b", prompt, re.I))
+        imperative = bool(re.search(r"\b(?:remove|merge|combine|consolidate|make|fix|correct|repair)\b", prompt, re.I))
         readonly = (not execution_requested(prompt)
                     or bool(re.search(
                         r"\b(?:do not|don't|dont|never)\s+(?:merge|combine|consolidate|remove|rename|exclude)",
@@ -254,6 +290,9 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
 
 
 async def apply(service, db, action, university_id, actor_id, *, undo=False):
+    if action.get("_intakeGroups") and not undo:
+        from app.services.assistant_intake_batches import apply_batch
+        return await apply_batch(service, db, action, university_id, actor_id)
     from app.models.user import User
     permissions(await db.get(User, actor_id))
     from app.services.scraper.replay_extraction import review_restore_lock_scope
