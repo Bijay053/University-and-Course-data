@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.study_modes import validate_study_mode_input
+from app.schemas.intake_fees import PublishedFeeSchedule
 
 
 class CourseLocationOffering(BaseModel):
@@ -87,6 +88,8 @@ class CourseUpdate(BaseModel):
 
 
 class CourseRead(CourseBase):
+    feeSchedules: list[PublishedFeeSchedule] = Field(default_factory=list)
+    feeScheduleReviewRequired: bool = False
     model_config = ConfigDict(from_attributes=True)
 
     id: int

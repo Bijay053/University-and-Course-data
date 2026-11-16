@@ -769,6 +769,8 @@ async def search_courses(
         d.setdefault("course_url", d.get("course_website"))
         d.setdefault("courseUrl", d.get("course_website"))
         out.append(d)
+    from app.services.published_intake_fees import attach
+    await attach(db, out, id_key="course_id", snake=True)
     # Build facets — UI expects {facets: {intakes, degree_levels, locations, universities}}
     # Each facet item: {name, count}. Use simple aggregate query.
     from collections import Counter
@@ -962,6 +964,8 @@ async def search_compare(
             }
         )
 
+    from app.services.published_intake_fees import attach
+    await attach(db, courses, snake=True)
     return JSONResponse(content=jsonable_encoder({"courses": courses}))
 
 

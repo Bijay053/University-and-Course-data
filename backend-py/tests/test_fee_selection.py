@@ -51,6 +51,8 @@ class DB:
             if model is University else sc))
 
     async def execute(self, stmt, *args, **kwargs):
+        if "course_audit_log" in str(stmt):
+            return SimpleNamespace(scalar_one_or_none=lambda: None)
         if "scraped_field_evidence" in str(stmt):
             # The promotion boundary now also asks for selected study/duration
             # evidence. This fixture only owns a fee proof, not mode evidence.

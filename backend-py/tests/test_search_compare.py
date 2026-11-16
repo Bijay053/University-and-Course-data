@@ -45,6 +45,7 @@ class _StubSession:
     """Returns canned result-sets keyed by the SQL fragment matched."""
 
     def __init__(self, mv_rows, eng_rows, acad_rows):
+        self.info = {"fee_intake_storage_ready": False}
         self.mv_rows = mv_rows
         self.eng_rows = eng_rows
         self.acad_rows = acad_rows
@@ -71,6 +72,7 @@ class _FailingSearchSession:
 
 class _SequentialSession:
     def __init__(self, results):
+        self.info = {"fee_intake_storage_ready": False}
         self.results = iter(results)
         self.calls: list[tuple[str, dict]] = []
 

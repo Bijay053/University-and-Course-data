@@ -153,6 +153,7 @@ async def approve_selected(
                                  == offering_identity(child, child_scope)]
                                 if child_scope else cohort)
                 await approve_scraped_course(db, child, actor=actor, commit=False, offering_cohort=award_cohort,
+                    allow_intake_schedules=True,
                                              qualification_proof_context=qualification_proof)
             await db.commit()
             approved_ids.extend(ids)

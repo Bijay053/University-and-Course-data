@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pydantic import BaseModel, Field
+from app.schemas.intake_fees import PublishedFeeSchedule
 
 
 class PublicUniversityInsight(BaseModel):
@@ -26,6 +27,8 @@ class SearchOffering(BaseModel):
 
 
 class SearchCourseRow(BaseModel):
+    fee_schedules: list[PublishedFeeSchedule] = Field(default_factory=list)
+    fee_schedule_review_required: bool = False
     course_id: int
     course_name: str
     university_id: int

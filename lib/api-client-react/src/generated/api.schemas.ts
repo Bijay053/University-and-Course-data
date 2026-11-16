@@ -222,7 +222,20 @@ export type CourseOfferingsItem = {
   feeYear?: number | null;
 };
 
+export interface PublishedFeeSchedule {
+  id: number;
+  feeYear: number;
+  entryYear: number;
+  amount: number;
+  currency: string;
+  basis: string;
+  intakes: string[];
+  sourceUrls: string[];
+}
+
 export interface Course {
+  feeSchedules?: PublishedFeeSchedule[];
+  feeScheduleReviewRequired?: boolean;
   /** @nullable */
   courseLocation?: string | null;
   /** @nullable */
@@ -353,6 +366,8 @@ export interface Intake {
 }
 
 export interface Fee {
+  intakeApplicability?: PublishedFeeSchedule | null;
+  intakeApplicabilityInvalid?: boolean;
   id: number;
   courseId: number;
   /** @nullable */

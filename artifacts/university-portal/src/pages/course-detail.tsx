@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CourseCampusFees } from "@/components/course-campus-fees";
+import { PublishedIntakeFees } from "@/components/published-intake-fees";
 import type { Course } from "@workspace/api-client-react";
 
 function formatDuration(d: number | null | undefined, term: string | null | undefined) {
@@ -56,6 +57,8 @@ export default function CourseDetail() {
   const c = course as unknown as {
     id: number; universityId: number; universityName?: string | null;
     offerings?: Course["offerings"];
+    feeSchedules?: Course["feeSchedules"];
+    feeScheduleReviewRequired?: boolean;
     name: string; category?: string | null; subCategory?: string | null;
     courseWebsite?: string | null; duration?: number | null; durationTerm?: string | null;
     studyMode?: string | null; degreeLevel?: string | null; studyLoad?: string | null;
@@ -251,13 +254,15 @@ export default function CourseDetail() {
         {/* Side panel */}
         <div className="space-y-4">
           {/* Fees */}
-          {fees.length > 0 && (
+          {(fees.length > 0 || !!c.feeSchedules?.length || c.feeScheduleReviewRequired) && (
             <Card>
               <CardHeader><CardTitle className="flex items-center gap-2"><DollarSign className="w-5 h-5" /> Fees</CardTitle></CardHeader>
               <CardContent className="space-y-3 text-sm">
+                {(!!c.feeSchedules?.length || c.feeScheduleReviewRequired) &&
+                  <PublishedIntakeFees schedules={c.feeSchedules ?? []} reviewRequired={c.feeScheduleReviewRequired} />}
                 {fees.map((f) => (
                   <div key={f.id} className="border-b last:border-0 pb-3 last:pb-0 space-y-1">
-                    {!c.offerings?.length && f.internationalFee != null && (
+                    {!c.feeSchedules?.length && !c.feeScheduleReviewRequired && !c.offerings?.length && f.internationalFee != null && (
                       <div className="flex justify-between"><span className="text-gray-600">International</span><strong>{f.currency || "Currency not published"} {Math.round(f.internationalFee).toLocaleString()}{f.feeTerm ? ` / ${f.feeTerm}` : ""}</strong></div>
                     )}
                     {f.domesticFee != null && (

@@ -21,6 +21,7 @@ from app.models.course_id_alias import CourseIdAlias
 from app.models.english_requirement import EnglishRequirement
 from app.models.evidence import ScrapedFieldEvidence
 from app.models.fee import Fee
+from app.models.fee_intake_applicability import FeeIntakeApplicability
 from app.models.field_approval import CourseFieldApproval
 from app.models.field_conflict import FieldConflict
 from app.models.import_job import ImportJob
@@ -73,6 +74,7 @@ __all__ = [
     "CourseFieldApproval",
     "EnglishRequirement",
     "Fee",
+    "FeeIntakeApplicability",
     "FieldConflict",
     "FieldVerificationResult",
     "ImportJob",

@@ -1,4 +1,5 @@
 import type { Course } from "@workspace/api-client-react";
+import { PublishedIntakeFees } from "./published-intake-fees";
 
 export function formatCampusTuition(offering: NonNullable<Course["offerings"]>[number]): string {
   if (offering.feeAmount == null) return "Fee not published for this location";
@@ -9,6 +10,12 @@ export function formatCampusTuition(offering: NonNullable<Course["offerings"]>[n
 export function courseFeeExportColumns(course: Record<string, unknown>) {
   const offerings = course.offerings as Course["offerings"];
   const hasOfferings = !!offerings?.length;
+  const schedules = course.feeSchedules as Course["feeSchedules"];
+  if (schedules?.length || course.feeScheduleReviewRequired) return {
+    "Campus fees": schedules?.map(s => `${s.intakes.join(", ")} ${s.entryYear}: ${s.currency} ${s.amount.toLocaleString()} / ${s.basis} · fee year ${s.feeYear}`).join("\n")
+      || "Intake-linked tuition requires review",
+    "Int'l Fee": "", "Fee Term": "", "Fee Year": "", "Currency": "",
+  };
   return {
     "Campus fees": hasOfferings
       ? offerings.map(o => `${o.location}: ${formatCampusTuition(o)}`).join("\n")
@@ -21,7 +28,10 @@ export function courseFeeExportColumns(course: Record<string, unknown>) {
 }
 
 /** Never collapse prices across campuses, years, currencies or fee periods. */
-export function CourseCampusFees({ course }: { course: Pick<Course, "offerings" | "internationalFee" | "currency" | "feeTerm" | "feeYear"> }) {
+export function CourseCampusFees({ course }: { course: Pick<Course, "offerings" | "internationalFee" | "currency" | "feeTerm" | "feeYear" | "feeSchedules" | "feeScheduleReviewRequired"> }) {
+  if (course.feeSchedules?.length || course.feeScheduleReviewRequired) {
+    return <PublishedIntakeFees schedules={course.feeSchedules ?? []} reviewRequired={course.feeScheduleReviewRequired} />;
+  }
   if (course.offerings?.length) {
     return (
       <ul className="space-y-1 min-w-48" data-testid="list-campus-fees">

@@ -1336,6 +1336,12 @@ components:
     Course:
       type: object
       properties:
+        feeSchedules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublishedFeeSchedule'
+        feeScheduleReviewRequired:
+          type: boolean
         courseLocation:
           type: ["string", "null"]
         scholarshipAmount:
@@ -1699,9 +1705,40 @@ components:
         - intakeMonth
         - isOpen
 
+    PublishedFeeSchedule:
+      type: object
+      required: [id, feeYear, entryYear, amount, currency, basis, intakes, sourceUrls]
+      properties:
+        id:
+          type: integer
+        feeYear:
+          type: integer
+        entryYear:
+          type: integer
+        amount:
+          type: number
+        currency:
+          type: string
+        basis:
+          type: string
+        intakes:
+          type: array
+          items:
+            type: string
+        sourceUrls:
+          type: array
+          items:
+            type: string
+
     Fee:
       type: object
       properties:
+        intakeApplicability:
+          anyOf:
+            - $ref: '#/components/schemas/PublishedFeeSchedule'
+            - type: "null"
+        intakeApplicabilityInvalid:
+          type: boolean
         id:
           type: integer
         courseId:

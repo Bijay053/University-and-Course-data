@@ -12,7 +12,8 @@ from sqlalchemy import select
 KEY = "intake_fee_schedules"
 HOLD = (
     "This course retains intake-specific tuition-year schedules. Publication is held "
-    "because reducing them to a single fee year would lose intake applicability. "
+    "unless an explicit approval can preserve the complete, intact schedules. "
+    "Automatic publication cannot replace them with one fee year. "
     "The pending schedules and original evidence remain available."
 )
 

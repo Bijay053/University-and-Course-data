@@ -34,6 +34,14 @@ from app.models import (
 router = APIRouter()
 
 
+async def _protect_intake_tuition(db, course_id):
+    from app.services.published_intake_fees import protect_course
+    try:
+        await protect_course(db, course_id)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
 def _to_float(v: Any) -> float | None:
     if v is None or v == "":
         return None
@@ -81,6 +89,7 @@ async def create_course_intake(
     db: Annotated[AsyncSession, Depends(get_db)],
     body: Annotated[dict, Body(...)],
 ) -> dict:
+    await _protect_intake_tuition(db, course_id)
     month = (body.get("intakeMonth") or "").strip()
     if not month:
         raise HTTPException(status_code=400, detail="intakeMonth is required")
@@ -106,6 +115,7 @@ async def update_intake(
     row = await db.get(Intake, intake_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Intake not found")
+    await _protect_intake_tuition(db, row.course_id)
     if "intakeMonth" in body:
         row.intake_month = str(body["intakeMonth"]).strip() or row.intake_month
     if "intakeDay" in body:
@@ -126,6 +136,7 @@ async def delete_intake(
     row = await db.get(Intake, intake_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Intake not found")
+    await _protect_intake_tuition(db, row.course_id)
     await db.delete(row)
     await db.commit()
 
@@ -150,7 +161,12 @@ async def list_course_fees(
     rows = (
         await db.execute(select(Fee).where(Fee.course_id == course_id))
     ).scalars().all()
-    return [_fee_dict(r) for r in rows]
+    from app.services.published_intake_fees import schedules_by_course
+    schedules = (await schedules_by_course(db, [course_id])).get(course_id)
+    return [{**_fee_dict(r), **({
+        "intakeApplicability": next((s for s in schedules["schedules"] if s["id"] == r.id), None),
+        "intakeApplicabilityInvalid": schedules["reviewRequired"],
+    } if schedules else {})} for r in rows]
 
 
 @router.post("/courses/{course_id}/fees", status_code=status.HTTP_201_CREATED)
@@ -159,6 +175,7 @@ async def create_course_fee(
     db: Annotated[AsyncSession, Depends(get_db)],
     body: Annotated[dict, Body(...)],
 ) -> dict:
+    await _protect_intake_tuition(db, course_id)
     row = Fee(
         course_id=course_id,
         international_fee=_to_float(body.get("internationalFee")),
@@ -181,6 +198,7 @@ async def update_fee(
     row = await db.get(Fee, fee_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Fee not found")
+    await _protect_intake_tuition(db, row.course_id)
     if "internationalFee" in body:
         row.international_fee = _to_float(body["internationalFee"])
     if "feeTerm" in body:
@@ -201,6 +219,7 @@ async def delete_fee(
     row = await db.get(Fee, fee_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Fee not found")
+    await _protect_intake_tuition(db, row.course_id)
     await db.delete(row)
     await db.commit()
 

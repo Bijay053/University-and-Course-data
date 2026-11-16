@@ -10,6 +10,8 @@ export type Offering = {
   feeAmount: number | null; feeCurrency: string | null; feeTerm: string | null; feeYear: number | null;
 };
 export type CourseResult = {
+  fee_schedules?: import("@workspace/api-client-react").PublishedFeeSchedule[];
+  fee_schedule_review_required?: boolean;
   matched_locations?: string[] | null;
   matched_offerings?: Offering[] | null;
   id: number;
@@ -228,7 +230,12 @@ export function safeHttpUrl(raw: string | null | undefined): string | null {
 
 export type FeeLine = { label: string | null; amount: number | null; currency: string | null; term: string | null; year: number | null };
 
-export function feeLines(c: Pick<CourseResult, "offerings" | "matched_offerings" | "international_fee" | "currency" | "fee_term" | "fee_year" | "course_location">): FeeLine[] {
+export function feeLines(c: Pick<CourseResult, "offerings" | "matched_offerings" | "international_fee" | "currency" | "fee_term" | "fee_year" | "course_location" | "fee_schedules" | "fee_schedule_review_required">): FeeLine[] {
+  if (c.fee_schedule_review_required) return [];
+  if (c.fee_schedules?.length) return c.fee_schedules.map(s => ({
+    label: null, amount: s.amount, currency: s.currency, term: s.basis, year: s.feeYear,
+    intakes: s.intakes, entryYear: s.entryYear,
+  }));
   const offs = c.matched_offerings ?? c.offerings ?? [];
   if (offs.length) {
     return offs.map((o) => ({ label: o.location, amount: o.feeAmount, currency: o.feeCurrency, term: o.feeTerm, year: o.feeYear }));
@@ -241,11 +248,15 @@ export function formatFeeLine(l: FeeLine): string {
   const cur = l.currency || "";
   const term = l.term ? ` / ${l.term}` : "";
   const year = l.year != null ? ` (${l.year})` : "";
-  return `${cur ? `${cur} ` : ""}${l.amount.toLocaleString()}${term}${year}`;
+  const scope = "intakes" in l && Array.isArray(l.intakes)
+    ? ` · ${l.intakes.join(", ")} ${"entryYear" in l ? l.entryYear : ""}` : "";
+  return `${cur ? `${cur} ` : ""}${l.amount.toLocaleString()}${term}${year}${scope}`;
 }
 
 /** Headline fee only when a single unambiguous published amount exists. */
 export function headlineFee(c: CourseResult): string {
+  if (c.fee_schedule_review_required) return "Intake-linked tuition requires review";
+  if (c.fee_schedules?.length) return feeLines(c).map(formatFeeLine).join("; ");
   const lines = feeLines(c).filter((l) => l.amount != null);
   if (!lines.length) return `Fee ${NOT_PUBLISHED.toLowerCase()}`;
   if (lines.length === 1) return formatFeeLine(lines[0]);

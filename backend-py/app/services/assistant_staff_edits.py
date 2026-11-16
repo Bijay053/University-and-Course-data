@@ -19,6 +19,9 @@ async def state(db, row, kind, fields, *, lock=False):
     """Include related-row identities and every column in published preview fences."""
     if kind == "pending":
         return {k: plain(getattr(row, k)) for k in fields}, {}
+    if lock and set(fields) & {"intake_months", "international_fee", "fee_term", "currency", "fee_year"}:
+        from app.services.published_intake_fees import protect_course
+        await protect_course(db, row.id)
     related = {}
     for key, model in (("fees", Fee), ("intakes", Intake), ("english", EnglishRequirement)):
         query = select(model).where(model.course_id == row.id).order_by(model.id)

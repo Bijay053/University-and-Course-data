@@ -13,6 +13,7 @@ from app.dependencies import get_current_user, get_db
 from app.models import Course, University
 from app.models.course_id_alias import CourseIdAlias
 from app.schemas.course import CourseCreate, CourseListResponse, CourseRead, CourseUpdate, CourseLocationOffering
+from app.schemas.intake_fees import PublishedFeeSchedule
 from app.services.course_id_aliases import (
     CourseAliasChainError,
     exclude_aliased_courses,
@@ -231,6 +232,8 @@ async def list_courses(
             elif isinstance(v, _dt2):
                 d[k] = v.isoformat()
         out.append(d)
+    from app.services.published_intake_fees import attach
+    await attach(db, out)
     return JSONResponse(content={"data": out, "total": int(total), "page": page, "limit": limit})
 
 
@@ -254,6 +257,11 @@ async def get_course(course_id: int, db: Annotated[AsyncSession, Depends(get_db)
         result.requestedCourseId = course_id
     result.offerings = [CourseLocationOffering(**o) for o in (await read_offerings(db, [c.id]))[c.id]]
     result.locations = [o.location for o in result.offerings]
+    from app.services.published_intake_fees import schedules_by_course
+    tuition = (await schedules_by_course(db, [c.id])).get(c.id)
+    if tuition:
+        result.feeSchedules = [PublishedFeeSchedule.model_validate(s) for s in tuition["schedules"]]
+        result.feeScheduleReviewRequired = tuition["reviewRequired"]
     return result
 
 

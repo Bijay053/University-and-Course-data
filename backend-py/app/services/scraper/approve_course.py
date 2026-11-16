@@ -183,6 +183,7 @@ async def approve_scraped_course(
     db: AsyncSession, sc: ScrapedCourse, *, actor: str = "system", commit: bool = True,
     offering_cohort: list[ScrapedCourse] | None = None,
     qualification_proof_context=None,
+    allow_intake_schedules: bool = False,
 ) -> dict:
     """Idempotent: if a course with the same (university_id, name CI) exists,
     the row is updated rather than duplicated.
@@ -237,13 +238,17 @@ async def approve_scraped_course(
         sc = (await db.execute(select(ScrapedCourse).where(
             ScrapedCourse.id == sc.id,
         ).with_for_update().execution_options(populate_existing=True))).scalar_one()
-        from app.services.assistant_intake_fees import publication_hold
-        schedule_hold = await publication_hold(db, sc)
-        if schedule_hold:
-            raise ApprovalValidationError(schedule_hold)
+        from app.services.published_intake_fees import approval_manifest
+        try:
+            intake_schedule = await approval_manifest(
+                db, sc, confirmed=allow_intake_schedules)
+        except ValueError as exc:
+            raise ApprovalValidationError(str(exc)) from exc
     elif (getattr(sc, "extraction_method", None) or {}).get("intake_fee_schedules"):
         from app.services.assistant_intake_fees import HOLD
         raise ApprovalValidationError(HOLD)
+    else:
+        intake_schedule = None
     # Every approval route reaches this service. A single reviewer-selected
     # fee on a joint source does not turn that source into a single award.
     if (getattr(sc, "course_website", None) or "").rstrip("/") == URL.rstrip("/") and not (
@@ -297,6 +302,8 @@ async def approve_scraped_course(
     ):
         raise ApprovalValidationError("Resolve the published fee options before approving this course")
     scope = fee_metadata.get(SCOPE)
+    if scope and intake_schedule:
+        raise ApprovalValidationError("Combined campus and intake fee schedules require a scoped review; neither may be flattened.")
     if scope:
         expected_locations = ", ".join(scope["locations"])
         expected_name = f"{scope['original_name']} — {expected_locations}"
@@ -433,6 +440,14 @@ async def approve_scraped_course(
 
     if existing:
         course = existing
+        # Serialize legacy resource edits with schedule-aware replacement.
+        await db.refresh(course, with_for_update=True)
+        if intake_schedule is None:
+            from app.services.published_intake_fees import protect_course
+            try:
+                await protect_course(db, course.id)
+            except ValueError as exc:
+                raise ApprovalValidationError(str(exc)) from exc
         if _uel_variant:
             course.name = sc.course_name
         course.last_edited_at = datetime.now(timezone.utc)
@@ -451,6 +466,17 @@ async def approve_scraped_course(
         )
         db.add(course)
         await db.flush()
+
+    previous_intake_tuition = None
+    if intake_schedule:
+        from app.services.published_intake_fees import schedules_by_course
+        previous_intake_tuition = (await schedules_by_course(db, [course.id])).get(course.id)
+        if previous_intake_tuition is None:
+            previous_intake_tuition = {"legacyFees": [
+                {"amount": f.international_fee, "feeYear": f.fee_year,
+                 "currency": f.currency, "basis": f.fee_term}
+                for f in (await db.execute(select(Fee).where(Fee.course_id == course.id))).scalars()
+            ]}
 
     # A course excluded by one scrape may legitimately return in a later run.
     # Promotion is authoritative for the current catalogue, so reactivate it.
@@ -562,12 +588,26 @@ async def approve_scraped_course(
                     course_id=course.id,
                     intake_month=str(m),
                     intake_day=sc.intake_days,
+                    intake_year=intake_schedule["entryYear"] if intake_schedule else None,
                 )
             )
 
     if scope or _uel_variant or sc.international_fee is not None:
         await db.execute(Fee.__table__.delete().where(Fee.course_id == course.id))
-    if scope:
+    if intake_schedule:
+        import json
+        from app.models.audit import CourseAuditLog
+        from app.services.published_intake_fees import persist
+        await persist(db, course.id, intake_schedule)
+        db.add(CourseAuditLog(
+            course_id=course.id, scraped_course_id=sc.id,
+            field_key="intake_fee_schedules", action="manual_approve_intake_fee_schedules",
+            old_value=json.dumps(previous_intake_tuition, sort_keys=True),
+            new_value=json.dumps(intake_schedule, sort_keys=True),
+            reason="Explicit reviewer approval retained every tuition year and its entry-year/month applicability.",
+            actor=actor,
+        ))
+    elif scope:
         from app.services.scraper.published_offerings import persist_offerings
         await persist_offerings(db, course, sc, scope, cohort=offering_cohort)
     elif sc.international_fee is not None:

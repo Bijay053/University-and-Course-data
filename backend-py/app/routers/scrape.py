@@ -5570,7 +5570,8 @@ async def staged_approve(
         approve_scraped_course as _promote,
     )
     try:
-        result = await _promote(db, sc, actor=user.get("email", "admin"))
+        result = await _promote(db, sc, actor=user.get("email", "admin"),
+                                allow_intake_schedules=True)
         return {
             "ok": True,
             "id": sc_id,

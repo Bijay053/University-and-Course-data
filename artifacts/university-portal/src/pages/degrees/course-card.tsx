@@ -7,7 +7,7 @@ type Props = {
 };
 
 export function CourseCard({ course, view, selected, shortlisted, onSelect, onToggleShortlist, index }: Props) {
-  const hasFee = feeLines(course).some((fee) => fee.amount != null);
+  const hasFee = course.fee_schedule_review_required || feeLines(course).some((fee) => fee.amount != null);
   // Keep an 8px gap beside the corner control, including the larger phone
   // button. In wide list cards with fees, that control is in the fee column.
   const controlClearance = view === "list" && hasFee ? "pr-11 sm:pr-0" : "pr-11 sm:pr-9";

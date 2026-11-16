@@ -61,9 +61,10 @@ async def test_individual_publication_failure_http_response_is_private(
         rollback=AsyncMock(),
     )
 
-    async def publish(db_arg, row, *, actor):
+    async def publish(db_arg, row, *, actor, allow_intake_schedules):
         assert db_arg is db
         assert actor == "reviewer"
+        assert allow_intake_schedules is True
         if row.id == 41:
             raise error
         # The failed transaction must be cleared before the later row runs.

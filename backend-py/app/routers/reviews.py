@@ -81,7 +81,8 @@ async def approve_scraped_course(
     try:
         sc = await db.get(ScrapedCourse, sc_id)
         if sc:
-            result = await _approve(db, sc, actor=user.get("email", "admin"))
+            result = await _approve(db, sc, actor=user.get("email", "admin"),
+                                    allow_intake_schedules=True)
     except ApprovalValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001 — do not expose service/database failures
@@ -204,7 +205,7 @@ async def bulk_approve_scraped_courses(
     for sc_id in row_ids:
         try:
             sc = await db.get(ScrapedCourse, sc_id)
-            result = await _approve(db, sc, actor=actor)
+            result = await _approve(db, sc, actor=actor, allow_intake_schedules=True)
             approved.append({"scraped_course_id": sc_id, "course_id": result.get("course_id")})
         except Exception as exc:  # noqa: BLE001
             await db.rollback()

@@ -359,6 +359,21 @@ export const ListCoursesQueryParams = zod.object({
 export const ListCoursesResponse = zod.object({
   data: zod.array(
     zod.object({
+      feeSchedules: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            feeYear: zod.number(),
+            entryYear: zod.number(),
+            amount: zod.number(),
+            currency: zod.string(),
+            basis: zod.string(),
+            intakes: zod.array(zod.string()),
+            sourceUrls: zod.array(zod.string()),
+          }),
+        )
+        .optional(),
+      feeScheduleReviewRequired: zod.boolean().optional(),
       courseLocation: zod.string().nullish(),
       scholarshipAmount: zod.number().nullish(),
       scholarshipPercentage: zod.number().nullish(),
@@ -502,6 +517,22 @@ export const GetCourseResponse = zod.object({
   ),
   fees: zod.array(
     zod.object({
+      intakeApplicability: zod
+        .union([
+          zod.object({
+            id: zod.number(),
+            feeYear: zod.number(),
+            entryYear: zod.number(),
+            amount: zod.number(),
+            currency: zod.string(),
+            basis: zod.string(),
+            intakes: zod.array(zod.string()),
+            sourceUrls: zod.array(zod.string()),
+          }),
+          zod.null(),
+        ])
+        .optional(),
+      intakeApplicabilityInvalid: zod.boolean().optional(),
       id: zod.number(),
       courseId: zod.number(),
       internationalFee: zod.number().nullish(),
@@ -580,6 +611,21 @@ export const UpdateCourseBody = zod.object({
 });
 
 export const UpdateCourseResponse = zod.object({
+  feeSchedules: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        feeYear: zod.number(),
+        entryYear: zod.number(),
+        amount: zod.number(),
+        currency: zod.string(),
+        basis: zod.string(),
+        intakes: zod.array(zod.string()),
+        sourceUrls: zod.array(zod.string()),
+      }),
+    )
+    .optional(),
+  feeScheduleReviewRequired: zod.boolean().optional(),
   courseLocation: zod.string().nullish(),
   scholarshipAmount: zod.number().nullish(),
   scholarshipPercentage: zod.number().nullish(),
@@ -734,6 +780,22 @@ export const ListCourseFeesParams = zod.object({
 });
 
 export const ListCourseFeesResponseItem = zod.object({
+  intakeApplicability: zod
+    .union([
+      zod.object({
+        id: zod.number(),
+        feeYear: zod.number(),
+        entryYear: zod.number(),
+        amount: zod.number(),
+        currency: zod.string(),
+        basis: zod.string(),
+        intakes: zod.array(zod.string()),
+        sourceUrls: zod.array(zod.string()),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  intakeApplicabilityInvalid: zod.boolean().optional(),
   id: zod.number(),
   courseId: zod.number(),
   internationalFee: zod.number().nullish(),
@@ -773,6 +835,22 @@ export const UpdateFeeBody = zod.object({
 });
 
 export const UpdateFeeResponse = zod.object({
+  intakeApplicability: zod
+    .union([
+      zod.object({
+        id: zod.number(),
+        feeYear: zod.number(),
+        entryYear: zod.number(),
+        amount: zod.number(),
+        currency: zod.string(),
+        basis: zod.string(),
+        intakes: zod.array(zod.string()),
+        sourceUrls: zod.array(zod.string()),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  intakeApplicabilityInvalid: zod.boolean().optional(),
   id: zod.number(),
   courseId: zod.number(),
   internationalFee: zod.number().nullish(),
