@@ -301,6 +301,13 @@ async def investigate(thread_id: str, turn_id: str):
             # the same preview/acknowledgement contract, including legacy users.
             from app.services.live_scrape_diagnostics import handle as live_diagnostics
             from app.services import scrape_assistant as service
+            from app.services.assistant_intake_consolidation import requested as consolidation_requested, handle as consolidate_intakes
+            if consolidation_requested(requested["content"], claimed_thread.messages):
+                ctx = await context(claimed_thread.job_id)
+                if await consolidate_intakes(service, thread_id, turn_id, run_id, ctx,
+                                             requested["content"], claimed_thread.messages):
+                    await run_automatic_action(thread_id, turn_id)
+                    return
             if requested.get("_documentToken"):
                 from app.services.assistant_image_review import image_read_requested, action_requested, review as review_image
                 if image_read_requested(requested, claimed_thread.actor_id, claimed_thread.job_id,

@@ -7,6 +7,7 @@
 - [Study-mode source trust](study-mode-source-trust.md) — selected generated evidence can still be prose; validate writes without guessing delivery or silently repairing old records.
 - [Background worker resources](background-worker-resources-index.md) — loop cleanup, client ownership, pre-claim isolation, and safe task testing after module reloads.
 - [Catalogue recovery evidence](catalogue-recovery-evidence.md) — reported counts are investigation inputs; sitemap counts alone do not prove discovery coverage.
+- [Repair lifecycle transactions](repair-lifecycle-transactions.md) — status reconciliation must not roll back or expire the locked chat conversation.
 - [UC Canberra SPA + hidden-input fees](uc-canberra-fix.md) — SPA listings need sitemap discovery; match hidden international fees to the selected current year.
 - [MQ coursehandbook resolver](mq-coursehandbook-resolver.md) — Sitemap needs patchright (CF-guarded); resolver needs httpx (127→223/383); BFS seeds return 0 in dev (expected).
 - [MQ Funnelback authority + CF bypass](mq-search-page-tier.md) — rendered Funnelback discovery must retain page-data fees; bare links fall into domestic HTML, so incomplete enrichment fails closed.
@@ -97,6 +98,7 @@
 - [Category-page warning parity](category-page-warning-parity.md) — URL-shape warnings must respect degree-qualifier overrides and be discarded when their candidate count differs from the live job.
 - [Skip reason counter conservation](skip-reason-counter-conservation.md) — every completed skipped-course increment must flow through one helper that also increments exactly one stable reason bucket.
 - [Testing and verification lessons](verification-testing-index.md) — isolation, teardown proof, frontend timing, resource ownership and persisted evidence.
+- [Live parser acceptance](live-parser-acceptance.md) — retained HTML does not prove production retrieval; require actual stored changes and current approval-state checks.
 - [QUT static extraction and delivery gates](qut-static-extraction.md) — prefer the usable static payload; browser rescue is blocked, and bare “online” text is not delivery authority.
 - [Central profiles in staged re-extraction](central-profiles-staged-reextract.md) — Review → Fix must prefetch central pages; semantic parser changes must bump the English cache schema.
 - [UQ start-semester intake authority](uq-start-semester-intake.md) — UQ intake comes only from the selected program’s Drupal start_semester fact; page-wide date scanning is unsafe.
@@ -110,6 +112,7 @@
 - [APU course delivery identity](apu-course-delivery-identity.md) — APU’s page-wide catalogue contaminates mode keywords; classify delivery from the current course title/H1/URL only.
 - [Required-fee resume checkpoints](required-fee-resume-checkpoints.md) — exact central-fee recipes must reprocess unproven pending checkpoints and retire only matched rows after clean completion.
 - [Duration value-unit atomicity](duration-value-unit-atomicity.md) — preserve deterministic duration value/unit pairs; restore the unit only while the numeric value still matches.
+- [Intake course identity](intake-course-identity.md) — intake months alone are not different awards; consolidate existing records without discarding fee-year or offering differences.
 - [Generated config release collisions](generated-config-release-collisions.md) — reconcile verified stubs below tracked recipes; unknown files must keep blocking release.
 - [Algolia provider trust boundaries](algolia-provider-trust-boundaries.md) — enforce record type and URL before emitting trusted links; preserve authoritative payloads through retries.
 - [Python local-import shadowing](python-local-import-shadowing.md) — late local imports shadow earlier uses; swallowed errors can misreport lock contention.
@@ -142,6 +145,7 @@
 - [HSU recovery source authority](hsu-recovery-source-authority.md) — null extraction is not proof of unpublished tuition; inspect inline/nested fees and preserve unknown campus facts for review.
 - [Git lazy-fetch backports](git-lazy-fetch-backports.md) — older distribution builds can honor lazy-fetch suppression; test transport denial independently of version numbers.
 - [Git stat-cache evidence](git-stat-cache-evidence.md) — byte-identical atomic restores can confuse metadata-only diff modes; require content comparison before declaring source dirty.
+- [Git export isolation](git-export-isolation.md) — failed private release exports must never be recovered by altering Replit's checkpoint index or lock.
 - [Database CA loading](database-ca-loading.md) — explicitly load configured CA bundles; OpenSSL default paths may silently ignore a missing file.
 - [Legacy repair scope](legacy-repair-scope.md) — hardening connections must not turn a targeted repair into a full upgrade or bypass local-only restrictions.
 - [SSM report completeness](ssm-report-completeness.md) — command stdout can truncate large production inventories; compress or page results before making bulk-edit decisions.

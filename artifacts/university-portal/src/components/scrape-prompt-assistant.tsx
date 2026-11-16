@@ -14,6 +14,7 @@ import { safeSourceUrl } from "./assistant-safe-url";
 import { AssistantMarkdown, CodeBlock } from "./assistant-markdown";
 import { CatalogueComparisonView, type CatalogueComparison } from "./assistant-catalogue-comparison";
 import { AssistantRepairPreview, type RepairCourseScope, type RepairPreview } from "./assistant-repair-preview";
+import { AssistantIntakeConsolidation, type IntakeConsolidation } from "./assistant-intake-consolidation";
 import { startVisiblePolling } from "@/lib/visible-polling";
 
 export { safeSourceUrl };
@@ -21,7 +22,7 @@ export { safeSourceUrl };
 export type AssistantSource = { url: string; title: string; excerpt: string; page?: number; quoteId?: string };
 export type AssistantAction = {
   id: string;
-  kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed" | "document_update";
+  kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed" | "document_update" | "merge_intakes" | "undo_intake_merge";
   requiresConfirmation?: boolean;
   label: string;
   courseCount: number;
@@ -40,6 +41,7 @@ export type AssistantAction = {
   courses?: { url: string; title: string }[];
   courseScope?: RepairCourseScope[];
   repairPreview?: RepairPreview[];
+  intakeConsolidation?: IntakeConsolidation;
 };
 export const RECOVER_MAX = 20;
 export type AssistantActivity = {
@@ -96,7 +98,7 @@ export const MAX_DOCUMENT_BYTES = 2_000_000;
 export function actionNeedsConfirmation(a: AssistantAction): boolean {
   return !!a.requiresConfirmation
     || (a.kind === "fix_fields" && a.requiresConfirmation !== false)
-    || ["runtime_tuning", "staff_edit", "staff_location", "undo_staff_location", "document_update"].includes(a.kind);
+    || ["runtime_tuning", "staff_edit", "staff_location", "undo_staff_location", "document_update", "undo_intake_merge"].includes(a.kind);
 }
 export function validateDocument(file: File): string | null {
   const isPdf = file.type === "application/pdf" && /\.pdf$/i.test(file.name);
@@ -539,13 +541,16 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     <div className="mt-3 space-y-2">
       {m.actions.map(a => (
         <div key={a.id} className="rounded-xl border border-amber-200 bg-amber-50/80 p-3" data-testid={`assistant-action-${a.id}`}>
+          {a.intakeConsolidation && <AssistantIntakeConsolidation preview={a.intakeConsolidation} />}
           <div className="flex items-center gap-2 text-[13px]">
             <Wrench className="h-3.5 w-3.5 text-amber-700" aria-hidden />
             <span className="flex-1 font-medium text-amber-950">{a.label}</span>
             <span className="rounded-full bg-amber-100 px-2 py-0.5 font-mono text-[10.5px] text-amber-900" data-testid={`status-action-${a.id}`}>{a.state === "needs_review" ? "Needs review" : a.state}</span>
           </div>
           <p className="mt-1 text-[12px] text-amber-900">
-            {a.courseCount} course{a.courseCount === 1 ? "" : "s"}{a.fields.length ? ` · ${a.fields.map(fieldLabel).join(", ")}` : ""}
+            {a.courseCount} {a.kind === "merge_intakes" || a.kind === "undo_intake_merge"
+              ? `intake record${a.courseCount === 1 ? "" : "s"}`
+              : `course${a.courseCount === 1 ? "" : "s"}`}{a.fields.length ? ` · ${a.fields.map(fieldLabel).join(", ")}` : ""}
           </p>
           {a.courseScope && <AssistantRepairPreview scope={a.courseScope}
             previews={a.repairPreview} testId={`repair-preview-${a.id}`}
@@ -883,6 +888,10 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                     ? "This restores the prior audited locations and provenance. It refuses to overwrite later edits. No page fetch or discovery runs."
                     : confirming?.kind === "staff_location" || confirming?.kind === "staff_edit"
                     ? "This saves the supplied values on the exact records listed in the chat, with staff-provided provenance and an audit log. It does not independently verify them, fetch pages or run catalogue discovery."
+                    : confirming?.kind === "merge_intakes"
+                    ? "This consolidates the listed intake-specific pending records into one course, removes the date suffix from its name, combines its existing intakes and softly excludes the duplicate rows. Conflicting values block the operation. Original source evidence is retained and an audited undo is provided. No discovery or fee re-extraction runs."
+                    : confirming?.kind === "undo_intake_merge"
+                    ? "This restores the exact records from the audited intake consolidation. It refuses to overwrite later edits. Nothing is fetched, approved or published."
                     : confirming?.kind === "repair_catalogue"
                     ? "This starts a bounded scraper repair for this job's catalogue."
                     : confirming?.kind === "recover_catalogue"
@@ -897,6 +906,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                       ? "This retries only the selected, settled failures. Attempt limits and backoff are listed in the chat. Successful URLs are not replayed."
                     : "This re-extracts the listed fields for staged review courses."}
                   {confirming?.kind === "runtime_tuning" ? ""
+                    : confirming?.kind === "merge_intakes" || confirming?.kind === "undo_intake_merge" ? ` It affects ${confirming.courseCount} existing intake records, not different awards.`
                     : confirming?.kind === "staff_location" || confirming?.kind === "undo_staff_location" || confirming?.kind === "staff_edit" || confirming?.kind === "document_update" ? ` It changes ${confirming.courseCount} listed records, including ${confirming.publishedCount ?? 0} published records.`
                     : confirming?.kind === "scan_catalogue" ? " Results land in review data only."
                     : confirming?.kind === "recover_catalogue" ? ` It checks ${selectedUrls.length} selected link${selectedUrls.length === 1 ? "" : "s"}; results land in review data only.`
@@ -929,6 +939,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                   </fieldset>
                 )}
                 {!!confirming?.fields.length && <p>Fields: {confirming.fields.map(fieldLabel).join(", ")}</p>}
+                {confirming?.intakeConsolidation && <AssistantIntakeConsolidation preview={confirming.intakeConsolidation} />}
                 {confirming?.courseScope && <AssistantRepairPreview scope={confirming.courseScope}
                   previews={confirming.repairPreview} testId="confirmation-repair-preview" />}
                 <p>It does not approve or publish any course. Results are not guaranteed to be accurate; review every changed value and its source afterwards.</p>

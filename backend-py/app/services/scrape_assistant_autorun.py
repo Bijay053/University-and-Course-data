@@ -12,7 +12,8 @@ def choose_action(actions):
     proposed = [a for a in actions if a.get("state") == "proposed"
                 and not a.get("requiresConfirmation")
                 and a.get("courseCount", 0) <= 10 and a.get("kind") in {
-        "scan_catalogue", "recover_catalogue", "review_courses", "fix_fields", "repair_catalogue"}]
+        "scan_catalogue", "recover_catalogue", "review_courses", "fix_fields", "repair_catalogue",
+        "merge_intakes"}]
     # A full discovery covers bounded recovery candidates too; never launch both.
     return next((a for a in proposed if a["kind"] == "scan_catalogue"), next(iter(proposed), None))
 
