@@ -1,4 +1,5 @@
 import { safeSourceUrl } from "./assistant-safe-url";
+import { IntakeFeeSchedules, type IntakeFeeSchedule } from "./intake-fee-schedules";
 
 export type IntakeConsolidation = {
   courseName: string;
@@ -7,6 +8,7 @@ export type IntakeConsolidation = {
   keepId: number;
   excludeIds: number[];
   intakes: string[];
+  feeSchedules?: IntakeFeeSchedule[];
   conflicts: Record<string, { id: number; value: unknown; expectedIntake?: string }[]>;
   rows: { id: number; name: string; url: string; intakes: string[] | null;
     fee: number | null; currency: string | null; feeYear: number | null }[];
@@ -38,6 +40,7 @@ export function AssistantIntakeConsolidation({ preview }: { preview: IntakeConso
           })}</tbody>
         </table>
       </div>
+      {preview.feeSchedules && <IntakeFeeSchedules schedules={preview.feeSchedules} />}
       {conflicts.length > 0 && <div role="status" className="mt-2 rounded bg-amber-50 p-2 text-amber-950">
         <p className="font-semibold">Merge blocked — conflicting values need review</p>
         <ul className="list-disc pl-4">{conflicts.map(([field, values]) =>

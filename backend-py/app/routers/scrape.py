@@ -347,6 +347,10 @@ def _staged_row_to_dict(r) -> dict:
     # Agent Recovery — populated by _attach_recovery_counts_bulk
     d["recoveryCount"] = 0
     d["recovery_count"] = 0
+    from app.services.assistant_intake_fees import projection
+    schedules = projection(d)
+    if schedules is not None:
+        d["intakeFeeSchedules"] = schedules
     return d
 
 

@@ -231,6 +231,19 @@ async def approve_scraped_course(
         text("SELECT pg_advisory_xact_lock(hashtext(:scope))"),
         {"scope": review_restore_lock_scope(sc.university_id)},
     )
+    # Match consolidation/undo's provider-then-row lock order and refresh after
+    # waiting. Otherwise approval could publish stale, pre-merge scalar fees.
+    if isinstance(sc, ScrapedCourse):
+        sc = (await db.execute(select(ScrapedCourse).where(
+            ScrapedCourse.id == sc.id,
+        ).with_for_update().execution_options(populate_existing=True))).scalar_one()
+        from app.services.assistant_intake_fees import publication_hold
+        schedule_hold = await publication_hold(db, sc)
+        if schedule_hold:
+            raise ApprovalValidationError(schedule_hold)
+    elif (getattr(sc, "extraction_method", None) or {}).get("intake_fee_schedules"):
+        from app.services.assistant_intake_fees import HOLD
+        raise ApprovalValidationError(HOLD)
     # Every approval route reaches this service. A single reviewer-selected
     # fee on a joint source does not turn that source into a single award.
     if (getattr(sc, "course_website", None) or "").rstrip("/") == URL.rstrip("/") and not (

@@ -7,7 +7,7 @@ import re
 import uuid
 from urllib.parse import urlsplit, urlunsplit
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.models import ScrapedCourse
 from app.models.audit import CourseAuditLog
@@ -116,11 +116,21 @@ def make_plan(rows, home):
             })
     keep = min(rows, key=lambda r: r.id)
     months = [m for m in MONTHS if m in combined_months or any(f[3] == m for f in families)]
+    schedules = None
+    if "fee_year" in conflicts:
+        from app.services.assistant_intake_fees import build
+        try:
+            schedules = build(rows, families, MONTHS)
+        except (ValueError, TypeError, OverflowError):
+            pass
+        else:
+            del conflicts["fee_year"]
     return {
         "courseName": name, "canonicalUrl": url, "entryYear": year,
         "intakes": months, "keepId": keep.id,
         "excludeIds": sorted(r.id for r in rows if r.id != keep.id),
         "conflicts": conflicts, "_values": values,
+        **({"feeSchedules": schedules["schedules"], "_feeSchedules": schedules} if schedules else {}),
         "rows": [{"id": r.id, "name": r.course_name, "url": r.course_website,
                   "intakes": r.intake_months, "fee": r.international_fee,
                   "currency": r.currency, "feeYear": r.fee_year} for r in rows],
@@ -216,7 +226,7 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
             "label": "Consolidate intake variants into one pending course",
             "courseCount": len(group), "fields": ["course_name", "intake_months"],
             "state": "needs_review" if conflicts else "proposed",
-            "requiresConfirmation": readonly or len(group) > 10,
+            "requiresConfirmation": readonly or len(group) > 10 or bool(plan.get("_feeSchedules")),
             "intakeConsolidation": public, "_ids": [r.id for r in group],
             "_versions": {str(r.id): version(service, r, "pending") for r in group},
             "_jobId": job_id, "_home": ctx["home"], "_turnId": turn_id,
@@ -233,6 +243,10 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
                 "the other rows, retaining their original evidence and an undo action. "
                 + (action["error"] if conflicts else
                    "No course will be published. No catalogue discovery or fee extraction is needed.")
+                + (" Both tuition-year schedules and their intake applicability will be retained. "
+                   "They are existing-record snapshots, not newly verified official evidence. "
+                   "Publication remains held to prevent a single-year fee overwrite."
+                   if plan.get("_feeSchedules") else "")
             ),
             "actions": [action], "sources": [], "intakeConsolidation": public,
         }, detail="Intake consolidation preview prepared for existing records.")
@@ -242,6 +256,9 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
 async def apply(service, db, action, university_id, actor_id, *, undo=False):
     from app.models.user import User
     permissions(await db.get(User, actor_id))
+    from app.services.scraper.replay_extraction import review_restore_lock_scope
+    await db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:scope))"),
+                     {"scope": review_restore_lock_scope(university_id)})
     async with db.begin_nested():
         ids = action["_ids"]
         rows = list((await db.execute(select(ScrapedCourse).where(
@@ -307,6 +324,9 @@ async def apply(service, db, action, university_id, actor_id, *, undo=False):
             "row_ids": ids, "source_urls": [r["url"] for r in plan["rows"]],
             "entry_year": plan["entryYear"], "authority": "existing-records",
         }}
+        if plan.get("_feeSchedules"):
+            from app.services.assistant_intake_fees import KEY
+            keep.extraction_method = {**keep.extraction_method, KEY: deepcopy(plan["_feeSchedules"])}
         # Existing source rows and evidence remain intact. The combined intake
         # evidence is explicitly derived, never passed off as newly verified HTML.
         proof = ScrapedFieldEvidence(
@@ -318,9 +338,24 @@ async def apply(service, db, action, university_id, actor_id, *, undo=False):
             selected=True, validation_status="unverified",
         )
         db.add(proof)
+        proofs = [proof]
+        if plan.get("_feeSchedules"):
+            schedule_proof = ScrapedFieldEvidence(
+                scraped_course_id=keep.id, field_key="intake_fee_schedules",
+                candidate_value=json.dumps(plan["_feeSchedules"], sort_keys=True),
+                normalized_value=json.dumps(plan["_feeSchedules"], sort_keys=True),
+                source_url=plan["canonicalUrl"],
+                extraction_method="fees:consolidated_intake_schedules:" + action["id"],
+                snippet="Retained separate tuition years and intake applicability from existing pending records.",
+                selected=True, validation_status="unverified",
+            )
+            db.add(schedule_proof)
+            proofs.append(schedule_proof)
         warnings = []
         for row in rows:
             warnings.extend(w for w in (row.scrape_warnings or []) if w not in warnings)
+        if plan.get("_feeSchedules"):
+            warnings.append("intake_fee_schedules_publication_hold")
         keep.scrape_warnings = warnings
         for row in rows:
             if row.id != keep.id:
@@ -339,9 +374,11 @@ async def apply(service, db, action, university_id, actor_id, *, undo=False):
             "id": r.id, "before": snapshots[r.id], "version": version(service, r, "pending"),
             "revision": await revision(db, ScrapedCourse, r.id),
         } for r in rows]
-        action["_evidenceIds"] = [proof.id]
-        action["_evidenceVersions"] = {str(proof.id): version(service, proof, "evidence")}
-        action["_evidenceRevisions"] = {str(proof.id): await revision(db, ScrapedFieldEvidence, proof.id)}
+        action["_evidenceIds"] = [p.id for p in proofs]
+        action["_evidenceVersions"] = {str(p.id): version(service, p, "evidence") for p in proofs}
+        action["_evidenceRevisions"] = {
+            str(p.id): await revision(db, ScrapedFieldEvidence, p.id) for p in proofs
+        }
         action.update(state="completed", jobId=action["_jobId"],
                       resultSummary=f"Consolidated {len(rows)} pending rows into {keep.course_name}: "
                                     + ", ".join(keep.intake_months) + ". Nothing published.")

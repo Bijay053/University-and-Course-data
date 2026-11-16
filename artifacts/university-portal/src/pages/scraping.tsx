@@ -4,6 +4,7 @@ import { shouldLoadForBackgroundJob } from "@/utils/scraping-poll-guard";
 import { mergeReextractFieldResults } from "@/utils/reextract-field-aggregation";
 import { fixFieldChanges } from "@/utils/fix-field-changes";
 import { FixFieldCounts } from "@/components/fix-field-counts";
+import { IntakeFeeSchedules, type IntakeFeeScheduleSnapshot } from "@/components/intake-fee-schedules";
 import { groupLegacyCampusRows, legacyCampusGroupName, legacyCampusReviewFees } from "@/utils/legacy-campus-groups";
 import { useListUniversities } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -168,6 +169,7 @@ function resultFromCompletedStatus(data: ScrapeStatusResponse): ScrapeLog {
 }
 
 type StagedCourse = FeeVariantCarrier & {
+  intakeFeeSchedules?: IntakeFeeScheduleSnapshot;
   lastQualificationApproval?: {
     rowId: number; jobId: string; universityId: number; reasonCode: string; attemptedAt: string;
   } | null;
@@ -310,7 +312,7 @@ function pruneExpiredCourseDrafts(): void {
 
 const SAVED_FEE_FIELDS = [
   "internationalFee", "currency", "feeTerm", "feeYear", "feeSelection",
-  "feeVariants", "fee_variants", "extractionMethod", "extraction_method",
+  "feeVariants", "fee_variants", "intakeFeeSchedules", "extractionMethod", "extraction_method",
 ] as const satisfies readonly (keyof StagedCourse)[];
 type RequirementState = "numeric" | "qualification_based" | "missing" | "unverified";
 type EnglishRequirementState = "verified" | "missing" | "not_required" | "unknown";
@@ -4602,7 +4604,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                             : <span className="text-gray-300" title="Duration not verified — source may be unavailable or extraction may have failed">Not verified</span>}
                         </td>
                         <td className="p-2 text-right font-medium whitespace-nowrap">
-                          {members.length > 1 ? (
+                          {course.intakeFeeSchedules ? (
+                            <IntakeFeeSchedules schedules={course.intakeFeeSchedules.schedules}
+                              snapshotMatchesCurrent={course.intakeFeeSchedules.snapshotMatchesCurrent} />
+                          ) : members.length > 1 ? (
                             <div className="space-y-1 text-left text-xs" data-testid={`text-campus-fees-${course.id}`}>
                               {selectedFeeLines.map((fee, index) => (
                                 <div key={`${fee.location}-${fee.year}-${index}`} className="text-green-700">
