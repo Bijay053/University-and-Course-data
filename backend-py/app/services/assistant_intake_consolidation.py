@@ -19,6 +19,12 @@ from app.services.scrape_assistant_tools import official_url
 
 MONTHS = "January February March April May June July August September October November December".split()
 MONTH = "|".join(MONTHS)
+MONTH_REFERENCE = re.compile(
+    r"\b(?:" + "|".join(
+        month if len(month) == 3 else month[:3] + "(?:" + month[3:] + ")?"
+        for month in MONTHS
+    ) + r"|Sept)\b", re.I,
+)
 DATED_NAME = re.compile(rf"^(.*?)\s*\(\s*({MONTH})\s+(20\d{{2}})\s*\)\s*$", re.I)
 DATED_PATH = re.compile(rf"^(.*)/({MONTH})-(20\d{{2}})/?$", re.I)
 IDENTITY = {
@@ -66,6 +72,20 @@ def requested(prompt, messages=()):
     if (re.search(r"\b(?:add|set|change)\b.*\bintakes?\b", prompt, re.I)
             and not re.search(r"\b(?:merge|consolidate|combine|course\s+name)\b", prompt, re.I)):
         return False
+    # Staff describe date-suffixed names as "jan sep in course name", without
+    # necessarily using the word intake. Route only explicit name cleanup to
+    # the existing fenced preview, never to generated prose or discovery.
+    if (
+        len({match[0][:3].casefold() for match in MONTH_REFERENCE.finditer(instruction)}) > 1
+        and re.search(r"\bcourses?\s+names?\b|\bnames?\s+of\s+(?:the\s+)?courses?\b", instruction, re.I)
+        and re.search(r"\b(?:fix|repair|remove|clean|rename|merge|consolidate|combine)\b", instruction, re.I)
+        and not re.search(
+            r"\b(?:only|just)\s+(?:(?:fix|repair|check|update)\s+)?"
+            r"(?:ielts|english|fees?|tuition|duration|location|campus|academic)\b",
+            instruction, re.I,
+        )
+    ):
+        return True
     if any(len(months) > 1 for months in examples.values()):
         # Dated examples are stronger than a stale field from the conversation.
         # This only routes to a database preview; it is not merge permission.
@@ -102,13 +122,14 @@ def all_families_requested(prompt, *, named=False):
     # examples only when staff explicitly says all courses or calls them samples.
     if named and not re.search(
         r"\b(?:samples?|examples?)\b"
-        r"|\b(?:all|every)\s+(?:(?:the|other|remaining|pending|these)\s+)*courses?\b",
+        r"|\b(?:all|every)\s+(?:(?:the|other|remaining|pending|these)\s+)*courses?\b"
+        r"|\bother\s+courses?\b[\s\S]*\ball\b",
         prompt, re.I,
     ):
         return False
     return bool(re.search(
         r"\b(?:all|every)\s+(?:(?:the|other|remaining|pending|these)\s+)*(?:courses?|rows?|intakes?|duplicates?|this)\b"
-        r"|\b(?:fix|repair|merge|consolidate|combine|review)\s+(?:them\s+)?all\b",
+        r"|\b(?:fix|repair|merge|consolidate|combine|review)\s+(?:(?:this|these|them)\s+)?all\b",
         prompt, re.I))
 
 

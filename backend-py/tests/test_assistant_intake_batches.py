@@ -28,7 +28,8 @@ def test_dated_examples_override_stale_conversation_fields(name):
     assert not merge.requested(prompt + "\nSet intake February and July")
 
 
-async def prepare(store, monkeypatch, engine="legacy", *, conflict=False, readonly=False, family_count=4):
+async def prepare(store, monkeypatch, engine="legacy", *, conflict=False, readonly=False, family_count=4,
+                  prompt=PROMPT):
     ctx, _ = await setup(store, engine=engine)
     async with store() as db:
         original = await db.get(ScrapedCourse, 1)
@@ -52,7 +53,7 @@ async def prepare(store, monkeypatch, engine="legacy", *, conflict=False, readon
         thread.status, thread.run_id = "queued", None
         thread.messages = [
             {"role": "assistant", "content": "Check study mode across all courses", "actions": []},
-            {"role": "user", "content": ("Do not merge any records.\n" if readonly else "") + PROMPT,
+            {"role": "user", "content": ("Do not merge any records.\n" if readonly else "") + prompt,
              "_engine": engine, "autoRun": True, "turnId": "turn", "createdAt": service.now().isoformat()},
         ]
         await db.commit()
@@ -73,6 +74,51 @@ async def prepare(store, monkeypatch, engine="legacy", *, conflict=False, readon
 ])
 def test_all_intakes_of_named_course_never_expands_to_other_awards(prompt):
     assert not merge.all_families_requested(prompt, named=True)
+
+
+ACTUAL_MONTH_NAME_REQUEST = (
+    "there as other courses same like this with jan sep in course name fix this all\n\n"
+    "notes: only fixed this from Scrape assistant"
+)
+
+
+@pytest.mark.parametrize("prompt", [
+    ACTUAL_MONTH_NAME_REQUEST,
+    "Fix all courses with January and September in the course name",
+    "Remove Jan and Sept from names of courses; fix them all",
+])
+def test_month_abbreviations_route_name_cleanup_to_consolidation(prompt):
+    assert merge.requested(prompt)
+    assert merge.all_families_requested(prompt)
+
+
+@pytest.mark.parametrize("prompt", [
+    "Add January and September intakes to all courses",
+    "Why are January and September fees different?",
+    "Course name includes Jan Sep; only fix IELTS bands",
+    "Fix January in this course name",
+])
+def test_month_mentions_do_not_convert_other_field_requests_to_merges(prompt):
+    assert not merge.requested(prompt)
+
+
+def test_other_courses_fix_this_all_expands_but_named_intakes_do_not():
+    assert merge.all_families_requested(ACTUAL_MONTH_NAME_REQUEST, named=True)
+    assert not merge.all_families_requested(
+        "Fix this all intakes for Artificial Intelligence MSc", named=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("engine", ["legacy", "v2"])
+async def test_exact_production_month_name_request_prepares_all_without_fetching(store, monkeypatch, engine):
+    action = await prepare(store, monkeypatch, engine, prompt=ACTUAL_MONTH_NAME_REQUEST)
+    assert action["kind"] == "merge_intakes" and action["state"] == "proposed"
+    assert action["courseCount"] == 12 and action["requiresConfirmation"] is True
+    assert len(action["intakeConsolidations"]) == 4 and not action.get("jobId")
+    async with store() as db:
+        assert not (await db.execute(select(CourseAuditLog))).scalars().all()
+        statuses = (await db.execute(select(ScrapedCourse.status))).scalars().all()
+        assert len(statuses) == 13 and set(statuses) == {"pending"}
 
 
 @pytest.mark.asyncio
