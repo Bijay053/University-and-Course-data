@@ -5,6 +5,7 @@ from urllib.parse import urljoin, urlsplit
 from bs4 import BeautifulSoup
 from .base import ExtractionResult
 
+INTAKE_FACTS_VERSION = 2
 MONTHS = ("January February March April May June July August September October November December").split()
 DATE = re.compile(r"\b(" + "|".join(MONTHS) + r")\b", re.I)
 LABEL = re.compile(r"(?:course\s+)?(?:start\s+dates?|intakes?)\s*:?", re.I)
@@ -12,6 +13,10 @@ LABEL = re.compile(r"(?:course\s+)?(?:start\s+dates?|intakes?)\s*:?", re.I)
 
 def extract_selected_intake(html, url):
     soup = BeautifulSoup(html, "html.parser")
+    canonicals = {
+        urljoin(url, node["href"])
+        for node in soup.select('head link[rel~="canonical"][href]')
+    }
     candidates = []
     for select in soup.find_all("select"):
         if any(
@@ -45,8 +50,24 @@ def extract_selected_intake(html, url):
             def same_url(option):
                 candidate = urlsplit(urljoin(url, option.get("value", "")))
                 current = urlsplit(url)
-                return (candidate.scheme, candidate.netloc, candidate.path.rstrip("/"), candidate.query) == (
-                    current.scheme, current.netloc, current.path.rstrip("/"), current.query)
+                if (candidate.scheme, candidate.netloc, candidate.path.rstrip("/"), candidate.query) == (
+                    current.scheme, current.netloc, current.path.rstrip("/"), current.query):
+                    return True
+                # Some official pages keep a dated alias while their selected
+                # start option points at the undated canonical course page.
+                # Require both the page's canonical declaration and its selected
+                # month/year label; a URL suffix alone never supplies an intake.
+                alias = re.fullmatch(
+                    r"(.*)/(" + "|".join(MONTHS) + r")-(20\d{2})/?", current.path, re.I)
+                return bool(
+                    option.has_attr("selected") and alias and not current.query
+                    and candidate.scheme == current.scheme and candidate.netloc == current.netloc
+                    and candidate.path.rstrip("/") == alias[1].rstrip("/") and not candidate.query
+                    and len(canonicals) == 1 and candidate.geturl() in canonicals
+                    and re.fullmatch(
+                        re.escape(alias[2]) + r"\s+" + re.escape(alias[3]),
+                        option.get_text(" ", strip=True), re.I)
+                )
             selected = [o for o in options if o.has_attr("selected")]
             chosen = selected if selected else [o for o in options if same_url(o)]
             if len(chosen) != 1 or not same_url(chosen[0]):

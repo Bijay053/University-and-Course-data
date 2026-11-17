@@ -70,6 +70,11 @@ def requested(prompt, messages=()):
         # Dated examples are stronger than a stale field from the conversation.
         # This only routes to a database preview; it is not merge permission.
         return True
+    if examples and re.search(
+        r"\b(?:duplicates?|duplicated|repeated|same|(?:still\s+)?show(?:n|ing)?\s+(?:[2-9]|two|three))\b",
+        instruction, re.I,
+    ):
+        return True
     explicit = bool(re.search(
         r"\b(?:same\s+course|(?:merge|consolidate|combine)\b.*\b(?:intakes?|courses?|rows?|duplicates?)"
         r"|(?:intakes?\b.*\bcourse\s+name)|course\b.*\bmultiple\s+intakes?)", prompt, re.I))
@@ -183,23 +188,12 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
             if identity:
                 key = (identity[0].casefold(), identity[1], identity[2])
                 groups.setdefault(key, []).append(row)
-        text = prompt.casefold()
-        urls = set()
-        for raw in re.findall(r"https?://[^\s<>]+", prompt, re.I):
-            parts = urlsplit(raw.rstrip(".,);]"))
-            urls.add(urlunsplit((parts.scheme, parts.netloc, parts.path.rstrip("/"), parts.query, "")))
-        def named(key):
-            match = re.search(r"(?<!\w)" + re.escape(key[0]) + r"(?!\w)", text)
-            if not match:
-                return False
-            # A plain MSc is not its placement/foundation/online sibling.
-            return not re.match(r"\s+(?:with|conversion|online|part[- ]time)\b", text[match.end():])
-        selected = [group for key, group in groups.items() if len(group) > 1 and (
-            (key[1] in urls or bool(urls & {r.course_website.rstrip("/") for r in group}))
-            if urls else named(key)
-        )]
+        from app.services.assistant_intake_context import matches, followup
+        selected = matches(prompt, groups)
         if all_families_requested(prompt, named=bool(selected)):
             selected = [group for group in groups.values() if len(group) > 1]
+        elif not selected:
+            selected = followup(prompt, messages, groups)
         contextual = bool(re.fullmatch(
             r"\s*(?:yes|merge them|combine them|do it|[\d\s,]*(?:these |they )?(?:all )?are (?:the )?same course)[.!]?\s*",
             prompt, re.I,
@@ -257,6 +251,10 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
             )
         public = {k: v for k, v in plan.items() if not k.startswith("_")}
         conflicts = plan["conflicts"]
+        if conflicts and set(conflicts) == {"intake_months"} and not readonly:
+            from app.services.assistant_intake_context import repair_conflict
+            if await repair_conflict(service, thread_id, turn_id, run_id, ctx, plan, messages):
+                return True
         action = {
             "id": uuid.uuid4().hex, "kind": "merge_intakes",
             "label": "Consolidate intake variants into one pending course",

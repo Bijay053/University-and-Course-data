@@ -260,6 +260,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
                         "method": delivery.method,
                     })
         from app.services.scraper.extractors.intake import extract as extract_intake
+        from app.services.scraper.extractors.selected_intake import INTAKE_FACTS_VERSION
         for extractor in (extract_fee, extract_english, extract_intake):
             for result in (await extractor(html, url))[:8]:
                 # Some providers put the course-owned start selector before
@@ -330,7 +331,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
             "_eligibilityQuote": domestic_evidence(html, eligibility_name) if eligibility_name else None,
             "facts": facts, "excerpts": evidence_excerpts(text, facts), "verified": True,
             "_deliveryFactsVersion": 1,
-            "_intakeFactsVersion": 1,
+            "_intakeFactsVersion": INTAKE_FACTS_VERSION,
             "_englishTablesSchema": SCHEMA, "_englishTables": profiles(str(evidence_root)),
             "_courseCohorts": cohort_data,
             "englishLinks": english_links[:8], "feeLinks": fee_links[:8],

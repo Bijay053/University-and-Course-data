@@ -57,10 +57,11 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
                 "verified": False, "error": "This pending course has no official source URL."}))
             return
         async def read():
+            from app.services.scraper.extractors.selected_intake import INTAKE_FACTS_VERSION
             async with semaphore:
                 return await cached_source(
                     service, thread_id, turn_id, run_id, row["url"], ctx["home"],
-                    service.inspect_source, 12, html_intake_schema=1)
+                    service.inspect_source, 12, html_intake_schema=INTAKE_FACTS_VERSION)
         if row["url"] not in page_checks:
             page_checks[row["url"]] = asyncio.create_task(read())
         source = await page_checks[row["url"]]
