@@ -96,7 +96,7 @@ export function AssistantUniversityHistory({ jobId, onReviewJob }: {
           {error && <div role="alert" className="text-sm text-red-700">{error}
             <Button size="sm" variant="outline" disabled={busy} onClick={() => void load(retryOlder.current)}>Retry history</Button>
           </div>}
-          {page && (
+          {page && <>
             <div ref={scroll} className="max-h-96 space-y-3 overflow-y-auto rounded-lg border border-slate-200 p-3"
               style={{ overflowAnchor: "none" }} data-testid="university-history-scroll">
               {!page.messages.length && <p className="text-sm text-slate-500">No saved messages were found for your account at this university.</p>}
@@ -134,9 +134,9 @@ export function AssistantUniversityHistory({ jobId, onReviewJob }: {
                   ))}
                 </article>
               ))}
-              {!!page.messages.length && !page.nextCursor && <p className="text-xs text-slate-500">End of retained university history.</p>}
             </div>
-          )}
+            {!!page.messages.length && !page.nextCursor && <p className="text-xs text-slate-500">End of retained university history.</p>}
+          </>}
         </div>
       )}
     </section>

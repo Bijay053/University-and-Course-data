@@ -37,6 +37,10 @@ describe("university conversation history", () => {
     expect(screen.getAllByTestId("university-history-message")).toHaveLength(4);
     expect(String(fetcher.mock.calls[1][0])).toContain("cursor=cursor%2Bvalue%3D");
     expect(screen.getByText("End of retained university history.")).toBeTruthy();
+    // A newly appearing footer must not count as prepended message height.
+    expect(screen.getByTestId("university-history-scroll").contains(
+      screen.getByText("End of retained university history."),
+    )).toBe(false);
     expect(screen.queryByRole("button", { name: /Run now|Approve|Apply/ })).toBeNull();
     expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
     expect(fetcher.mock.calls[0][1]?.credentials).toBe("include");
