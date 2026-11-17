@@ -37,6 +37,16 @@ def failed_job_followup(prompt):
 
 
 def requested(prompt, messages=(), *, failed_job=False):
+    # A prohibition is not a request to repair the discovery pipeline. Keep
+    # source/field investigations on their own routes even when they say not
+    # to launch discovery, or describe a possible source-access failure.
+    prompt = re.sub(
+        r"\b(?:do not|don't|dont|never|without)\s+"
+        r"(?:re[- ]?run(?:ning)?|run(?:ning)?|start(?:ing)?|trigger(?:ing)?|launch(?:ing)?|perform(?:ing)?)\s+"
+        r"(?:(?:a|an|the|any|new|fresh|full|catalogue|catalog|course|university)\s+){0,5}"
+        r"(?:discovery|scrap(?:e|ing)|extraction(?:\s+pipeline)?)\b",
+        "", prompt, flags=re.I,
+    )
     # A field edit or document request must never become a discovery repair.
     if re.search(r"\b(?:pdf|document|upload)\b", prompt, re.I):
         return False

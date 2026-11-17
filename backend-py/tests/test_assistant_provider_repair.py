@@ -75,6 +75,56 @@ def test_documents_and_individual_field_requests_stay_on_their_routes(prompt):
     assert not requested(prompt)
 
 
+@pytest.mark.parametrize("prohibition", [
+    "do not run catalogue discovery", "don't start fresh discovery",
+    "never trigger course scraping", "without launching a new extraction pipeline",
+    "do not re-run full catalogue discovery",
+])
+def test_negated_discovery_does_not_hijack_official_field_investigation(prohibition):
+    prompt = (
+        "Read-only: check the intake at https://www.aston.ac.uk/study/courses/cyber-security-msc/september-2027. "
+        f"{prohibition}. If access fails, leave the existing record unchanged."
+    )
+    assert not requested(prompt, failed_job=True)
+    assert requested(f"Why is the scraper failing? {prohibition}.")
+    assert not wants_repair(prompt)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("engine", ["legacy", "v2"])
+async def test_readonly_official_source_request_reaches_research_in_both_engines(monkeypatch, engine):
+    from app.models.scrape_assistant import ScrapeAssistantThread
+    from app.services import scrape_assistant as service
+    from app.services.scrape_agent_v2 import access, runtime
+    prompt = (
+        "Read-only official-source investigation. Only investigate; do not change any records, "
+        "and do not run catalogue discovery. Check Cyber Security MSc row 59872: "
+        "https://www.aston.ac.uk/study/courses/cyber-security-msc/september-2027. "
+        "It currently stores January as the intake. Read the official page and return the "
+        "selected option's source-backed start date. If access fails, leave the row unchanged."
+    )
+    thread = SimpleNamespace(job_id="aston-job", actor_id=1,
+        messages=[{"role":"user","content":prompt,"_engine":engine}])
+    class DB:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+        async def get(self, model, identity):
+            assert model is ScrapeAssistantThread, "No provider diagnosis should be opened"
+            return thread
+    legacy, v2 = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(service, "AsyncSessionLocal", DB)
+    monkeypatch.setattr(service, "claim", AsyncMock(return_value=True))
+    monkeypatch.setattr(service, "_investigate", legacy)
+    monkeypatch.setattr(service, "run_automatic_action", AsyncMock())
+    monkeypatch.setattr(runtime, "investigate", v2)
+    monkeypatch.setattr(access, "enabled_for", lambda *args: True)
+    await service.investigate("thread", "turn")
+    assert legacy.await_count == int(engine == "legacy")
+    assert v2.await_count == int(engine == "v2")
+
+
 def test_short_followup_requires_same_thread_repair_context():
     assert requested("fix this", [{"role": "assistant", "providerRepair": report()}])
     assert not requested("fix this", [{"role": "assistant", "content": "Intakes checked"}])
