@@ -10,6 +10,7 @@ from app.models.audit import CourseAuditLog
 from app.services import scrape_assistant as service
 from app.services.scrape_assistant_tools import inspect_source, official_url
 from app.services.english_applicability import applicability, category, quote_page, score_binding, uploaded_course_evidence
+from app.services.english_html_tables import APPLICABILITY_VERSION as HTML_APPLICABILITY_VERSION
 
 BANDS = ("ielts_overall", "ielts_reading", "ielts_writing", "ielts_listening", "ielts_speaking")
 
@@ -230,8 +231,11 @@ async def review(thread_id, turn_id, run_id, thread, message):
                 and not any(named_clause(r, clause) for page in source.get("_pages", [])
                             for clause in page.get("text", "").splitlines())
             }
+            # A model cannot invent course-to-school proof or resolve
+            # conflicting structured profiles. Avoid paid, doomed retries.
             eligible = [(r, p) for r, p in zip(group, course_pages)
-                        if p.get("verified") and r.id not in deterministic_ids | protected_ids]
+                        if not source.get("_englishTables") and p.get("verified")
+                        and r.id not in deterministic_ids | protected_ids]
             if eligible:
                 client = client or _client()
                 if client is None:
@@ -337,30 +341,27 @@ async def review(thread_id, turn_id, run_id, thread, message):
         if client:
             await client.close()
     action = {"id": uuid.uuid4().hex, "kind": "document_update", "state": "proposed",
-              "_applicabilityVersion": 1,
+                    "_applicabilityVersion": HTML_APPLICABILITY_VERSION if source.get("sourceType", "html") == "html" else 1,
               "label": "Apply checked document requirements", "courseCount": len(targets),
               "fields": sorted({c["field"] for t in targets for c in t["changes"]}),
               "requiresConfirmation": True, "_targets": targets, "_turnId": turn_id,
               "_source": source.get("url"), "_objectKey": source.get("_objectKey"),
               "_sourceType": source.get("sourceType", "html"),
               "_provenance": source.get("provenance", "official-document")}
-    not_checked = sum(row["status"] == "not_checked" for row in results)
-    checked_count = len(rows) - not_checked
+    from app.services.document_review_summary import summarize, describe
+    counts = summarize(results)
+    not_checked = counts["notChecked"]
+    checked_count = counts["checked"]
     action["_reviewSummary"] = {
         "unchanged": sum(row["status"] == "unchanged" for row in results),
         "exceptions": sum(row["status"] in {"excluded", "conflict", "unverified"} for row in results),
         "notChecked": not_checked,
     }
     reply = {"role": "assistant", "turnId": turn_id, "createdAt": service.now().isoformat(),
-             "content": f"Selected {len(rows)} pending records for this provider. "
-                        f"{checked_count} had readable course evidence; {not_checked} could not be checked. "
-                        f"{len(targets)} have proposed IELTS changes; {len(rows)-len(targets)} remain unchanged. "
-                        "No course values have been changed. Review the evidence and confirm the proposed batch. "
-                        "Published records are not included in this pending-record batch.",
+             "content": describe(counts, len(rows)),
              "actions": [action] if targets else [], "sources": [],
              "matchingDiagnostics": diagnostics[:500],
-             "documentReview": {"checked": checked_count, "proposed": len(targets),
-                                "unmatched": checked_count-len(targets), "notChecked": not_checked, "rows": results}}
+             "documentReview": {**counts, "rows": results}}
     if not source.get("verified"):
         reply["sourceOutcome"] = "access_verification_failed"
         reply["content"] = "Document could not be read. No courses were source-verified or changed. " + source.get("error", "")
@@ -380,7 +381,8 @@ async def apply(db, thread, action, university_id, actor):
     from app.services.assistant_staff_edits import permissions
     if action.get("_turnId") != thread.turn_id:
         raise ValueError("Document preview belongs to an earlier request.")
-    if action.get("_applicabilityVersion") != 1:
+    expected_version = HTML_APPLICABILITY_VERSION if action.get("_sourceType") == "html" else 1
+    if action.get("_applicabilityVersion") != expected_version:
         raise ValueError("Run the document check again to verify each course's applicability.")
     permissions(await db.get(User, int(actor["id"])))
     targets = action["_targets"]

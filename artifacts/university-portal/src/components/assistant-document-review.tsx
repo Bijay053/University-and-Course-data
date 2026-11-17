@@ -1,7 +1,8 @@
 export type DocumentReviewChange = { field: string; oldValue?: unknown; newValue?: unknown; quote?: string; page?: number };
 export type DocumentReviewRow = { id: string | number; name: string; status: string; reason?: string; changes?: DocumentReviewChange[];
   currentValues?: Record<string, unknown>; proposedValues?: Record<string, unknown>; diagnosticCode?: string;
-  category?: string; applicability?: string; evidence?: { url?: string; quote: string; page?: number; provenance?: string }[] };
+  category?: string; applicability?: string; bandConstraint?: { text: string; kind?: string };
+  evidence?: { url?: string; quote: string; page?: number; provenance?: string }[] };
 export type DocumentReview = { checked: number; proposed: number; unmatched: number; notChecked?: number; rows: DocumentReviewRow[];
   accessError?: { message: string; url?: string; restrictionKind?: string; alternatives?: string[] } };
 
@@ -38,12 +39,16 @@ export function DocumentReviewView({ review, testId }: { review: DocumentReview;
   const matched = rows.filter(r => r.applicability === "verified").length;
   const unchanged = rows.filter(r => r.status === "unchanged").length;
   const manual = rows.filter(r => ["unmatched", "unverified", "conflict", "excluded", "not_checked"].includes(r.status)).length;
+  const completeRows = rows.length === (Number(review.checked) || 0) + notChecked;
+  const unresolved = completeRows
+    ? rows.filter(r => ["unmatched", "unverified", "conflict", "excluded"].includes(r.status)).length
+    : Number(review.unmatched) || 0;
   return (
     <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3" data-testid={testId}>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[12px]">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Document review</p>
         <span className="font-mono tabular-nums text-slate-700" data-testid={`${testId}-counts`}>
-          {Number(review.checked) || 0} checked · {Number(review.proposed) || 0} proposed · {Number(review.unmatched) || 0} unmatched
+          {Number(review.checked) || 0} checked · {Number(review.proposed) || 0} proposed · {unresolved} unresolved
           {!!notChecked && <> · {notChecked} not checked</>}
         </span>
       </div>
@@ -56,7 +61,8 @@ export function DocumentReviewView({ review, testId }: { review: DocumentReview;
         </div>
       ) : <p className="mt-1 text-[12px] text-slate-600">
         {matched} matched · {unchanged} unchanged · {manual} skipped / manual review.
-        {" "}This is a preview, not an update receipt. Apply the proposed changes after reviewing the evidence.
+        {" "}This is a preview, not an update receipt.
+        {review.proposed > 0 ? " Apply the proposed changes after reviewing the evidence." : " There are no proposed changes to approve."}
       </p>}
       {accessError ? (
         <details className="mt-2 text-[12px] text-slate-600">
@@ -77,6 +83,11 @@ export function DocumentReviewView({ review, testId }: { review: DocumentReview;
               {r.applicability && <p className="mt-1 text-[12px] text-slate-600">
                 {r.category?.replace(/_/g, " ")} · Applicability: {r.applicability}
               </p>}
+              {r.bandConstraint?.text && <div className="mt-2 rounded-md border border-teal-200 bg-teal-50 p-2 text-[12px]" data-testid={`document-band-rule-${r.id}`}>
+                <p className="font-medium">Combined IELTS band requirement</p>
+                <p>{r.bandConstraint.text}</p>
+                <p className="mt-1">This rule does not specify four fixed per-skill scores. Blank skill values have not been filled or guessed.</p>
+              </div>}
               {r.evidence?.map((e, index) => (
                 <blockquote key={index} className="mt-1 border-l-2 border-slate-200 pl-2 text-[12px] text-slate-600">
                   {e.provenance === "existing-record-and-document" && (
@@ -88,10 +99,12 @@ export function DocumentReviewView({ review, testId }: { review: DocumentReview;
                   </a>}
                 </blockquote>
               ))}
-              {!!r.changes?.length && (
+              {(r.currentValues || r.proposedValues || !!r.changes?.length) && (
                 <div className="mt-2 overflow-x-auto" data-testid={`document-ielts-preview-${r.id}`}>
                   <table className="w-full text-left text-[12px]">
-                    <caption className="text-left text-slate-600">IELTS approval preview — no changes applied</caption>
+                    <caption className="text-left text-slate-600">{r.changes?.length
+                      ? "IELTS approval preview — no changes applied"
+                      : "IELTS comparison — no changes proposed"}</caption>
                     <thead><tr><th>Requirement</th><th>Existing</th><th>Proposed</th></tr></thead>
                     <tbody>{["overall", "listening", "reading", "writing", "speaking"].map(band => {
                       const field = `ielts_${band}`;

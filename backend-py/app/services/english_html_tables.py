@@ -6,6 +6,7 @@ import re
 from bs4 import BeautifulSoup
 
 SCHEMA = 2
+APPLICABILITY_VERSION = 2
 FIELDS = ("ielts_overall", "ielts_listening", "ielts_reading", "ielts_writing", "ielts_speaking")
 
 
@@ -15,10 +16,32 @@ def text(value):
 
 def programme_name(value):
     """Intake annotations are not awards or different programme identities."""
-    return re.sub(
+    name = re.sub(
         r"\s*\((?:January|February|March|April|May|June|July|August|September|October|November|December)"
         r"\s+20\d{2}\)\s*$", "", text(value), flags=re.I,
     )
+    repeated = re.fullmatch(r"(.+)\s+(MBA|MSc|MA|BSc|BA|BEng|MEng|LLB|LLM|PGDip|PGCert)", name, re.I)
+    if repeated and re.search(r"(?<!\w)" + re.escape(repeated[2]) + r"(?!\w)", repeated[1], re.I):
+        return repeated[1]
+    return name
+
+
+def programme_specificity(row, profile, course):
+    """An explicitly named programme/subject takes precedence over its school."""
+    from app.services.document_ielts_matching import identity_matches
+    label = profile["label"]
+    if identity_matches(programme_name(row.course_name), programme_name(label)) and identity_matches(
+        programme_name(course.get("courseTitle")), programme_name(label)
+    ):
+        return 3
+    if ":" in label:
+        title = " ".join(re.findall(r"\w+", programme_name(course.get("courseTitle")).casefold()))
+        for term in re.split(r",|\band\b", label.split(":", 1)[1], flags=re.I):
+            term = re.sub(r"\ball\b|\bprogrammes?\b|\bprograms?\b", "", term, flags=re.I)
+            words = " ".join(re.findall(r"\w+", term.casefold()))
+            if words and re.search(r"(?<!\w)" + re.escape(words) + r"(?!\w)", title):
+                return 2
+    return 1
 
 
 def profiles(html):
@@ -158,6 +181,10 @@ def named_match(row, profile, course, siblings=()):
         return False
     if len(confirmed_levels) == 1:
         level = next(iter(confirmed_levels))
+    if re.search(r"\b(?:Ph\.?\s?D|MPhil|MRes|Doctor of Philosophy|Master of Research)\b", title, re.I):
+        if confirmed_levels and confirmed_levels != {"postgraduate_research"}:
+            return False
+        level = "postgraduate_research"
     if profile["level"] != level:
         return False
     label = profile["label"]
@@ -196,7 +223,7 @@ def checked_profile(row, candidate, source, course):
     profile = profile_for(candidate, source)
     proof = candidate.get("applicability") or {}
     body = text(course.get("_fullText") or course.get("text"))
-    if (not profile or not named_match(row, profile, course, source.get("_englishTables", []))
+    if (not profile or not any(p["id"] == profile["id"] for p in applicable_profiles(row, source, course))
             or text(proof.get("courseQuote")) != text(course.get("courseTitle"))
             or text(proof.get("courseQuote")) not in body):
         return None
@@ -209,7 +236,7 @@ def checked_profile(row, candidate, source, course):
             values = fact.get("normalized") or fact.get("value")
             values = values if isinstance(values, dict) else {fact["field"]: values}
             for key, value in values.items():
-                if key in profile["scores"] and float(value) != profile["scores"][key]:
+                if key in profile["scores"] and value not in (None, "") and float(value) != profile["scores"][key]:
                     return None
         except (TypeError, ValueError):
             return None
@@ -226,19 +253,28 @@ def final_year_restricted(row, profile, source, course):
     )
 
 
-def candidate(row, source, course):
+def applicable_profiles(row, source, course):
     if source.get("_englishTablesSchema") != SCHEMA:
-        return None
+        return []
     choices = [p for p in source.get("_englishTables", [])
                if named_match(row, p, course, source.get("_englishTables", []))
                and not final_year_restricted(row, p, source, course)]
     if not choices:
-        return None
+        return []
+    specificity = max(programme_specificity(row, p, course) for p in choices)
+    choices = [p for p in choices if programme_specificity(row, p, course) == specificity]
     if len(choices) > 1:
         if any(p["scores"] != choices[0]["scores"] or
                p.get("bandConstraint") != choices[0].get("bandConstraint") for p in choices[1:]):
-            return None
+            return []
         choices.sort(key=lambda p: len(p["label"]), reverse=True)
+    return choices
+
+
+def candidate(row, source, course):
+    choices = applicable_profiles(row, source, course)
+    if not choices:
+        return None
     profile = choices[0]
     result = {"id": row.id, "matched": True,
               "applicability": {"tableId": profile["id"], "guidanceQuote": profile["quote"],

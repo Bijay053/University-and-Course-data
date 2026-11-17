@@ -14,7 +14,7 @@ def normal(value):
     return " ".join(str(value or "").split())
 
 
-def identity_matches(name, quote):
+def identity_matches(name, quote, *, allow_single_subject=False):
     """Ignore formatting/award omission, not subject changes or different awards."""
     # Only a heading-sized quote can use semantic title equivalence.
     if len(normal(quote)) > 200:
@@ -26,7 +26,8 @@ def identity_matches(name, quote):
         return True
     la, ra = set(left) & (awards - {"honours"}), set(right) & (awards - {"honours"})
     return bool((not la or not ra) and tuple(x for x in left if x not in awards)
-                == tuple(x for x in right if x not in awards) and len(set(left)-awards) >= 2)
+                == tuple(x for x in right if x not in awards)
+                and len(set(left)-awards) >= (1 if allow_single_subject else 2))
 
 
 def scores(quote):

@@ -54,6 +54,144 @@ def test_subject_sounding_like_school_is_not_membership_proof():
     assert candidate(row(), source(table()), course(membership=False)) is None
 
 
+def test_named_psychology_programmes_override_the_broader_business_school_rule():
+    conditional = "<td colspan='4'>Two bands at 5.5 and other bands at 6.0 and above</td><td>6.5</td>"
+    guidance = source(table("Aston Business School", cells=conditional) + table(
+        "Health and Life Sciences: Biomedicine, Neuroscience, Biochemistry, Psychology all programmes",
+        cells="<td>6.0</td>" * 4 + "<td>6.5</td>"))
+    page = course("Psychology and Business BSc (Hons)")
+    page["cohortEvidence"][0]["label"] = "Aston Business School"
+    result = candidate(row(page["courseTitle"]), guidance, page)
+    assert result
+    assert {c["field"]: c["newValue"] for c in result["changes"]} == {
+        "ielts_overall": 6.5, "ielts_listening": 6.0, "ielts_reading": 6.0,
+        "ielts_writing": 6.0, "ielts_speaking": 6.0,
+    }
+    assert applicability(row(page["courseTitle"]), result, guidance, page)["applicability"] == "verified"
+    broader = next(p for p in guidance["_englishTables"] if p["label"] == "Aston Business School")
+    model_choice = {**result, "applicability": {**result["applicability"],
+                    "tableId": broader["id"], "guidanceQuote": broader["quote"]},
+                    "changes": [{"field": f, "newValue": v, "quote": broader["quote"], "page": None}
+                                for f, v in broader["scores"].items()]}
+    assert applicability(row(page["courseTitle"]), model_choice, guidance, page)["applicability"] != "verified"
+
+
+def test_equally_specific_conflicting_subject_profiles_still_require_review():
+    guidance = source(table("Health and Life Sciences: Psychology all programmes") +
+                      table("Joint programmes: Business all programmes",
+                            cells="<td>6.0</td>" * 4 + "<td>6.5</td>"))
+    page = course("Psychology and Business BSc (Hons)")
+    assert candidate(row(page["courseTitle"]), guidance, page) is None
+
+
+def test_repeated_award_in_official_heading_is_not_a_different_mba():
+    guidance = source(table("Aston Business School", level="Postgraduate"))
+    page = course("MBA (Full-time) MBA")
+    page["cohortEvidence"][0].update(label="Aston Business School", level="postgraduate_taught")
+    assert candidate(row("MBA (Full-time)", "Master's"), guidance, page)
+
+
+def test_missing_fact_components_are_not_conflicting_scores():
+    page = course()
+    page["facts"] = [{"field": "ielts_overall", "normalized": {
+        "ielts_overall": 6.0, "ielts_listening": None, "ielts_reading": "",
+    }}]
+    assert candidate(row(), source(table()), page)
+    page["facts"][0]["normalized"]["ielts_listening"] = 7.0
+    assert candidate(row(), source(table()), page) is None
+
+
+def test_canonical_selected_option_proves_a_dated_alias_without_guessing_paths():
+    url = HOME + "/courses/history/september-2027"
+    html = """<link rel="canonical" href="/courses/history">
+      <select class="other_variant_switch"><option selected value="/courses/history">September 2027</option></select>"""
+    assert metadata(html, url)["variants"][0]["url"] == HOME + "/courses/history"
+    assert metadata(html.replace('href="/courses/history"', 'href="/courses/unrelated"'), url)["variants"] == []
+
+
+def test_department_cards_exclude_navigation_breadcrumbs_and_unrelated_links():
+    html = """<nav><a href="/other"><h3>School of Other</h3></a></nav>
+      <ol class="breadcrumb"><li><a href="/college">College of Everything</a></li></ol>
+      <h1>School of Law</h1><a href="/school/department"><h4>Department of Politics</h4><p>Our teaching.</p></a>
+      <a href="/staff"><h3>Staff</h3></a>"""
+    assert metadata(html, HOME + "/school")["academicUnits"] == [
+        {"url": HOME + "/school/department", "label": "Department of Politics", "quote": "Department of Politics"}]
+
+
+def test_generic_postgraduate_list_does_not_imply_taught_instead_of_research():
+    html = '<h1>Department of English</h1><h2>Postgraduate</h2><a href="/courses/english">English</a>'
+    assert metadata(html, HOME + "/school/department")["linkedCourses"][0]["level"] is None
+    assert metadata(html.replace("Postgraduate</h2>", "Postgraduate taught</h2>"),
+                    HOME + "/school/department")["linkedCourses"][0]["level"] == "postgraduate_taught"
+
+
+def test_official_research_award_cannot_be_reclassified_as_taught_by_catalogue():
+    page = course("Engineering MRes")
+    page["cohortEvidence"][0]["level"] = "postgraduate_taught"
+    assert candidate(row("Engineering MRes", "Master"), source(table(level="Postgraduate")), page) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("department_path,matched", [("/school/department", True), ("/peer-school", False)])
+async def test_verified_department_chain_matches_single_subject_course_but_not_peer_school(department_path, matched):
+    from unittest.mock import AsyncMock
+    from app.services.scrape_assistant_tools import official_url
+    school = "School of Law and Social Sciences"
+    guidance = source(table(school))
+    course_url = HOME + "/courses/history/september-2027"
+    html = """<h1>History BA (Hons)</h1><nav><a href="/school">School of Law and Social Sciences</a></nav>
+        <link rel="canonical" href="/courses/history"><select class="other_variant_switch">
+        <option selected value="/courses/history">September 2027</option></select>"""
+    page = course("History BA (Hons)", membership=False)
+    page.update(url=course_url, _fullText=BeautifulSoup(html, "html.parser").get_text(" ", strip=True),
+                _courseCohorts=metadata(html, course_url))
+    root = f"""<h1>{school}</h1><a href="/school/unavailable"><h3>Department of Unavailable</h3></a>
+      <a href="{department_path}"><h3>Department of Politics</h3></a>"""
+    department = """<h1>Department of Politics</h1><h2>Undergraduate</h2>
+      <a href="/courses/history"><h3>History</h3></a>"""
+    def parsed(body, url):
+        return {"verified": True, "url": url,
+                "_fullText": BeautifulSoup(body, "html.parser").get_text(" ", strip=True),
+                "_courseCohorts": metadata(body, url)}
+    sources = {
+        HOME + "/school": parsed(root, HOME + "/school"),
+        HOME + department_path: parsed(department, HOME + department_path),
+        HOME + "/school/unavailable": {"verified": False, "failureStage": "robots", "httpStatus": 403},
+        HOME + "/courses/history": parsed(html, HOME + "/courses/history"),
+    }
+    reader = AsyncMock(side_effect=lambda url, home: sources[url])
+    enriched = await enrich(page, guidance, HOME, reader, official_url, {})
+    result = candidate(row("History BA (Hons)"), guidance, enriched)
+    assert bool(result) is matched
+    if matched:
+        proof = applicability(row("History BA (Hons)"), result, guidance, enriched)
+        assert proof["applicability"] == "verified"
+        assert any(e["quote"] == "Undergraduate" for e in proof["evidence"])
+        assert HOME + "/courses/history" not in [call.args[0] for call in reader.await_args_list]
+
+
+@pytest.mark.asyncio
+async def test_school_link_to_university_wide_level_filter_is_not_school_membership():
+    from unittest.mock import AsyncMock
+    from app.services.scrape_assistant_tools import official_url
+    school = "School of Law and Social Sciences"
+    root_url, catalogue_url = HOME + "/school", HOME + "/courses?level%5B1%5D=1"
+    root_html = f'<h1>{school}</h1><a href="{catalogue_url}"><h2>Undergraduate</h2></a>'
+    all_courses_html = """<h1>Courses</h1><form method="get" action="/courses">
+      <label for="ug">Undergraduate</label><input id="ug" type="checkbox" name="level[1]" value="1" checked>
+      </form><a href="/course"><h3 class="course-title">Aerospace Engineering BEng (Hons)</h3>
+      <h5 class="program-type">Undergraduate degrees</h5></a>"""
+    def parsed(html, url):
+        return {"verified": True, "url": url, "_fullText": BeautifulSoup(html, "html.parser").get_text(" ", strip=True),
+                "_courseCohorts": metadata(html, url)}
+    sources = {root_url: parsed(root_html, root_url), catalogue_url: parsed(all_courses_html, catalogue_url)}
+    page = course(membership=False)
+    page["_courseCohorts"] = {"schoolLinks": [{"label": school, "url": root_url}]}
+    enriched = await enrich(page, source(table(school)), HOME,
+                            AsyncMock(side_effect=lambda url, home: sources[url]), official_url, {})
+    assert enriched["cohortEvidence"] == []
+
+
 def test_unresolved_subgroup_exception_blocks_general_cohort():
     html = table(level="Postgraduate") + table(
         "Engineering and Physical Sciences (Engineering Systems and Management programmes)",

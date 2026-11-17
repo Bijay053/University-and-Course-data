@@ -76,6 +76,16 @@ def test_document_updates_require_existing_applicability_validation_and_pending_
     assert not policy.supported(action)
 
 
+def test_html_document_updates_require_the_current_matching_version():
+    action = {"kind": "document_update", "state": "proposed", "courseCount": 1,
+              "_sourceType": "html", "_applicabilityVersion": 1,
+              "_targets": [{"id": 1, "version": "checked",
+                            "changes": [{"field": "ielts_overall", "newValue": 6.5}]}]}
+    assert not policy.supported(action)
+    action["_applicabilityVersion"] = 2
+    assert policy.supported(action)
+
+
 def test_bulk_intake_repair_checks_remaining_rows_but_not_known_unsupported_sources():
     action = {"kind":"fix_fields","state":"proposed","courseCount":12,"_ids":list(range(12)),
         "fields":["intake_months"],"_sourceCheckedIds":[0],

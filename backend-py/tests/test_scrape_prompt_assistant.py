@@ -75,6 +75,9 @@ async def test_uploaded_pdf_partial_preview_preserves_rows_and_requires_approval
     from app.services.scrape_agent_v2 import model
     quotes = [f"Bachelor of Business {i} requires IELTS overall 6.5 with no component below 5.5."
               for i in range(1, 8)]
+    # Leave one record unsupported by the PDF so its blocked course page
+    # exercises a real partial-source failure, independently of AI call order.
+    quotes[-1] = "Bachelor of Business 7: English requirements require individual assessment."
     async with store() as db:
         first = await db.get(ScrapedCourse, 1)
         first.course_name = "Bachelor of Business 1"
@@ -92,13 +95,9 @@ async def test_uploaded_pdf_partial_preview_preserves_rows_and_requires_approval
         return {"verified": True, "sourceType": "pdf", "url": "uploaded-document:sha",
                 "provenance": "staff-uploaded-document", "officialProvenanceVerified": False,
                 "text": "\n".join(quotes), "_pages": [{"page": 1, "text": "\n".join(quotes)}]}
-    calls = 0
     async def complete(client, messages, *args, **kwargs):
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            return {"message": {"content": "malformed JSON"}}
         courses = json.loads(messages[-1]["content"])["courses"]
+        assert all(r["id"] != 7 for r in courses)
         return {"message": {"content": json.dumps({"rows": [
             {"id": r["id"], "matched": True,
              "applicability": {"guidanceQuote": quotes[r["id"]-1],
@@ -106,6 +105,8 @@ async def test_uploaded_pdf_partial_preview_preserves_rows_and_requires_approval
              "changes": [{"field": "ielts_overall", "newValue": 6.5,
                           "quote": quotes[r["id"]-1], "page": 1}]} for r in courses]})}}
     monkeypatch.setattr(assistant_documents, "read_uploaded", uploaded)
+    monkeypatch.setattr(assistant_documents, "settings",
+                        SimpleNamespace(session_secret="isolated-upload-fixture-key"))
     monkeypatch.setattr(assistant_document_review, "inspect_source", blocked)
     monkeypatch.setattr(model, "complete", complete)
     monkeypatch.setattr(openai_client, "_client", lambda: SimpleNamespace(close=AsyncMock()))
@@ -114,7 +115,10 @@ async def test_uploaded_pdf_partial_preview_preserves_rows_and_requires_approval
         thread = await db.get(ScrapeAssistantThread, thread_id)
         # Invoke the real document workflow with isolated persistence and a claimed run.
         messages = deepcopy(thread.messages)
-        messages[-1]["_documentToken"] = "test"
+        messages[-1]["_documentToken"] = assistant_documents.sign({
+            "actor": 1, "job": "source", "expires": 4102444800,
+            "key": "assistant-documents/1/source/test.pdf", "contentType": "application/pdf",
+        })
         thread.messages = messages
         await db.commit()
     await service.investigate(thread_id, turn_id)
@@ -128,7 +132,8 @@ async def test_uploaded_pdf_partial_preview_preserves_rows_and_requires_approval
         assert len(rows) == 7
         assert all(r.ielts_overall is None for r in rows)
         failed = next(r for r in reply["documentReview"]["rows"] if r["id"] == 7)
-        assert "invalid response" in failed["reason"]
+        assert failed["status"] == "not_checked"
+        assert failed["reason"] == "robots.txt unavailable"
 
 
 @pytest.mark.asyncio

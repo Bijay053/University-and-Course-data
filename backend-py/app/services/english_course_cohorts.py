@@ -11,7 +11,8 @@ def normal(value):
 
 
 def key(value):
-    return re.sub(r"^(?:school|college|faculty)\s+of\s+", "", normal(value).casefold()).replace("&", "and")
+    value = re.sub(r"^courses\s*\((.*)\)$", r"\1", normal(value), flags=re.I)
+    return re.sub(r"^(?:department|school|college|faculty)\s+of\s+", "", value.casefold()).replace("&", "and")
 
 
 def level(value):
@@ -32,6 +33,13 @@ def owned_url(value, base):
     return urlunsplit((target.scheme, target.netloc, target.path.rstrip("/"), target.query, ""))
 
 
+def course_list_level(value):
+    result = level(value)
+    if result == "postgraduate_taught" and not re.search(r"\btaught\b|\bMBA\b|MA\s*/\s*MSc", normal(value), re.I):
+        return None
+    return result
+
+
 def metadata(html, url):
     """Keep public GET filter controls, not form tokens, navigation or staff input."""
     soup = BeautifulSoup(html, "html.parser")
@@ -45,13 +53,17 @@ def metadata(html, url):
     scope_labels = [normal(n.get_text(" ", strip=True)) for n in soup.select("h1,.breadcrumb li")]
     if soup.title:
         scope_labels.append(normal(soup.title.get_text(" ", strip=True)).split("|", 1)[0].strip())
+    canonicals = soup.select("link[rel~='canonical'][href]")
+    canonical = owned_url(canonicals[0]["href"], url) if len(canonicals) == 1 else None
     for selector in soup.select("select.other_variant_switch,select[data-course-variants]"):
         options = selector.select("option[value]")
         if options and all(re.fullmatch(
             r"(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+20\d{2}",
             normal(o.get_text(" ", strip=True)), re.I) for o in options):
             urls = [owned_url(o["value"], url) for o in options]
-            if owned_url(url, url) in urls and all(urls):
+            selected_options = [u for o, u in zip(options, urls) if o.has_attr("selected")]
+            canonical_selected = canonical and selected_options == [canonical] and canonical in urls
+            if (owned_url(url, url) in urls or canonical_selected) and all(urls):
                 variants.extend({"url": u, "quote": normal(selector.get_text(" ", strip=True))} for u in urls)
     breadcrumb = soup.select_one(".breadcrumb")
     last = breadcrumb.select("li")[-1] if breadcrumb and breadcrumb.select("li") else None
@@ -90,7 +102,7 @@ def metadata(html, url):
             continue
         target = owned_url(anchor["href"], url)
         qualification = anchor.select_one(".program-type,.programme-type,.course-level")
-        scope = level(qualification.get_text(" ", strip=True)) if qualification else None
+        scope = course_list_level(qualification.get_text(" ", strip=True)) if qualification else None
         if target and scope:
             records.append({"url": target, "title": normal(heading.get_text(" ", strip=True)),
                             "level": scope, "quote": normal(heading.get_text(" ", strip=True))
@@ -106,19 +118,31 @@ def metadata(html, url):
     # Breadcrumbs are identity evidence, not evidence of school membership.
     catalogue_links = []
     linked_courses = []
+    academic_units = []
     for anchor in soup.select("a[href]"):
         target = owned_url(anchor["href"], url)
         heading = anchor.find(["h2", "h3", "h4", "h5"])
         label = normal((heading or anchor).get_text(" ", strip=True))
+        if (target and heading and len(label) <= 120 and re.search(
+                r"^(?:(?:department|school|college|faculty)\s+of\b|[\w &'’()-]+\s+(?:school|college|faculty)$)",
+                label, re.I)):
+            academic_units.append({"url": target, "label": label, "quote": label})
         if target and (level(label) or re.fullmatch(r"courses|programmes|programs|study(?: with us)?", label, re.I)):
             catalogue_links.append({"url": target, "label": label})
         if target and len(label) <= 200 and re.search(r"/(?:courses|programmes|programs|degrees)/", urlsplit(target).path):
-            linked_courses.append({"url": target, "title": label, "quote": label, "level": None})
-    return {"schema": 2, "filters": filters[:50], "selected": selected, "selectedControls": selected_controls, "records": records,
+            study_heading = next((h for h in anchor.find_all_previous(["h2", "h3", "h4", "h5"])
+                                  if not h.find_parent("a") and not h.find_parent("table")), None)
+            level_quote = normal(study_heading.get_text(" ", strip=True)) if study_heading else ""
+            # Generic postgraduate lists can mix taught and research masters.
+            listing_level = course_list_level(level_quote)
+            linked_courses.append({"url": target, "title": label, "quote": label,
+                                   "level": listing_level, "levelQuote": level_quote})
+    return {"schema": 3, "filters": filters[:50], "selected": selected, "selectedControls": selected_controls, "records": records,
             "schools": schools, "identity": title if len(title) <= 200 else "",
             "schoolLinks": list({p["url"]: p for p in school_links}.values())[:50],
             "scopeLabels": scope_labels, "catalogueLinks": catalogue_links[:20], "next": next_url,
-            "linkedCourses": linked_courses, "variants": variants}
+            "linkedCourses": linked_courses, "variants": variants,
+            "academicUnits": list({p["url"]: p for p in academic_units}.values())[:12]}
 
 
 async def enrich(course, guidance, home, reader, validator, cache):
@@ -157,54 +181,100 @@ async def enrich(course, guidance, home, reader, validator, cache):
             meta = page.get("_courseCohorts") or {}
             if not page.get("verified") or any(meta.get("selectedControls", {}).get(k) != v for k, v in requirements.items()):
                 break
+            # A university-wide "Undergraduate" filter linked from a school
+            # is not proof that every result belongs to that school.
+            if filter_.get("scopedLabels"):
+                expected = {key(s) for s in filter_["scopedLabels"]}
+                selected_scopes = {key(s) for s in meta.get("selected", [])}
+                scoped = bool(expected & (selected_scopes | {key(s) for s in meta.get("scopeLabels", [])}))
+                academic_filter = any(re.search(
+                    r"(?:school|college|faculty|department|subject|discipline|theme)(?:_|\[|$)", name, re.I,
+                ) for name in requirements)
+                # E.g. a Business School's own course link selects the
+                # university's "Business" subject facet. A level-only filter
+                # or an unrelated subject cannot establish school membership.
+                generic = {"all", "science", "sciences", "arts", "research", "courses",
+                           "school", "college", "faculty", "department"}
+                if not scoped and academic_filter:
+                    scoped = any(len(label) >= 4 and label not in generic and re.search(
+                        r"(?<!\w)" + re.escape(label) + r"(?!\w)", parent,
+                    ) for label in selected_scopes for parent in expected)
+                if not scoped:
+                    break
             for record in meta.get("records", []):
                 if record["quote"] in normal(page.get("_fullText")):
                     found.append({**record, "label": filter_["label"], "sourceUrl": page["url"],
-                                  "scopeSource": filter_.get("scopeSource")})
+                                   "scopeSource": filter_.get("scopeSource"),
+                                   "scopeChain": filter_.get("scopeChain", [])})
             current = meta.get("next")
             if not current:
                 break
         return found
 
     async def school_catalogue(link):
-        pending, visited, found = [(link["url"], None)], set(), []
-        for _ in range(5):
+        pending, visited, found = [(link["url"], None, link["label"], [])], set(), []
+        for _ in range(12):
             if not pending:
                 break
-            target, inherited_level = pending.pop(0)
+            target, inherited_level, unit_label, chain = pending.pop(0)
             if target in visited:
-                break
+                continue
             visited.add(target)
             page = await permitted_page(target)
             meta = page.get("_courseCohorts") or {}
             scoped = next((s for s in meta.get("scopeLabels", [])
                            if key(re.sub(r"^courses\s*\((.*)\)$", r"\1", s, flags=re.I))
-                           == key(link["label"])), None)
+                            in {key(link["label"]), key(unit_label)}), None)
             if not page.get("verified") or not scoped or scoped not in normal(page.get("_fullText")):
-                break
+                continue
+            if chain:
+                parent = urlsplit(chain[-1]["url"])
+                child = urlsplit(page["url"])
+                descendant = (parent.netloc == child.netloc
+                              and child.path.startswith(parent.path.rstrip("/") + "/"))
+                parent_labels = {key(link["label"]), key(chain[-2]["quote"])}
+                if not descendant and not parent_labels.intersection(map(key, meta.get("scopeLabels", []))):
+                    # An unstructured main-content link to a peer school is
+                    # not enough to assign all of that school's programmes.
+                    continue
             visited.add(page["url"])
-            if inherited_level and any(level(s) == inherited_level for s in meta.get("scopeLabels", [])):
-                for record in meta.get("linkedCourses", []):
-                    if record["quote"] in normal(page.get("_fullText")):
-                        found.append({**record, "level": inherited_level, "label": link["label"],
-                                      "sourceUrl": page["url"], "scopeSource": None})
+            body = normal(page.get("_fullText"))
+            inherited = inherited_level if any(level(s) == inherited_level for s in meta.get("scopeLabels", [])) else None
+            for record in meta.get("linkedCourses", []) + meta.get("records", []):
+                level_quote = record.get("levelQuote")
+                own_level = record.get("level") if (not level_quote or level_quote in body) else None
+                verified_level = own_level or inherited
+                if verified_level and record["quote"] in body:
+                    level_proof = [{"url": page["url"], "quote": level_quote}] if level_quote else []
+                    found.append({**record, "level": verified_level, "label": link["label"],
+                                  "sourceUrl": page["url"], "scopeSource": None, "scopeChain": chain + level_proof})
+            # Only links extracted from the parent's main content can establish
+            # a department relationship. A global menu never establishes it.
+            for unit in meta.get("academicUnits", []) if len(chain) < 6 else []:
+                child_url = validator(unit["url"], home)
+                if (unit["quote"] in normal(page.get("_fullText"))
+                        and child_url not in visited and child_url not in {p[0] for p in pending}):
+                    proof = [{"url": page["url"], "quote": scoped},
+                             {"url": page["url"], "quote": unit["quote"], "targetUrl": child_url}]
+                    pending.append((child_url, None, unit["label"], chain + proof))
             for child in meta.get("catalogueLinks", []):
                 child_url = validator(child["url"], home)
                 parameters = {k: v for k, v in parse_qs(urlsplit(child_url).query).items()
                               if re.fullmatch(r"[a-zA-Z_]\w*\[\d+\]", k)}
                 if parameters and level(child["label"]) in {"undergraduate", "postgraduate_taught"}:
                     descriptor = {"url": child_url, "label": link["label"], "requirements": parameters,
-                                  "scopeSource": {"url": page["url"], "quote": scoped}}
+                                  "scopeSource": {"url": page["url"], "quote": scoped},
+                                  "scopeChain": chain, "scopedLabels": [link["label"], unit_label]}
                     if child_url not in cache:
                         cache[child_url] = asyncio.create_task(catalogue(descriptor))
                     found.extend(await cache[child_url])
                 elif re.fullmatch(r"courses|programmes|programs|study(?: with us)?", child["label"], re.I):
-                    if child_url not in visited and child_url not in {u for u, _ in pending}:
-                        pending.append((child_url, None))
-                elif (level(child["label"]) in {"undergraduate", "postgraduate_taught"}
+                    if child_url not in visited and child_url not in {p[0] for p in pending}:
+                        pending.append((child_url, None, unit_label, chain))
+                elif (course_list_level(child["label"]) in {"undergraduate", "postgraduate_taught"}
                       and not urlsplit(child_url).path.lower().endswith(".pdf")):
-                    if child_url not in visited and child_url not in {u for u, _ in pending}:
-                        pending.append((child_url, level(child["label"])))
+                    if child_url not in visited and child_url not in {p[0] for p in pending}:
+                        pending.append((child_url, course_list_level(child["label"]), unit_label, chain))
         return found
 
     collections = []
@@ -245,7 +315,10 @@ async def enrich(course, guidance, home, reader, validator, cache):
                     and normal(record["title"]).lower() == normal(course.get("courseTitle")).lower())
     # Some universities advertise the default intake with an unversioned URL,
     # while their catalogue links to its final, year-stamped URL.
-    for variant in ([] if any(intake_identity(r) for r in collections) else data.get("variants", [])):
+    direct_match = any(r["url"] in urls and identity_matches(
+        course.get("courseTitle", ""), r["title"], allow_single_subject=True,
+    ) for r in collections)
+    for variant in ([] if direct_match or any(intake_identity(r) for r in collections) else data.get("variants", [])):
         if variant["url"] not in direct_urls and not re.search(
                 r"/(?:january|february|march|april|may|june|july|august|september|october|november|december)-20\d{2}/?$",
                 urlsplit(variant["url"]).path, re.I):
@@ -256,12 +329,16 @@ async def enrich(course, guidance, home, reader, validator, cache):
                 urls.add(owned_url(resolved["url"], course["url"]))
                 variant_aliases[owned_url(resolved["url"], course["url"])] = variant
     for record in collections:
-        if (record["url"] in urls or intake_identity(record)) and identity_matches(course.get("courseTitle", ""), record["title"]):
+        if (record["url"] in urls or intake_identity(record)) and identity_matches(
+            course.get("courseTitle", ""), record["title"], allow_single_subject=record["url"] in urls,
+        ):
             evidence.append({"label": record["label"], "url": record["sourceUrl"],
                              "level": record["level"], "quote": record["quote"],
                              "courseUrl": record["url"]})
             if record.get("scopeSource"):
                 evidence.append({**record["scopeSource"], "label": record["label"], "level": record["level"]})
+            for proof in record.get("scopeChain", []):
+                evidence.append({**proof, "label": record["label"], "level": record["level"]})
             if record["url"] not in {owned_url(course.get(k) or "", course["url"]) for k in ("url", "requestedUrl")}:
                 variant = variant_aliases.get(record["url"]) or data["variants"][0]
                 evidence.append({"url": course["url"], "quote": variant["quote"],

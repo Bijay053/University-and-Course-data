@@ -68,10 +68,12 @@ def supported(action):
         targets = action.get("_targets", [])
         return len(targets) == count and all(t.get("kind") == "pending" for t in targets)
     if kind == "document_update":
+        from app.services.english_html_tables import APPLICABILITY_VERSION
         targets = action.get("_targets", [])
-        # This writer accepts ScrapedCourse records only and revalidates the
-        # course-specific applicability proof and all five scores at commit.
-        return (action.get("_applicabilityVersion") == 1 and len(targets) == count
+        # This writer accepts pending records only and fences their reviewed
+        # versions before applying the saved, versioned applicability proof.
+        expected_version = APPLICABILITY_VERSION if action.get("_sourceType") == "html" else 1
+        return (action.get("_applicabilityVersion") == expected_version and len(targets) == count
                 and all(t.get("kind", "pending") == "pending" and t.get("version")
                         and t.get("changes") for t in targets))
     return False

@@ -263,7 +263,7 @@ describe("document review", () => {
         { id: "r2", name: "MBA", status: "unmatched", reason: "Not found in document", changes: [] },
       ] },
       actions: [{ id: "doc", kind: "document_update", label: "Apply document values", state: "proposed", courseCount: 1, fields: ["international_fee"] }] }] };
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(json(thread));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => json(thread));
     render(<ScrapePromptAssistant jobId="j1" />);
     expect((await screen.findByTestId("document-row-r1")).textContent).toContain("AUD 32,400");
     expect(screen.getByText("AUD 30,000")).toBeTruthy();

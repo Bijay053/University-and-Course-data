@@ -45,3 +45,34 @@ it("retains unverified and excluded rows alongside exact applicability citations
   expect(screen.getByTestId("document-row-3").textContent).toContain("Applicability: unverified");
   expect(screen.getByTestId("report-counts").textContent).toContain("1 not checked");
 });
+
+it("corrects legacy saved unmatched totals from a complete 149-row report", () => {
+  render(<DocumentReviewView testId="report" review={{
+    checked: 149, proposed: 0, unmatched: 149,
+    rows: Array.from({ length: 149 }, (_, i) => ({
+      id: i, name: `Course ${i}`,
+      status: i < 75 ? "unchanged" : i < 138 ? "unverified" : "excluded",
+      applicability: i < 75 ? "verified" : "unverified",
+    })),
+  }} />);
+  expect(screen.getByTestId("report-counts").textContent).toContain("74 unresolved");
+  expect(screen.getByTestId("report").textContent).toContain("75 matched · 75 unchanged · 74 skipped / manual review");
+  expect(screen.getByTestId("report").textContent).toContain("There are no proposed changes to approve.");
+  expect(screen.getByTestId("report").textContent).not.toContain("Apply the proposed changes");
+});
+
+it("shows all five values and the combined rule even when no numeric change exists", () => {
+  render(<DocumentReviewView testId="report" review={{
+    checked: 1, proposed: 0, unmatched: 1,
+    rows: [{ id: 9, name: "Business MSc", status: "unchanged", applicability: "verified",
+      currentValues: { ielts_overall: 6.5 },
+      proposedValues: { ielts_overall: 6.5 },
+      bandConstraint: { kind: "conditional_band_floor",
+        text: "1 band at 5.5 as a minimum. Other bands at 6.0 and above" },
+    }],
+  }} />);
+  expect(screen.getByTestId("document-ielts-preview-9").querySelectorAll("tbody tr")).toHaveLength(5);
+  expect(screen.getByTestId("document-band-rule-9").textContent).toContain("1 band at 5.5");
+  expect(screen.getByTestId("document-band-rule-9").textContent).toContain("have not been filled or guessed");
+  expect(screen.getByTestId("report-counts").textContent).toContain("0 unresolved");
+});
