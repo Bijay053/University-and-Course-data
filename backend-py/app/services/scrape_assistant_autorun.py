@@ -5,15 +5,20 @@ from sqlalchemy import select
 
 
 def execution_requested(prompt):
+    if re.search(r"^\s*(?:please\s+)?(?:prepare|show|create|generate)\b.*\bpreview\b"
+                 r"|^\s*(?:please\s+)?preview\b|\bpreview\s+(?:only|first)\b", prompt, re.I):
+        return False
     return not re.search(r"\bread[- ]only\b|\b(?:just|only)\s+(?:explain|compare|research|investigate|check|show|report)\b|\b(?:do not|don't|dont|never)\s+(?:run|change|modify|repair|fix|scrape|update|apply|add|import|recover|execute)\b", prompt, re.I)
 
 
 def choose_action(actions):
     proposed = [a for a in actions if a.get("state") == "proposed"
                 and not a.get("requiresConfirmation")
-                and a.get("courseCount", 0) <= 10 and a.get("kind") in {
+                and (a.get("courseCount", 0) <= 10 or a.get("automaticPending"))
+                and (a.get("kind") in {
         "scan_catalogue", "recover_catalogue", "review_courses", "fix_fields", "repair_catalogue",
-        "merge_intakes"}]
+        "merge_intakes"} or a.get("automaticPending") and a.get("kind") in {
+            "staff_edit", "staff_location", "document_update"})]
     # A full discovery covers bounded recovery candidates too; never launch both.
     return next((a for a in proposed if a["kind"] == "scan_catalogue"), next(iter(proposed), None))
 
@@ -30,10 +35,14 @@ async def autorun(thread_id, turn_id):
         if not thread or thread.turn_id != turn_id or thread.status != "ready":
             return
         request = next((m for m in reversed(thread.messages) if m["role"] == "user"), {})
-        if not request.get("autoRun"):
+        if not request.get("autoRun") or not execution_requested(request.get("content", "")):
             return
         messages = deepcopy(thread.messages)
         actions = messages[-1].get("actions", [])
+        from app.config import settings
+        from app.services.assistant_pending_automation import enabled
+        if not enabled(settings, thread.actor_id):
+            actions = [a for a in actions if not a.get("automaticPending")]
         from app.services.assistant_import_pause import provider_for_job, is_paused, IMPORT_KINDS
         university = await provider_for_job(db, thread.job_id)
         if is_paused(university):

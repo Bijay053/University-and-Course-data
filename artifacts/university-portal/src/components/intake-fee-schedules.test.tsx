@@ -23,7 +23,7 @@ describe("intake-specific tuition", () => {
     expect(screen.getByText("Fee year 2027:")).toBeTruthy();
     expect(screen.getByText("Proposed intake applicability: January, April 2027")).toBeTruthy();
     expect(screen.getByText("Proposed intake applicability: September 2027")).toBeTruthy();
-    expect(screen.getByText(/Manual approval required/)).toBeTruthy();
+    expect(screen.getByText(/Publication remains held/)).toBeTruthy();
     expect(screen.queryByText("2026/27")).toBeNull();
     expect(screen.getAllByRole("link")).toHaveLength(2);
   });

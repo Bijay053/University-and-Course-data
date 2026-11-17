@@ -31,6 +31,33 @@ afterEach(() => {
 });
 
 describe("ScrapePromptAssistant", () => {
+  it("shows automatic pending work without a Run now button or client-side execution", async () => {
+    const thread: AssistantThread = {...empty, status:"ready", messages:[{
+      role:"assistant",content:"Pending intake merge is starting.",createdAt:"2026-11-17T03:00:00Z",
+      actions:[{id:"automatic-batch",kind:"merge_intakes",label:"Merge pending intakes",
+        courseCount:39,fields:["course_name","intake_months"],state:"proposed",
+        requiresConfirmation:false,automaticPending:true}],
+    }]};
+    const fetcher = vi.spyOn(globalThis,"fetch").mockResolvedValue(json(thread));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    await screen.findByText(/Starting automatically/);
+    expect(screen.queryByTestId("button-run-action-automatic-batch")).toBeNull();
+    expect(fetcher.mock.calls.every(([, options]) => !options?.method || options.method === "GET")).toBe(true);
+  });
+
+  it("explains outdated proposals without allowing them to run again", async () => {
+    const thread: AssistantThread = {...empty,status:"ready",messages:[{
+      role:"assistant",content:"Historical intake preview",createdAt:"2026-11-17T03:00:00Z",
+      actions:[{id:"old-batch",kind:"merge_intakes",label:"Old pending merge",courseCount:39,
+        fields:["course_name","intake_months"],state:"superseded",
+        resultSummary:"Outdated preview: these records were already consolidated. This operation was not run again."}],
+    }]};
+    vi.spyOn(globalThis,"fetch").mockResolvedValue(json(thread));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    await screen.findByText(/This operation was not run again/);
+    expect(screen.queryByTestId("button-run-action-old-batch")).toBeNull();
+  });
+
   it("shows every intake family in one approval preview and keeps conflicting families separate", async () => {
     const makePreview = (courseName: string, keepId: number) => ({
       courseName, keepId, canonicalUrl: "https://www.example.edu/" + keepId,

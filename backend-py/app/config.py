@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     scrape_agent_v2_enabled: bool = False
     assistant_document_uploads_enabled: bool = False
     scrape_agent_v2_user_ids: str = ""
+    scrape_assistant_auto_pending_user_ids: str = ""
     scrape_agent_v2_daily_usd: float = 100
     # Standard pricing verified against OpenAI's model page. Budgeting also
     # includes long-context and cache-write surcharges in spend.py.

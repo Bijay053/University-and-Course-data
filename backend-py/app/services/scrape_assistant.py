@@ -1002,6 +1002,10 @@ async def save_research_reply(thread_id, turn_id, run_id, reply, *, detail, phas
         ).with_for_update())).scalar_one_or_none()
         if thread is None:
             return
+        from app.config import settings
+        from app.services.assistant_pending_automation import prepare as prepare_automatic
+        request = next((m for m in reversed(thread.messages) if m["role"] == "user"), {})
+        prepare_automatic(reply, request, settings, thread.actor_id)
         items = [dict(item) for item in thread.activity]
         finish_running(items)
         access_failed = reply.get("sourceOutcome") in {"access_verification_failed", "document_read_failed"}

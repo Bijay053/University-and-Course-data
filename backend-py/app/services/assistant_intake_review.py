@@ -96,6 +96,7 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
     action.update(
         label="Check and repair course intakes",
         _versions=ctx["versions"], _configVersion=ctx["config_version"],
+        _sourceCheckedIds=list(by_id),
         requiresConfirmation=len(rows) > 10 or any(p["status"] != "supported" for p in previews),
         repairPreview=previews,
         courseScope=[{"id": r["id"], "name": r["name"], "url": r["url"]} for r in rows],

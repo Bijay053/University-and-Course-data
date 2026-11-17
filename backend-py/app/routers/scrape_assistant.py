@@ -167,7 +167,8 @@ async def response(thread, db, job_id=None):
         return {"reviewCounts":counts,"threadId": None, "status": "idle", "phase": "", "error": None, "messages": [],
                 "activity": [], "queuedAt": None, "startedAt": None, "updatedAt": None}
     messages = deepcopy(thread.messages)
-    changed = False
+    from app.services.assistant_pending_automation import supersede_changed_merges
+    changed = await supersede_changed_merges(service, db, messages)
     for message in messages:
         for action in message.get("actions", []):
             if action["kind"] == "runtime_tuning" and action["state"] == "running":
@@ -338,7 +339,7 @@ async def response(thread, db, job_id=None):
             live_phase = "Confirmed work needs attention. See the action result above."
         elif actions and actions[-1]["state"] == "proposed":
             automatic = (not actions[-1].get("requiresConfirmation")
-                         and actions[-1].get("courseCount", 0) <= 10
+                         and (actions[-1].get("courseCount", 0) <= 10 or actions[-1].get("automaticPending"))
                          and any(message.get("autoRun") for message in messages[current_start:] if message["role"] == "user"))
             live_phase = ("Preparing automatic execution. No changes applied yet." if automatic
                           else "Action proposed. No changes applied.")
@@ -407,6 +408,14 @@ async def get_assistant(job_id: str, db: Database, actor: Actor):
     if thread and result["status"] == "queued":
         from app.services.scrape_assistant_runner import schedule
         schedule(thread.id, thread.turn_id)
+    elif thread and result["status"] == "ready" and thread.messages:
+        from app.config import settings
+        from app.services.assistant_pending_automation import enabled, schedule
+        if enabled(settings, thread.actor_id) and any(
+            a.get("automaticPending") and a.get("state") == "proposed"
+            for a in thread.messages[-1].get("actions", [])
+        ):
+            schedule(service, thread.id, thread.turn_id)
     return result
 
 

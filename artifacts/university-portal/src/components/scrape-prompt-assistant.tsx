@@ -24,6 +24,7 @@ export type AssistantAction = {
   id: string;
   kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed" | "document_update" | "merge_intakes" | "undo_intake_merge";
   requiresConfirmation?: boolean;
+  automaticPending?: boolean;
   label: string;
   courseCount: number;
   publishedCount?: number;
@@ -543,12 +544,14 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     <div className="mt-3 space-y-2">
       {m.actions.map(a => (
         <div key={a.id} className="rounded-xl border border-amber-200 bg-amber-50/80 p-3" data-testid={`assistant-action-${a.id}`}>
+          {a.state !== "superseded" && <>
           {a.intakeConsolidation && <AssistantIntakeConsolidation preview={a.intakeConsolidation} />}
           {a.intakeConsolidations?.map(preview => <AssistantIntakeConsolidation key={preview.keepId} preview={preview} />)}
           {a.blockedIntakeConsolidations?.length ? <details>
             <summary>{a.blockedIntakeConsolidations.length} intake families need review</summary>
             {a.blockedIntakeConsolidations.map(preview => <AssistantIntakeConsolidation key={preview.keepId} preview={preview} />)}
           </details> : null}
+          </>}
           <div className="flex items-center gap-2 text-[13px]">
             <Wrench className="h-3.5 w-3.5 text-amber-700" aria-hidden />
             <span className="flex-1 font-medium text-amber-950">{a.label}</span>
@@ -576,6 +579,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             </p>
           )}
           {a.state === "completed" && <p className="mt-1.5 text-[12px] text-green-800">{a.resultSummary || "Job finished. Updated pending data was refreshed. Nothing was published."}</p>}
+          {a.state === "superseded" && <p className="mt-1.5 text-[12px] text-slate-600">{a.resultSummary || "This preview is outdated and cannot be run again."}</p>}
           {a.state === "needs_review" && <p role="status" className="mt-1.5 text-[12px] text-amber-900">
             {a.resultSummary || "Partial recovery completed. Quality checks still require review; nothing was published."}
           </p>}
@@ -600,7 +604,10 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             <summary className="cursor-pointer select-none text-[11.5px] font-medium text-amber-900 hover:text-amber-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600">Operation details</summary>
             <div className="mt-1.5"><CodeBlock code={operationDetailsJson(a)} lang="json" testId={`code-operation-${a.id}`} /></div>
           </details>
-          {a.state === "proposed" && (
+          {a.state === "proposed" && a.automaticPending && (
+            <p className="mt-2 text-[12px] text-teal-800" role="status">Starting automatically. Results will appear here; nothing will be published.</p>
+          )}
+          {a.state === "proposed" && !a.automaticPending && (
             <Button size="sm" variant="outline" className="mt-2 h-8 border-amber-300 text-[12px]" disabled={disabled || actionBusy || (isImport(a) && importsBlocked)}
               onClick={() => actionNeedsConfirmation(a) ? openConfirm(a) : void runAction(a)} data-testid={`button-run-action-${a.id}`}>
               {isImport(a) && importsBlocked ? "Imports paused or status unavailable" : a.kind === "undo_staff_location" ? "Undo locations" : "Run now"}

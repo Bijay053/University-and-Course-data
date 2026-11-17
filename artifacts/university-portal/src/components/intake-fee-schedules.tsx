@@ -30,6 +30,6 @@ export function IntakeFeeSchedules({ schedules, snapshotMatchesCurrent = true }:
         })}</div>
       </li>)}
     </ul>
-    <p className="mt-2 font-medium">Manual approval required: preserve every fee year and its intake applicability.</p>
+    <p className="mt-2 font-medium">Every fee year and its intake applicability are preserved. Publication remains held.</p>
   </section>;
 }
