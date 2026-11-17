@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AssistantImportStatus } from "./assistant-import-status";
+import { AssistantUniversityHistory } from "./assistant-university-history";
 import { AssistantMessageAttachment } from "./assistant-message-attachment";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -77,6 +78,7 @@ export type AssistantThread = {
   phase: string;
   error: string | null;
   messages: AssistantMessage[];
+  messageCount?: number;
   /** Real events of the current (in-flight or most recent) turn. */
   activity?: AssistantActivity[];
   turnId?: string | null;
@@ -650,6 +652,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
         )}
       </header>
       {viewKey && <AssistantImportStatus key={viewKey} base={base} onStatus={updateImportStatus} />}
+      {viewKey && <AssistantUniversityHistory key={`history:${viewKey}`} jobId={jobId} onReviewJob={onReviewJob} />}
 
       <div className="relative">
         <div
@@ -681,6 +684,11 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
               Provider total: {thread.reviewCounts.providerPendingRows} pending rows across all reviews.
               {" "}This job: {thread.reviewCounts.thisJobPendingRows} pending rows.
             </div>
+          )}
+          {thread?.messageCount != null && thread.messageCount > thread.messages.length && (
+            <p className="mb-3 text-xs text-slate-500">
+              Showing the latest {thread.messages.length} messages in this review. Open university history above for earlier saved conversations.
+            </p>
           )}
           {thread && !hasConversation && (
             <div className="mx-auto max-w-lg py-4 text-center" data-testid="assistant-empty">

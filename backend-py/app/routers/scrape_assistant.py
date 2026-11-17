@@ -6,7 +6,7 @@ from datetime import timedelta
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from sqlalchemy import select
@@ -18,6 +18,7 @@ from app.permissions import require_permission
 from app.models import ScrapeRuntimeJob, ScrapedCourse, University
 from app.models.scrape_assistant import ScrapeAssistantThread
 from app.services import scrape_assistant as service
+from app.services.assistant_history import LIVE_MESSAGE_LIMIT
 
 router = APIRouter()
 Database = Annotated[AsyncSession, Depends(get_db)]
@@ -166,7 +167,9 @@ async def response(thread, db, job_id=None):
         counts=await pending_counts(db,job.university_id,job_id) if job else None
         return {"reviewCounts":counts,"threadId": None, "status": "idle", "phase": "", "error": None, "messages": [],
                 "activity": [], "queuedAt": None, "startedAt": None, "updatedAt": None}
-    messages = deepcopy(thread.messages)
+    # Full durable history is retained; only the recent action window is live.
+    prefix = list(thread.messages[:-LIVE_MESSAGE_LIMIT])
+    messages = deepcopy(thread.messages[-LIVE_MESSAGE_LIMIT:])
     from app.services.assistant_pending_automation import supersede_changed_merges
     changed = await supersede_changed_merges(service, db, messages)
     for message in messages:
@@ -306,7 +309,7 @@ async def response(thread, db, job_id=None):
                 action["error"] = "Dispatch could not be confirmed. Check existing jobs before starting another correction."
                 changed = True
     if changed:
-        thread.messages = messages
+        thread.messages = prefix + messages
         await db.commit()
     if thread.status == "researching" and service.now() - thread.updated_at > timedelta(seconds=100):
         thread.status, thread.run_id = "queued", None
@@ -395,9 +398,25 @@ async def response(thread, db, job_id=None):
     count_job=await db.get(ScrapeRuntimeJob,thread.job_id)
     counts=await pending_counts(db,count_job.university_id,thread.job_id) if count_job else None
     return {"reviewCounts":counts,"threadId": thread.id, "turnId": thread.turn_id, "status": thread.status, "phase": live_phase,
-            "error": thread.error, "messages": public, "activity": activity,
+            "error": thread.error, "messages": public, "messageCount": len(thread.messages), "activity": activity,
             "queuedAt": queued_at, "startedAt": started_at, "updatedAt": thread.updated_at.isoformat(),
             "relatedReviews": related}
+
+
+@router.get("/jobs/{job_id}/assistant/history")
+async def get_assistant_history(
+    job_id: str, db: Database, actor: Actor,
+    cursor: Annotated[str | None, Query(max_length=2048)] = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+):
+    job = await db.get(ScrapeRuntimeJob, job_id)
+    if not job or job.university_id is None:
+        raise HTTPException(404, "Scrape job not found.")
+    from app.services.assistant_history import university_history
+    try:
+        return await university_history(db, job.university_id, int(actor["id"]), cursor=cursor, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.get("/jobs/{job_id}/assistant")
@@ -468,7 +487,7 @@ async def prompt_assistant(job_id: str, body: PromptBody, db: Database, actor: A
                                      detail="Preparing a bounded, official-source investigation.")]
     from app.services.scrape_assistant_autorun import execution_requested
     from app.config import settings
-    thread.messages = list(thread.messages[-18:]) + [{
+    thread.messages = list(thread.messages) + [{
         "role": "user", "content": prompt, "createdAt": service.now().isoformat(), "turnId": turn, "autoRun": execution_requested(prompt),
         "_engine":"v2" if enabled_for(settings,actor["id"]) else "legacy",
         "_documentToken": body.documentToken,
@@ -494,7 +513,7 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
     if thread is None:
         raise HTTPException(404, "Assistant conversation not found.")
     messages = deepcopy(thread.messages)
-    action = next((a for m in messages for a in m.get("actions", []) if a["id"] == action_id), None)
+    action = next((a for m in messages[-LIVE_MESSAGE_LIMIT:] for a in m.get("actions", []) if a["id"] == action_id), None)
     if action is None:
         raise HTTPException(404, "Proposed action not found.")
     if action["kind"] == "retry_failed":

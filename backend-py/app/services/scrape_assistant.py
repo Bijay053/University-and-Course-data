@@ -1030,6 +1030,7 @@ async def save_research_reply(thread_id, turn_id, run_id, reply, *, detail, phas
         ))
         thread.activity = items[-40:]
         reply["activity"] = public_activity(thread.activity)
-        thread.messages, thread.status = (list(thread.messages) + [reply])[-20:], "ready"
+        # Retention is independent of the bounded model/UI context windows.
+        thread.messages, thread.status = list(thread.messages) + [reply], "ready"
         thread.phase, thread.error, thread.updated_at = phase, None, now()
         await db.commit()
