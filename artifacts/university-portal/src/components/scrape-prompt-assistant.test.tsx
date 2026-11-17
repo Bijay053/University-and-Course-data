@@ -42,14 +42,17 @@ describe("ScrapePromptAssistant", () => {
         intakes: [month], fee: 24800, currency: "GBP", feeYear: 2027,
       })),
     });
-    const previews = [makePreview("Artificial Intelligence MSc", 1), makePreview("Business Analytics MSc", 4)];
+    const previews = [
+      makePreview("Artificial Intelligence MSc", 1), makePreview("Business Analytics MSc", 4),
+      ...Array.from({ length: 11 }, (_, i) => makePreview(`Additional course ${i + 1} MSc`, 20 + i * 3)),
+    ];
     const blocked = {...makePreview("Clinical Research MSc", 7),
       conflicts: {ielts_overall: [{id: 7, value: 7}, {id: 8, value: 6.5}]}};
     const thread: AssistantThread = {...empty, status: "ready", messages: [{
       role: "assistant", content: "Existing intake families checked without fetching pages.",
       createdAt: "2026-11-16T07:00:00Z", actions: [{
         id: "intake-batch", kind: "merge_intakes", label: "Consolidate matching intake families",
-        courseCount: 12, fields: ["course_name", "intake_months"], state: "proposed",
+        courseCount: 26, fields: ["course_name", "intake_months"], state: "proposed",
         requiresConfirmation: true, intakeConsolidations: previews, blockedIntakeConsolidations: [blocked],
       }],
     }]};
@@ -59,6 +62,10 @@ describe("ScrapePromptAssistant", () => {
     expect(screen.getByText("1 intake families need review")).toBeTruthy();
     fireEvent.click(screen.getByTestId("button-run-action-intake-batch"));
     const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.className).toContain("max-h-[calc(100dvh-2rem)]");
+    expect(dialog.className).toContain("overflow-hidden");
+    expect(within(dialog).getAllByRole("region", { name: "Intake consolidation preview" })).toHaveLength(13);
+    expect(within(dialog).getByText("Confirm and start").parentElement?.className).toContain("shrink-0");
     for (const preview of previews)
       expect(within(dialog).getAllByText(preview.courseName, {exact: false}).length).toBeGreaterThan(0);
     expect(within(dialog).queryByText("Clinical Research MSc", {exact: false})).toBeNull();

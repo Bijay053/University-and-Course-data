@@ -881,8 +881,9 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
       )}
 
       <AlertDialog open={!!confirming} onOpenChange={open => { if (!open && !actionBusy) setConfirming(null); }}>
-        <AlertDialogContent data-testid="dialog-confirm-action">
-          <AlertDialogHeader>
+        <AlertDialogContent data-testid="dialog-confirm-action"
+          className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-3xl flex-col overflow-hidden">
+          <AlertDialogHeader className="min-h-0 overflow-y-auto overscroll-contain pr-1">
             <AlertDialogTitle className="flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-amber-600" aria-hidden /> Run "{confirming?.label}"?
             </AlertDialogTitle>
@@ -954,7 +955,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="shrink-0">
             <AlertDialogCancel disabled={actionBusy} data-testid="button-cancel-action">Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={actionBusy || (confirming?.kind === "recover_catalogue" && (selectedUrls.length < 1 || selectedUrls.length > RECOVER_MAX))}
