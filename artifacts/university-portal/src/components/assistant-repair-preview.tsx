@@ -20,13 +20,13 @@ const equalValues = (left: unknown, right: unknown) =>
   Array.isArray(left) || Array.isArray(right)
     ? JSON.stringify(left) === JSON.stringify(right) : left === right;
 
-export function AssistantRepairPreview({ scope, previews, testId, applied = false }: {
-  scope: RepairCourseScope[]; previews?: RepairPreview[]; testId: string; applied?: boolean;
+export function AssistantRepairPreview({ scope, previews, testId, applied = false, scrollable = true }: {
+  scope: RepairCourseScope[]; previews?: RepairPreview[]; testId: string; applied?: boolean; scrollable?: boolean;
 }) {
   return <div className="mt-3 space-y-3 text-[12px]" data-testid={testId}>
     <p className="font-medium">Exact course scope: {scope.length}</p>
-    <div className="max-h-80 space-y-2 overflow-y-auto pr-1" role="region"
-      aria-label="Courses and proposed field values" tabIndex={0}>
+    <div className={scrollable ? "max-h-80 space-y-2 overflow-y-auto pr-1" : "space-y-2"} role="region"
+      aria-label="Courses and proposed field values" tabIndex={scrollable ? 0 : undefined}>
     {scope.map(course => {
       const preview = previews?.find(p => p.id === course.id);
       const href = safeSourceUrl(course.url);

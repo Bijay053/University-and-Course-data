@@ -598,7 +598,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
               : `course${a.courseCount === 1 ? "" : "s"}`}{a.fields.length ? ` · ${a.fields.map(fieldLabel).join(", ")}` : ""}
           </p>
           {a.courseScope && <AssistantRepairPreview scope={a.courseScope}
-            previews={a.repairPreview} testId={`repair-preview-${a.id}`}
+            previews={a.repairPreview} testId={`repair-preview-${a.id}`} scrollable={false}
             applied={a.state === "completed" && typeof a.valuesChanged === "number"} />}
           {a.nameCleanup && <details className="mt-2 text-xs text-amber-950">
             <summary>Course names to clean ({a.nameCleanup.length})</summary>

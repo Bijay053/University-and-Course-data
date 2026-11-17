@@ -195,6 +195,8 @@ describe("ScrapePromptAssistant", () => {
     const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(json(thread));
     render(<ScrapePromptAssistant jobId="checked-review" />);
     const preview = await screen.findByTestId("repair-preview-ielts-preview");
+    expect(within(preview).getByRole("region").classList.contains("overflow-y-auto")).toBe(false);
+    expect(within(preview).getByRole("region").classList.contains("max-h-80")).toBe(false);
     expect(within(preview).getByText("Exact course scope: 1")).toBeTruthy();
     expect(within(preview).getAllByText("Missing")).toHaveLength(4);
     expect(within(preview).getByText("Unchanged")).toBeTruthy();
@@ -202,6 +204,7 @@ describe("ScrapePromptAssistant", () => {
     fireEvent.click(screen.getByTestId("button-run-action-ielts-preview"));
     const dialog = await screen.findByTestId("dialog-confirm-action");
     expect(within(dialog).getByTestId("confirmation-repair-preview")).toBeTruthy();
+    expect(within(within(dialog).getByTestId("confirmation-repair-preview")).getByRole("region").classList.contains("overflow-y-auto")).toBe(true);
     expect(within(dialog).getByRole("table").querySelectorAll("tbody tr")).toHaveLength(5);
     expect(within(dialog).getByText("Speaking")).toBeTruthy();
     fireEvent.click(screen.getByTestId("button-cancel-action"));
