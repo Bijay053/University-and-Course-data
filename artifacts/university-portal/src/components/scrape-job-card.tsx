@@ -15,6 +15,7 @@ import { countPendingReviewCourses } from "@/utils/pending-review-count";
 import { CourseReport } from "@/components/course-report";
 import { useCan } from "@/components/can";
 import { ScrapePromptAssistant } from "@/components/scrape-prompt-assistant";
+import { CurrentReviewSummary } from "@/components/current-review-summary";
 import { LiveScrapeAssistant } from "@/components/live-scrape-assistant";
 import {
   TargetedRetryAllFilteredNotice,
@@ -4800,6 +4801,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
             )}
 
             {/* Full log (scrollable) */}
+            <CurrentReviewSummary pendingCount={visiblePendingReviewCount}
+              originallyStaged={resultSummary?.imported} />
+            <p className="text-xs text-muted-foreground">Original scrape log — historical totals, not the current pending review.</p>
             <div className="relative">
               <div ref={doneLogRef} className="max-h-[600px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
                 {logs.map((l, i) => (

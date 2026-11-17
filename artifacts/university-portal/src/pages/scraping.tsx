@@ -40,6 +40,7 @@ import {
 } from "@/components/review-scraped-courses-table";
 import { ScrapeJobCard } from "@/components/scrape-job-card";
 import { ScrapePromptAssistant } from "@/components/scrape-prompt-assistant";
+import { CurrentReviewSummary } from "@/components/current-review-summary";
 import { preferFreshRepair, startVisiblePolling } from "@/lib/visible-polling";
 import { CourseReport, type CourseReportPrefillCourse } from "@/components/course-report";
 import { DurationReviewNotice, type DurationReviewStatus } from "@/components/duration-review-status";
@@ -1266,6 +1267,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [qualityExpanded, setQualityExpanded] = useState<Set<number>>(new Set());
   const [qualitySortDesc, setQualitySortDesc] = useState(false);
   const [lastScrapeInfo, setLastScrapeInfo] = useState<{ jobId: string; startedAt: string | null; completedAt: string | null; durationMs: number | null; totalFound: number; staged: number; skipped: number; errors: number } | null>(null);
+  const [reviewReloadedAt, setReviewReloadedAt] = useState<number | null>(null);
   const [showReview, setShowReview] = useState(Boolean(initialReviewState));
   const [reviewJobId, setReviewJobId] = useState<string | null>(
     initialReviewState?.jobId ?? null,
@@ -2007,7 +2009,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         const lastScrape = Array.isArray(payload)
           ? null
           : ((payload as { lastScrape?: typeof lastScrapeInfo }).lastScrape ?? null);
-        if (lastScrape) setLastScrapeInfo(lastScrape);
+        setLastScrapeInfo(lastScrape);
         if (controller.signal.aborted) return false;
         const pending = data.filter((c: StagedCourse) => c.status === "pending");
 
@@ -2034,6 +2036,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         stagedCoursesRef.current = pending;
         setApprovalFailures([]);
         setStagedCourses(pending);
+        setReviewReloadedAt(Date.now());
         reviewJobIdRef.current = jobId;
         setReviewJobId(jobId);
         setShowReview(true);
@@ -4031,8 +4034,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                     </Badge>
                   )}
                 </CardTitle>
+                <div className="mt-2">
+                  <CurrentReviewSummary pendingCount={stagedCourses.length}
+                    originallyStaged={lastScrapeInfo?.staged} refreshedAt={reviewReloadedAt} />
+                </div>
                 {lastScrapeInfo && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <details className="text-xs text-gray-500 mt-2" data-testid="original-scrape-history">
+                    <summary className="cursor-pointer">Original scrape history — not current review totals</summary>
+                  <p className="mt-1">
                     Original scrape: <span className="font-medium text-gray-700">
                       {lastScrapeInfo.staged} review entries staged in{" "}
                       {lastScrapeInfo.durationMs != null
@@ -4051,6 +4060,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                       <> &bull; {lastScrapeInfo.totalFound} source courses expanded into campus-specific entries; these are not {lastScrapeInfo.staged} distinct courses</>
                     )}
                   </p>
+                  </details>
                 )}
                 {qualityBlockedCount > 0 && (
                   <p className="mt-2 text-xs text-red-800" role="status" data-testid="text-review-quality-warning">

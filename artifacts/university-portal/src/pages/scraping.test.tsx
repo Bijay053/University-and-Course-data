@@ -380,6 +380,34 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("quality-blocked pending review visibility", { timeout: 20_000 }, () => {
+  it("refreshes current counts after consolidation while keeping original totals explicitly historical", async () => {
+    const review = initialReview();
+    review.courses = Array.from({ length: 182 }, (_, index) => ({
+      ...review.courses[0], id: index + 1, courseName: `Course ${index + 1}`,
+      courseWebsite: `https://example.test/courses/${index + 1}`,
+    }));
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({
+        courses: review.courses.slice(0, 149),
+        lastScrape: { jobId: "repair-job", staged: 182, totalFound: 199,
+          durationMs: 1081000, skipped: 17, errors: 0 },
+      });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    }));
+    render(<ScrapingForTest initialReviewState={review} />);
+    await userEvent.setup().click(screen.getByTitle("Reload staged courses and refresh quality scores"));
+    await waitFor(() => expect(screen.getByTestId("text-review-entry-count").textContent).toContain("149 pending"));
+    expect(screen.getByTestId("current-review-summary").textContent).toContain("33 fewer");
+    expect(screen.getByTestId("original-scrape-history").hasAttribute("open")).toBe(false);
+    expect(screen.getByText(/182 review entries staged in/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Approve (149 courses)" })).toBeTruthy();
+  });
+
   function mockReview(courses: ScrapingInitialReviewState["courses"]) {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
