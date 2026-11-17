@@ -2369,3 +2369,31 @@ describe("Scraping repair reviewer", () => {
     });
   }, 10_000);
 });
+it("keeps the university conversation available for an opened review with zero pending rows", async () => {
+  const jobId = "approved-review";
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+    const url = String(input);
+    if (url === `/api/scrape/jobs/${jobId}/assistant`) return jsonResponse({
+      threadId: "t1", status: "ready", phase: "", error: null, universityName: "Aston University",
+      messages: [{ threadId: "t1", jobId, position: 0, role: "assistant", content: "All 149 rows were approved.",
+        createdAt: "2026-02-01T00:00:00Z" }],
+    });
+    if (url.startsWith(`/api/scrape/jobs/${jobId}/assistant/history?`)) return jsonResponse({
+      messages: [{ threadId: "t0", jobId: "earlier-review", position: 1, role: "assistant",
+        content: "Earlier IELTS check finished.", createdAt: "2026-01-20T00:00:00Z" }],
+      nextCursor: null, retentionNotice: "", universityName: "Aston University",
+    });
+    if (url === "/api/import/history") return jsonResponse([]);
+    if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+    return jsonResponse({});
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<ScrapingForTest initialReviewState={{ universityId: 7, jobId, courses: [] }} />);
+  expect(await screen.findByText("All courses reviewed")).toBeTruthy();
+  const zero = await screen.findByTestId("review-assistant-zero-pending");
+  expect(await within(zero).findByText("All 149 rows were approved.")).toBeTruthy();
+  expect(await within(zero).findByText("Earlier IELTS check finished.")).toBeTruthy();
+  expect(screen.getAllByTestId("scrape-prompt-assistant")).toHaveLength(1);
+  // Opening the chat performs reads only: no approvals, discovery or other mutations.
+  expect(fetchMock.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+});

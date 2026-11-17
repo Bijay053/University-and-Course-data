@@ -1,13 +1,15 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AssistantImportStatus } from "./assistant-import-status";
-import { AssistantUniversityHistory } from "./assistant-university-history";
+import { AssistantSavedMessage } from "./assistant-saved-message";
+import { buildTimeline, clockTime, dayLabel } from "./assistant-timeline";
+import { useAssistantHistory } from "./use-assistant-history";
 import { AssistantMessageAttachment } from "./assistant-message-attachment";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertCircle, ArrowDown, ArrowUp, ExternalLink, FileText, Loader2, Paperclip, ShieldAlert, Sparkles, Wrench, X } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowUp, ExternalLink, FileText, GraduationCap, Loader2, RotateCw, Paperclip, ShieldAlert, Sparkles, Wrench, X } from "lucide-react";
 import { DocumentReviewView, type DocumentReview } from "./assistant-document-review";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { useAuth } from "@/context/auth";
@@ -59,6 +61,9 @@ export type AssistantActivity = {
   durationMs?: number;
 };
 export type AssistantMessage = {
+  threadId?: string;
+  jobId?: string;
+  position?: number;
   role: "user" | "assistant";
   content: string;
   createdAt: string;
@@ -74,6 +79,8 @@ export type AssistantMessage = {
 export type AssistantRelatedReview = { jobId: string; courseName: string; status: string };
 export type AssistantThread = {
   threadId: string | null;
+  universityId?: number | string | null;
+  universityName?: string | null;
   status: "idle" | "queued" | "researching" | "ready" | "error";
   phase: string;
   error: string | null;
@@ -132,6 +139,7 @@ const EXAMPLES = [
   "Check IELTS overall and band scores against the official English requirements page.",
 ];
 const NEAR_BOTTOM_PX = 96;
+const NEAR_TOP_PX = 160;
 
 export function formatDuration(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return "";
@@ -292,6 +300,9 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
   onChangedRef.current = onChanged;
   const viewKeyRef = useRef(viewKey);
   viewKeyRef.current = viewKey;
+  const history = useAssistantHistory(jobId, viewKey);
+  const historyRef = useRef(history);
+  historyRef.current = history;
   const seenCompleted = useRef<Set<string> | null>(null);
   const mutateAbort = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -325,6 +336,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     }
     seenCompleted.current = done;
     setStored({ key: forKey, thread: t });
+    historyRef.current.retainLive(forKey, t.messages);
   }, []);
 
   // Reset on job or identity change and load history.
@@ -402,11 +414,29 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     else setShowJump(true);
   }, [contentSig]);
 
+  // Saved pages: open at the latest message, then keep the reader's position when older pages
+  // are prepended (including the final page). Never moves a reader who has scrolled away.
+  const prevScrollHeight = useRef(0);
+  const historySig = `${history.messages.length}|${history.loading}|${history.error ?? ""}|${history.loaded}`;
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (nearBottom.current) el.scrollTop = el.scrollHeight;
+    else el.scrollTop += el.scrollHeight - prevScrollHeight.current;
+    const h = historyRef.current;
+    // Short transcripts cannot scroll, so keep filling until the panel can or history ends.
+    if (h.hasMore && !h.loading && !h.error && el.scrollHeight > 0 && el.scrollHeight <= el.clientHeight + NEAR_TOP_PX) h.loadOlder();
+  }, [historySig]);
+  useLayoutEffect(() => {
+    if (scrollRef.current) prevScrollHeight.current = scrollRef.current.scrollHeight;
+  });
+
   const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
     nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
-    if (nearBottom.current) setShowJump(false);
+    setShowJump(!nearBottom.current);
+    if (el.scrollTop < NEAR_TOP_PX) historyRef.current.loadOlder();
   };
   const jumpToLatest = () => {
     const el = scrollRef.current;
@@ -424,7 +454,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
-  }, [prompt]);
+  }, [prompt, active]);
 
   const clearAttachment = () => { uploadSeq.current++; setAttachState(null); if (fileRef.current) fileRef.current.value = ""; };
   const attach = async (file: File) => {
@@ -541,7 +571,9 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
     : thread?.status === "queued" ? "Queued, waiting for a research slot"
     : (thread?.phase || "Working");
   const related = onReviewJob ? relatedReviewsFor(thread, jobId) : [];
-  const hasConversation = !!thread && (thread.messages.length > 0 || liveEvents.length > 0 || active);
+  const hasConversation = !!(thread?.messages.length || history.messages.length || liveEvents.length || active);
+  const timeline = buildTimeline(history.messages, thread?.messages ?? []);
+  const universityName = thread?.universityName || history.universityName;
 
   const renderActions = (m: AssistantMessage) => !!m.actions?.length && (
     <div className="mt-3 space-y-2">
@@ -632,33 +664,50 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
 
   return (
     <section
-      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[#f6f4ee] shadow-[0_1px_0_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,60,60,0.18)]"
+      className="flex h-[min(82dvh,820px)] min-h-[440px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[#f6f4ee] shadow-[0_1px_0_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,60,60,0.18)]"
       aria-label="Scrape assistant"
       data-testid="scrape-prompt-assistant"
     >
-      <header className="flex items-center gap-2.5 border-b border-slate-200/80 bg-[#fbfaf6] px-4 py-3">
+      <header className="flex shrink-0 items-center gap-2.5 border-b border-slate-200/80 bg-[#fbfaf6] px-4 py-3">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-800 text-teal-50" aria-hidden>
           <Sparkles className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0">
-          <h3 className="text-[14px] font-semibold leading-tight text-slate-900">Scrape assistant</h3>
-          <p className="truncate text-[11.5px] text-slate-500">Runs research and pending-record repairs automatically. Reports results here. Never publishes automatically.</p>
+          <h3 className="truncate text-[14px] font-semibold leading-tight text-slate-900" data-testid="text-assistant-title">{universityName || "Scrape assistant"}</h3>
+          <p className="truncate text-[11.5px] text-slate-500">{universityName ? "Scrape assistant · " : ""}Researches and repairs pending records. Never publishes automatically.</p>
         </div>
+        {thread?.reviewCounts && (() => {
+          const rc = thread.reviewCounts;
+          const same = rc.providerPendingRows === rc.thisJobPendingRows;
+          return (
+            <span className={`ml-auto inline-flex max-w-[45%] shrink-0 truncate rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[11px] text-teal-900`}
+              title={`${rc.providerPendingRows} pending rows across this university's reviews; ${rc.thisJobPendingRows} in this review`}
+              data-testid="assistant-review-counts">
+              {same ? `${rc.thisJobPendingRows} pending` : `${rc.thisJobPendingRows} pending here · ${rc.providerPendingRows} across university`}
+            </span>
+          );
+        })()}
         {active && (
-          <span className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full bg-teal-100 px-2.5 py-1 text-[11.5px] font-medium text-teal-900" data-testid="status-assistant-active">
+          <span className={`${thread?.reviewCounts ? "" : "ml-auto "}flex shrink-0 items-center gap-1.5 rounded-full bg-teal-100 px-2.5 py-1 text-[11.5px] font-medium text-teal-900`} data-testid="status-assistant-active">
             <Loader2 className="h-3 w-3 motion-safe:animate-spin" aria-hidden />
             {thread?.status === "queued" ? "Queued" : "Working"}
           </span>
         )}
       </header>
-      {viewKey && <AssistantImportStatus key={viewKey} base={base} onStatus={updateImportStatus} />}
-      {viewKey && <AssistantUniversityHistory key={`history:${viewKey}`} jobId={jobId} onReviewJob={onReviewJob} />}
+      {viewKey && (
+        // Always mounted (it supplies import permission state); visually tucked away.
+        <details className="group shrink-0 border-b border-slate-200/70 bg-[#fbfaf6] px-4 text-[11.5px] sm:px-6" data-testid="assistant-conversation-controls">
+          <summary className="cursor-pointer select-none py-1.5 text-slate-500 hover:text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600">Conversation controls</summary>
+          <div className="pb-2"><AssistantImportStatus key={viewKey} base={base} onStatus={updateImportStatus} /></div>
+        </details>
+      )}
 
-      <div className="relative">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scrollRef}
           onScroll={onScroll}
-          className="max-h-[min(70vh,640px)] min-h-[200px] overflow-y-auto px-4 py-5 sm:px-6"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6"
+          style={{ overflowAnchor: "none" }}
           data-testid="assistant-scroll"
         >
           {loading && (
@@ -679,16 +728,30 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             </div>
           )}
 
-          {thread?.reviewCounts && (
-            <div className="mb-3 text-xs text-muted-foreground" data-testid="assistant-review-counts">
-              Provider total: {thread.reviewCounts.providerPendingRows} pending rows across all reviews.
-              {" "}This job: {thread.reviewCounts.thisJobPendingRows} pending rows.
+          {(thread || history.messages.length > 0) && (history.loading || history.error || (history.loaded && history.hasMore) || (history.loaded && history.messages.length > 0)) && (
+            <div className="mb-4 flex justify-center" data-testid="assistant-history-edge">
+              {history.loading ? (
+                <div className="w-full space-y-2" aria-busy="true" role="status" aria-label="Loading earlier messages" data-testid="assistant-history-loading">
+                  <div className="ml-auto h-8 w-2/5 rounded-2xl bg-slate-200/60 motion-safe:animate-pulse" />
+                  <div className="h-3 w-3/5 rounded bg-slate-200/60 motion-safe:animate-pulse" />
+                </div>
+              ) : history.error ? (
+                <div role="alert" className="flex items-center gap-2 rounded-full border border-red-200 bg-red-50 py-1 pl-3 pr-1 text-[12px] text-red-800" data-testid="assistant-history-error">
+                  <span>Earlier messages could not load.</span>
+                  <button type="button" onClick={history.retry}
+                    className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-0.5 font-medium text-red-800 hover:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600"
+                    data-testid="button-history-retry">
+                    <RotateCw className="h-3 w-3" aria-hidden /> Retry
+                  </button>
+                </div>
+              ) : history.hasMore ? (
+                <button type="button" onClick={history.loadOlder}
+                  className="rounded-full px-3 py-1 text-[11.5px] text-teal-800 hover:bg-teal-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600"
+                  data-testid="button-history-older">Show earlier messages</button>
+              ) : (
+                <p className="text-[11px] text-slate-400" data-testid="text-history-start">Start of your conversation{universityName ? ` about ${universityName}` : ""}</p>
+              )}
             </div>
-          )}
-          {thread?.messageCount != null && thread.messageCount > thread.messages.length && (
-            <p className="mb-3 text-xs text-slate-500">
-              Showing the latest {thread.messages.length} messages in this review. Open university history above for earlier saved conversations.
-            </p>
           )}
           {thread && !hasConversation && (
             <div className="mx-auto max-w-lg py-4 text-center" data-testid="assistant-empty">
@@ -709,20 +772,44 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
             </div>
           )}
 
-          {thread && hasConversation && (
+          {hasConversation && (
             <ol className="space-y-5" data-testid="assistant-history">
-              {thread.messages.map((m, i) => {
+              {timeline.map((entry, ti) => {
+                const day = dayLabel(entry.at);
+                const prevDay = ti > 0 ? dayLabel(timeline[ti - 1].at) : null;
+                const divider = day && day !== prevDay && (
+                  <li className="flex items-center gap-3 py-1 text-[11px] text-slate-400" aria-hidden data-testid="assistant-day-divider">
+                    <span className="h-px flex-1 bg-slate-200" />{day}<span className="h-px flex-1 bg-slate-200" />
+                  </li>
+                );
+                if (entry.kind === "saved") return (
+                  <Fragment key={entry.key}>
+                    {divider}
+                    <AssistantSavedMessage message={entry.message} at={entry.at} currentJobId={jobId} onReviewJob={onReviewJob} />
+                  </Fragment>
+                );
+                const m = entry.message;
+                const i = entry.liveIndex;
+                const time = clockTime(entry.at);
                 const archived = m.role === "assistant" ? validEvents(m.activity) : [];
+                const archivedFailed = archived.some(a => a.status === "error");
                 return (
-                  <Fragment key={`${m.createdAt}-${i}`}>
+                  <Fragment key={entry.key}>
+                    {divider}
                     {archived.length > 0 && (
-                      <li className="pl-1" data-testid={`assistant-turn-activity-${i}`}>
-                        <EventList events={archived} testId={`list-activity-${i}`} />
+                      <li className="pl-10" data-testid={`assistant-turn-activity-${i}`}>
+                        <details className="group" open={archivedFailed || undefined}>
+                          <summary className={`inline-flex cursor-pointer select-none items-center gap-1.5 rounded-full px-2 py-0.5 text-[11.5px] hover:bg-black/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600 ${archivedFailed ? "text-red-700" : "text-slate-500"}`}>
+                            <Wrench className="h-3 w-3" aria-hidden />
+                            {archived.length} research step{archived.length === 1 ? "" : "s"}{archivedFailed ? ", some failed" : ""}
+                          </summary>
+                          <div className="mt-2"><EventList events={archived} testId={`list-activity-${i}`} /></div>
+                        </details>
                       </li>
                     )}
                     {m.role === "user" ? (
-                      <li className="flex justify-end" data-testid={`assistant-message-${i}`} data-role="user">
-                        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-teal-900 px-3.5 py-2.5 text-[13.5px] leading-relaxed text-teal-50">
+                      <li className="flex flex-col items-end" data-testid={`assistant-message-${i}`} data-role="user">
+                        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[#e6ece9] px-3.5 py-2.5 text-[13.5px] leading-relaxed text-slate-900">
                           <span className="sr-only">You said: </span>
                           {m.attachment && m.turnId && ["image/png", "image/jpeg"].includes(m.attachment.contentType) && (
                             <AssistantMessageAttachment
@@ -730,24 +817,22 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                               filename={m.attachment.filename} />
                           )}
                           <p className="whitespace-pre-wrap break-words">{String(m.content ?? "")}</p>
-                          <time dateTime={m.createdAt} className="mt-1 block text-right text-[10.5px] text-teal-200/80">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
                         </div>
+                        {time && <time dateTime={m.createdAt} className="mt-1 pr-1 text-[10.5px] text-slate-400">{time}</time>}
                       </li>
                     ) : (
                       <li className="flex gap-3" data-testid={`assistant-message-${i}`} data-role="assistant">
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-teal-800 text-teal-50" aria-hidden>
-                          <Sparkles className="h-3 w-3" />
+                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-800 text-teal-50" aria-hidden>
+                          <GraduationCap className="h-3.5 w-3.5" />
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-1 flex items-baseline gap-2 text-[11px] text-slate-500">
-                            <span className="font-medium text-slate-700">Assistant</span>
-                            <time dateTime={m.createdAt}>{new Date(m.createdAt).toLocaleString()}</time>
-                          </div>
+                        <div className="min-w-0 flex-1 text-[13.5px] text-slate-800">
+                          <span className="sr-only">Assistant: </span>
                           {/* Safe markdown: rendered as React text nodes, never as HTML. */}
                           <AssistantMarkdown content={String(m.content ?? "")} />
                           {!!m.sources?.length && (
-                            <div className="mt-3 space-y-2">
-                              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Evidence</p>
+                            <details className="mt-2.5">
+                              <summary className="cursor-pointer select-none text-[12px] text-teal-800 hover:text-teal-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600">Evidence ({m.sources.length})</summary>
+                              <div className="mt-1.5 space-y-2">
                               {m.sources.map((s, si) => {
                                 const sourceHref = safeSourceUrl(s.url);
                                 const page = typeof s.page === "number" && Number.isSafeInteger(s.page) && s.page > 0 ? s.page : null;
@@ -767,7 +852,8 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                                   </blockquote>
                                 );
                               })}
-                            </div>
+                              </div>
+                            </details>
                           )}
                           {m.comparison && typeof m.comparison === "object" && (
                             <CatalogueComparisonView comparison={m.comparison} onReviewJob={onReviewJob} testId={`assistant-comparison-${i}`} />
@@ -776,6 +862,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                             <DocumentReviewView review={m.documentReview} testId={`assistant-document-review-${i}`} />
                           )}
                           {renderActions(m)}
+                          {time && <time dateTime={m.createdAt} className="mt-1 block text-[10.5px] text-slate-400">{time}</time>}
                         </div>
                       </li>
                     )}
@@ -797,7 +884,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                 </li>
               )}
 
-              {thread.status === "error" && thread.error && (
+              {thread?.status === "error" && thread.error && (
                 <li role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-800" data-testid="assistant-thread-error">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                   <span>Investigation failed: {thread.error}</span>
@@ -809,7 +896,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
 
         {showJump && (
           <button type="button" onClick={jumpToLatest}
-            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-700 shadow-md hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600"
+            className="absolute bottom-3 right-4 flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-700 shadow-md hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600"
             data-testid="button-jump-latest">
             <ArrowDown className="h-3.5 w-3.5" aria-hidden /> Jump to latest
           </button>
@@ -817,7 +904,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
       </div>
 
       {related.length > 0 && (
-        <div className="mx-4 mb-3 space-y-2 rounded-xl border border-teal-200 bg-white p-3 sm:mx-6" data-testid="assistant-related-reviews">
+        <div className="mx-4 mb-3 shrink-0 space-y-2 rounded-xl border border-teal-200 bg-white p-3 sm:mx-6" data-testid="assistant-related-reviews">
           <p className="text-[12.5px] font-semibold text-teal-900">Available course review</p>
           <p className="text-[11.5px] text-slate-600">A pending review in another job of this university includes a course you asked about. Opening it does not change earlier results here.</p>
           {related.map(r => (
@@ -834,7 +921,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
       )}
 
       {thread && (
-        <form onSubmit={e => { e.preventDefault(); void submit(); }} className="border-t border-slate-200/80 bg-[#fbfaf6] px-4 py-3 sm:px-6">
+        <form onSubmit={e => { e.preventDefault(); void submit(); }} className="shrink-0 border-t border-slate-200/80 bg-[#fbfaf6] px-4 py-3 sm:px-6">
           <label htmlFor={`assistant-prompt-${jobId}`} className="sr-only">Message the scrape assistant</label>
           {attachment && (
             <div className={`mb-2 flex items-center gap-2 rounded-xl border px-3 py-1.5 text-[12px] ${attachment.status === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-teal-200 bg-teal-50/60 text-teal-950"}`} data-testid="assistant-attachment" data-status={attachment.status}>
@@ -880,7 +967,7 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                 e.preventDefault();
                 void submit();
               }}
-              placeholder={active ? "The assistant is working. You can draft your next message." : "Ask about missing courses, fees, IELTS, durations..."}
+              placeholder={active ? "Draft here…" : "Message…"}
               rows={1}
               disabled={disabled}
               aria-describedby={`assistant-hint-${jobId}`}

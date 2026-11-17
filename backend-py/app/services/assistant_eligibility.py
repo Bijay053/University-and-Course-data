@@ -282,7 +282,7 @@ async def persist(service, thread_id, turn_id, run_id, ctx, rows, results, *, co
                 "fields": [], "state": "proposed", "requiresConfirmation": True,
                 "_undo": undo, "_universityId": ctx["university_id"],
             })
-        thread.messages = (list(thread.messages) + [reply])[-20:]
+        thread.messages = list(thread.messages) + [reply]
         thread.activity = items[-40:]
         thread.status, thread.phase, thread.error = "ready", "Eligibility check finished", None
         thread.updated_at = service.now()

@@ -16,6 +16,15 @@ vi.mock("./assistant-import-status", async () => {
   }};
 });
 
+// The saved-conversation loader issues its own automatic GET; it is covered in
+// use-assistant-history.test.tsx and the merged-timeline test. Here it is stubbed so the
+// live fixtures keep asserting exact GET/POST sequences for actions and approvals.
+vi.mock("./use-assistant-history", () => ({
+  HISTORY_PAGE_SIZE: 20,
+  useAssistantHistory: () => ({ messages: [], universityName: null, loaded: true, loading: false,
+    error: null, hasMore: false, loadOlder: () => {}, retry: () => {}, retainLive: () => {} }),
+}));
+
 import { ScrapePromptAssistant, ASSISTANT_IDLE_POLL_MS, type AssistantThread } from "./scrape-prompt-assistant";
 
 const json = (body: unknown, status = 200) =>

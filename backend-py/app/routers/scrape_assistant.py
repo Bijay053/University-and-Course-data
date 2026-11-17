@@ -165,7 +165,10 @@ async def response(thread, db, job_id=None):
         from app.services.review_counts import pending_counts
         job=await db.get(ScrapeRuntimeJob,job_id) if job_id else None
         counts=await pending_counts(db,job.university_id,job_id) if job else None
-        return {"reviewCounts":counts,"threadId": None, "status": "idle", "phase": "", "error": None, "messages": [],
+        university=await db.get(University,job.university_id) if job else None
+        return {"universityId":job.university_id if job else None,
+                "universityName":university.name if university else None,
+                "reviewCounts":counts,"threadId": None, "status": "idle", "phase": "", "error": None, "messages": [],
                 "activity": [], "queuedAt": None, "startedAt": None, "updatedAt": None}
     # Full durable history is retained; only the recent action window is live.
     prefix = list(thread.messages[:-LIVE_MESSAGE_LIMIT])
@@ -324,7 +327,8 @@ async def response(thread, db, job_id=None):
         await db.commit()
     public = deepcopy(messages)
     from app.services.assistant_documents import message_image
-    for original, visible in zip(messages, public):
+    for position, (original, visible) in enumerate(zip(messages, public), start=len(prefix) + 1):
+        visible.update(threadId=thread.id, jobId=thread.job_id, position=position)
         image = message_image(original, thread.actor_id, thread.job_id)
         if image:
             visible["attachment"] = {"filename": image["filename"], "contentType": image["contentType"]}
@@ -397,7 +401,10 @@ async def response(thread, db, job_id=None):
     from app.services.review_counts import pending_counts
     count_job=await db.get(ScrapeRuntimeJob,thread.job_id)
     counts=await pending_counts(db,count_job.university_id,thread.job_id) if count_job else None
-    return {"reviewCounts":counts,"threadId": thread.id, "turnId": thread.turn_id, "status": thread.status, "phase": live_phase,
+    university=await db.get(University,count_job.university_id) if count_job else None
+    return {"universityId":count_job.university_id if count_job else None,
+            "universityName":university.name if university else None,
+            "reviewCounts":counts,"threadId": thread.id, "turnId": thread.turn_id, "status": thread.status, "phase": live_phase,
             "error": thread.error, "messages": public, "messageCount": len(thread.messages), "activity": activity,
             "queuedAt": queued_at, "startedAt": started_at, "updatedAt": thread.updated_at.isoformat(),
             "relatedReviews": related}
@@ -414,9 +421,12 @@ async def get_assistant_history(
         raise HTTPException(404, "Scrape job not found.")
     from app.services.assistant_history import university_history
     try:
-        return await university_history(db, job.university_id, int(actor["id"]), cursor=cursor, limit=limit)
+        result=await university_history(db, job.university_id, int(actor["id"]), cursor=cursor, limit=limit)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+    university=await db.get(University,job.university_id)
+    return {**result,"universityId":job.university_id,
+            "universityName":university.name if university else None}
 
 
 @router.get("/jobs/{job_id}/assistant")

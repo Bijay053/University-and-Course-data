@@ -39,10 +39,14 @@ Use one atomic bulk_edit for up to ten supported rows. Never repeat a denied ope
 Give concise progress explanations, not private reasoning. Confirm completion from the tool results."""
 
 
-async def investigate(service, thread_id, turn_id, run_id):
+async def investigate(service, thread_id, turn_id, run_id, *, references=None):
     async with service.AsyncSessionLocal() as db:
         thread = await db.get(ScrapeAssistantThread, thread_id)
         job_id, saved = thread.job_id, deepcopy(thread.messages)
+        from app.services.assistant_conversation_context import university_context, with_cross_review_context, REFERENCE_NOTICE
+        if references is None:
+            references=await university_context(db,thread,saved[-1]["content"])
+        saved=with_cross_review_context(saved,references,thread.id)
     ctx = await service.context(job_id)
     prompt = next(m["content"] for m in reversed(saved) if m["role"] == "user")
     from app.services.assistant_staff_locations import handle as staff_locations
@@ -55,7 +59,10 @@ async def investigate(service, thread_id, turn_id, run_id):
     if await live_diagnostics(service, thread_id, turn_id, run_id, ctx, prompt):
         return
     tools = DataTools(service, thread_id, turn_id, run_id, ctx, prompt)
-    history = [{"role":"system","content":SYSTEM}]
+    history = [{"role":"system","content":SYSTEM + "\n" + REFERENCE_NOTICE}]
+    if references:
+        history.append({"role":"user","content":json.dumps({
+            "savedUniversityConversation":references,"notice":REFERENCE_NOTICE},ensure_ascii=False)})
     history.extend({"role":m["role"],"content":m.get("content","")} for m in saved[-12:])
     request=next(m for m in reversed(saved) if m["role"]=="user")
     if request.get("_imageObservation"):

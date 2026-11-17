@@ -3697,6 +3697,25 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     }
   }, []);
 
+  // Shared assistant panel: same conversation and unsaved-edit guards whether or not rows remain pending.
+  const assistantPanel = reviewJobId ? (
+    <div className="mb-3" data-testid="review-assistant-panel">
+      {assistantRefreshDeferred && (
+        <p role="status" className="mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800" data-testid="status-assistant-refresh-deferred">
+          Assistant changes are ready. The review list will refresh after you save or discard your open edits.
+        </p>
+      )}
+      <ScrapePromptAssistant
+        jobId={reviewJobId}
+        onChanged={handleAssistantReviewChanged}
+        onReviewJob={handleAssistantOpenReview}
+        disabled={reviewRefreshing}
+      />
+      {bulkFixRefreshError && (
+        <p role="status" className="mt-2 text-xs text-amber-800">{bulkFixRefreshError}</p>
+      )}
+    </div>
+  ) : null;
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -4207,24 +4226,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 </section>
               </Can>
             )}
-            {reviewJobId && (
-              <div className="mb-3">
-                {assistantRefreshDeferred && (
-                  <p role="status" className="mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800" data-testid="status-assistant-refresh-deferred">
-                    Assistant changes are ready. The review list will refresh after you save or discard your open edits.
-                  </p>
-                )}
-                <ScrapePromptAssistant
-                  jobId={reviewJobId}
-                  onChanged={handleAssistantReviewChanged}
-                  onReviewJob={handleAssistantOpenReview}
-                  disabled={reviewRefreshing}
-                />
-                {bulkFixRefreshError && (
-                  <p role="status" className="mt-2 text-xs text-amber-800">{bulkFixRefreshError}</p>
-                )}
-              </div>
-            )}
+            {assistantPanel}
             <DatedCatalogueReview courses={stagedCourses} />
             {bulkFixJob && (
               <div className={`mb-3 rounded-lg border p-3 ${
@@ -4956,6 +4958,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <p className="text-muted-foreground text-sm mt-1">All scraped courses have been approved or rejected.</p>
           </CardContent>
         </Card>
+      )}
+      {showReview && stagedCourses.length === 0 && assistantPanel && (
+        <section className="mt-4" aria-label="Review conversation" data-testid="review-assistant-zero-pending">{assistantPanel}</section>
       )}
 
       {/* Force-cancel confirmation dialog — replaces native browser confirm() */}

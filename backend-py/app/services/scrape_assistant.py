@@ -295,6 +295,10 @@ async def investigate(thread_id: str, turn_id: str):
                 claimed_thread=await db.get(ScrapeAssistantThread,thread_id)
                 requested=next(m for m in reversed(claimed_thread.messages) if m["role"]=="user")
                 v2=requested.get("_engine")=="v2" or "_agentV2" in requested
+                from app.services.assistant_conversation_context import university_context, with_cross_review_context
+                conversation_references=await university_context(db,claimed_thread,requested["content"])
+                conversation_messages=with_cross_review_context(
+                    claimed_thread.messages,conversation_references,claimed_thread.id)
             # Job diagnostics and confirmed runtime previews are deterministic
             # controls, not an optional agent-engine capability. Dispatch them
             # before engine selection so every authorized staff member gets
@@ -308,16 +312,16 @@ async def investigate(thread_id: str, turn_id: str):
                     await run_automatic_action(thread_id, turn_id)
                     return
             from app.services.assistant_intake_consolidation import requested as consolidation_requested, handle as consolidate_intakes
-            if consolidation_requested(requested["content"], claimed_thread.messages):
+            if consolidation_requested(requested["content"], conversation_messages):
                 ctx = await context(claimed_thread.job_id)
                 if await consolidate_intakes(service, thread_id, turn_id, run_id, ctx,
-                                             requested["content"], claimed_thread.messages):
+                                             requested["content"], conversation_messages):
                     await run_automatic_action(thread_id, turn_id)
                     return
             if requested.get("_documentToken"):
                 from app.services.assistant_image_review import image_read_requested, action_requested, review as review_image
                 if image_read_requested(requested, claimed_thread.actor_id, claimed_thread.job_id,
-                                        claimed_thread.messages):
+                                        conversation_messages):
                     continuing = action_requested(requested["content"])
                     await review_image(service, thread_id, turn_id, run_id, claimed_thread, requested,
                                        continue_request=continuing)
@@ -329,7 +333,7 @@ async def investigate(thread_id: str, turn_id: str):
             if intake_requested(requested["content"]):
                 ctx = await context(claimed_thread.job_id)
                 if await intake_review(service, thread_id, turn_id, run_id, ctx,
-                                       requested["content"], claimed_thread.messages):
+                                       requested["content"], conversation_messages):
                     await run_automatic_action(thread_id, turn_id)
                     return
             from app.services.selective_retry import retry_requested
@@ -347,12 +351,12 @@ async def investigate(thread_id: str, turn_id: str):
                 return
             from app.services.assistant_document_review import requested as document_requested, review as review_document
             from app.services.assistant_staff_values import parse as parse_staff
-            staff_request = parse_staff(requested["content"], claimed_thread.messages)
+            staff_request = parse_staff(requested["content"], conversation_messages)
             if staff_request and staff_request.values and not staff_request.error:
                 from app.services.assistant_staff_locations import handle as handle_staff
                 ctx = await context(claimed_thread.job_id)
                 if await handle_staff(service, thread_id, turn_id, run_id, ctx,
-                                      requested["content"], claimed_thread.messages):
+                                      requested["content"], conversation_messages):
                     return
             # IELTS component recovery is an executable existing-row operation,
             # including a field-only follow-up to the previous user prompt.
@@ -360,10 +364,10 @@ async def investigate(thread_id: str, turn_id: str):
             # edit fallback or the model turn it into discovery or copy a score.
             from app.services.assistant_field_edits import evidence_edit_field, handle_field_edit
             if (not document_requested(requested)
-                    and evidence_edit_field(requested["content"], claimed_thread.messages) == "ielts"):
+                    and evidence_edit_field(requested["content"], conversation_messages) == "ielts"):
                 ctx = await context(claimed_thread.job_id)
                 if await handle_field_edit(service, thread_id, turn_id, run_id, ctx,
-                                           requested["content"], claimed_thread.messages):
+                                           requested["content"], conversation_messages):
                     await run_automatic_action(thread_id, turn_id)
                     return
             if document_requested(requested):
@@ -374,9 +378,9 @@ async def investigate(thread_id: str, turn_id: str):
                 if not enabled_for(settings, claimed_thread.actor_id):
                     raise ValueError("The new agent is disabled; unfinished work will not fall back to another engine")
                 from app.services.scrape_agent_v2.runtime import investigate as investigate_v2
-                await investigate_v2(service, thread_id, turn_id, run_id)
+                await investigate_v2(service, thread_id, turn_id, run_id, references=conversation_references)
             else:
-                await _investigate(thread_id, turn_id, run_id)
+                await _investigate(thread_id, turn_id, run_id, conversation_references)
         await run_automatic_action(thread_id, turn_id)
     except asyncio.CancelledError:
         async with AsyncSessionLocal() as db:
@@ -504,13 +508,17 @@ def requested_course_urls(prompt, messages, home):
     return []
 
 
-async def _investigate(thread_id: str, turn_id: str, run_id: str):
+async def _investigate(thread_id: str, turn_id: str, run_id: str, references=None):
     await progress(thread_id, turn_id, "Reading this scrape and its review records", run_id)
     async with AsyncSessionLocal() as db:
         thread = await db.get(ScrapeAssistantThread, thread_id)
         if not thread or thread.turn_id != turn_id:
             return
         job_id, messages = thread.job_id, list(thread.messages)
+        from app.services.assistant_conversation_context import university_context, with_cross_review_context, REFERENCE_NOTICE
+        if references is None:
+            references=await university_context(db,thread,messages[-1]["content"])
+        messages=with_cross_review_context(messages,references,thread.id)
     ctx = await context(job_id)
     from app.services.scraper.config.context import set_uni_config
     set_uni_config(ctx["config"])
@@ -805,9 +813,11 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             "Match recent operations to their requested URLs; do not transfer one course's outcome to another."
             " When executionMode is automatic_pending_only, supported actions run automatically after this answer. "
             "Do not ask the user to confirm, select courses, or click Review and run. Do not claim completion before results exist. "
-            "Publishing, deletion and deployment are never authorized by this mode."
+            "Publishing, deletion and deployment are never authorized by this mode. "
+            + REFERENCE_NOTICE
         ),
         user=json.dumps({"prompt": prompt, "recentConversation": history,
+                         "savedUniversityConversation": references,
                          "staffImageContext": messages[-1].get("_imageObservation"),
                          "requestedCourseUrls": recent_user_urls,
                          "reviewWideScope": review_wide,
