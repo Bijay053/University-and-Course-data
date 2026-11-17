@@ -18,7 +18,7 @@ def choose_action(actions):
                 and (a.get("kind") in {
         "scan_catalogue", "recover_catalogue", "review_courses", "fix_fields", "repair_catalogue",
         "merge_intakes"} or a.get("automaticPending") and a.get("kind") in {
-            "staff_edit", "staff_location", "document_update"})]
+            "staff_edit", "staff_location", "document_update", "cleanup_names"})]
     # A full discovery covers bounded recovery candidates too; never launch both.
     return next((a for a in proposed if a["kind"] == "scan_catalogue"), next(iter(proposed), None))
 
@@ -67,6 +67,7 @@ async def autorun(thread_id, turn_id):
             urls = action.get("_requestedUrls", [])[:20] if action["kind"] == "recover_catalogue" else None
             await confirm_action(thread.job_id, action["id"], ConfirmBody(confirm=True, courseUrls=urls), db, actor)
         except Exception as exc:
+            service.logger.exception("Automatic assistant action failed: kind=%s", action.get("kind"))
             from fastapi import HTTPException
             await db.rollback()
             thread = (await db.execute(select(ScrapeAssistantThread).where(

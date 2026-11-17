@@ -22,7 +22,8 @@ export { safeSourceUrl };
 export type AssistantSource = { url: string; title: string; excerpt: string; page?: number; quoteId?: string };
 export type AssistantAction = {
   id: string;
-  kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed" | "document_update" | "merge_intakes" | "undo_intake_merge";
+  kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed" | "document_update" | "merge_intakes" | "undo_intake_merge" | "cleanup_names" | "undo_name_cleanup";
+  nameCleanup?: { beforeName: string; afterName: string; intakes: string[] }[];
   requiresConfirmation?: boolean;
   automaticPending?: boolean;
   label: string;
@@ -101,7 +102,7 @@ export const MAX_DOCUMENT_BYTES = 2_000_000;
 export function actionNeedsConfirmation(a: AssistantAction): boolean {
   return !!a.requiresConfirmation
     || (a.kind === "fix_fields" && a.requiresConfirmation !== false)
-    || ["runtime_tuning", "staff_edit", "staff_location", "undo_staff_location", "document_update", "undo_intake_merge"].includes(a.kind);
+    || ["runtime_tuning", "staff_edit", "staff_location", "undo_staff_location", "document_update", "undo_intake_merge", "cleanup_names", "undo_name_cleanup"].includes(a.kind);
 }
 export function validateDocument(file: File): string | null {
   const isPdf = file.type === "application/pdf" && /\.pdf$/i.test(file.name);
@@ -565,6 +566,15 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
           {a.courseScope && <AssistantRepairPreview scope={a.courseScope}
             previews={a.repairPreview} testId={`repair-preview-${a.id}`}
             applied={a.state === "completed" && typeof a.valuesChanged === "number"} />}
+          {a.nameCleanup && <details className="mt-2 text-xs text-amber-950">
+            <summary>Course names to clean ({a.nameCleanup.length})</summary>
+            <p>Names only. Intakes, fees and delivery options are retained; no records are merged.</p>
+            <ul className="mt-1 space-y-1">
+              {a.nameCleanup.map((item, index) => <li key={index}>
+                {item.beforeName} → {item.afterName} · Intakes: {item.intakes.join(", ")}
+              </li>)}
+            </ul>
+          </details>}
           {a.progress && (a.state === "starting" || a.state === "running") && (
             <div className="mt-2">
               <div className="h-1.5 overflow-hidden rounded-full bg-amber-100" role="progressbar" aria-valuemin={0} aria-valuemax={a.progress.total} aria-valuenow={a.progress.current}>
@@ -901,6 +911,10 @@ export function ScrapePromptAssistant({ jobId, onChanged, disabled, onReviewJob 
                     ? "This requests the displayed old/new settings for this job only. The owning worker must acknowledge before this is reported as applied. Active requests finish normally. Provider throttles and fleet limits remain in place. Nothing is restarted, discarded or published."
                     : confirming?.kind === "undo_staff_location"
                     ? "This restores the prior audited locations and provenance. It refuses to overwrite later edits. No page fetch or discovery runs."
+                    : confirming?.kind === "cleanup_names"
+                    ? "This removes only the intake-date suffix from the listed pending course names. Intakes, fees, delivery options and source evidence are retained. No records are merged, excluded or published. Audited undo is available."
+                    : confirming?.kind === "undo_name_cleanup"
+                    ? "This restores the original course names only. It refuses to overwrite later edits and does not fetch pages or change intake or fee values."
                     : confirming?.kind === "staff_location" || confirming?.kind === "staff_edit"
                     ? "This saves the supplied values on the exact records listed in the chat, with staff-provided provenance and an audit log. It does not independently verify them, fetch pages or run catalogue discovery."
                     : confirming?.kind === "merge_intakes"

@@ -301,6 +301,12 @@ async def investigate(thread_id: str, turn_id: str):
             # the same preview/acknowledgement contract, including legacy users.
             from app.services.live_scrape_diagnostics import handle as live_diagnostics
             from app.services import scrape_assistant as service
+            from app.services.assistant_name_cleanup import requested as cleanup_requested, handle as cleanup_names
+            if cleanup_requested(requested["content"]):
+                cleanup_ctx = await context(claimed_thread.job_id)
+                if await cleanup_names(service, thread_id, turn_id, run_id, cleanup_ctx, requested["content"]):
+                    await run_automatic_action(thread_id, turn_id)
+                    return
             from app.services.assistant_intake_consolidation import requested as consolidation_requested, handle as consolidate_intakes
             if consolidation_requested(requested["content"], claimed_thread.messages):
                 ctx = await context(claimed_thread.job_id)
@@ -568,7 +574,9 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         history = history[-1:] if name_resolution.get("inherited") else []
         review_wide = False
         if name_resolution.get("requestPrompt"):
-            prompt = name_resolution["requestPrompt"] + "\nSelected course: " + name_resolution["choices"][0]["title"]
+            prompt = name_resolution["requestPrompt"] + "\nSelected course options: " + "; ".join(
+                item["title"] for item in name_resolution["choices"]
+            )
     source_prompt = prompt + " " + " ".join(recent_user_urls[:3])
     if review_wide:
         source_prompt = topic_messages[0]["content"] + " " + source_prompt
@@ -755,6 +763,12 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
             "Use recorded skip reasons when available. Do not confuse unpublished review records with missing discovery. "
             "Check universityInventory: an approved course or one in another review is not missing discovery. "
             "Never propose bulk correction of unrelated rows when the requested course is outside this review. "
+            "Short course-name requests need no row numbers or technical prompts. "
+            "When a name resolves to several intake options, investigate each selected option separately; "
+            "shared names never authorize merging different delivery variants or copying their values. "
+            "Use course-owned teaching, delivery and location labels, not navigation, application-process "
+            "references or related-course cards. A missing tuition amount needs its selected course's "
+            "international audience, fee year, currency and fee basis; otherwise report it as unverified. "
             "Only propose a correction if the user requested one and evidence supports investigation. "
             "Actions never approve/publish/delete or directly write model-generated numbers. "
             "fix_fields reruns validated extraction only for the server-scoped existing pending rows "

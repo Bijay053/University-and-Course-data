@@ -330,7 +330,7 @@ async def response(thread, db, job_id=None):
         current_start = max((index for index, message in enumerate(messages)
                              if message["role"] == "user"), default=0)
         actions = [action for message in messages[current_start:] for action in message.get("actions", [])
-                   if action.get("kind") not in {"undo_exclusion", "undo_staff_location", "undo_intake_merge"}]
+                   if action.get("kind") not in {"undo_exclusion", "undo_staff_location", "undo_intake_merge", "undo_name_cleanup"}]
         if any(action["state"] in {"starting", "running"} for action in actions):
             live_phase = "Research complete — work is running. Results are not yet verified."
         elif actions and actions[-1]["state"] == "completed":
@@ -569,6 +569,22 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
         except ValueError as exc:
             await db.rollback()
             raise HTTPException(409, str(exc)) from exc
+        if not undo:
+            message = next(m for m in messages if any(a["id"] == action_id for a in m.get("actions", [])))
+            message["actions"].append(undo_proposal(action))
+        thread.messages = messages
+        await db.commit()
+        return await response(thread, db, job_id)
+    if action["kind"] in {"cleanup_names", "undo_name_cleanup"}:
+        from app.services.assistant_name_cleanup import apply as apply_cleanup, undo_proposal
+        undo = action["kind"] == "undo_name_cleanup"
+        if not undo and action.get("_turnId") != thread.turn_id:
+            raise HTTPException(409, "This cleanup belongs to an older request")
+        try:
+            await apply_cleanup(service, db, action, job.university_id, actor["id"], undo=undo)
+        except ValueError as exc:
+            await db.rollback()
+            raise HTTPException(409, str(exc))
         if not undo:
             message = next(m for m in messages if any(a["id"] == action_id for a in m.get("actions", [])))
             message["actions"].append(undo_proposal(action))

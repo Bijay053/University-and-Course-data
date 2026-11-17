@@ -16,6 +16,59 @@ PREFIX = re.compile(
     r"(?:\s+(?:of|in))?\s+", re.I,
 )
 CONTEXTUAL = re.compile(r"\b(?:this|that|same|again|it|retry|results?|progress)\b", re.I)
+MONTH = r"January|February|March|April|May|June|July|August|September|October|November|December"
+MONTH_ALIASES = {alias.casefold(): month for month in MONTH.split("|")
+                 for alias in (month, month[:3])} | {"sept": "September"}
+PROMPT_MONTH = "|".join(sorted(MONTH_ALIASES, key=len, reverse=True))
+DATED_TITLE = re.compile(rf"^(.*?)\s*\(\s*({MONTH})\s+(20\d{{2}})\s*\)\s*$", re.I)
+DATED_URL = re.compile(rf"^(.*)/({MONTH})-(20\d{{2}})/?$", re.I)
+
+
+def family_identity(item):
+    """Group only matching name/URL intake suffixes, never delivery variants."""
+    from urllib.parse import urlsplit, urlunsplit
+    title = item["title"].strip()
+    parts = urlsplit(item["url"])
+    dated = DATED_TITLE.fullmatch(title)
+    path = DATED_URL.fullmatch(parts.path)
+    if dated:
+        if (not path or parts.query
+                or dated[2].casefold() != path[2].casefold()
+                or dated[3] != path[3]):
+            return (normal(title), item["url"].rstrip("/"))
+        title, course_path = dated[1], path[1]
+    elif path:
+        # An unlabelled or mismatched dated URL is not proof of intake identity.
+        return (normal(title), item["url"].rstrip("/"))
+    else:
+        course_path = parts.path.rstrip("/")
+    return (normal(title), urlunsplit((parts.scheme, parts.netloc, course_path, parts.query, "")))
+
+
+def family_matches(prompt, choices):
+    """A short award title targets its options; option dates still narrow it."""
+    text = " " + normal(positive_request(prompt)) + " "
+    found = [item for item in choices
+             if " " + family_identity(item)[0] + " " in text]
+    # Retain longest-title preference: MSc X is not MSc X with placement.
+    found = [item for item in found if not any(
+        family_identity(item)[0] != family_identity(other)[0]
+        and (" " + family_identity(item)[0] + " ") in
+            (" " + family_identity(other)[0] + " ")
+        for other in found
+    )]
+    dates = re.findall(rf"\b({PROMPT_MONTH})\.?\s+(20\d{{2}})\b", positive_request(prompt), re.I)
+    if dates:
+        selected = {normal(MONTH_ALIASES[month.casefold()] + " " + year) for month, year in dates}
+        found = [item for item in found if (date := DATED_TITLE.fullmatch(item["title"]))
+                 and normal(date[2] + " " + date[3]) in selected]
+    return found
+
+
+def name_predicate(column, value):
+    """Literal, case-insensitive tool lookup, including labelled options."""
+    value = value.strip().replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+    return column.ilike(value, escape="\\") | column.ilike(value + " (%)", escape="\\")
 
 
 def normal(value):
@@ -48,6 +101,9 @@ def candidates(rows, home):
 
 def matches(prompt, choices):
     text = " " + normal(positive_request(prompt)) + " "
+    families = family_matches(prompt, choices)
+    if families:
+        return families
     exact = [item for item in choices if " " + normal(item["title"]) + " " in text]
     if exact:
         # A full longer title is not also a request for its shorter prefix.
@@ -77,7 +133,9 @@ def matches(prompt, choices):
 
 
 def result(choices, *, incomplete=False):
-    return {"state": "resolved" if len(choices) == 1 and not incomplete else "choice",
+    incomplete = incomplete or len(choices) > 10
+    same_family = bool(choices) and len({family_identity(item) for item in choices}) == 1
+    return {"state": "resolved" if same_family and not incomplete else "choice",
             "choices": choices[:10], "incomplete": incomplete}
 
 

@@ -31,6 +31,29 @@ afterEach(() => {
 });
 
 describe("ScrapePromptAssistant", () => {
+  it("shows name-only bulk cleanup and starts automatically without a manual run", async () => {
+    const thread: AssistantThread = {
+      threadId: "names", status: "ready", phase: "", error: null,
+      messages: [{
+        role: "assistant", content: "Prepared name-only cleanup.", createdAt: "2026-11-17T03:00:00Z",
+        sources: [], actions: [{
+          id: "cleanup", kind: "cleanup_names", state: "proposed",
+          label: "Remove intake dates from pending course names", courseCount: 17,
+          fields: ["course_name"], automaticPending: true, requiresConfirmation: false,
+          nameCleanup: [{
+            beforeName: "Finance MSc (January 2027)", afterName: "Finance MSc", intakes: ["January"],
+          }],
+        }],
+      }],
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(json(thread));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    await screen.findByText(/Starting automatically/);
+    expect(screen.getByText(/Names only. Intakes, fees and delivery options are retained/)).toBeTruthy();
+    expect(screen.getByText(/Finance MSc \(January 2027\) → Finance MSc/)).toBeTruthy();
+    expect(screen.queryByTestId("button-run-action-cleanup")).toBeNull();
+  });
+
   it("shows automatic pending work without a Run now button or client-side execution", async () => {
     const thread: AssistantThread = {...empty, status:"ready", messages:[{
       role:"assistant",content:"Pending intake merge is starting.",createdAt:"2026-11-17T03:00:00Z",

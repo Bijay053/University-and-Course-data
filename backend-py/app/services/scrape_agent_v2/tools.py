@@ -34,7 +34,7 @@ class DataTools:
                    {"url":{"type":"string"},"tab":{"type":"string"}},["url","tab"]),
         definition("search_site","Search text on an official site page; use links for further pages.",
                    {"url":{"type":"string"},"query":{"type":"string"}},["url","query"]),
-        definition("query_rows", "Read this provider's rows; no website fetch.",
+        definition("query_rows", "Read this provider's rows; no website fetch. Name lookup is case-insensitive and includes labelled intake options; paginate with after_id.",
                    {"status": {"type":"string"}, "name": {"type":"string"},
                     "missing_intake": {"type":"boolean"}, "after_id": {"type":"integer"}}),
         definition("read_row", "Read one row, including its stored values and status.",
@@ -161,7 +161,8 @@ class DataTools:
                 if args.get("status"):
                     base = base.where(ScrapedCourse.status == args["status"])
                 if args.get("name"):
-                    base = base.where(ScrapedCourse.course_name == args["name"])
+                    from app.services.assistant_course_names import name_predicate
+                    base = base.where(name_predicate(ScrapedCourse.course_name, args["name"]))
                 if args.get("after_id"):
                     base = base.where(ScrapedCourse.id > args["after_id"])
                 rows = (await db.execute(base.order_by(ScrapedCourse.id).limit(101))).scalars().all()

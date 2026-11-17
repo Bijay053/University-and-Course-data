@@ -36,6 +36,11 @@ def supported(action):
     if not isinstance(count, int) or isinstance(count, bool) or count < 1:
         return False
     kind = action.get("kind")
+    if kind == "cleanup_names":
+        targets = action.get("_targets", [])
+        return (len(targets) == count == len({target.get("id") for target in targets})
+                and all(target.get("kind") == "pending" and target.get("version")
+                        and target.get("beforeName") and target.get("afterName") for target in targets))
     if kind == "merge_intakes":
         plans = action.get("intakeConsolidations") or [action.get("intakeConsolidation")]
         ids = []
