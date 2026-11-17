@@ -1016,6 +1016,44 @@ async def test_already_registered_course_does_not_trigger_unrelated_repair(store
 
 
 @pytest.mark.asyncio
+async def test_readonly_existing_course_source_check_is_not_rewritten_as_new_review(store, monkeypatch):
+    url = "https://www.example.edu/cyber-security/september-2027"
+    async with store() as db:
+        row = await db.get(ScrapedCourse, 1)
+        row.course_name = "Cyber Security MSc (September 2027)"
+        row.course_website = url
+        row.intake_months = ["January"]
+        await db.commit()
+    research_fakes(monkeypatch)
+    checked = []
+    async def source(value, home):
+        checked.append(value)
+        return {"url":value,"title":"Cyber Security | University","verified":True,
+                "text":"Cyber Security MSc. Start date September 2027.","facts":[],
+                "excerpts":[{"id":"q0","text":"Start date September 2027."}]}
+    async def ai(**kwargs):
+        return {"answer":"The existing row stores January; the selected official course states September 2027.",
+                "citations":[{"url":url,"quoteId":"q0"}],"action":None}
+    monkeypatch.setattr(service, "inspect_source", source)
+    monkeypatch.setattr(service, "chat_json", ai)
+    thread_id, turn = await prompt_thread(store,
+        "Read-only investigation. Only investigate; do not change, apply, import or publish any records, "
+        f"and do not run catalogue discovery. Check the existing intake at {url}. "
+        "If source access fails, leave the row unchanged.")
+    await service.investigate(thread_id, turn)
+    async with store() as db:
+        reply = (await get_assistant("source", db, {"id":1}))["messages"][-1]
+        assert reply["actions"] == []
+        assert reply["sources"][0]["url"] == url
+        assert "existing row stores January" in reply["content"]
+        assert "added to review" not in reply["content"]
+        row = await db.get(ScrapedCourse, 1)
+        assert row.intake_months == ["January"] and row.status == "pending"
+        assert row.course_name == "Cyber Security MSc (September 2027)"
+    assert checked == [url]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("matching_row", [False, True])
 async def test_add_this_keeps_requested_course_and_creates_confirmable_targeted_review(store, monkeypatch, matching_row):
     import json

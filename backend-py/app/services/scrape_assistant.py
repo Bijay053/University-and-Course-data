@@ -835,6 +835,12 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str):
         wants_review = True
     if re.search(r"\b(?:do not|don't|dont|never|stop)\s+(?:\w+\s+){0,2}(?:add|recover|import|fetch|rescrape|reextract|fix|correct|update|verify|recheck|refresh)\b", prompt, re.I):
         wants_review = False
+    from app.services.scrape_assistant_autorun import execution_requested
+    if not execution_requested(prompt):
+        # Import verbs can occur in a coordinated prohibition ("do not change,
+        # apply, import or publish"). Research-only source checks must retain
+        # their verified answer, not be rewritten into a new-course offer.
+        wants_review = False
     targeted_review = wants_review and bool(recent_user_urls) and all(
         value in verified and verified[value].get("excerpts")
         and verified[value].get("sourceType") != "pdf" for value in recent_user_urls)
