@@ -4,9 +4,23 @@ import re
 from sqlalchemy import select
 
 
+def preview_requested(prompt):
+    """A requested approval preview is research, never implicit execution."""
+    text = re.sub(r"https?://[^\s<>]+", " ", prompt, flags=re.I)
+    positive = " ".join(
+        re.split(r"\b(?:do not|don't|dont|never)\b", clause, maxsplit=1, flags=re.I)[0]
+        for clause in re.split(r"[.;!?\n]|\b(?:but|then|however)\b", text, flags=re.I)
+    )
+    return bool(re.search(
+        r"\b(?:prepare|show|create|generate|give|make|want|need)\b.{0,140}"
+        r"\b(?:preview|proposal|for\s+approval|current\s+and\s+proposed|proposed\s+(?:changes|values|updates))\b"
+        r"|^\s*(?:please\s+)?preview\b|\bpreview\s+(?:only|first)\b",
+        positive, re.I,
+    ))
+
+
 def execution_requested(prompt):
-    if re.search(r"^\s*(?:please\s+)?(?:prepare|show|create|generate)\b.*\bpreview\b"
-                 r"|^\s*(?:please\s+)?preview\b|\bpreview\s+(?:only|first)\b", prompt, re.I):
+    if preview_requested(prompt):
         return False
     return not re.search(r"\bread[- ]only\b|\b(?:just|only)\s+(?:explain|compare|research|investigate|check|show|report)\b|\b(?:do not|don't|dont|never)\s+(?:run|change|modify|repair|fix|scrape|update|apply|add|import|recover|execute)\b", prompt, re.I)
 

@@ -112,6 +112,15 @@ def matches(prompt, choices):
             and (" " + normal(item["title"]) + " ") in (" " + normal(other["title"]) + " ")
             for other in exact
         )]
+    # MBA is a complete conventional award name, not arbitrary title initials.
+    # Resolve it only against that award in this provider's existing inventory.
+    # Different course URLs still remain choices; this does not merge variants.
+    if re.search(r"\bmba\b", positive_request(prompt), re.I):
+        abbreviated = [item for item in choices if family_identity(item)[0] in {
+            "master of business administration", "master business administration",
+        }]
+        if abbreviated:
+            return abbreviated
     if AWARD.search(positive_request(prompt)):
         # A qualification is explicit; never substitute another award in the
         # same subject just because the requested title was not found.

@@ -49,7 +49,8 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
     # A document is evidence to investigate, not a literal replacement value.
     # In particular "update each band IELTS" used to fall into unsupported
     # manual editing before the source reader ever saw the supplied PDF.
-    if document_research_requested(prompt):
+    from app.services.scrape_assistant_autorun import preview_requested
+    if document_research_requested(prompt) or preview_requested(prompt):
         return False
     from app.services.assistant_eligibility import scope
     rows = scope(prompt, ctx["samples"])
