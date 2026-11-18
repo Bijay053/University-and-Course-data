@@ -100,6 +100,8 @@ def _bounded_html(html: str, maximum: int = _MAX_PROBE_HTML_BYTES) -> str:
 
 def _bounded_source(url: str, html: str) -> tuple[str, str, str]:
     from app.services.scraper.repair_source_urls import is_catalogue_source
+    if re.match(r"\s*(?:<\?xml\b|<(?:urlset|sitemapindex)\b)", html):
+        return _bounded_html(html), "", ""
     if is_catalogue_source(url) and len(html.encode("utf-8")) >= _MAX_PROBE_HTML_BYTES:
         return "", "unsupported_content", "Catalogue exceeds bounded evidence size; coverage is incomplete"
     return _bounded_html(html), "", ""
@@ -220,9 +222,8 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
             if is_robots:
                 return html, "", ""
             if "xml" in content_type:
-                # A truncated sitemap cannot establish a usable catalogue.
-                if size >= _MAX_PROBE_HTML_BYTES:
-                    return "", "unsupported_content", "Sitemap exceeds bounded evidence size"
+                # Complete locations in a bounded prefix can seed independent
+                # page checks. They never establish full catalogue coverage.
                 return html, "", ""
             if _needs_rendered_evidence(html):
                 template_failed = _incomplete_course_template(html)
@@ -570,22 +571,9 @@ def inspect_page(url: str, html: str, config=None) -> dict:
         return {"url": url, "classification": "robots",
                 "links": [{"url": value} for value in dict.fromkeys(sources)],
                 "reason": "Official sitemap declarations; not course evidence"}
-    if html.lstrip().startswith("<?xml") or re.match(r"\s*<urlset\b", html):
-        from xml.etree import ElementTree
-        try:
-            if "<!DOCTYPE" in html.upper() or "<!ENTITY" in html.upper():
-                raise ValueError("External entities prohibited")
-            root = ElementTree.fromstring(html)
-            if root.tag.rsplit("}", 1)[-1] != "urlset":
-                return {"url": url, "classification": "unconfirmed", "reason": "A complete course sitemap is required"}
-            urls = [node.text.strip() for node in root.iter()
-                    if node.tag.rsplit("}", 1)[-1] == "loc" and node.text]
-            if len(urls) > 5000:
-                raise ValueError("Sitemap too large")
-            return {"url": url, "classification": "sitemap", "links": [{"url": value} for value in urls],
-                    "reason": "Complete bounded sitemap"}
-        except Exception:
-            return {"url": url, "classification": "unconfirmed", "reason": "Sitemap could not be validated"}
+    if html.lstrip().startswith("<?xml") or re.match(r"\s*<(?:urlset|sitemapindex)\b", html):
+        from app.services.scraper.repair_sitemap_evidence import inspect_sitemap
+        return inspect_sitemap(url, html, byte_limit=_MAX_PROBE_HTML_BYTES)
     """Classify using shared gates and visible, course-owned positive evidence."""
     from app.services.scraper.challenge_shell import is_challenge_shell
 
@@ -1151,6 +1139,21 @@ class LiveRepairEvidence:
         if not course_candidates and not passed and sitemap_url and limit >= 3:
             sitemap = await self.fetch(sitemap_url)
             self.initial[sitemap_url] = sitemap
+            if sitemap.get("classification") == "sitemap_index":
+                # Reserve at least two of the existing probe slots for actual
+                # course pages. No unbounded recursive sitemap traversal.
+                children = [
+                    link["url"] for link in sitemap.get("links") or []
+                    if official_url(link["url"], self.ctx["scrape_url"], self.extra_hosts)
+                ]
+                collected = []
+                for child in list(dict.fromkeys(children))[:min(2, max(0, limit - 3))]:
+                    child_map = await self.fetch(child)
+                    self.initial[child] = child_map
+                    if child_map.get("classification") == "sitemap":
+                        collected.extend(child_map.get("links") or [])
+                sitemap = {"classification": "sitemap", "links": collected,
+                           "coverageComplete": False, "candidateOnly": True}
             if sitemap.get("classification") == "sitemap":
                 from app.services.scraper.ai_repair_agent import _is_course_url
                 from app.services.scraper.official_catalogue_repair import _sitemap_sample, _sitemap_candidate_rank

@@ -46,7 +46,7 @@ def _catalogue_hints(record: dict, source: str, seed: str, extra_hosts) -> list[
     """Follow university-published catalogue navigation, never search queries."""
     from app.services.scraper.guards import _sanitized_visible_document
     html = record.get("_source_html") or record.get("html") or ""
-    if not html or record.get("classification") in {"sitemap", "robots"}:
+    if not html or record.get("classification") in {"sitemap", "sitemap_index", "robots"}:
         return []
     soup = _sanitized_visible_document(html)
     hints = []
@@ -384,9 +384,11 @@ async def discover_official_catalogue(evidence) -> dict:
             filter_patch.update(catalogue_allow_proposal(candidates, {**discovery, **filter_patch}))
         candidates = [url for url in candidates if passes(url, {**discovery, **filter_patch})]
         candidates = candidates[:max_candidates]
-        if candidates and record.get("has_pagination"):
+        if candidates and (record.get("has_pagination") or record.get("coverageComplete") is False):
             partial_sources.append({"url": source, "candidate_count": len(candidates),
-                                    "reason": "Pagination not verified; not a complete catalogue"})
+                                    "reason": ("Pagination not verified; not a complete catalogue"
+                                               if record.get("has_pagination") else
+                                               "Bounded sitemap sample; not a complete catalogue")})
             for link in record.get("links") or []:
                 if isinstance(link, dict) and link.get("url") in candidates:
                     partial_candidates.setdefault(link["url"], link.get("name", ""))
@@ -397,6 +399,7 @@ async def discover_official_catalogue(evidence) -> dict:
             max_candidates > 0
             and len(candidates) >= min(2, max_candidates)
             and not record.get("has_pagination")
+            and record.get("coverageComplete") is not False
         ):
             source_titles = {link["url"]: link.get("name", "") for link in record.get("links", [])
                              if isinstance(link, dict) and link.get("url")}

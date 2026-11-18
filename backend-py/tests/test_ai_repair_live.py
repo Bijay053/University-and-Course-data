@@ -1008,6 +1008,81 @@ async def test_configured_sitemap_precedes_navigation_when_no_course_samples(mon
     assert evidence.discovery_validation(discovery, {"block_url_patterns": []})["accepted"]
 
 
+@pytest.mark.asyncio
+async def test_large_sitemap_prefix_seeds_real_course_probes_without_coverage_claim(monkeypatch):
+    sitemap_url = "https://university.example/sitemap.xml"
+    candidates = [f"{SEED}/bachelor-of-{name}" for name in ("arts", "science", "music", "law")]
+    xml = "<urlset>" + "".join(f"<url><loc>{url}</loc></url>" for url in candidates)
+    xml += "<url><loc>https://university.example/" + "x" * 1_000_000
+    cfg = config()
+    cfg.discovery.sitemap_url = sitemap_url
+    evidence = live.LiveRepairEvidence(context(repair_course_url_sample=[], passed_sample=[],
+        repair_url_sample=[], dropped_sample=[], effective_config=cfg))
+    calls = []
+    async def fetch(url):
+        calls.append(url)
+        record = (live.inspect_page(url, live._bounded_html(xml), cfg) if url == sitemap_url else
+                  {"url":url,"classification":"course" if url in candidates else "listing"})
+        evidence.pages_checked += 1
+        evidence.records.append(record)
+        return record
+    monkeypatch.setattr(evidence, "fetch", fetch)
+    result = await evidence.probe()
+    assert set(candidates).issubset(calls)
+    assert result["course_pages"] == 4
+    assert not evidence.initial[sitemap_url]["coverageComplete"]
+    assert len(calls) <= 6
+
+
+@pytest.mark.asyncio
+async def test_sitemap_index_traversal_stays_official_and_bounded(monkeypatch):
+    sitemap_url = "https://university.example/sitemap.xml"
+    child = "https://university.example/courses.xml"
+    candidates = [f"{SEED}/bachelor-of-{name}" for name in ("arts", "science")]
+    cfg = config()
+    cfg.discovery.sitemap_url = sitemap_url
+    evidence = live.LiveRepairEvidence(context(repair_course_url_sample=[], passed_sample=[],
+        repair_url_sample=[], dropped_sample=[], effective_config=cfg))
+    calls = []
+    async def fetch(url):
+        calls.append(url)
+        if url == sitemap_url:
+            record = live.inspect_page(url, f"<sitemapindex><sitemap><loc>https://evil.example/a.xml</loc></sitemap><sitemap><loc>{child}</loc></sitemap></sitemapindex>")
+        elif url == child:
+            record = {"url":url,"classification":"sitemap","links":[{"url":v} for v in candidates]}
+        else:
+            record = {"url":url,"classification":"course" if url in candidates else "listing"}
+        evidence.pages_checked += 1
+        evidence.records.append(record)
+        return record
+    monkeypatch.setattr(evidence, "fetch", fetch)
+    result = await evidence.probe()
+    assert child in calls and set(candidates).issubset(calls)
+    assert not any("evil.example" in url for url in calls)
+    assert result["course_pages"] == 2
+    assert len(calls) <= 6
+
+
+@pytest.mark.asyncio
+async def test_direct_xml_stream_retains_bounded_sitemap_candidates(monkeypatch):
+    import httpx
+    from app.services import scraper_config_ai
+    monkeypatch.setattr(scraper_config_ai, "_is_safe_public_url", lambda _: (True, ""))
+    xml = f"<urlset><url><loc>{ONE}</loc></url>" + "<!--" + "x" * 1_100_000
+    client = httpx.AsyncClient
+    transport = httpx.MockTransport(lambda request: httpx.Response(200,
+        headers={"content-type":"application/xml"}, content=xml.encode()))
+    monkeypatch.setattr(live.httpx, "AsyncClient",
+        lambda **kwargs: client(transport=transport, follow_redirects=False))
+    html, failure, _ = await live._fetch_official("https://university.example/sitemap.xml", config(), 5)
+    assert not failure
+    assert len(html.encode()) <= live._MAX_PROBE_HTML_BYTES
+    record = live.inspect_page("https://university.example/sitemap.xml", html)
+    assert record["classification"] == "sitemap"
+    assert record["links"] == [{"url":ONE}]
+    assert not record["coverageComplete"]
+
+
 def test_selector_evidence_fails_closed_for_ambiguous_or_image_only_options():
     html = """<main><select>
       <option data-audience="Domestic International"></option>
