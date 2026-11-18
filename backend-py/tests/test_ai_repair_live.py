@@ -1013,7 +1013,7 @@ async def test_large_sitemap_prefix_seeds_real_course_probes_without_coverage_cl
     sitemap_url = "https://university.example/sitemap.xml"
     candidates = [f"{SEED}/bachelor-of-{name}" for name in ("arts", "science", "music", "law")]
     xml = "<urlset>" + "".join(f"<url><loc>{url}</loc></url>" for url in candidates)
-    xml += "<url><loc>https://university.example/" + "x" * 1_000_000
+    xml += "<url><loc>https://university.example/" + "x" * live._MAX_SITEMAP_BYTES
     cfg = config()
     cfg.discovery.sitemap_url = sitemap_url
     evidence = live.LiveRepairEvidence(context(repair_course_url_sample=[], passed_sample=[],
@@ -1021,7 +1021,7 @@ async def test_large_sitemap_prefix_seeds_real_course_probes_without_coverage_cl
     calls = []
     async def fetch(url):
         calls.append(url)
-        record = (live.inspect_page(url, live._bounded_html(xml), cfg) if url == sitemap_url else
+        record = (live.inspect_page(url, live._bounded_html(xml, live._MAX_SITEMAP_BYTES), cfg) if url == sitemap_url else
                   {"url":url,"classification":"course" if url in candidates else "listing"})
         evidence.pages_checked += 1
         evidence.records.append(record)
@@ -1068,7 +1068,7 @@ async def test_direct_xml_stream_retains_bounded_sitemap_candidates(monkeypatch)
     import httpx
     from app.services import scraper_config_ai
     monkeypatch.setattr(scraper_config_ai, "_is_safe_public_url", lambda _: (True, ""))
-    xml = f"<urlset><url><loc>{ONE}</loc></url>" + "<!--" + "x" * 1_100_000
+    xml = f"<urlset><url><loc>{ONE}</loc></url>" + "<!--" + "x" * (live._MAX_SITEMAP_BYTES + 100_000)
     client = httpx.AsyncClient
     transport = httpx.MockTransport(lambda request: httpx.Response(200,
         headers={"content-type":"application/xml"}, content=xml.encode()))
@@ -1076,7 +1076,7 @@ async def test_direct_xml_stream_retains_bounded_sitemap_candidates(monkeypatch)
         lambda **kwargs: client(transport=transport, follow_redirects=False))
     html, failure, _ = await live._fetch_official("https://university.example/sitemap.xml", config(), 5)
     assert not failure
-    assert len(html.encode()) <= live._MAX_PROBE_HTML_BYTES
+    assert len(html.encode()) <= live._MAX_SITEMAP_BYTES
     record = live.inspect_page("https://university.example/sitemap.xml", html)
     assert record["classification"] == "sitemap"
     assert record["links"] == [{"url":ONE}]

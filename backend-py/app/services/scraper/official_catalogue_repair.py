@@ -75,7 +75,6 @@ def _sitemap_candidate_rank(url: str, title: str = "") -> tuple[int, int, int, s
     from app.services.scraper.guards import classify_course_candidate, LIKELY_DEGREE
 
     path = urlsplit(url).path.rstrip("/").lower()
-    parts = [part for part in path.split("/") if part]
     outcome, _reason = classify_course_candidate(url, title)
     detail = bool(
         re.search(r"/(?:courses?|programmes?|programs?)/.+", path)
@@ -100,7 +99,10 @@ def _sitemap_candidate_rank(url: str, title: str = "") -> tuple[int, int, int, s
         stratum = 2
     else:
         stratum = 3
-    return (stratum, -len(parts), len(path), url)
+    catalogue_detail = bool(re.search(
+        r"/(?:courses?|programmes?|programs?)/(?:catalogue|catalog)/[^/]+$", path, re.I,
+    ))
+    return (stratum, 0 if catalogue_detail else 1, len(path), url)
 
 
 def _bounded_sitemap_urls(urls: list[str], titles: dict[str, str], cap: int) -> list[str]:
@@ -115,14 +117,23 @@ def _bounded_sitemap_urls(urls: list[str], titles: dict[str, str], cap: int) -> 
     return [url for url in urls if url in selected]
 
 
+def _sample_family(url: str) -> str:
+    """Diversity key only, not permission to merge courses or canonical URLs."""
+    parsed = urlsplit(programme_identity(url))
+    path = re.sub(r"(?:/index)?\.html?$", "", parsed.path.rstrip("/"), flags=re.I)
+    return parsed._replace(path=path.rstrip("/")).geturl()
+
+
 def _sitemap_sample(urls: list[str], titles: dict[str, str], sample_cap: int) -> list[str]:
     """Choose a deterministic, likelihood-stratified sample spread across URLs."""
     if sample_cap <= 0 or not urls:
         return []
     strata: dict[int, list[str]] = {index: [] for index in range(-2, 5)}
     identities = set()
-    for url in urls:
-        identity = programme_identity(url)
+    # If both publisher routes exist, prefer the static HTML representative.
+    # Keep the actual URL and require fresh page proof; this is not alias proof.
+    for url in sorted(urls, key=lambda u: not urlsplit(u).path.lower().endswith((".html", ".htm"))):
+        identity = _sample_family(url)
         if identity in identities:
             continue
         identities.add(identity)
@@ -169,8 +180,8 @@ def _repair_sample(urls, titles, cap, discovery, patch):
 
 
 def _sample_alternatives(urls, titles, sample):
-    identities = {programme_identity(url) for url in sample}
-    return _sitemap_sample([url for url in urls if programme_identity(url) not in identities], titles, 2)
+    identities = {_sample_family(url) for url in sample}
+    return _sitemap_sample([url for url in urls if _sample_family(url) not in identities], titles, 2)
 
 
 async def discover_official_catalogue(evidence) -> dict:

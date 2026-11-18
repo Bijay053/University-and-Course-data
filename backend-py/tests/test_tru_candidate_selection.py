@@ -35,6 +35,24 @@ def test_candidate_cap_is_applied_after_ranking_not_an_alphabetical_prefix():
     assert len(selected) == 200 and all(url in selected for url in courses)
 
 
+def test_cap_keeps_catalogue_details_before_deep_award_bearing_support_routes():
+    deep=[HOME+f"/science/programs/master-of-science-{n}/admissions/policies.html" for n in range(250)]
+    details=[HOME+"/programs/catalogue/bachelor-of-science.html",
+             HOME+"/programs/catalogue/master-of-education.html"]
+    assert all(u in _bounded_sitemap_urls(deep+details,{},200) for u in details)
+
+
+def test_sample_spreads_across_awards_not_html_and_directory_aliases():
+    from app.services.scraper.official_catalogue_repair import _sample_alternatives
+    nursing=HOME+"/programs/catalogue/bachelor-of-nursing"
+    business=HOME+"/programs/catalogue/bachelor-of-business"
+    science=HOME+"/programs/catalogue/bachelor-of-science"
+    urls=[nursing+"/",nursing+".html",business+".html",science+".html"]
+    sample=_sitemap_sample(urls,{},2)
+    assert len(sample)==2 and not any(url.endswith("/") for url in sample)
+    assert len(_sample_alternatives(urls,{},sample))==1
+
+
 def test_same_host_https_upgrade_preserves_published_source_and_deduplicates():
     legacy = "http://www.tru.ca/programs/catalogue/bachelor-of-science.html"
     secure = legacy.replace("http:", "https:")
@@ -143,3 +161,21 @@ async def test_probe_uses_observed_programme_details_before_support_links(monkey
     assert all(seen.index(course) < seen.index(url)
                for course in details for url in support if url in seen)
     assert e.audit()["course_pages"] >= 2 and e.pages_checked <= e.max_pages//2
+
+
+def test_complete_large_xml_is_distinct_from_a_bounded_prefix_and_html():
+    from app.services.scraper import ai_repair_live as live
+    links=[HOME+"/programs/catalogue/bachelor-of-science-"+str(n)+"-"+"x"*100+".html"
+           for n in range(6000)]
+    xml="<urlset>"+"".join(f"<url><loc>{u}</loc></url>" for u in links)+"</urlset>"
+    assert len(xml.encode()) > live._MAX_PROBE_HTML_BYTES
+    bounded, failure, _ = live._bounded_source(HOME+"/sitemap.xml",xml)
+    assert not failure and bounded == xml
+    record=live.inspect_page(HOME+"/sitemap.xml",bounded)
+    assert record["coverageComplete"] and len(record["links"])==6000
+    oversized=xml[:-9]+"<!--"+"x"*live._MAX_SITEMAP_BYTES
+    bounded, failure, _=live._bounded_source(HOME+"/sitemap.xml",oversized)
+    assert not failure and len(bounded.encode()) <= live._MAX_SITEMAP_BYTES
+    assert not live.inspect_page(HOME+"/sitemap.xml",bounded)["coverageComplete"]
+    html="<main><h1>All courses</h1>"+"x"*live._MAX_PROBE_HTML_BYTES+"</main>"
+    assert live._bounded_source(HOME+"/programs",html)[1]=="unsupported_content"

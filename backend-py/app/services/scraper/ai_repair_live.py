@@ -27,6 +27,8 @@ from app.services.scraper.page_type import classify_page
 
 
 _MAX_PROBE_HTML_BYTES = 1_000_000
+_MAX_SITEMAP_BYTES = 8_000_000
+_MAX_SITEMAP_LOCATIONS = 50_000
 
 
 def _incomplete_course_template(html: str) -> bool:
@@ -101,7 +103,7 @@ def _bounded_html(html: str, maximum: int = _MAX_PROBE_HTML_BYTES) -> str:
 def _bounded_source(url: str, html: str) -> tuple[str, str, str]:
     from app.services.scraper.repair_source_urls import is_catalogue_source
     if re.match(r"\s*(?:<\?xml\b|<(?:urlset|sitemapindex)\b)", html):
-        return _bounded_html(html), "", ""
+        return _bounded_html(html, _MAX_SITEMAP_BYTES), "", ""
     if is_catalogue_source(url) and len(html.encode("utf-8")) >= _MAX_PROBE_HTML_BYTES:
         return "", "unsupported_content", "Catalogue exceeds bounded evidence size; coverage is incomplete"
     return _bounded_html(html), "", ""
@@ -206,9 +208,13 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
             is_robots = urlsplit(url).path == "/robots.txt" and "text/plain" in content_type
             if "html" not in content_type and "xml" not in content_type and not is_robots:
                 return "", "unsupported_content", "Live HTML evidence required"
+            # XML catalogues have a separate bounded budget. Treating their
+            # HTML-sized prefix as a complete catalogue would be unsafe;
+            # course HTML retains the original, smaller limit.
+            byte_limit = _MAX_SITEMAP_BYTES if "xml" in content_type else _MAX_PROBE_HTML_BYTES
             chunks, size = [], 0
             async for chunk in response.aiter_bytes():
-                remaining = _MAX_PROBE_HTML_BYTES - size
+                remaining = byte_limit - size
                 if remaining <= 0:
                     break
                 chunks.append(chunk[:remaining])
@@ -217,7 +223,7 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                     break
             html = b"".join(chunks).decode(response.encoding or "utf-8", errors="replace")
             from app.services.scraper.repair_source_urls import is_catalogue_source
-            if size >= _MAX_PROBE_HTML_BYTES and is_catalogue_source(url):
+            if size >= byte_limit and is_catalogue_source(url):
                 return "", "unsupported_content", "Catalogue exceeds bounded evidence size; coverage is incomplete"
             if is_robots:
                 return html, "", ""
@@ -573,7 +579,8 @@ def inspect_page(url: str, html: str, config=None) -> dict:
                 "reason": "Official sitemap declarations; not course evidence"}
     if html.lstrip().startswith("<?xml") or re.match(r"\s*<(?:urlset|sitemapindex)\b", html):
         from app.services.scraper.repair_sitemap_evidence import inspect_sitemap
-        return inspect_sitemap(url, html, byte_limit=_MAX_PROBE_HTML_BYTES)
+        return inspect_sitemap(url, html, byte_limit=_MAX_SITEMAP_BYTES,
+                               link_limit=_MAX_SITEMAP_LOCATIONS)
     """Classify using shared gates and visible, course-owned positive evidence."""
     from app.services.scraper.challenge_shell import is_challenge_shell
 
