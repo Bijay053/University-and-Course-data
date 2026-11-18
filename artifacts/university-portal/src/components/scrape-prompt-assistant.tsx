@@ -25,7 +25,7 @@ export { safeSourceUrl };
 export type AssistantSource = { url: string; title: string; excerpt: string; page?: number; quoteId?: string };
 export type AssistantAction = {
   id: string;
-  kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed" | "document_update" | "merge_intakes" | "undo_intake_merge" | "cleanup_names" | "undo_name_cleanup";
+  kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "exclude_online" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed" | "document_update" | "merge_intakes" | "undo_intake_merge" | "cleanup_names" | "undo_name_cleanup";
   nameCleanup?: { beforeName: string; afterName: string; intakes: string[] }[];
   requiresConfirmation?: boolean;
   automaticPending?: boolean;

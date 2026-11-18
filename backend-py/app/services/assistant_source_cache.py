@@ -37,7 +37,8 @@ async def refresh_ielts_facts(source, url):
 
 async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect, timeout, *,
                         fresh=False, html_table_schema=None, html_delivery_schema=None,
-                        html_intake_schema=None, html_fee_links_schema=None):
+                        html_intake_schema=None, html_fee_links_schema=None,
+                        online_exclusion_schema=None):
     from app.services.scrape_assistant_tools import official_url
     try:
         url = official_url(url, home)
@@ -62,6 +63,12 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                     if not result or result.get("_sourceScopeVersion") != 2:
                         continue
                     from app.services.assistant_html_excerpts import SCHEMA as excerpt_schema
+                    if (result.get("verified") and result.get("sourceType") == "html"
+                            and online_exclusion_schema is not None
+                            and result.get("_onlineExclusionSchema") != online_exclusion_schema):
+                        # Destructive eligibility decisions require course-owned
+                        # DOM proof, never a reconstruction from cached snippets.
+                        break
                     if (result.get("verified") and result.get("sourceType") == "html"
                             and result.get("sourceOrigin") != "retained_scrape_page_text"
                             and html_fee_links_schema is not None

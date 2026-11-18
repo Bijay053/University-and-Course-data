@@ -305,6 +305,18 @@ async def investigate(thread_id: str, turn_id: str):
             # the same preview/acknowledgement contract, including legacy users.
             from app.services.live_scrape_diagnostics import handle as live_diagnostics
             from app.services import scrape_assistant as service
+            from app.services.assistant_online_exclusion import intent as online_exclusion_intent
+            online_request = online_exclusion_intent(requested["content"], conversation_messages)
+            if online_request:
+                from app.services import assistant_eligibility
+                from app.services.assistant_online_exclusion import confirm_followup
+                ctx = await context(claimed_thread.job_id)
+                ctx["_eligibilityKind"] = "online"
+                if await confirm_followup(service, thread_id, turn_id, run_id, ctx, requested["content"]):
+                    return
+                await assistant_eligibility.run(
+                    service, thread_id, turn_id, run_id, ctx, online_request["prompt"])
+                return
             from app.services.assistant_name_cleanup import requested as cleanup_requested, handle as cleanup_names
             if cleanup_requested(requested["content"]):
                 cleanup_ctx = await context(claimed_thread.job_id)

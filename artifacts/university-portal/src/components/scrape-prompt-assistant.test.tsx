@@ -304,6 +304,22 @@ describe("ScrapePromptAssistant", () => {
     expect(JSON.parse(String(post?.[1]?.body))).toEqual({ confirm: true });
     expect(screen.queryByRole("button", { name: "Undo locations" })).toBeNull();
   });
+  it("holds an online-only exclusion preview until confirmation and displays retained mixed courses", async () => {
+    const saved: AssistantThread = { ...empty, threadId: "online", status: "ready",
+      messages: [{ role: "assistant", content: "Checked 149/149 pending records.",
+        createdAt: "2024-01-01T00:00:00Z",
+        actions: [{ id: "online-plan", kind: "exclude_online", label: "Exclude confirmed online-only pending courses",
+          state: "proposed", courseCount: 12, fields: [], requiresConfirmation: true,
+          courseResults: [{ url: "https://uni.edu/hearing", status: "retained",
+            message: "Hearing Therapy — compulsory campus teaching; not online-only." }] }] }] };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(json(saved));
+    render(<ScrapePromptAssistant jobId="source" />);
+    expect(await screen.findByText(/Hearing Therapy — compulsory campus teaching/)).toBeTruthy();
+    fireEvent.click(screen.getByTestId("button-run-action-online-plan"));
+    expect(await screen.findByTestId("dialog-confirm-action")).toBeTruthy();
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+  });
+
   it("shows partial recovery and each exclusion inline with the resulting review link", async () => {
     const messages = [
       "Verified in pending review.",
@@ -418,12 +434,12 @@ describe("ScrapePromptAssistant", () => {
     expect(container.querySelector("img, b")).toBeNull();
   });
 
-  it("refreshes the review and renders saved domestic exclusions without a run button", async () => {
+  it.each(["exclude_domestic", "exclude_online"] as const)("refreshes the review and renders saved %s exclusions without a run button", async (kind) => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const saved: AssistantThread = { ...empty, status: "ready", messages: [{
       role: "assistant", createdAt: "2024-01-01T00:00:00Z",
       content: "Excluded 1 confirmed domestic-only record.",
-      actions: [{ id: "exclude-1", kind: "exclude_domestic", label: "Pending eligibility check",
+      actions: [{ id: "exclude-1", kind, label: "Pending eligibility check",
         state: "completed", courseCount: 2, fields: [],
         resultSummary: "One excluded; one retained.",
         courseResults: [

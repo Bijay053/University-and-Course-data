@@ -332,6 +332,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
             course_title = identity_title
             if course_title not in text:
                 text = course_title + "\n" + text
+        from app.services.assistant_online_exclusion import evidence as online_exclusion_evidence, SCHEMA as online_exclusion_schema
         return {
             "url": url, "title": title[:200], "sourceType": "html",
             "text": text[:24000], "_fullText": text, **identity,
@@ -344,6 +345,8 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
             "_htmlExcerptsSchema": HTML_EXCERPTS_SCHEMA,
             "_htmlFeeLinksSchema": 1,
             "_deliveryFactsVersion": 1,
+            "_onlineExclusionSchema": online_exclusion_schema,
+            "_onlineExclusion": online_exclusion_evidence(html, url),
             "_intakeFactsVersion": INTAKE_FACTS_VERSION,
             "_englishTablesSchema": SCHEMA, "_englishTables": profiles(str(evidence_root)),
             "_courseCohorts": cohort_data,

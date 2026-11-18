@@ -704,7 +704,7 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
         thread.messages = messages
         await db.commit()
         return await response(thread, db)
-    if action["kind"] == "exclude_domestic":
+    if action["kind"] in {"exclude_domestic", "exclude_online"}:
         if action.get("_turnId") != thread.turn_id:
             raise HTTPException(409, "This proposal belongs to an older request. Check the current review again.")
         from app.services.assistant_eligibility import persist

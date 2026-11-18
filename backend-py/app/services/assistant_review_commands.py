@@ -138,7 +138,7 @@ async def handle_read_or_rule(service, thread_id, turn_id, run_id, ctx, prompt, 
         selected = [r for r in rows if r.id in numbers or r.course_name.casefold() in prompt.casefold()]
         if not selected and re.search(r"\b(this|it|that)\b", prompt, re.I):
             prior = next((a for m in reversed(messages[:-1]) for a in reversed(m.get("actions", []))
-                          if a.get("kind") == "exclude_domestic"), None)
+                          if a.get("kind") in {"exclude_domestic", "exclude_online"}), None)
             ids = {r["id"] for r in (prior or {}).get("_undo", [])}
             selected = [r for r in rows if r.id in ids]
         if numbers and not selected:
