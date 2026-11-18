@@ -238,7 +238,7 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
 
 
 _LABEL = re.compile(
-    r"\b(qualification|award|degree|duration|course length|study mode|mode of study|campus|location|"
+    r"\b(qualification|credential|award|degree|duration|course length|length|study mode|mode of study|campus|location|"
     r"intake|start date|international (?:tuition|fee)|tuition fee|ielts|entry requirements?)\b", re.I
 )
 _AWARD = re.compile(
@@ -643,6 +643,13 @@ def inspect_page(url: str, html: str, config=None) -> dict:
         node.decompose()
     title_node = region.find("h1")
     title = title_node.get_text(" ", strip=True) if title_node else ""
+    if re.fullmatch(
+        r"(?:our\s+)?(?:faculty(?:\s+and\s+staff)?|staff|(?:student\s+)?resources|"
+        r"contact(?:\s+us)?|frequently\s+asked\s+questions|faqs?|"
+        r"tuition(?:\s+(?:and|&)\s+fees)?)", title, re.I,
+    ):
+        return {**result, "title": title, "classification": "non_course",
+                "reason": "Programme support-page heading; parent programme facts are not page identity"}
     fields = []
     for node in region.select("dt, tr, h2, h3, p, li, [class], [id]"):
         text = node.get_text(" ", strip=True)
@@ -731,11 +738,15 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     for field in fields:
         text = field["text"]
         if (
-            re.search(r"\b(?:qualification|award|degree)\b", text, re.I)
+            re.search(r"\b(?:qualification|credential|award|degree)\b", text, re.I)
             and _AWARD.search(text)
         ):
             facts.add("award")
-        if re.search(r"\b(?:duration|course length)\b.{0,40}\d.{0,15}\b(?:years?|months?|weeks?)\b", text, re.I):
+        if re.search(
+            r"\b(?:duration|course length|length)\b.{0,40}"
+            r"(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)"
+            r"\b.{0,15}\b(?:years?|months?|weeks?)\b", text, re.I,
+        ):
             facts.add("duration")
         if re.search(r"\b(?:study mode|mode of study)\b.{0,40}\b(?:full.time|part.time|campus|blended|online)\b", text, re.I):
             facts.add("mode")

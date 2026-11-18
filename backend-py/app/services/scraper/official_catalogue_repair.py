@@ -21,6 +21,13 @@ _SITEMAP_NAVIGATION_INTERMEDIATE = re.compile(
     r"conversion-courses|clearing|how-to-apply)/",
     re.I,
 )
+_SITEMAP_SUPPORT_LEAF = re.compile(
+    r"/(?:faculty|staff|resources|student-resources|current-students|"
+    r"contact(?:-us)?|faq|faqs|news|events|testimonials|tuition|"
+    r"(?:[\w-]+-)?committee|"
+    r"general-education-requirements|business-general-education-requirements)"
+    r"(?:\.html?|\.aspx)?/?$", re.I,
+)
 
 
 def discovery_patches(fallback: dict) -> list[dict]:
@@ -77,6 +84,7 @@ def _sitemap_candidate_rank(url: str, title: str = "") -> tuple[int, int, int, s
     navigation = bool(
         _SITEMAP_NAVIGATION_TERMINAL.search(path)
         or _SITEMAP_NAVIGATION_INTERMEDIATE.search(path + "/")
+        or _SITEMAP_SUPPORT_LEAF.search(path)
     )
 
     # Lower stratum is preferred: award-bearing details, then other detail
@@ -111,7 +119,7 @@ def _sitemap_sample(urls: list[str], titles: dict[str, str], sample_cap: int) ->
     """Choose a deterministic, likelihood-stratified sample spread across URLs."""
     if sample_cap <= 0 or not urls:
         return []
-    strata: dict[int, list[str]] = {index: [] for index in range(-1, 5)}
+    strata: dict[int, list[str]] = {index: [] for index in range(-2, 5)}
     identities = set()
     for url in urls:
         identity = programme_identity(url)
@@ -128,7 +136,13 @@ def _sitemap_sample(urls: list[str], titles: dict[str, str], sample_cap: int) ->
             r"PGCert|PGDip|Bachelor|Master|Doctor)\b",
             titles.get(url, "") + " " + urlsplit(url).path.replace("-", " "), re.I,
         ):
-            rank = -1
+            # Dedicated catalogue detail routes are useful template probes.
+            # A degree word in an ancestor folder does not make its faculty,
+            # fee or resource child a degree page (rank 4 remains untouched).
+            rank = -2 if re.search(
+                r"/(?:courses?|programmes?|programs?)/(?:catalogue|catalog)/[^/]+/?$",
+                urlsplit(url).path, re.I,
+            ) else -1
         strata[rank].append(url)
 
     sample: list[str] = []
@@ -383,7 +397,11 @@ async def discover_official_catalogue(evidence) -> dict:
         if evidence.ctx.get("catalogue_recovery"):
             filter_patch.update(catalogue_allow_proposal(candidates, {**discovery, **filter_patch}))
         candidates = [url for url in candidates if passes(url, {**discovery, **filter_patch})]
-        candidates = candidates[:max_candidates]
+        # Apply the bound after ranking, not before: an alphabetical prefix
+        # of faculty/resource URLs must not displace observed degree details.
+        source_titles = {link["url"]: link.get("name", "") for link in record.get("links", [])
+                         if isinstance(link, dict) and link.get("url")}
+        candidates = _bounded_sitemap_urls(candidates, source_titles, max_candidates)
         if candidates and (record.get("has_pagination") or record.get("coverageComplete") is False):
             partial_sources.append({"url": source, "candidate_count": len(candidates),
                                     "reason": ("Pagination not verified; not a complete catalogue"

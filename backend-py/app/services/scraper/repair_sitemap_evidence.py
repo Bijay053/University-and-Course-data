@@ -1,5 +1,22 @@
 """Bounded sitemap candidates, never proof of course identity or coverage."""
 from xml.etree import ElementTree
+from urllib.parse import urlsplit
+
+
+def _secure_sitemap_location(value: str, source: str) -> str:
+    """Use HTTPS for same-host HTTP locations published by an HTTPS sitemap."""
+    try:
+        target, origin = urlsplit(value), urlsplit(source)
+        if (origin.scheme == "https" and target.scheme == "http"
+                and target.hostname and origin.hostname
+                and target.hostname.lower().removeprefix("www.") ==
+                    origin.hostname.lower().removeprefix("www.")
+                and not target.username and not target.password
+                and target.port is None):
+            return target._replace(scheme="https").geturl()
+    except ValueError:
+        pass
+    return value
 
 
 def inspect_sitemap(url: str, xml: str, *, byte_limit: int, link_limit: int = 5000) -> dict:
@@ -31,9 +48,13 @@ def inspect_sitemap(url: str, xml: str, *, byte_limit: int, link_limit: int = 50
                 else:
                     owner = "url" if root_kind == "urlset" else "sitemap"
                     if tag == "loc" and stack == [root_kind, owner, "loc"] and node.text:
-                        value = node.text.strip()
+                        published = node.text.strip()
+                        value = _secure_sitemap_location(published, url)
                         if value and value not in seen:
-                            links.append({"url": value})
+                            link = {"url": value}
+                            if value != published:
+                                link["publishedUrl"] = published
+                            links.append(link)
                             seen.add(value)
                     stack.pop()
                     node.clear()

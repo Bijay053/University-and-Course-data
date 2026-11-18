@@ -66,13 +66,24 @@ def _is_nested_loc(loc: str) -> bool:
     return bool(_NESTED_RE.search(loc)) or loc.lower().endswith(".xml")
 
 
-def _normalize_sitemap_url(loc: str) -> str:
+def _normalize_sitemap_url(loc: str, official_origin: str | None = None,
+                           allow_url_patterns=None) -> str:
     """Strip noise query params + apply known site-specific path rewrites.
 
     Mirrors Node ``normalizeSitemapUrl``. The VU rewrite is the only
     site-specific case currently in use; new ones should be added here
     rather than scattered through callers.
     """
+    if official_origin:
+        from app.services.scraper.repair_sitemap_evidence import _secure_sitemap_location
+        secure = _secure_sitemap_location(loc, official_origin)
+        # Repaired HTTPS-only families must receive the URL they verified.
+        # Do not rewrite existing HTTP-compatible recipes or unfiltered sites.
+        if allow_url_patterns is None or (
+            any(p.search(secure) for p in allow_url_patterns)
+            and not any(p.search(loc) for p in allow_url_patterns)
+        ):
+            loc = secure
     try:
         u = urlparse(loc)
     except Exception:
@@ -615,7 +626,7 @@ async def discover_from_sitemap(
                             raw_loc,
                             public_host=public_hostname,
                             host_canonicalizations=loc_host_canonicalizations,
-                        )
+                        ), official_origin=base, allow_url_patterns=allow_url_patterns or [],
                     )
                     if (
                         loc in found
@@ -643,7 +654,7 @@ async def discover_from_sitemap(
                     raw_loc,
                     public_host=public_hostname,
                     host_canonicalizations=loc_host_canonicalizations,
-                )
+                ), official_origin=base, allow_url_patterns=allow_url_patterns or [],
             )
             if (
                 loc in found
