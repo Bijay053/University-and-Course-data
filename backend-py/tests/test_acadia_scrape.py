@@ -145,3 +145,64 @@ async def test_normal_pipeline_extracts_owned_fields_without_browser_refetch(mon
         assert accepted, reason
     finally:
         current_uni_config.reset(token)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("programme,guard,expected", [
+    ("Psychology", True, 25172.62), ("Education", True, None),
+    ("Psychology", False, None),
+])
+async def test_repair_rule_survives_normal_extraction_without_leaking_widget_fields(
+        programme, guard, expected, monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.services.scraper.extractors import gemini_primary
+    from app.services.scraper.pipelines.single_course import extract_course
+    from app.services.scraper.repair_fee_authority import FEE_EVIDENCE_GUARD
+    monkeypatch.setattr(gemini_primary, "extract_primary", AsyncMock(return_value=({}, 0, 0, 0, {})))
+    html = f"""<h1>Acadia University - {programme}</h1><main id="main">
+    <h2>{programme}</h2><p>Earn a Bachelor of {programme} with us.</p>
+    <div id="requirements-fees"><span class="int">Undergraduate Full Course Load Fees for
+    International Students Tuition $25,172.62 TOTAL $28,466.86</span>
+    <span>Bachelor of Education Fees for International Students Tuition $26,190.44</span>
+    <span class="other-course">Unrelated subject IELTS 8.0</span></div></main>"""
+    rule = {"css": "span.int", "regex_scope": "selected", "regex": r"Tuition\s+\$([\d,.]+)"}
+    if guard:
+        rule["evidence_guard"] = FEE_EVIDENCE_GUARD
+    token = current_uni_config.set(config())
+    try:
+        result = await extract_course(URL.replace("computer-science", programme.lower()),
+            html=html, country="Canada", use_ai_fallback=False, extraction_rules={
+                "international_fee": rule, "ielts_overall": {"css": ".other-course"}})
+        payload = result["payload"]
+        assert payload.get("international_fee") == expected
+        assert not payload.get("ielts_overall")
+        if expected:
+            assert payload["currency"] == "CAD"
+            assert any("International Students Tuition" in e.get("snippet", "")
+                       for e in result["evidence"] if e["field_key"] == "international_fee")
+    finally:
+        current_uni_config.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_discovery_admits_only_programme_cards_with_reviewed_external_destinations(monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.services.scraper import discovery, sitemap
+    from app.services.scraper.extractors.acadia_html import CATALOGUE_URL
+    from app.services.scraper.guards import is_blocked_page
+    urls = ["https://acadiadiv.ca/bth/", "https://med.acadiau.ca/home.html",
+            "https://acadiadiv.ca/mdiv/", "https://www.nsphdeducation.ca/",
+            "https://acadiadiv.ca/dmin/"]
+    junk = ["https://acadiadiv.ca/programs", "https://acadiadiv.ca/news/",
+            "https://med.acadiau.ca.invalid/home.html"]
+    html = '<main><div id="program_sort_grad"><div class="profile_content">' + ''.join(
+        f'<a href="{u}">Programme {i}</a>' for i, u in enumerate(urls + junk)) + '</div></div></main>'
+    monkeypatch.setattr(discovery, "fetch_html", AsyncMock(return_value=html))
+    monkeypatch.setattr(sitemap, "discover_from_sitemap", AsyncMock(return_value=[]))
+    cfg = config().discovery
+    rows = await discovery.discover_course_links(CATALOGUE_URL, max_pages=1, max_courses=60,
+                                                  discovery_config=cfg)
+    accepted = {r["url"] for r in rows if any(re.search(p, r["url"]) for p in cfg.allow_url_patterns)
+                and not is_blocked_page(r["url"], r["name"])[0]}
+    assert set(urls) <= accepted
+    assert not accepted.intersection(junk)

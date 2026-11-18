@@ -4640,6 +4640,15 @@ async def extract_course(
             except Exception:  # noqa: BLE001
                 pass
             _stage0_results = _apply_rules(html or "", extraction_rules)
+            # Acadia removes a shared admissions/fee widget from generic
+            # extraction. Replay only its independently guarded fee rule on
+            # the same document that the assistant used for validation.
+            from app.services.scraper.extractors.acadia_html import guarded_widget_tuition
+            _widget_fee = guarded_widget_tuition(
+                _transport_html or "", url, extraction_rules.get("international_fee"),
+            )
+            if _widget_fee is not None:
+                _stage0_results["international_fee"] = _widget_fee[:2]
             for _s0_field, (_s0_value, _s0_method) in _stage0_results.items():
                 if _s0_field in _s0_manual_override_fields:
                     continue
@@ -4672,13 +4681,20 @@ async def extract_course(
                         _s0_method = "course_name.owned_award_identity"
                 if _s0_value is not None and _s0_field not in payload:
                     payload[_s0_field] = _s0_value
+                    if _s0_field == "international_fee" and _widget_fee:
+                        # The verified Acadia recipe defines CAD. Do not infer
+                        # currency from '$', or invent a fee period or year.
+                        if getattr(getattr(getattr(_s0_uc, "extraction", None),
+                                           "fees", None), "default_currency", None) == "CAD":
+                            payload.setdefault("currency", "CAD")
                     _stage0_covered.add(_s0_field)
                     evidence.append({
                         "field_key": _s0_field,
                         "value": _s0_value,      # _persist_evidence reads "value" not "candidate_value"
                         "method": _s0_method,    # _persist_evidence reads "method" not "extraction_method"
                         "confidence": 0.80,
-                        "snippet": f"{_s0_method}: {_s0_value}",
+                        "snippet": (_widget_fee[2] if _s0_field == "international_fee" and _widget_fee
+                                    else f"{_s0_method}: {_s0_value}"),
                         "source_url": url,
                         # Do NOT pre-mark selected — _finalize_evidence_selection decides
                     })

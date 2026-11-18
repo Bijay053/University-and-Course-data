@@ -1493,6 +1493,12 @@ async def discover_course_links(
         # Take the classifier's curated list when it found any — those
         # have already been deduped, junk-filtered, and resolved against
         # the page's origin.
+        from app.services.scraper.extractors.acadia_html import CATALOGUE_URL, linked_award_cards
+        if url == CATALOGUE_URL and parsed.hostname == "www2.acadiau.ca":
+            for target, award in linked_award_cards(html, url).items():
+                if len(found) >= max_courses:
+                    break
+                found.setdefault(target, award)
         for link in classification.get("course_links", []) or []:
             u = link.get("url")
             n = _PROMO_PREFIX_RE.sub("", link.get("name") or "").strip()

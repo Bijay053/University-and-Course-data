@@ -313,3 +313,26 @@ async def test_unrelated_prompt_does_not_even_open_database():
     service = SimpleNamespace(AsyncSessionLocal=lambda: (_ for _ in ()).throw(AssertionError()))
     assert not await handle(service, "thread", "turn", "run", {"job": {"id": "one"}},
                             "Set intake February")
+
+
+@pytest.mark.asyncio
+async def test_repeat_complaint_reads_actual_verification_instead_of_offering_another_batch(monkeypatch):
+    from unittest.mock import MagicMock
+    from app.services.scrape_agent_v2.tools import DataTools
+    thread = SimpleNamespace(job_id="review", messages=[
+        {"role": "assistant", "providerRepair": {"jobId": "review"}},
+        {"role": "user", "content": "still same bug"}])
+    db = AsyncMock()
+    db.get.side_effect = [thread, SimpleNamespace(university_id=104)]
+    manager = MagicMock()
+    manager.__aenter__ = AsyncMock(return_value=db)
+    manager.__aexit__ = AsyncMock(return_value=False)
+    service = SimpleNamespace(AsyncSessionLocal=lambda: manager, now=lambda: __import__("datetime").datetime.now(),
+                              save_research_reply=AsyncMock())
+    execute = AsyncMock(side_effect=[report(), {"phase": "needs_review", "verification": {
+        "cumulative_staged_courses": 44, "unresolved_fields": ["fee_pct", "ielts_pct"]}}])
+    monkeypatch.setattr(DataTools, "execute", execute)
+    assert await handle(service, "thread", "turn", "run", {"job": {"id": "review"}}, "still same bug")
+    assert [c.args[0] for c in execute.await_args_list] == ["diagnose_scraper", "read_scraper_repair"]
+    msg = service.save_research_reply.await_args.args[3]
+    assert msg["actions"] == [] and "staged 44" in msg["content"] and "fee, ielts" in msg["content"]

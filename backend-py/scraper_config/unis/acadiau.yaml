@@ -7,6 +7,7 @@ locked_config_paths:
   - discovery.seed_urls
   - discovery.skip_auto_api_discovery
   - discovery.allow_url_patterns
+  - discovery.allowed_extra_hostnames
   - discovery.course_detail_url_patterns
   - discovery.listing_only_patterns
   - discovery.block_url_patterns
@@ -19,13 +20,16 @@ locked_config_paths:
   - extraction.fees.default_currency
 discovery:
   skip_auto_api_discovery: true
+  allowed_extra_hostnames: [med.acadiau.ca, acadiadiv.ca, www.nsphdeducation.ca]
   seed_urls:
     - https://www2.acadiau.ca/academics.html
     - https://www2.acadiau.ca/academics/graduate.html
   allow_url_patterns:
     - '^https://www2\.acadiau\.ca/academics/(?:undergraduate|graduate)/[a-z0-9-]+\.html$'
+    - '^https://(?:acadiadiv\.ca/(?:bth|mdiv|dmin)/|med\.acadiau\.ca/home\.html|www\.nsphdeducation\.ca/)$'
   course_detail_url_patterns:
     - '^https://www2\.acadiau\.ca/academics/(?:undergraduate|graduate)/[a-z0-9-]+\.html$'
+    - '^https://(?:acadiadiv\.ca/(?:bth|mdiv|dmin)/|med\.acadiau\.ca/home\.html|www\.nsphdeducation\.ca/)$'
   listing_only_patterns:
     - '^https://www2\.acadiau\.ca/academics(?:/(?:undergraduate|graduate))?\.html$'
   block_url_patterns:

@@ -8,6 +8,7 @@ from app.models.scrape_assistant import ScrapeAssistantThread
 _SCRAPER = r"\b(?:scrap(?:e|er|ing|ping)|scap(?:e|er|ing|ting)|discovery|extraction pipeline)\b"
 _PROVIDER_TARGET = r"\b(?:scraper|scaper|scraping|scaping|scapting|scrapping|discovery|extraction pipeline)\b"
 _FAILED_JOB_STATUSES = {"failed", "failed_degraded", "failed_provider", "interrupted", "error"}
+_REPEAT_COMPLAINT = re.compile(r"\s*(?:still (?:the )?(?:same (?:bug|issue|error)|not working)|same bug)[.!? ]*", re.I)
 
 
 def normalize_scraper_words(prompt):
@@ -146,7 +147,8 @@ def answer(report):
 
 async def handle(service, thread_id, turn_id, run_id, ctx, prompt):
     # Return quickly on unrelated prompts, without database or network work.
-    if not requested(prompt) and not failed_job_followup(prompt) and not re.fullmatch(
+    repeat = bool(_REPEAT_COMPLAINT.fullmatch(prompt))
+    if not repeat and not requested(prompt) and not failed_job_followup(prompt) and not re.fullmatch(
         r"\s*(?:fix (?:this|it)|repair (?:this|it)|do it|still broken)[.!? ]*", prompt, re.I
     ):
         return False
@@ -157,7 +159,7 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt):
         job = await db.get(ScrapeRuntimeJob, thread.job_id)
         if not job:
             raise ValueError("Scrape job no longer exists.")
-        if not requested(prompt, thread.messages or [],
+        if not repeat and not requested(prompt, thread.messages or [],
                          failed_job=getattr(job, "status", None) in _FAILED_JOB_STATUSES):
             return False
         from app.services.assistant_staff_values import parse
@@ -168,15 +170,37 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt):
     from app.services.scrape_agent_v2.tools import DataTools
     tools = DataTools(service, thread_id, turn_id, run_id,
                       {"job": {"id": ctx["job"]["id"]}, "university_id": university_id}, prompt)
+    if repeat:
+        # Only continue an actual provider-repair discussion, never hijack
+        # a terse follow-up to a field edit or an unrelated provider's chat.
+        prior = next((m for m in reversed(thread.messages or [])
+                      if m.get("role") == "assistant"), {})
+        if not prior.get("providerRepair"):
+            return False
     # DataTools rechecks turn ownership, live actor permissions and provider scope.
     report = await tools.execute("diagnose_scraper", {}, "provider-diagnosis")
     content, actions = answer(report), []
+    if repeat:
+        previous = await tools.execute("read_scraper_repair", {}, "provider-last-verification")
+        comparison = previous.get("verification") or {}
+        if previous.get("phase") == "needs_review" and comparison:
+            staged = comparison.get("cumulative_staged_courses", 0)
+            fields = ", ".join(str(f).removesuffix("_pct").replace("_", " ")
+                               for f in comparison.get("unresolved_fields") or [])
+            content += f"\n\nThe last verification staged {staged} courses but did not verify a complete repair."
+            if fields:
+                content += f" Fields still incomplete: {fields}."
+            content += " No repeat scrape has been started."
+        else:
+            content += ("\n\nLast repair status for this review: "
+                        f"{previous.get('phase') or previous.get('status') or 'unavailable'}. "
+                        "No repeat scrape has been started.")
     if wants_repair(prompt, thread.messages or []) and report["repairAvailable"]:
         result = await tools.execute("repair_scraper", {}, "provider-repair")
         if result.get("proposal"):
             actions = [result["proposal"]]
             content += (
-                "\n\nI prepared a validated provider-configuration repair and isolated fresh verification. "
+                "\n\nI prepared a request to test a possible scraper repair. No fix has been validated for this request yet. "
                 "The test can select up to 50 courses, so batch approval is required. "
                 "No repair has run yet and no course has been published."
             )
@@ -184,7 +208,7 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt):
             content += "\n\n" + result.get("reason", "Repair could not be prepared; no success is claimed.")
     elif not report["repairAvailable"]:
         content += "\n\n" + (report.get("blockedReason") or "No supported automatic repair was identified.")
-    else:
+    elif not repeat:
         content += "\n\nA supported repair is available. This was a diagnostic-only request; no repair was started."
     await service.save_research_reply(thread_id, turn_id, run_id, {
         "role": "assistant", "turnId": turn_id, "createdAt": service.now().isoformat(),
