@@ -141,6 +141,12 @@ def result(choices, *, incomplete=False):
 
 async def resolve(prompt, messages, ctx, factory, catalogue_reader):
     """Return None for a non-targeted prompt; unresolved names fail closed."""
+    from app.services.assistant_provider_repair import filter_diagnostic, requested as provider_request
+    if filter_diagnostic(prompt) or provider_request(prompt):
+        # Diagnostic logs can contain "diploma", "undergraduate" and course
+        # URLs. They are not a named-course selection, including after an
+        # earlier unresolved-name response.
+        return None
     prior = next((m for m in reversed(messages[:-1]) if m["role"] == "assistant"), {})
     previous_choices = candidates(
         [(item.get("title"), item.get("url")) for item in prior.get("courseChoices", [])],
@@ -189,7 +195,8 @@ async def resolve(prompt, messages, ctx, factory, catalogue_reader):
                "these", "those", "they", "them", "scores", "test", "score", "amount",
                "tuition", "campus", "please"}
     title_only = 0 < len(target.split()) <= 10 and not (set(normal(target).split()) & generic)
-    explicit_name = bool(AWARD.search(prompt) or title_only or re.search(
+    name_text = re.sub(r"https?://\S+", "", prompt)
+    explicit_name = bool(AWARD.search(name_text) or title_only or re.search(
         r"\bcourse\s+(?:called|named)\b", prompt, re.I))
     if not explicit_name:
         if previous_choices:

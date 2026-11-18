@@ -10,6 +10,34 @@ _PROVIDER_TARGET = r"\b(?:scraper|scaper|scraping|scaping|scapting|scrapping|dis
 _FAILED_JOB_STATUSES = {"failed", "failed_degraded", "failed_provider", "interrupted", "error"}
 
 
+def normalize_scraper_words(prompt):
+    """Correct scraper-command typos, never course names, URLs or stored facts."""
+    def word(match):
+        value = match.group()
+        if value.casefold() in {"scrape", "scraper", "scraping", "scrapping"}:
+            return value
+        if 6 <= len(value) <= 12 and re.match(r"(?:scra|scap)", value, re.I) and any(
+            SequenceMatcher(None, value.casefold(), target).ratio() >= 0.8
+            for target in ("scraping", "scraper")
+        ):
+            return "scraping"
+        return value
+    return re.sub(r"https?://\S+|[a-zA-Z]+", lambda m:
+                  m.group() if m.group().lower().startswith(("https://", "http://"))
+                  else word(m), prompt)
+
+
+def filter_diagnostic(prompt):
+    """Recognise pasted diagnostics as context, not as proof or executable code."""
+    text = re.sub(r"https?://\S+", "", prompt)
+    return bool(re.search(
+        r"\bURL filter excluded\s+\d+(?:\.\d+)?%\s+of discovered links\b"
+        r"|\ballow_url_patterns\s+matched\s+\d+\s+links?\s+and excluded\s+\d+\b"
+        r"|\[FILTER\]\s+\d+\s+raw\s*[→>-]+\s*\d+\s+extractable",
+        text, re.I,
+    ))
+
+
 def failed_job_followup(prompt):
     """Recognise shorthand only; the caller must separately verify failed state."""
     words = re.findall(r"[a-z]+", prompt.casefold())
@@ -37,6 +65,7 @@ def failed_job_followup(prompt):
 
 
 def requested(prompt, messages=(), *, failed_job=False):
+    prompt = normalize_scraper_words(prompt)
     # A prohibition is not a request to repair the discovery pipeline. Keep
     # source/field investigations on their own routes even when they say not
     # to launch discovery, or describe a possible source-access failure.
@@ -53,6 +82,8 @@ def requested(prompt, messages=(), *, failed_job=False):
     if (re.search(r"\b(?:intakes?|ielts|location|course name)\b", prompt, re.I)
             and not re.search(_PROVIDER_TARGET, prompt, re.I)):
         return False
+    if filter_diagnostic(prompt):
+        return True
     if re.search(_SCRAPER, prompt, re.I):
         return bool(re.search(r"\b(?:fix|repair|bug|wrong|why|diagnose|fail\w*|issue|missing|problem)\b", prompt, re.I))
     if failed_job and failed_job_followup(prompt):
@@ -63,9 +94,19 @@ def requested(prompt, messages=(), *, failed_job=False):
     return False
 
 
-def wants_repair(prompt):
+def wants_repair(prompt, messages=()):
     from app.services.scrape_assistant_autorun import execution_requested
-    return execution_requested(prompt) and bool(re.search(r"\b(?:fix|repair|resolve|recover|do it)\b", prompt, re.I))
+    if not execution_requested(prompt):
+        return False
+    if re.search(r"\b(?:fix|repair|resolve|recover|do it)\b", prompt, re.I):
+        return True
+    if filter_diagnostic(prompt) and not re.search(r"\b(?:why|explain|diagnose|only|just)\b", prompt, re.I):
+        # A log-only follow-up continues the immediately preceding user repair
+        # request, never an instruction found in an assistant answer or website.
+        prior = next((m.get("content", "") for m in reversed(messages[:-1])
+                      if m.get("role") == "user"), "")
+        return requested(prior) and wants_repair(prior)
+    return False
 
 
 def answer(report):
@@ -130,7 +171,7 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt):
     # DataTools rechecks turn ownership, live actor permissions and provider scope.
     report = await tools.execute("diagnose_scraper", {}, "provider-diagnosis")
     content, actions = answer(report), []
-    if wants_repair(prompt) and report["repairAvailable"]:
+    if wants_repair(prompt, thread.messages or []) and report["repairAvailable"]:
         result = await tools.execute("repair_scraper", {}, "provider-repair")
         if result.get("proposal"):
             actions = [result["proposal"]]

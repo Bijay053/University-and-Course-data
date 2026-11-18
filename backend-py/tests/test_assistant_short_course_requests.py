@@ -20,6 +20,23 @@ def option(month, *, title=TITLE, path="mechanical-engineering-msc", year=2027):
 OPTIONS = [option(month) for month in ("January", "April", "September")]
 
 
+@pytest.mark.asyncio
+async def test_pasted_pipeline_diagnostics_are_not_a_course_name_or_an_old_choice():
+    prompt = (
+        "URL filter excluded 60% of discovered links\n"
+        "allow_url_patterns matched 45 links and excluded 66.\n"
+        "/alumni-friends/alumni/benefits-services/diploma-frames.html\n"
+        "/academics-overview/online/courses/pre-university-courses.html"
+    )
+    forbidden = AsyncMock(side_effect=AssertionError("No name lookup or catalogue request expected"))
+    result = await names.resolve(prompt, [
+        {"role": "assistant", "content": "Which course?", "courseNameUnresolved": True},
+        {"role": "user", "content": prompt},
+    ], {"home": HOME}, forbidden, forbidden)
+    assert result is None
+    forbidden.assert_not_called()
+
+
 @pytest.mark.parametrize("prompt", [
     "Check Mechanical Engineering MSc",
     "check mechanical engineering msc",

@@ -342,6 +342,7 @@ async def investigate(thread_id: str, turn_id: str):
                 service, thread_id, turn_id, run_id,
                 {"job": {"id": claimed_thread.job_id}}, requested["content"],
             ):
+                await run_automatic_action(thread_id, turn_id)
                 return
             # A request to retry settled failures belongs to the fenced retry
             # handler below, not to a read-only diagnostic matching "retry".

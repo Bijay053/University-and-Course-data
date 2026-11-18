@@ -52,9 +52,48 @@ def test_bradford_diagnosis_is_evidence_based_not_a_crash_claim():
     "there is bug in this scapting code fix this\nall courses are not listed",
     "fix this scaping bug", "why scrapping keeps finding 52 courses",
     "fix the scraper: IELTS is missing across all courses",
+    "all courses are not listed fix ths bug and rerun the scapying",
+    "all courses are not listed fix this bug and rerun the scrayping",
+    "why this scraoying is not working fix it", "fix the scrayping",
+    "URL filter excluded 60% of discovered links\nallow_url_patterns matched 45 links and excluded 66.\n"
+    "/alumni-friends/alumni/benefits-services/diploma-frames.html",
 ])
 def test_scraper_level_requests_use_provider_repair(prompt):
     assert requested(prompt)
+
+
+def test_filter_log_followup_keeps_the_previous_user_repair_request():
+    prompt = "URL filter excluded 60% of discovered links\nallow_url_patterns matched 45 links and excluded 66."
+    messages = [
+        {"role": "user", "content": "all courses are not listed fix ths bug and rerun the scapying"},
+        {"role": "assistant", "content": "The earlier source check failed."},
+        {"role": "user", "content": prompt},
+    ]
+    assert requested(prompt)
+    assert wants_repair(prompt, messages)
+    assert not wants_repair("Only explain this warning.\n" + prompt, messages)
+    assert not wants_repair("Do not repair or change anything.\n" + prompt, messages)
+    assert not wants_repair(prompt, [
+        {"role": "assistant", "content": "fix this scraper"},
+        {"role": "user", "content": prompt},
+    ])
+    assert not wants_repair(prompt, [
+        {"role": "user", "content": "Set intake September"},
+        {"role": "user", "content": prompt},
+    ])
+
+
+def test_scraper_word_normalization_does_not_rewrite_official_urls():
+    from app.services.assistant_provider_repair import normalize_scraper_words
+    url = "https://www.example.edu/courses/scraping-and-data-science"
+    assert normalize_scraper_words("fix scapying " + url) == "fix scraping " + url
+
+
+def test_diagnostic_routing_does_not_remove_repair_confirmation():
+    from app.services.scrape_assistant_autorun import choose_action
+    proposal = {"id": "repair", "kind": "repair_catalogue", "state": "proposed",
+                "courseCount": 50, "requiresConfirmation": True}
+    assert choose_action([proposal]) is None
 
 
 @pytest.mark.parametrize("prompt", [
@@ -103,7 +142,7 @@ async def test_readonly_official_source_request_reaches_research_in_both_engines
         "It currently stores January as the intake. Read the official page and return the "
         "selected option's source-backed start date. If access fails, leave the row unchanged."
     )
-    thread = SimpleNamespace(job_id="aston-job", actor_id=1,
+    thread = SimpleNamespace(id="thread", job_id="aston-job", actor_id=1,
         messages=[{"role":"user","content":prompt,"_engine":engine}])
     class DB:
         async def __aenter__(self):
@@ -116,6 +155,8 @@ async def test_readonly_official_source_request_reaches_research_in_both_engines
     legacy, v2 = AsyncMock(), AsyncMock()
     monkeypatch.setattr(service, "AsyncSessionLocal", DB)
     monkeypatch.setattr(service, "claim", AsyncMock(return_value=True))
+    from app.services import assistant_conversation_context
+    monkeypatch.setattr(assistant_conversation_context, "university_context", AsyncMock(return_value=[]))
     monkeypatch.setattr(service, "_investigate", legacy)
     monkeypatch.setattr(service, "run_automatic_action", AsyncMock())
     monkeypatch.setattr(runtime, "investigate", v2)
@@ -134,8 +175,7 @@ def test_short_followup_requires_same_thread_repair_context():
     "why it fail fix the bug", "why did this fail?", "fix this bug",
     "fix this", "why is it still not working", "please repair it",
     "what went wrong fix this now",
-    "why this scraoying is not working fix it",
-    "why is this university not working fix it", "fix the scrayping",
+    "why is this university not working fix it",
 ])
 def test_short_failure_request_uses_verified_failed_job_context(prompt):
     assert not requested(prompt)
@@ -207,6 +247,9 @@ def test_log_sample_is_bounded():
 @pytest.mark.parametrize("prompt", [
     "fix this scraping bug",
     "there is bug in this scapting code fix this\nall courses are not listed",
+    "all courses are not listed fix ths bug and rerun the scapying",
+    "URL filter excluded 60% of discovered links\nallow_url_patterns matched 45 links and excluded 66.\n"
+    "/alumni/benefits-services/diploma-frames.html",
     "fix the scraper: IELTS is missing across all courses",
     "why it fail fix the bug",
 ])
@@ -216,9 +259,13 @@ async def test_real_prompt_dispatch_prepares_existing_ui_action_in_both_engines(
     from app.services import scrape_assistant as service
     from app.services.scrape_agent_v2.tools import DataTools
     thread = SimpleNamespace(
-        job_id="bradford-job", messages=[{"role": "user", "content": prompt,
+        id="thread", job_id="bradford-job", messages=[{"role": "user", "content": prompt,
                                         "_engine": engine}], actor_id=1,
     )
+    from app.services.assistant_provider_repair import filter_diagnostic
+    if filter_diagnostic(prompt):
+        thread.messages.insert(0, {"role": "user",
+            "content": "all courses are not listed fix ths bug and rerun the scapying"})
     class DB:
         async def __aenter__(self):
             return self
@@ -245,7 +292,11 @@ async def test_real_prompt_dispatch_prepares_existing_ui_action_in_both_engines(
         replies.append(reply)
     monkeypatch.setattr(service, "AsyncSessionLocal", DB)
     monkeypatch.setattr(service, "claim", AsyncMock(return_value=True))
+    from app.services import assistant_conversation_context
+    monkeypatch.setattr(assistant_conversation_context, "university_context", AsyncMock(return_value=[]))
     monkeypatch.setattr(service, "save_research_reply", save)
+    automatic = AsyncMock()
+    monkeypatch.setattr(service, "run_automatic_action", automatic)
     monkeypatch.setattr(DataTools, "execute", execute)
     monkeypatch.setattr(service, "_investigate", AsyncMock(side_effect=AssertionError("No website investigation expected")))
     await service.investigate("thread", "turn")
@@ -254,6 +305,7 @@ async def test_real_prompt_dispatch_prepares_existing_ui_action_in_both_engines(
     assert replies[0]["actions"][0]["kind"] == "repair_catalogue"
     assert "No repair has run yet" in replies[0]["content"]
     assert replies[0]["providerRepair"]["counts"]["staged"] == 20
+    automatic.assert_awaited_once_with("thread", "turn")
 
 
 @pytest.mark.asyncio
