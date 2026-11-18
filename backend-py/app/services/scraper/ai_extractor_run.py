@@ -337,6 +337,13 @@ def apply_extraction_rules(
 
         if raw is not None:
             raw = _apply_transform(raw, transform)
+            if rule.get("evidence_guard") is not None:
+                from .repair_fee_authority import FEE_EVIDENCE_GUARD, missing_fee_authority
+                if (field != "international_fee"
+                        or rule["evidence_guard"] != FEE_EVIDENCE_GUARD
+                        or not missing_fee_authority(html, raw)["supported"]):
+                    raw = None
+                    method = "ai_rule:fee_scope_unverified"
             # A stale generated/admin category selector can match the site's
             # navigation wrapper instead of a course-owned subject element.
             # Reject it here so it neither enters the payload nor counts toward

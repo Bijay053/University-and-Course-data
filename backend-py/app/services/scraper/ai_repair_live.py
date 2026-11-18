@@ -848,7 +848,7 @@ def field_authority_html(field: str, html: str) -> str:
         return html
     soup = _sanitized_visible_document(html)
     selected = []
-    for node in soup.select("p, tr, dl, section, div, li"):
+    for node in soup.select("p, tr, dl, section, div, li, span"):
         text = node.get_text(" ", strip=True)
         if len(text) > 500:
             continue
@@ -1506,9 +1506,32 @@ class LiveRepairEvidence:
                 for url, page in checked.items():
                     if page["classification"] != "course":
                         continue
-                    full = apply_extraction_rules(page["html"], {field: rule}).get(field, (None, ""))[0]
+                    full_result = apply_extraction_rules(page["html"], {field: rule}).get(field, (None, ""))
+                    full = full_result[0]
+                    # An explicitly guarded, blank-only exception is not a
+                    # successful fill. Keep it unresolved; do not let it block
+                    # evidenced fills for other qualifications. Unexpected
+                    # loss of previously supported evidence still fails below.
+                    known_excluded = any(
+                        item.get("url") == url and item.get("scope_excluded")
+                        and item.get("before") in (None, "")
+                        for replay in (snapshot_validation or {}).get("reports") or []
+                        if replay.get("field") == field
+                        for item in replay.get("samples") or []
+                    )
+                    if (known_excluded and full is None
+                            and full_result[1] == "ai_rule:fee_scope_unverified"):
+                        report.setdefault("scope_exclusions", []).append({"url": url, "field": field})
+                        continue
                     authority = field_authority_html(field, page["owned_html"])
-                    owned = apply_extraction_rules(authority, {field: rule}).get(field, (None, ""))[0]
+                    # The guard needs the current course's identity, which is
+                    # deliberately absent from a fee-only fragment. It already
+                    # ran on the full page above; compare selector output from
+                    # labelled course-owned evidence without stripping identity
+                    # out from under the guard a second time.
+                    authority_rule = {key: value for key, value in rule.items()
+                                      if key != "evidence_guard"}
+                    owned = apply_extraction_rules(authority, {field: authority_rule}).get(field, (None, ""))[0]
                     value = _normalise_repair_value(field, owned)
                     source_text = _sanitized_visible_document(authority).get_text(" ", strip=True).replace(",", "")
                     supported = value is not None and str(value).removesuffix(".0").lower() in source_text.lower()

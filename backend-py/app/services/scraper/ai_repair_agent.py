@@ -871,6 +871,11 @@ def _validate_extraction_patch(field: str, value: Any) -> None:
             raise PatchValidationError(
                 f"extraction.{field} confidence must be between 0.85 and 1.0."
             )
+        if value.get("evidence_guard") is not None:
+            from .repair_fee_authority import FEE_EVIDENCE_GUARD
+            if (field != "extraction_rules.international_fee"
+                    or value["evidence_guard"] != FEE_EVIDENCE_GUARD):
+                raise PatchValidationError("Unsupported extraction evidence guard.")
         for key in ("css", "xpath", "regex", "attribute", "transform", "quoted_text"):
             item = value.get(key)
             if item is not None and (not isinstance(item, str) or len(item) > 1000):
@@ -938,6 +943,16 @@ def validate_extraction_rule_on_samples(
     _validate_extraction_patch(f"extraction_rules.{field}", rule)
     from app.services.scraper.ai_extractor_run import apply_extraction_rules
 
+    # Blank values cannot prove preservation. Instead require independent
+    # source applicability, retain that guard in the persisted rule, and still
+    # require fresh live verification before any configuration write.
+    missing_only = (
+        field == "international_fee" and len(samples) >= 2
+        and all(sample.get("before") in (None, "") for sample in samples)
+    )
+    if missing_only:
+        from .repair_fee_authority import FEE_EVIDENCE_GUARD
+        rule = {**rule, "evidence_guard": FEE_EVIDENCE_GUARD}
     tested: list[dict[str, Any]] = []
     filled_missing = corrected_invalid = regressions = valid_outputs = populated_tested = 0
     for sample in samples:
@@ -966,6 +981,7 @@ def validate_extraction_rule_on_samples(
             "method": result.get(field, (None, "ai_rule:miss"))[1],
             "preserved": preserved,
             "corrected_invalid": invalid_before and after is not None,
+            "scope_excluded": result.get(field, (None, ""))[1] == "ai_rule:fee_scope_unverified",
         })
 
     reasons: list[str] = []
@@ -973,8 +989,14 @@ def validate_extraction_rule_on_samples(
         reasons.append("At least two stored HTML samples are required.")
     if filled_missing + corrected_invalid < 1:
         reasons.append("The rule did not fill a missing value or correct an invalid value.")
-    if populated_tested < 1 and corrected_invalid < 2:
-        reasons.append(
+    independent_fills = {
+        item["url"] for item in tested
+        if item.get("url") and _normalise_repair_value(field, item["after"]) is not None
+        and not item["scope_excluded"]
+    } if missing_only else set()
+    if populated_tested < 1 and corrected_invalid < 2 and len(independent_fills) < 2:
+        reasons.append("Fewer than two distinct courses have applicable official tuition evidence."
+                       if missing_only else
             "No populated baseline value was available to prove preservation, "
             "and fewer than two invalid values were corrected."
         )
@@ -984,6 +1006,10 @@ def validate_extraction_rule_on_samples(
         reasons.append(f"The rule changed {regressions} already-populated value(s).")
     return {
         "field": field,
+        "rule": rule,
+        "validation_basis": "guarded_course_owned_missing_fill" if missing_only else "baseline_preservation",
+        "requires_live_validation": True,
+        "scope_excluded": sum(item["scope_excluded"] for item in tested),
         "accepted": not reasons,
         "confidence": float(rule["confidence"]),
         "samples_tested": len(samples),
@@ -1087,7 +1113,7 @@ async def _validate_extraction_patch_on_snapshots(
         report = validate_extraction_rule_on_samples(field, rule, samples)
         reports.append(report)
         if report["accepted"]:
-            accepted_rules[field] = rule
+            accepted_rules[field] = report["rule"]
     return {
         "accepted": bool(rules) and len(accepted_rules) == len(rules),
         "rules": accepted_rules,
@@ -3409,6 +3435,10 @@ async def run_ai_repair_loop(
                                 for reason in report["rejection_reasons"]
                             )
                         extr_patch = {}
+                    elif extr_patch.get("extraction_rules"):
+                        # Persist and live-test exactly the guarded rule replayed
+                        # above, never the unguarded model proposal.
+                        extr_patch["extraction_rules"] = extraction_validation["rules"]
 
             # ⑤ URL filter simulation (discovery patches only — no live re-scrape needed)
             current_disc = dict(ctx.get("effective_discovery") or {})
