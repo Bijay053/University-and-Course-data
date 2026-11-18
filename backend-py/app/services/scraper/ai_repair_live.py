@@ -1394,8 +1394,39 @@ class LiveRepairEvidence:
             if fresh != self.fallback:
                 reasons.append("Official catalogue changed during validation; no changes are safe")
         required = set(report["courses"])
+        from .repair_fee_authority import FEE_EVIDENCE_GUARD
+        rules = extraction.get("extraction_rules") or {}
+        guarded_fee_only = (
+            not patch and set(rules) == {"international_fee"}
+            and rules["international_fee"].get("evidence_guard") == FEE_EVIDENCE_GUARD
+        )
+        scope_excluded = set()
+        write_or_preservation_targets = set()
         for item in (snapshot_validation or {}).get("reports") or []:
             required.update(sample["url"] for sample in item.get("samples") or [] if sample.get("url"))
+            write_or_preservation_targets.update(
+                sample["url"] for sample in item.get("samples") or []
+                if sample.get("url") and (
+                    sample.get("before") not in (None, "") or sample.get("after") is not None
+                )
+            )
+            if guarded_fee_only and item.get("field") == "international_fee":
+                scope_excluded.update(
+                    sample["url"] for sample in item.get("samples") or []
+                    if sample.get("url") and sample.get("scope_excluded")
+                    and sample.get("before") in (None, "") and sample.get("after") is None
+                    and sample.get("method") == "ai_rule:fee_scope_unverified"
+                )
+        scope_excluded.difference_update(write_or_preservation_targets)
+        if scope_excluded:
+            # There is no proposed write to these rows. The persisted runtime
+            # guard remains mandatory if their content changes in future.
+            required.difference_update(scope_excluded)
+            report["scope_exclusions"] = [
+                {"url": url, "field": "international_fee", "source_check": "not_rechecked",
+                 "reason": "No fee proposed; applicability guard retained"}
+                for url in sorted(scope_excluded)
+            ]
         if not required:
             reasons.append("No live validation targets")
         if any(is_intentionally_excluded_course_url(url) for url in required):
@@ -1406,7 +1437,15 @@ class LiveRepairEvidence:
         # for a later attempt that is actually eligible to be applied.
         if not reasons:
             for url in sorted(required):
-                checked[url] = self.validation_pages.get(url) or await self.fetch(url)
+                cached = self.validation_pages.get(url)
+                # These are actual source documents fetched and verified by
+                # this same bounded repair session, not historical snapshots.
+                initial = self.initial.get(url) if guarded_fee_only else None
+                if (not cached and initial and initial.get("classification") == "course"
+                        and initial.get("_source_html")):
+                    cached = initial
+                    report.setdefault("reused_session_sources", []).append(url)
+                checked[url] = cached or await self.fetch(url)
                 if checked[url]["classification"] not in _FAILURES:
                     self.validation_pages[url] = checked[url]
                 if checked[url]["classification"] != "course":

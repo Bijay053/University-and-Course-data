@@ -158,6 +158,46 @@ async def test_live_validation_requires_real_positive_outputs_and_reports_known_
     result = await evidence.validate({}, {}, {"extraction_rules": {
         "international_fee": replay["rule"]}}, {"reports": [replay]})
     assert result["accepted"] is not changed_source
-    assert result["scope_exclusions"] == [{"url": rows[2]["url"], "field": "international_fee"}]
+    assert result["scope_exclusions"] == [{
+        "url": rows[2]["url"], "field": "international_fee", "source_check": "not_rechecked",
+        "reason": "No fee proposed; applicability guard retained"}]
     if changed_source:
         assert any("not supported by course-owned live content" in s for s in result["reasons"])
+
+
+@pytest.mark.asyncio
+async def test_twelve_snapshot_rows_do_not_exhaust_live_budget_on_eight_excluded_fees(monkeypatch):
+    from types import SimpleNamespace
+    from app.services.scraper.ai_repair_live import LiveRepairEvidence
+    rows = [sample(i) for i in range(4)] + [
+        sample(i, course("Education", "Bachelor of Education")) for i in range(4, 12)]
+    replay = validate_extraction_rule_on_samples("international_fee", RULE, rows)
+    assert replay["missing_filled"] == 4 and replay["scope_excluded"] == 8
+    cfg = SimpleNamespace(discovery=SimpleNamespace(allowed_extra_hostnames=[]),
+                          extraction=SimpleNamespace(), filters=SimpleNamespace())
+    evidence = LiveRepairEvidence({"university_id": 1, "scrape_url": rows[0]["url"],
+                                  "effective_config": cfg, "repair_url_sample": []})
+    # Eight of twelve page slots were already consumed by initial diagnosis.
+    evidence.pages_checked = 8
+    def page(row):
+        return {"classification": "course", "html": row["html"], "owned_html": row["html"],
+                "_source_html": row["html"], "url": row["url"], "audience_evidence": {}}
+    evidence.initial[rows[0]["url"]] = page(rows[0])
+    monkeypatch.setattr(evidence, "discovery_validation", lambda *_: {
+        "reasons": [], "courses": [row["url"] for row in rows]})
+    visited = []
+    async def fetch(url):
+        assert evidence.pages_checked < evidence.max_pages, "Existing page limit must remain intact"
+        evidence.pages_checked += 1
+        visited.append(url)
+        return page(next(row for row in rows if row["url"] == url))
+    monkeypatch.setattr(evidence, "fetch", fetch)
+    result = await evidence.validate({}, {}, {"extraction_rules": {
+        "international_fee": replay["rule"]}}, {"reports": [replay]})
+    assert result["accepted"]
+    assert len(visited) == 3
+    assert evidence.pages_checked == 11 and evidence.max_pages == 12
+    assert result["reused_session_sources"] == [rows[0]["url"]]
+    assert len(result["scope_exclusions"]) == 8
+    assert all(row["source_check"] == "not_rechecked" for row in result["scope_exclusions"])
+    assert not set(visited) & {row["url"] for row in rows[4:]}
