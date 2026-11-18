@@ -3,6 +3,48 @@ from types import SimpleNamespace
 import pytest
 from app.services import scrape_assistant as service
 from app.services.assistant_delivery_review import delivery_review_proposal, delivery_recheck_options
+from app.services.assistant_delivery_review import pending_delivery_question, guidance_source
+
+
+@pytest.mark.parametrize("prompt", [
+    "WHY THERE IS STILL ONLINE COURSES LISTED IN PENDING LIT FIX IT",
+    "Why are online-only courses still in pending review?",
+    "Why is this online course still in the pending list?",
+    "Fix online courses in pending",
+    "Why are courses still online in pending?",
+])
+def test_pending_delivery_queue_is_a_scope_boundary_not_an_old_course_reference(prompt):
+    from app.services.scrape_assistant import scope_boundary, requested_course_urls
+    old = [{"role": "user", "content":
+            "https://www.aston.ac.uk/international/english-language-requirements"}]
+    assert pending_delivery_question(prompt)
+    assert scope_boundary(prompt)
+    assert requested_course_urls(prompt, old, "https://www.aston.ac.uk") == []
+
+
+@pytest.mark.parametrize("title,url", [
+    ("English Language Requirements | Aston University", "https://www.aston.ac.uk/international/english-language-requirements"),
+    ("Official guidance", "https://university.example/admission-requirements"),
+    ("Fees and funding", "https://university.example/students/fees"),
+    ("Academic calendar", "https://university.example/calendar"),
+])
+def test_central_guidance_cannot_be_imported_as_a_course(title, url):
+    assert guidance_source({"title": title, "url": url})
+
+
+def test_actual_course_is_not_rejected_as_central_guidance():
+    assert not guidance_source({"title": "English Language BA (Hons)",
+                                "url": "https://university.example/courses/english-language"})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prompt", [
+    "Exclude online courses from pending for Aston only",
+    "Add online courses to pending from this official catalogue",
+])
+async def test_explicit_mutation_is_not_replaced_with_default_policy_explanation(prompt):
+    from app.services.assistant_delivery_review import handle_pending_delivery_question
+    assert not await handle_pending_delivery_question(None, None, None, None, None, prompt)
 from app.services.assistant_repair_proposals import finalize_field_proposal
 from app.services.scrape_assistant_autorun import choose_action
 

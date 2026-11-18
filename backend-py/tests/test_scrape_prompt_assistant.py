@@ -635,6 +635,58 @@ async def prompt_thread(store, prompt="Check the international fee"):
         return thread.id, thread.turn_id
 
 
+@pytest.mark.asyncio
+async def test_online_pending_complaint_does_not_fetch_old_english_guidance(store, monkeypatch):
+    prompt = "WHY THERE IS STILL ONLINE COURSES LISTED IN PENDING LIT FIX IT"
+    tid, turn = await prompt_thread(store, prompt)
+    async with store() as db:
+        row = await db.get(ScrapedCourse, 1)
+        row.study_mode = "Online"
+        thread = await db.get(ScrapeAssistantThread, tid)
+        thread.messages = [
+            {"role": "user", "content":
+             "https://www.example.edu/international/english-language-requirements"},
+            {"role": "assistant", "content": "Checked English requirements."},
+        ] + thread.messages
+        await db.commit()
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("A pending-delivery complaint must not fetch/import stale guidance or run discovery")
+    monkeypatch.setattr(service, "chat_json", forbidden)
+    monkeypatch.setattr(service, "inspect_source", forbidden)
+    monkeypatch.setattr(service, "inspect_comparison", forbidden)
+    monkeypatch.setattr(service, "inventory_for_urls", forbidden)
+    await service.investigate(tid, turn)
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, tid)
+        assert thread.status == "ready", thread.error
+        reply = thread.messages[-1]
+        assert reply["actions"] == []
+        assert "1 pending record(s)" in reply["content"]
+        assert "existing pending courses" in reply["content"]
+        assert "not a request to add" in reply["content"]
+        row = await db.get(ScrapedCourse, 1)
+        assert row.status == "pending" and row.study_mode == "Online"
+
+
+@pytest.mark.asyncio
+async def test_fix_central_guidance_url_never_creates_new_course_review(store, monkeypatch):
+    url = "https://www.example.edu/international/english-language-requirements"
+    research_fakes(monkeypatch)
+    async def source(value, home):
+        return {"url": value, "title": "English Language Requirements | University",
+                "verified": True, "text": "English requirements for existing courses.",
+                "facts": [], "excerpts": [{"id": "q0", "text": "English requirements for existing courses."}]}
+    monkeypatch.setattr(service, "inspect_source", source)
+    tid, turn = await prompt_thread(store, url + "\nfix it")
+    await service.investigate(tid, turn)
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, tid)
+        assert thread.status == "ready", thread.error
+        reply = thread.messages[-1]
+        assert not any(a["kind"] == "review_courses" for a in reply.get("actions", []))
+        assert "added to review" not in reply["content"]
+
+
 def research_fakes(monkeypatch):
     calls = []
     async def ai(**kwargs):

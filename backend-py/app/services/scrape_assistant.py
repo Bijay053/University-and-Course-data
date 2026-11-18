@@ -464,6 +464,9 @@ def known_sources(prompt, ctx, sampled):
 
 def scope_boundary(text):
     """Explicit topic/scope changes fence off older course references."""
+    from app.services.assistant_delivery_review import pending_delivery_question
+    if pending_delivery_question(text):
+        return True
     return bool(re.search(
         r"\b(?:all|every|each|other|many|several|remaining|these|those|(?:a\s+)?lots?\s+of)\s+(?:(?:the|these|those|pending|unapproved)\s+)*courses?\b"
         r"|\b(?:entire|review[- ]wide|catalog(?:ue)?|new topic|different topic)\b"
@@ -527,6 +530,10 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str, references=Non
     from app.services.assistant_review_commands import handle_read_or_rule
     from app.services import scrape_assistant as this_service
     if await handle_read_or_rule(this_service, thread_id, turn_id, run_id, ctx, prompt, messages):
+        return
+    from app.services.assistant_delivery_review import handle_pending_delivery_question
+    if await handle_pending_delivery_question(
+            this_service, thread_id, turn_id, run_id, ctx, prompt):
         return
     from app.services import assistant_eligibility
     if assistant_eligibility.requested(prompt):
@@ -866,9 +873,11 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str, references=Non
         # apply, import or publish"). Research-only source checks must retain
         # their verified answer, not be rewritten into a new-course offer.
         wants_review = False
+    from app.services.assistant_delivery_review import guidance_source
     targeted_review = wants_review and bool(recent_user_urls) and all(
         value in verified and verified[value].get("excerpts")
-        and verified[value].get("sourceType") != "pdf" for value in recent_user_urls)
+        and verified[value].get("sourceType") != "pdf"
+        and not guidance_source(verified[value]) for value in recent_user_urls)
     citations = []
     for citation in ([] if targeted_review else result.get("citations", [])[:6]):
         if not isinstance(citation, dict):
