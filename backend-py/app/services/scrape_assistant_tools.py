@@ -14,6 +14,7 @@ from urllib.parse import urljoin, urlsplit
 import httpx
 from bs4 import BeautifulSoup
 from httpcore._backends.auto import AutoBackend
+from app.services.assistant_html_excerpts import SCHEMA as HTML_EXCERPTS_SCHEMA
 
 MAX_BYTES = 2_000_000
 PDF_PARSE_SECONDS = 4
@@ -107,7 +108,11 @@ def evidence_excerpts(text: str, facts: list[dict], *, preserve_layout=False) ->
     if preserve_layout:
         starts = {text.rfind("\n", 0, start) + 1 for start in starts}
     selected = sorted(starts)[:24]
-    return [{"id": f"q{index}", "text": text[start:start + 800]} for index, start in enumerate(selected)]
+    result = [{"id": f"q{index}", "text": text[start:start + 800]} for index, start in enumerate(selected)]
+    if not preserve_layout:
+        from app.services.assistant_html_excerpts import html_windows
+        result = html_windows(text, result)
+    return result
 
 
 class PublicNetworkBackend(AutoBackend):
@@ -279,6 +284,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
         title = soup.title.get_text(" ", strip=True) if soup.title else urlsplit(url).path
         english_links = []
         fee_links = []
+        owned_html_hrefs = {a["href"] for a in evidence_root.select("a[href]")}
         for anchor in soup.select("a[href]"):
             label = anchor.get_text(" ", strip=True) + " " + anchor["href"]
             english = bool(re.search(r"english|language.requirements", label, re.I))
@@ -287,7 +293,12 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
                 and (urlsplit(anchor["href"]).path.lower().endswith(".pdf")
                      or re.search(r"\bPDF\b", anchor.get_text(" ", strip=True), re.I))
             )
-            if not english and not fee_pdf:
+            fee_html = bool(
+                re.search(r"\btuition\b", label, re.I)
+                and not urlsplit(anchor["href"]).path.lower().endswith(".pdf")
+                and anchor["href"] in owned_html_hrefs
+            )
+            if not english and not fee_pdf and not fee_html:
                 continue
             try:
                 link = official_url(urljoin(url, anchor["href"]), home)
@@ -295,7 +306,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
                 continue
             if english and link not in english_links:
                 english_links.append(link)
-            if fee_pdf and link not in fee_links:
+            if (fee_pdf or fee_html) and link not in fee_links:
                 fee_links.append(link)
         from app.services.assistant_eligibility import domestic_evidence
         headings = evidence_soup.find_all("h1")
@@ -330,6 +341,8 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
                                "quote": intake_facts.get("_intake_snippet")},
             "_eligibilityQuote": domestic_evidence(html, eligibility_name) if eligibility_name else None,
             "facts": facts, "excerpts": evidence_excerpts(text, facts), "verified": True,
+            "_htmlExcerptsSchema": HTML_EXCERPTS_SCHEMA,
+            "_htmlFeeLinksSchema": 1,
             "_deliveryFactsVersion": 1,
             "_intakeFactsVersion": INTAKE_FACTS_VERSION,
             "_englishTablesSchema": SCHEMA, "_englishTables": profiles(str(evidence_root)),

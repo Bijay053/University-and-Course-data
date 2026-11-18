@@ -61,6 +61,21 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                     result = message.get("_sourceChecks", {}).get(url)
                     if not result or result.get("_sourceScopeVersion") != 2:
                         continue
+                    from app.services.assistant_html_excerpts import SCHEMA as excerpt_schema
+                    if (result.get("verified") and result.get("sourceType") == "html"
+                            and result.get("sourceOrigin") != "retained_scrape_page_text"
+                            and result.get("_htmlFeeLinksSchema") != 1):
+                        # Plain cached text cannot recover discarded hrefs.
+                        # Re-read once; the new reader extracts owned tuition
+                        # HTML links, not just tuition PDFs.
+                        break
+                    if (result.get("verified") and result.get("sourceType") == "html"
+                            and result.get("_htmlExcerptsSchema") != excerpt_schema
+                            and len(result.get("text") or "") >= 24000):
+                        # Old retained text is a prefix plus separate quotations,
+                        # not a contiguous document. Never synthesize new windows
+                        # across its joins; reread the permitted source once.
+                        break
                     if result.get("sourceOrigin") == "retained_scrape_page_text":
                         from app.services.assistant_retained_source import recent_capture
                         if not recent_capture(result.get("sourceCapturedAt")):
@@ -92,6 +107,14 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                             # table columns. Refresh once, never a cached refusal.
                             break
                         cached = deepcopy(result)
+                        if (cached.get("verified") and cached.get("sourceType") == "html"
+                                and cached.get("_htmlExcerptsSchema") != excerpt_schema):
+                            # A short retained `text` is contiguous; use it,
+                            # never the cache's prefix-plus-quotations _fullText.
+                            from app.services.assistant_html_excerpts import html_windows
+                            cached["excerpts"] = html_windows(
+                                cached.get("text") or "", cached.get("excerpts") or [])
+                            cached["_htmlExcerptsSchema"] = excerpt_schema
                         cached.setdefault("requestedUrl", url)
                         cached.setdefault("urlHandling", "preserved")
                         if cached.get("accessIssue") in {"robots_unavailable", "robots_disallowed"}:
@@ -118,6 +141,9 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
         retained = await retained_course_source(service, thread_id, turn_id, run_id, url, result)
         if retained:
             result = retained
+    if result.get("verified") and result.get("sourceType") == "html":
+        from app.services.assistant_html_excerpts import SCHEMA as excerpt_schema
+        result["_htmlExcerptsSchema"] = excerpt_schema
     if isinstance(result.get("verified"), bool) and result.get("failureStage") != "access_in_progress":
         async with service.AsyncSessionLocal() as db:
             thread = (await db.execute(select(ScrapeAssistantThread).where(
