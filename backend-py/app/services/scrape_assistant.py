@@ -653,6 +653,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str, references=Non
                     this_service, thread_id, turn_id, run_id, url, ctx["home"],
                     inspect_source, min(12, remaining),
                     fresh=bool(re.search(r"\b(fresh|re-?scrape|re-?fetch)\b", prompt, re.I)),
+                    **({"html_fee_links_schema": 1} if re.search(
+                        r"fee|tuition", prompt, re.I) else {}),
                     **({"html_delivery_schema": 1} if re.search(
                         r"\b(?:online|on[- ]campus|study mode|delivery|blended|distance)\b",
                         prompt, re.I) else {}),

@@ -37,7 +37,7 @@ async def refresh_ielts_facts(source, url):
 
 async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect, timeout, *,
                         fresh=False, html_table_schema=None, html_delivery_schema=None,
-                        html_intake_schema=None):
+                        html_intake_schema=None, html_fee_links_schema=None):
     from app.services.scrape_assistant_tools import official_url
     try:
         url = official_url(url, home)
@@ -64,17 +64,11 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                     from app.services.assistant_html_excerpts import SCHEMA as excerpt_schema
                     if (result.get("verified") and result.get("sourceType") == "html"
                             and result.get("sourceOrigin") != "retained_scrape_page_text"
-                            and result.get("_htmlFeeLinksSchema") != 1):
+                            and html_fee_links_schema is not None
+                            and result.get("_htmlFeeLinksSchema") != html_fee_links_schema):
                         # Plain cached text cannot recover discarded hrefs.
                         # Re-read once; the new reader extracts owned tuition
                         # HTML links, not just tuition PDFs.
-                        break
-                    if (result.get("verified") and result.get("sourceType") == "html"
-                            and result.get("_htmlExcerptsSchema") != excerpt_schema
-                            and len(result.get("text") or "") >= 24000):
-                        # Old retained text is a prefix plus separate quotations,
-                        # not a contiguous document. Never synthesize new windows
-                        # across its joins; reread the permitted source once.
                         break
                     if result.get("sourceOrigin") == "retained_scrape_page_text":
                         from app.services.assistant_retained_source import recent_capture
