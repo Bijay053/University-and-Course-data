@@ -184,7 +184,7 @@ def _sample_alternatives(urls, titles, sample):
     return _sitemap_sample([url for url in urls if _sample_family(url) not in identities], titles, 2)
 
 
-async def discover_official_catalogue(evidence) -> dict:
+async def discover_official_catalogue(evidence, *, source_url: str | None = None) -> dict:
     from app.services.scraper.guards import classify_course_candidate, OBVIOUS_NON_DEGREE, is_blocked_page
     seed = evidence.ctx["scrape_url"]
     sample_cap = 2 if (
@@ -205,7 +205,7 @@ async def discover_official_catalogue(evidence) -> dict:
         getattr(evidence, "directory_roots", [])
         or directory_roots(discovery.get("seed_urls") or [])
     )
-    if roots:
+    if roots and source_url is None:
         async def read_directory(url, _config, _timeout):
             record = await evidence.fetch(url)
             body = record.get("_source_html")
@@ -274,7 +274,7 @@ async def discover_official_catalogue(evidence) -> dict:
                 remaining_sources=directory.remaining,
             )
         return result
-    if configured and canonicalizations and official_url(
+    if source_url is None and configured and canonicalizations and official_url(
         configured, seed, evidence.extra_hosts
     ):
         # Reuse the regular sitemap parser so explicitly configured publishing
@@ -355,16 +355,22 @@ async def discover_official_catalogue(evidence) -> dict:
             result["sample_alternatives"] = _sample_alternatives(sitemap_urls, sitemap_titles, result["sample"])
             return result
 
-    sources = list(dict.fromkeys(filter(None, [
+    sources = [source_url] if source_url else list(dict.fromkeys(filter(None, [
         *(url for url in evidence.ctx.get("requested_course_urls", []) if is_catalogue_source(url)),
         configured, *(discovery.get("seed_urls") or []), urljoin(seed, "/sitemap.xml"), seed,
     ])))[:3]
     partial_sources = []
     partial_candidates = {}
+    source_failures = []
     for source_index, source in enumerate(sources):
         if not official_url(source, seed, evidence.extra_hosts):
             continue
         record = await evidence.fetch(source)
+        if record.get("classification") not in {"sitemap", "listing"}:
+            source_failures.append({
+                "url": source, "reason": record.get("reason") or "Source not verified",
+                "classification": record.get("classification", "unconfirmed"),
+            })
         for hint in _catalogue_hints(record, source, seed, evidence.extra_hosts):
             if len(sources) < 3 and hint not in sources:
                 sources.append(hint)
@@ -432,15 +438,20 @@ async def discover_official_catalogue(evidence) -> dict:
         ):
             source_titles = {link["url"]: link.get("name", "") for link in record.get("links", [])
                              if isinstance(link, dict) and link.get("url")}
-            result = {"source": source, "candidates": candidates,
-                      "sample": _repair_sample(candidates, source_titles,
+            static = [url for url in candidates if urlsplit(url).path.endswith((".html", ".htm"))]
+            # Sample observed static destinations to leave room for independent
+            # fresh replay; never synthesize an .html URL or drop other courses.
+            sample_pool = static if record["classification"] == "listing" and len(static) >= 2 else candidates
+            result = {"source": record.get("canonical_url") or source, "candidates": candidates,
+                      "sample": _repair_sample(sample_pool, source_titles,
                           max(0, min(sample_cap, (evidence.max_pages - 2 * (source_index + 1)) // 2)),
                           discovery, filter_patch)}
             if filter_patch:
                 result["filter_patch"] = filter_patch
-            result["sample_alternatives"] = _sample_alternatives(candidates, source_titles, result["sample"])
+            result["sample_alternatives"] = _sample_alternatives(sample_pool, source_titles, result["sample"])
             return result
-    result = {"source": None, "candidates": [], "sample": []}
+    result = {"source": None, "candidates": [], "sample": [],
+              "source_failures": source_failures}
     if partial_candidates:
         result.update(
             partial_sources=partial_sources,

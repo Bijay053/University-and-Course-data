@@ -62,6 +62,22 @@ async def test_no_change_reply_does_not_hide_previous_patch_rejection(memory, mo
 
 
 @pytest.mark.asyncio
+async def test_failed_source_reason_is_not_replaced_with_generic_validation(memory, monkeypatch):
+    evidence = session(worker_claim="delivery", config_loop_done=True)
+    reason = "Official catalogue could not be verified: https://uni.example/sitemap.xml: TimeoutError."
+    evidence.update(status="failed", live_probe={
+        "accepted": False, "status": "needs_review", "reason": reason,
+    })
+    memory.evidence = copy.deepcopy(evidence)
+    dispatch = AsyncMock()
+    monkeypatch.setattr(workflow, "dispatch_verification", dispatch)
+    result = await workflow.queue_verification(evidence, DB(memory))
+    assert reason in result["autonomous"]["reason"]
+    assert "No verification scrape was launched." in result["autonomous"]["reason"]
+    dispatch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_partial_catalogue_refusal_preserves_source_counts(memory, monkeypatch):
     evidence = session(worker_claim="delivery", config_loop_done=True)
     evidence.update(status="failed", live_probe={

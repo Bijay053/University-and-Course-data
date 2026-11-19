@@ -24,7 +24,7 @@ def is_catalogue_source(url: str) -> bool:
                 r"/(?:courses?-atoz|(?:a-z|az)-of-courses(?:\.aspx)?|"
                 r"course-finder|find-a-course|courses?|programmes?|programs?|degrees?|"
                 r"courses/(?:undergraduate|postgraduate)-degrees)"
-                r"(?:/(?:ug|pg|undergraduate|postgraduate))?/?$",
+                r"(?:/(?:ug|pg|undergraduate|postgraduate))?(?:\.html)?/?$",
                 parsed.path, re.I,
             )
         )

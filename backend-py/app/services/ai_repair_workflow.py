@@ -571,7 +571,11 @@ async def queue_verification(session: dict, db) -> dict:
                 "No verification scrape was launched."
             )
         else:
-            reason = "Accepted live validation is required; no scrape launched."
+            probe = session.get("live_probe") or {}
+            reason = (
+                str(probe.get("reason") or "Accepted live validation is required.")
+                + " No verification scrape was launched."
+            )
         return await finish(
             session, db, "blocked", reason,
             failed=session.get("status") == "failed",

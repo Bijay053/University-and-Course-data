@@ -120,3 +120,108 @@ def test_previously_enabled_fallback_cannot_authorize_new_partial_catalogue():
     assert audit["catalogue_coverage"]["candidate_count"] == 1
     assert "1 course page(s) verified" in audit["reason"]
     assert evidence.discovery_needed(cfg.discovery.model_dump()) is True
+
+
+@pytest.mark.asyncio
+async def test_sitemap_timeout_uses_verified_cms_directory_destination(monkeypatch):
+    from app.services.scraper import ai_repair_live as live
+    cfg = UniConfig(slug="test", name="Test", base_url=HOME, scrape_url=HOME)
+    calls = []
+    async def fetch(url, *_args):
+        calls.append(url)
+        if url.endswith("/sitemap.xml"):
+            return "", "network_failure", "TimeoutError"
+        if url == HOME:
+            return '<a href="/programs">All programmes</a>', "", ""
+        if url == HOME + "/programs":
+            return "", "canonical_redirect", HOME + "/programs/"
+        if url == HOME + "/robots.txt":
+            return "User-agent: *\nAllow: /", "", ""
+        if url == HOME + "/programs/":
+            return '<meta http-equiv="refresh" content="1; url=/programs.html">', "", ""
+        assert url == HOME + "/programs.html"
+        return finder(pagination=False), "", ""
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    evidence = LiveRepairEvidence({"scrape_url": HOME, "effective_config": cfg,
+                                   "catalogue_recovery": True})
+    result = await discover_official_catalogue(evidence)
+    assert result["source"] == HOME + "/programs.html"
+    assert len(result["candidates"]) == 2
+    assert calls == [HOME + "/sitemap.xml", HOME, HOME + "/programs",
+                     HOME + "/robots.txt", HOME + "/programs/", HOME + "/programs.html"]
+    assert evidence.pages_checked == 6
+
+
+@pytest.mark.asyncio
+async def test_meta_redirect_never_evades_robots_policy(monkeypatch):
+    from app.services.scraper import ai_repair_live as live
+    async def fetch(url, *_args):
+        if url.endswith("robots.txt"):
+            return "User-agent: *\nDisallow: /programs.html", "", ""
+        assert url == HOME + "/programs/"
+        return '<meta http-equiv="refresh" content="1; url=/programs.html">', "", ""
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    cfg = UniConfig(slug="test", name="Test", base_url=HOME, scrape_url=HOME)
+    evidence = LiveRepairEvidence({"scrape_url": HOME, "effective_config": cfg})
+    assert (await evidence.fetch(HOME + "/programs/"))["classification"] == "network_failure"
+
+
+@pytest.mark.asyncio
+async def test_source_failures_survive_empty_catalogue_for_error_reporting():
+    cfg = UniConfig(slug="test", name="Test", base_url=HOME, scrape_url=HOME)
+    evidence = SimpleNamespace(
+        ctx={"scrape_url": HOME, "catalogue_recovery": True}, config=cfg,
+        extra_hosts=(), fetch=AsyncMock(return_value={
+            "classification": "network_failure", "reason": "TimeoutError",
+        }), fetch_seconds=20, max_pages=12,
+    )
+    result = await discover_official_catalogue(evidence)
+    assert result["source"] is None and result["candidates"] == []
+    assert result["source_failures"][0]["url"] == HOME + "/sitemap.xml"
+    assert result["source_failures"][0]["reason"] == "TimeoutError"
+
+
+@pytest.mark.asyncio
+async def test_fresh_replay_does_not_retry_failed_sitemap(monkeypatch):
+    from app.services.scraper import ai_repair_live as live
+    cfg = UniConfig(slug="test", name="Test", base_url=HOME, scrape_url=HOME)
+    cfg.discovery.sitemap_url = HOME + "/sitemap.xml"
+    calls = []
+    async def fetch(url, *_args):
+        calls.append(url)
+        if url.endswith("/sitemap.xml"):
+            return "", "network_failure", "TimeoutError"
+        if url == HOME:
+            return '<a href="/courses">Find courses</a>', "", ""
+        if url == HOME + "/courses":
+            return finder(pagination=False), "", ""
+        from tests.test_ai_repair_live import course
+        return course(), "", ""
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    evidence = LiveRepairEvidence({"scrape_url": HOME, "effective_config": cfg,
+                                   "catalogue_recovery": True})
+    await evidence.probe()
+    from app.services.scraper.official_catalogue_repair import discovery_patches
+    patch = {p["field"]: p["value"] for p in discovery_patches(evidence.fallback)}
+    result = await evidence.validate({}, patch, {})
+    assert result["accepted"], result["reasons"]
+    assert calls.count(HOME + "/sitemap.xml") == 1
+    assert calls.count(HOME + "/courses") == 2
+    assert evidence.pages_checked <= 12
+
+
+@pytest.mark.parametrize("credential,expected", [
+    ("Bachelor of Engineering", "course"), ("Bachelor of Nursing", "unconfirmed"),
+])
+def test_programme_sibling_facts_require_matching_credential(credential, expected):
+    html = f"""<div class="inner-wrap"><main class="program-transition-main">
+    <h1>Bachelor of Engineering</h1><p>Design computers.</p></main>
+    <div id="program-container"><aside class="transition-highlights">
+    <div class="side-cell-fullwidth"><h4>Program Details</h4><dl>
+    <dt>Credential</dt><dd>{credential}</dd><dt>Length</dt><dd>Five years</dd>
+    <dt>International</dt><dd>Open to international applicants</dd>
+    </dl></div></aside></div></div>"""
+    record = inspect_page(HOME + "/programs/catalogue/engineering.html", html)
+    assert record["classification"] == expected
+    if expected == "course":
+        assert "Length: Five years" in [row["text"] for row in record["fields"]]

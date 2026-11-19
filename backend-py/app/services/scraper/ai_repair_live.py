@@ -588,10 +588,40 @@ def inspect_page(url: str, html: str, config=None) -> dict:
               "links": [], "html": html, "owned_html": ""}
     if is_challenge_shell(html):
         return {**result, "classification": "challenge", "reason": "Challenge shell, not course evidence"}
+    # Legacy CMS navigation stubs declare their destination in HTML rather
+    # than an HTTP Location. Treat this only as a proposed move: fetch() still
+    # checks both URLs against verified robots policy within its two-hop cap.
+    if len(html) < 2_000:
+        from bs4 import BeautifulSoup
+        stub = BeautifulSoup(html, "html.parser")
+        refresh = stub.find("meta", attrs={"http-equiv": re.compile("^refresh$", re.I)})
+        content = refresh.get("content", "") if refresh else ""
+        match = re.fullmatch(r"\s*\d+\s*;\s*url\s*=\s*['\"]?([^'\"<>]+?)['\"]?\s*", content, re.I)
+        if match:
+            target = official_course_redirect(url, match.group(1))
+            if target:
+                return {**result, "classification": "canonical_redirect", "reason": target}
     if _incomplete_course_template(html):
         return {**result, "classification": "source_render_failure",
                 "reason": "Official course components failed to render; not listing or course evidence"}
     soup = _sanitized_visible_document(html)
+    # This template puts the selected programme's labelled facts in a sibling
+    # aside, outside main. Copy only its own bounded Program Details block,
+    # not the whole sidebar or neighbouring programme cards.
+    primary = soup.select_one("main.program-transition-main:has(h1)")
+    container = soup.select_one("#program-container")
+    if (primary and container and len(soup.select("main.program-transition-main")) == 1
+            and primary.parent is not None and container in primary.parent.descendants):
+        from copy import deepcopy
+        heading = primary.find("h1").get_text(" ", strip=True).casefold()
+        for block in container.select("aside.transition-highlights .side-cell-fullwidth"):
+            label = block.find("h4")
+            credential = block.find("dt", string=re.compile(r"^\s*Credential\s*$", re.I))
+            value = credential.find_next_sibling("dd") if credential else None
+            if (label and label.get_text(" ", strip=True) == "Program Details"
+                    and value and value.get_text(" ", strip=True).casefold() == heading
+                    and len(str(block)) < 12_000):
+                primary.append(deepcopy(block))
     result["has_pagination"] = bool(
         soup.select('[rel=next], .pagination, [class*=load-more], [id*=load-more]')
         or any(re.search(r"\b(?:load more|next page|show more courses)\b", node.get_text(" ", strip=True), re.I)
@@ -964,7 +994,7 @@ class LiveRepairEvidence:
                 self.max_pages = bounded_limit(limits, "max_directory_pages", 128)
                 self.max_seconds = bounded_limit(limits, "max_directory_seconds", 600)
 
-    async def fetch(self, url: str, *, _canonical_followed: bool = False) -> dict:
+    async def fetch(self, url: str, *, _canonical_followed: int = 0) -> dict:
         # The live-evidence time budget covers network activity only. AI
         # deliberation and deterministic rule replay must not consume the
         # remaining fetch allowance between probe and validation.
@@ -1013,13 +1043,13 @@ class LiveRepairEvidence:
                            if row.get("url") == policy_url and row.get("classification") == "robots"
                            and row.get("_source_html")), None)
             allowed = False
-            if target and not _canonical_followed and not policy:
+            if target and _canonical_followed < 2 and not policy:
                 known = any(row.get("url") == policy_url for row in self.records)
                 if not known:
                     checked_policy = await self.fetch(policy_url, _canonical_followed=True)
                     if checked_policy.get("classification") == "robots":
                         policy = checked_policy.get("_source_html")
-            if policy and target and not _canonical_followed:
+            if policy and target and _canonical_followed < 2:
                 from app.services.scraper.directory_catalogue import robots_policy
                 permits, delay = robots_policy(policy)
                 allowed = permits(url) and permits(target) and delay <= self.fetch_seconds
@@ -1028,8 +1058,9 @@ class LiveRepairEvidence:
             if allowed:
                 record.update(classification="canonical_alias", reference_only=True,
                               reason="Publisher canonical URL; both paths permitted by verified robots.txt")
-                checked = await self.fetch(target, _canonical_followed=True)
-                return {**checked, "url": url, "canonical_url": target}
+                checked = await self.fetch(target, _canonical_followed=_canonical_followed + 1)
+                return {**checked, "url": url,
+                        "canonical_url": checked.get("canonical_url") or target}
             record.update(classification="network_failure",
                           reason="Canonical redirect refused: verified source policy required, or redirect loop")
         return record
@@ -1263,6 +1294,15 @@ class LiveRepairEvidence:
             "samples": [{k: r.get(k) for k in ("url", "classification", "reason", "title", "snippet", "fields", "audience_evidence", "fee_source_links", "reference_only", "linked_from", "url_gate_override_required")}
                         for r in self.records],
         }
+        if not fallback.get("source") and fallback.get("source_failures") and not partial:
+            result["source_failures"] = fallback["source_failures"]
+            detail = "; ".join(
+                f"{row['url']}: {row['reason']}" for row in fallback["source_failures"][:3]
+            )
+            result["reason"] = (
+                f"Official catalogue could not be verified: {detail}. "
+                f"{courses} course page(s) confirmed; no complete catalogue source established."
+            )
         if fallback.get("coverage_scope"):
             result["catalogue_coverage"] = {
                 "status": "configured_directories_checked" if fallback.get("source") else "partial",
@@ -1408,7 +1448,10 @@ class LiveRepairEvidence:
         reasons = report["reasons"]
         if patch.get("official_catalogue_fallback") and not reasons:
             from app.services.scraper.official_catalogue_repair import discover_official_catalogue
-            fresh = await discover_official_catalogue(self)
+            fresh = await discover_official_catalogue(
+                self, **({"source_url": self.fallback["source"]}
+                         if not self.fallback.get("coverage_scope") else {}),
+            )
             if fresh != self.fallback:
                 reasons.append("Official catalogue changed during validation; no changes are safe")
         required = set(report["courses"])
@@ -1463,7 +1506,18 @@ class LiveRepairEvidence:
                         and initial.get("_source_html")):
                     cached = initial
                     report.setdefault("reused_session_sources", []).append(url)
-                checked[url] = cached or await self.fetch(url)
+                initial_source = self.initial.get(url) or {}
+                canonical = initial_source.get("canonical_url")
+                # The initial fetch already verified the complete publisher
+                # redirect chain and both-path robots policy. Re-read its final
+                # official destination, not every navigation stub again.
+                target = (
+                    canonical if initial_source.get("classification") == "course"
+                    and isinstance(canonical, str)
+                    and official_url(canonical, self.ctx["scrape_url"], self.extra_hosts)
+                    else url
+                )
+                checked[url] = cached or await self.fetch(target)
                 if checked[url]["classification"] not in _FAILURES:
                     self.validation_pages[url] = checked[url]
                 if checked[url]["classification"] != "course":
