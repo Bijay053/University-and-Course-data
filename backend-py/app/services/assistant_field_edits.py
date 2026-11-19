@@ -106,7 +106,9 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
                 },detail="Source access failed; no bulk fix queued.")
                 return True
             action.update(_versions=ctx["versions"], _configVersion=ctx["config_version"],
-                          requiresConfirmation=len(rows) > 10)
+                          requiresConfirmation=len(rows) > 10,
+                          courseScope=[{"id": r["id"], "name": r["name"],
+                                        "url": r.get("url")} for r in rows])
             await service.save_research_reply(thread_id, turn_id, run_id, {
                 "role": "assistant", "turnId": turn_id, "createdAt": service.now().isoformat(),
                 "content": (

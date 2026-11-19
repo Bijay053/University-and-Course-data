@@ -2718,6 +2718,10 @@ def _from_otago_polytechnic_international_fee(
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
+    from .tru_calculator import extract as tru_calculator
+    tru_known, tru_fee = await tru_calculator(html, url)
+    if tru_known:
+        return [tru_fee] if tru_fee is not None else []
     from .label_boundaries import exclude_labelled_values, DOMESTIC_FEE_LABEL, INTERNATIONAL
     html = exclude_labelled_values(html, DOMESTIC_FEE_LABEL, INTERNATIONAL)
     from app.services.scraper.extractors.uk_course_facts import surrey_options

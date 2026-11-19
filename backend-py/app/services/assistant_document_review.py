@@ -17,6 +17,12 @@ BANDS = ("ielts_overall", "ielts_reading", "ielts_writing", "ielts_listening", "
 
 def requested(message):
     content = message["content"]
+    # An attachment is context, not an instruction to run the IELTS workflow.
+    # Fee/intake/location commands retain their existing-field repair path.
+    instruction = re.sub(r"https://\S+", " ", content)
+    if (re.search(r"\b(?:fees?|tuition|scholarships?|intakes?|locations?)\b", instruction, re.I)
+            and not re.search(r"\b(?:ielts|english|bands?)\b", instruction, re.I)):
+        return False
     from app.services.assistant_field_edits import html_guidance_research_requested
     if html_guidance_research_requested(content):
         return True

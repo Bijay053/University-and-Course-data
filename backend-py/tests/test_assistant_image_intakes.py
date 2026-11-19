@@ -270,8 +270,10 @@ async def test_literal_staff_intakes_retain_existing_staff_authority(monkeypatch
 @pytest.mark.asyncio
 async def test_investigate_does_not_return_after_image_read_when_correction_requested(monkeypatch):
     from app.services import scrape_assistant as core
+    from app.services import assistant_conversation_context
+    monkeypatch.setattr(assistant_conversation_context, "university_context", AsyncMock(return_value=[]))
     message = {"role": "user", "content": "review all course intakes and add it", "_documentToken": "token"}
-    thread = SimpleNamespace(actor_id=1, job_id="job", messages=[message])
+    thread = SimpleNamespace(id="thread", actor_id=1, job_id="job", messages=[message])
     monkeypatch.setattr(core, "claim", AsyncMock(return_value=True))
     monkeypatch.setattr(core, "AsyncSessionLocal", lambda: DB(thread))
     monkeypatch.setattr(core, "context", AsyncMock(return_value={"samples": []}))
