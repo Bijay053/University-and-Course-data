@@ -6,6 +6,22 @@ import { AssistantRepairPreview } from "./assistant-repair-preview";
 afterEach(cleanup);
 
 describe("delivery repair preview", () => {
+  it("preserves tuition cents and marks unstated fee years unverified", () => {
+    const course = { id: 1, name: "Journalism", url: "https://www.tru.ca/programs/catalogue/bachelor-journalism.html" };
+    render(<AssistantRepairPreview testId="fee-preview" scope={[course]} previews={[{
+      ...course, status: "supported", reason: "",
+      changes: [
+        { field: "international_fee", oldValue: null, newValue: 8860.56 },
+        { field: "fee_year", oldValue: 2027, newValue: null },
+        { field: "fee_term", oldValue: "Annual", newValue: "Semester" },
+      ],
+    }]} />);
+    expect(screen.getByText("8860.56")).toBeTruthy();
+    expect(screen.queryByText("8860.6")).toBeNull();
+    expect(screen.getByText("Unverified")).toBeTruthy();
+    expect(screen.getByText("2027")).toBeTruthy();
+    expect(screen.getByText("Semester")).toBeTruthy();
+  });
   it("shows current and proposed modes without treating them as numeric IELTS scores", () => {
     const course = { id: 59824, name: "Addiction and Mental Health MSc",
       url: "https://www.aston.ac.uk/study/courses/addiction-and-mental-health-msc/september-2027" };

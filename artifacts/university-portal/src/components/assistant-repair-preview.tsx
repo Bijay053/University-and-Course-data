@@ -4,7 +4,7 @@ export type RepairCourseScope = { id: number; name: string; url: string };
 export type RepairPreview = RepairCourseScope & {
   status: "supported" | "unverified";
   reason: string;
-  changes: { field: string; oldValue: number | string | string[] | null; newValue: number | string | string[] }[];
+  changes: { field: string; oldValue: number | string | string[] | null; newValue: number | string | string[] | null }[];
   source?: { url: string; quote: string };
 };
 const labels: Record<string, string> = {
@@ -12,10 +12,14 @@ const labels: Record<string, string> = {
   ielts_reading: "Reading", ielts_writing: "Writing", ielts_speaking: "Speaking",
   study_mode: "Study mode",
   intake_months: "Intakes",
+  international_fee: "International tuition", currency: "Currency",
+  fee_term: "Fee basis", fee_year: "Fee year",
 };
-const displayValue = (value: number | string | string[] | null) =>
+const displayValue = (value: number | string | string[] | null, field?: string) =>
   Array.isArray(value) ? value.join(", ") || "Missing"
-    : typeof value === "number" ? value.toFixed(1) : value ?? "Missing";
+    : typeof value === "number" ? field === "international_fee" ? value.toFixed(2)
+      : field === "fee_year" ? String(value) : value.toFixed(1)
+      : value ?? (field === "fee_year" ? "Unverified" : "Missing");
 const equalValues = (left: unknown, right: unknown) =>
   Array.isArray(left) || Array.isArray(right)
     ? JSON.stringify(left) === JSON.stringify(right) : left === right;
@@ -49,8 +53,8 @@ export function AssistantRepairPreview({ scope, previews, testId, applied = fals
               </tr></thead>
               <tbody>{preview.changes.map(change => <tr key={change.field} className="border-b last:border-0">
                 <th scope="row" className="py-1 pr-3 font-normal">{labels[change.field] ?? change.field}</th>
-                <td className="py-1 pr-3">{displayValue(change.oldValue)}</td>
-                <td className="py-1 pr-3 font-medium">{displayValue(change.newValue)}</td>
+                <td className="py-1 pr-3">{displayValue(change.oldValue, change.field)}</td>
+                <td className="py-1 pr-3 font-medium">{displayValue(change.newValue, change.field)}</td>
                 <td className="py-1">{equalValues(change.oldValue, change.newValue) ? "Unchanged" : applied ? "Updated" : "Proposed"}</td>
               </tr>)}</tbody>
             </table>

@@ -1,5 +1,7 @@
 """TRU's course-bound calculator: four courses, international tuition only."""
 import asyncio
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 import json
 import re
 from decimal import Decimal, InvalidOperation
@@ -9,6 +11,22 @@ from bs4 import BeautifulSoup
 from .base import ExtractionResult
 
 INIT = "/__shared/templates/2019/js/programs-2020-cost-calculator-init.js"
+_ASSET_READS = ContextVar("tru_calculator_asset_reads", default=None)
+
+
+@asynccontextmanager
+async def asset_session():
+    """Share public assets only within this one bounded preview, never globally."""
+    reads = {}
+    token = _ASSET_READS.set(reads)
+    try:
+        yield
+    finally:
+        for task in reads.values():
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*reads.values(), return_exceptions=True)
+        _ASSET_READS.reset(token)
 
 
 def assets(html, url):
@@ -99,11 +117,18 @@ async def extract(html, url):
     # The same robots, DNS pinning, redirect and size controls as source reads.
     from app.services.scrape_assistant_tools import public_request
     from app.services.official_source_redirects import read_official_source
-    async def read(target):
+    async def download(target):
         raw, final, _ = await read_official_source(target, url, public_request)
         if final != target:
             raise ValueError("Calculator asset moved; needs verification.")
         return raw.decode("utf-8", errors="strict")
+    async def read(target):
+        reads = _ASSET_READS.get()
+        if reads is None:
+            return await download(target)
+        if target not in reads:
+            reads[target] = asyncio.create_task(download(target))
+        return await asyncio.shield(reads[target])
     try:
         documents = await asyncio.wait_for(
             asyncio.gather(*(read(u) for u in selected), return_exceptions=True), timeout=10)
