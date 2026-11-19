@@ -54,3 +54,29 @@ def test_real_robots_declaration_is_recognized_without_guessing():
                           "Sitemap: https://www.cardiffmet.ac.uk/sitemap-en.xml")
     assert result["classification"] == "robots"
     assert result["links"] == [{"url": HOME + "/sitemap-en.xml"}]
+
+
+@pytest.mark.asyncio
+async def test_declared_catalogue_descriptor_matches_fresh_replay_and_detects_change():
+    cfg = UniConfig(slug="test", name="Test University", base_url=HOME, scrape_url=HOME)
+    cfg.discovery.seed_urls = [HOME + "/courses/"]
+    urls = [HOME + f"/courses/undergraduate/bsc-subject-{i}/" for i in range(8)]
+    async def fetch(url):
+        if url == HOME + "/courses/":
+            return {"classification": "listing", "has_pagination": True,
+                    "links": [{"url": u} for u in urls[:2]]}
+        if url == HOME + "/robots.txt":
+            return {"classification": "robots", "links": [{"url": HOME + "/sitemap-en.xml"}]}
+        if url == HOME + "/sitemap-en.xml":
+            return {"classification": "sitemap", "coverageComplete": True,
+                    "links": [{"url": u} for u in urls]}
+        return {"classification": "unconfirmed"}
+    evidence = SimpleNamespace(ctx={"scrape_url": HOME, "provider_failure": True}, config=cfg,
+                               extra_hosts=(), fetch=fetch, fetch_seconds=20, max_pages=12)
+    first = await discover_official_catalogue(evidence)
+    fresh = await discover_official_catalogue(evidence, source_url=first["source"])
+    assert len(first["sample"]) == 4
+    assert first == fresh
+    urls.pop()
+    changed = await discover_official_catalogue(evidence, source_url=first["source"])
+    assert changed != first

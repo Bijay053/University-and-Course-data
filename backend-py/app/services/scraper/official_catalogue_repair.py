@@ -471,10 +471,10 @@ async def discover_official_catalogue(evidence, *, source_url: str | None = None
                 if declared:
                     fallback = await discover_official_catalogue(evidence, source_url=declared)
                     if fallback.get("source"):
-                        # Reserve live calls for independent course proof and
-                        # the fresh replay; sitemap URLs alone authorize no write.
-                        fallback["sample"] = fallback.get("sample", [])[:2]
-                        fallback["sample_alternatives"] = []
+                        # Preserve the complete replay descriptor. The caller
+                        # bounds actual probes and stops after sufficient live
+                        # course proof; changing this descriptor here makes a
+                        # fresh replay falsely report a changed catalogue.
                         return fallback
                     source_failures.extend(fallback.get("source_failures", []))
             else:
