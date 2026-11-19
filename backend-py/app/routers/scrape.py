@@ -2775,6 +2775,7 @@ async def re_extract_staged(
         retry_merge_fields: set[str] | None = None
         recovery_reason_code: str | None = None
         online_only_found = False
+        fee_source_url = url
         for pass_number in range(1, 3):
             if body.smart and pass_number == 2:
                 from app.services.scraper.smart_fix import refresh_central_recovery
@@ -2804,6 +2805,16 @@ async def re_extract_staged(
                 ):
                     from app.services.scraper.extractors.ulaw_fees import recover_course_fee_only
                     pass_out = await recover_course_fee_only(url)
+                    if pass_out is None:
+                        from app.services.scraper.extractors.tru_fee_recovery import recover
+                        pass_out = await recover(url)
+                        if pass_out and pass_out.get("_official_course_url"):
+                            fee_source_url = pass_out["_official_course_url"]
+                            pass_out = None
+                    if pass_out is not None and pass_out.get("status") == "failed":
+                        last_error = pass_out.get("error") or "Official tuition could not be verified."
+                        recovery_reason_code = "source_recovery_failed"
+                        break
                 if pass_out is None:
                     if _ulaw_defer_central and central_data is None and central_config.get("uniPages"):
                         try:
@@ -2816,7 +2827,7 @@ async def re_extract_staged(
                             central_data = {}
                     pass_out = await _asyncio.wait_for(
                         _extract_only(
-                            {"url": url, "name": row.course_name or ""},
+                            {"url": fee_source_url, "name": row.course_name or ""},
                             country=country,
                             ai_provider="openai",
                             central_data=central_data,

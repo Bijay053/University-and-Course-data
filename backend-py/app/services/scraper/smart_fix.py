@@ -118,7 +118,7 @@ async def run_smart_batch(body, db):
 
     deadline = time.monotonic() + 240
     results = []
-    for course_id in body.ids:
+    for position, course_id in enumerate(body.ids):
         scope = ReExtractBody(ids=[course_id], universityId=body.university_id)
         try:
             before = await include_requested_ielts_bands(
@@ -195,12 +195,12 @@ async def run_smart_batch(body, db):
                     targetFields=targets, forceFields=body.force_fields,
                     forceReasons=body.force_reasons, smart=True,
                 ), db,
-            ), timeout=remaining)
+            ), timeout=remaining / (len(body.ids) - position))
         except TimeoutError:
             await db.rollback()
             results.append({
                 **base, "attempted": True, "ok": False,
-                "error": "Smart Fix batch budget exhausted",
+                "error": "This course exhausted its allocated recovery time; remaining courses will still be attempted.",
                 "reason_code": "budget_exhausted",
                 "unresolved_fields": sorted(set(targets) | suppressed),
             })

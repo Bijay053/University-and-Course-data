@@ -47,8 +47,8 @@ def assets(html, url):
         return ()
     scripts = [urljoin(url, s["src"]) for s in soup.select("script[src]")]
     root = f"https://{urlsplit(url).hostname}"
-    data = [s for s in scripts if re.fullmatch(
-        re.escape(root) + r"/__shared/assets/academic\d+\.js", s)]
+    data = list(dict.fromkeys(s for s in scripts if re.fullmatch(
+        re.escape(root) + r"/__shared/assets/academic\d+\.js", s)))
     if root + INIT not in scripts or len(data) != 1:
         return ()
     return root + INIT, data[0]

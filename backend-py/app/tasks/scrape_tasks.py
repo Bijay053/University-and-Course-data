@@ -385,17 +385,19 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
                 from app.services.scraper.smart_fix import run_smart_batch
 
                 extract_batch = run_smart_batch if payload.get("smart") else re_extract_staged
-                part = await extract_batch(
-                    ReExtractBody(
-                        ids=chunk,
-                        universityId=university_id,
-                        targetFields=sorted(target_fields),
-                        forceFields=sorted(force_fields),
-                        forceReasons=force_reasons,
-                        smart=bool(payload.get("smart")),
-                    ),
-                    db,
-                )
+                from app.services.scraper.extractors.tru_calculator import asset_session
+                async with asset_session():
+                    part = await extract_batch(
+                        ReExtractBody(
+                            ids=chunk,
+                            universityId=university_id,
+                            targetFields=sorted(target_fields),
+                            forceFields=sorted(force_fields),
+                            forceReasons=force_reasons,
+                            smart=bool(payload.get("smart")),
+                        ),
+                        db,
+                    )
             except Exception as exc:  # noqa: BLE001
                 log.exception(
                     "Bulk Fix batch failed job=%s ids=%s: %s",
