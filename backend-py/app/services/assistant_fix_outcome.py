@@ -1,5 +1,7 @@
 """A finished queue job is not proof of a repaired course."""
 
+FIX_OUTCOME_VERSION = 2
+
 
 def fix_outcome(action, job):
     from app.services.fix_field_changes import field_change_counts
@@ -11,7 +13,11 @@ def fix_outcome(action, job):
         and len(results) == len(expected)
         and {r.get("id") for r in results} == expected
     )
-    repaired = sum(r.get("outcome") == "updated" and bool(r.get("made_progress"))
+    repaired = sum((r.get("outcome") == "updated" or (
+                       r.get("outcome") == "completed"
+                       and r.get("reason_code") == "issues_resolved"
+                       and bool(set(r.get("resolved_fields") or []) & set(action.get("fields") or []))))
+                   and bool(r.get("made_progress"))
                    and r.get("ok") is not False
                    for r in results)
     clear = sum(r.get("outcome") == "already_resolved" and not r.get("made_progress")

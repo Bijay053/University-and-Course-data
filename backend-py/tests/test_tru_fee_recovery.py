@@ -19,7 +19,7 @@ async def test_recovery_passes_the_exact_selected_fee_and_evidence_to_the_existi
         field_key="international_fee", value=8860.56,
         normalized={"international_fee":8860.56, "fee_term":"Semester", "currency":"CAD", "fee_year":None},
         method="fee.tru_international_calculator_four_courses",
-        snippet="International tuition 2215.14 per course × 4 courses", confidence=1.0,
+        snippet="International tuition 2215.14 per course × 4 courses", confidence=1.0, extras={},
     )
     monkeypatch.setattr(tru_calculator, "extract", AsyncMock(return_value=(True, fee)))
     result = await module.recover(URL)
@@ -78,8 +78,8 @@ def test_identical_repeated_asset_links_are_not_conflicting_fee_schedules():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("distance", [False, True])
-async def test_pending_fee_fix_persists_calculator_amount_basis_currency_and_evidence(store, monkeypatch, distance, tmp_path):
+@pytest.mark.parametrize("distance,profile", [(False,False), (True,False), (True,True)])
+async def test_pending_fee_fix_persists_calculator_amount_basis_currency_and_evidence(store, monkeypatch, distance, profile, tmp_path):
     from app.models import ScrapedCourse, University
     from app.routers import scrape
     from app.services.scraper import central_pages
@@ -92,6 +92,14 @@ async def test_pending_fee_fix_persists_calculator_amount_basis_currency_and_evi
     source = URL if not distance else "https://www.tru.ca/distance/programs/example/"
     final = URL if not distance else "https://www.tru.ca/distance/programs/example.html"
     amount, basis = (8860.56, "Semester") if not distance else (275, "Per Credit")
+    proof_url = final
+    if profile:
+        from tests.test_tru_open_learning_fees import PROGRAMME, SCHEDULE, TUITION, URL as OL_URL
+        source = final = OL_URL
+        proof_url, amount = TUITION, 514.66
+        async def official(target, *args, **kwargs):
+            return ((SCHEDULE if target == TUITION else PROGRAMME).encode(), target, [])
+        monkeypatch.setattr(official_source_redirects, "read_official_source", AsyncMock(side_effect=official))
     quote = (f"International tuition CAD {amount} " + ("per semester: 4 courses" if not distance else "per credit"))
     fee = {"status": "success", "url": URL,
            "payload": {"international_fee":amount, "currency":"CAD", "fee_term":basis, "fee_year":None},
@@ -100,8 +108,9 @@ async def test_pending_fee_fix_persists_calculator_amount_basis_currency_and_evi
                          "snippet":quote,
                          "decision_status":"selected", "confidence":1.0}]}
     fee["url"] = final
-    monkeypatch.setattr(module, "recover", AsyncMock(return_value=fee if not distance else {"_official_course_url":final}))
-    extraction = AsyncMock(return_value=fee) if distance else AsyncMock(side_effect=AssertionError("No unrelated AI extraction"))
+    if not profile:
+        monkeypatch.setattr(module, "recover", AsyncMock(return_value=fee if not distance else {"_official_course_url":final}))
+    extraction = AsyncMock(return_value=fee) if distance and not profile else AsyncMock(side_effect=AssertionError("No unrelated AI extraction"))
     monkeypatch.setattr(orchestrator, "_extract_only", extraction)
     monkeypatch.setattr(central_pages, "prefetch_central_pages", AsyncMock(return_value={}))
     async with store() as db:
@@ -124,8 +133,8 @@ async def test_pending_fee_fix_persists_calculator_amount_basis_currency_and_evi
             ScrapedFieldEvidence.scraped_course_id==1,
             ScrapedFieldEvidence.field_key=="international_fee",
             ScrapedFieldEvidence.selected.is_(True)))).scalars().all()
-        assert any(e.source_url==final and str(amount) in e.snippet for e in evidence)
-        if distance:
+        assert any(e.source_url==proof_url and str(amount) in e.snippet for e in evidence)
+        if distance and not profile:
             assert extraction.await_args.args[0]["url"] == final
         else:
             extraction.assert_not_awaited()

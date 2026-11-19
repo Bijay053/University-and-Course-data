@@ -108,30 +108,34 @@ def calculate(initializer, payload, urls):
     )
 
 
+async def read_dependency(target, home):
+    """Share a permitted public dependency only within this bounded batch."""
+    from app.services.scrape_assistant_tools import public_request
+    from app.services.scrape_assistant_tools import official_url
+    from app.services.official_source_redirects import read_official_source
+    target = official_url(target, home)
+    async def download():
+        raw, final, _ = await read_official_source(target, home, public_request)
+        if final != target:
+            raise ValueError("Calculator asset moved; needs verification.")
+        return raw.decode("utf-8", errors="strict")
+    reads = _ASSET_READS.get()
+    if reads is None:
+        return await download()
+    if target not in reads:
+        reads[target] = asyncio.create_task(download())
+    return await asyncio.shield(reads[target])
+
+
 async def extract(html, url):
     selected = assets(html, url)
     if selected is None:
         return False, None
     if not selected:
         return True, None
-    # The same robots, DNS pinning, redirect and size controls as source reads.
-    from app.services.scrape_assistant_tools import public_request
-    from app.services.official_source_redirects import read_official_source
-    async def download(target):
-        raw, final, _ = await read_official_source(target, url, public_request)
-        if final != target:
-            raise ValueError("Calculator asset moved; needs verification.")
-        return raw.decode("utf-8", errors="strict")
-    async def read(target):
-        reads = _ASSET_READS.get()
-        if reads is None:
-            return await download(target)
-        if target not in reads:
-            reads[target] = asyncio.create_task(download(target))
-        return await asyncio.shield(reads[target])
     try:
         documents = await asyncio.wait_for(
-            asyncio.gather(*(read(u) for u in selected), return_exceptions=True), timeout=10)
+            asyncio.gather(*(read_dependency(u, url) for u in selected), return_exceptions=True), timeout=10)
     except (ValueError, OSError, TimeoutError, UnicodeError):
         return True, None
     if any(isinstance(value, BaseException) for value in documents):

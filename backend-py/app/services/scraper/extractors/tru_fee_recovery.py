@@ -41,9 +41,13 @@ async def recover(url):
             raw, final, _ = await asyncio.wait_for(
                 read_official_source(moved, url, public_request), timeout=15)
         if parsed.path.startswith("/distance/programs/"):
-            # Its fee basis is different; no on-campus four-course price.
-            return {"_official_course_url": final} if moved else None
-        known, fee = await extract(raw.decode("utf-8", errors="strict"), final)
+            from .tru_open_learning_fees import extract as open_learning_fee
+            fee = await open_learning_fee(raw.decode("utf-8", errors="strict"), final)
+            if fee is None:
+                return {"_official_course_url": final} if moved else None
+            known = True
+        else:
+            known, fee = await extract(raw.decode("utf-8", errors="strict"), final)
         if not known:
             return None
         if fee is None:
@@ -53,7 +57,8 @@ async def recover(url):
     payload = {**fee.normalized, "extraction_method": {"international_fee": fee.method}}
     evidence = {
         "field_key": fee.field_key, "value": fee.value, "normalized": fee.normalized,
-        "source_url": final, "method": fee.method, "snippet": fee.snippet,
+        "source_url": (fee.extras or {}).get("tuition_source_url") or final,
+        "method": fee.method, "snippet": fee.snippet, "extras": fee.extras,
         "confidence": fee.confidence, "selected": True, "decision_status": "selected",
     }
     return {"status": "success", "url": final, "payload": payload, "evidence": [evidence]}

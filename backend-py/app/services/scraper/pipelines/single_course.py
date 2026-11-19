@@ -892,7 +892,33 @@ def _is_not_accepting_page(html: str) -> bool:
     """
     if not html:
         return False
-    return bool(_NOT_ACCEPTING_RE.search(html))
+    if (not _NOT_ACCEPTING_RE.search(html)
+            and "uon.degree.degreestatus" not in html.lower()
+            and not _re.search(r"\bnot\s+(?:currently\s+)?accepting\s+(?:new\s+)?applications\b", html, _re.I)):
+        return False
+    # Preserve Newcastle's explicit machine-readable current-page status.
+    if _re.search(r'"UON\.Degree\.DegreeStatus"\s*:\s*"(?:rested|closed|inactive)"',
+                  html, _re.I):
+        return True
+    # A CMS can embed the entire catalogue, including other closed programmes,
+    # inside scripts. Generic prose is evidence only when actually rendered.
+    from bs4 import BeautifulSoup
+    visible = BeautifulSoup(html, "html.parser")
+    for meta in visible.find_all("meta", attrs={"name": _re.compile(r"^UON\.Degree\.DegreeStatus$", _re.I)}):
+        if str(meta.get("content", "")).lower() in {"rested", "closed", "inactive"}:
+            return True
+    for node in visible.select("script, style"):
+        node.decompose()
+    if _NOT_ACCEPTING_RE.search(str(visible)):
+        return True
+    titles = {h.get_text(" ", strip=True) for h in visible.select("h1") if h.get_text(strip=True)}
+    if len(titles) != 1:
+        return False
+    title = next(iter(titles))
+    return bool(_re.search(
+        _re.escape(title) + r"\s+(?:program(?:me)?\s+)?is\s+(?:currently\s+)?not\s+"
+        r"(?:currently\s+)?accepting\s+(?:new\s+)?applications\b",
+        visible.get_text(" ", strip=True), _re.I))
 
 
 def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
@@ -2745,6 +2771,10 @@ async def extract_course(
     the *absolute last-resort* fallback (lower confidence than ``uni_pdf_data``)
     for universities that publish fees/IELTS only on central pages (Bug 2).
     """
+    if emit is None:
+        async def emit(*_args, **_kwargs):
+            return None
+
     from app.services.scraper.extractors.uel_variants import (
         is_uel_course_url,
         parse_uel_variants,

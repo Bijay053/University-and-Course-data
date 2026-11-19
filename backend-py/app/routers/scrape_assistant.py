@@ -19,6 +19,7 @@ from app.models import ScrapeRuntimeJob, ScrapedCourse, University
 from app.models.scrape_assistant import ScrapeAssistantThread
 from app.services import scrape_assistant as service
 from app.services.assistant_history import LIVE_MESSAGE_LIMIT
+from app.services.assistant_fix_outcome import FIX_OUTCOME_VERSION
 
 router = APIRouter()
 Database = Annotated[AsyncSession, Depends(get_db)]
@@ -191,17 +192,19 @@ async def response(thread, db, job_id=None):
                 and action["state"] in {"error", "needs_review"}
             ) and not (
                 action["kind"] == "fix_fields" and action.get("jobId")
-                and action["state"] in {"completed", "error"} and action.get("_fixOutcomeVersion") != 1
+                and action["state"] in {"completed", "error", "needs_review"}
+                and action.get("_fixOutcomeVersion") != FIX_OUTCOME_VERSION
             ):
                 continue
             target = await db.get(ScrapeRuntimeJob, action.get("jobId")) if action.get("jobId") else None
-            if action["kind"] == "fix_fields" and action["state"] in {"completed", "error"} and target is None:
+            if action["kind"] == "fix_fields" and action["state"] in {"completed", "error", "needs_review"} and target is None:
                 action["state"] = "needs_review"
                 action["resultSummary"] = (
                     "The historical correction results are no longer available. "
                     "The old completion label does not verify a course correction. "
                     "No new operation was run.")
                 action["error"] = action["resultSummary"]
+                action["_fixOutcomeVersion"] = FIX_OUTCOME_VERSION
                 changed = True
                 continue
             if action["kind"] == "retry_failed" and target:
@@ -285,7 +288,7 @@ async def response(thread, db, job_id=None):
                         from app.routers.scrape import _bulk_fix_job_dict
                         action["state"], action["resultSummary"], action["courseResults"] = fix_outcome(
                             action, _bulk_fix_job_dict(target))
-                        action["_fixOutcomeVersion"] = 1
+                        action["_fixOutcomeVersion"] = FIX_OUTCOME_VERSION
                         if action["state"] == "needs_review":
                             action["error"] = action["resultSummary"]
                         else:
@@ -305,7 +308,7 @@ async def response(thread, db, job_id=None):
                     action["state"] = "error"
                     action["error"] = "The correction job stopped. Review its results before retrying."
                     if action["kind"] == "fix_fields":
-                        action["_fixOutcomeVersion"] = 1
+                        action["_fixOutcomeVersion"] = FIX_OUTCOME_VERSION
                 changed = True
             elif service.now() - thread.updated_at > timedelta(minutes=3):
                 action["state"] = "error"
