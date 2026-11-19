@@ -376,9 +376,8 @@ async def investigate(thread_id: str, turn_id: str):
             # Share this control across engines; do not let the legacy generic
             # edit fallback or the model turn it into discovery or copy a score.
             from app.services.assistant_field_edits import evidence_edit_field, handle_field_edit
-            from app.services.scrape_assistant_autorun import preview_requested
-            if (evidence_edit_field(requested["content"], conversation_messages) in {"fee", "fees", "tuition"}
-                    and preview_requested(requested["content"])):
+            from app.services.assistant_fee_preview import requested as fee_preview_requested
+            if fee_preview_requested(requested["content"]):
                 from app.services.assistant_fee_preview import handle as fee_preview
                 research_deadline.reschedule(asyncio.get_running_loop().time() + 600)
                 await fee_preview(service, thread_id, turn_id, run_id,

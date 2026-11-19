@@ -2,12 +2,22 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 import pytest
 
-from app.services.assistant_fee_preview import handle, proposal
+from app.services.assistant_fee_preview import handle, proposal, requested
 from app.services.scraper.extractors import tru_calculator
 
 BASE = "https://www.tru.ca/programs/catalogue/"
 ROW = {"id": 1, "name": "Journalism", "url": BASE + "journalism.html", "fee": None}
 
+
+@pytest.mark.parametrize("prompt,expected", [
+    ("Add fee in all courses. Prepare an approval preview only. "
+     "Do not update any record, do not run catalogue discovery.", True),
+    ("Do not add fees. Preview IELTS only.", False),
+    ("https://www.tru.ca/fees Update IELTS; preview only", False),
+    ("Review international tuition for all pending courses; preview only", True),
+])
+def test_later_write_prohibition_does_not_discard_positive_preview(prompt, expected):
+    assert requested(prompt) is expected
 
 def source(url, amount=8860.56):
     return {"url": url, "verified": True, "facts": [{
@@ -92,7 +102,9 @@ async def test_fee_preview_uses_full_row_path_and_never_autoruns(monkeypatch, en
     from app.services import scrape_assistant as core, assistant_fee_preview
     from app.services import assistant_conversation_context, assistant_provider_repair, live_scrape_diagnostics
     from tests.test_assistant_image_intakes import DB
-    message = {"role": "user", "content": "add fee in all courses; prepare a preview only",
+    message = {"role": "user", "content": "add fee in all courses; prepare a preview only. "
+               "Do not apply or execute any action, do not update any record, "
+               "do not run catalogue discovery, and do not approve or publish.",
                "_engine": engine}
     thread = SimpleNamespace(id="thread", actor_id=1, job_id="job", messages=[message])
     monkeypatch.setattr(core, "claim", AsyncMock(return_value=True))

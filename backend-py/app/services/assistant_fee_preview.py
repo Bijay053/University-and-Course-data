@@ -1,6 +1,25 @@
 """Read every selected pending row for a fee preview, without executing repairs."""
 import asyncio
+import re
 from urllib.parse import urlsplit
+
+
+def requested(prompt):
+    """A later 'do not apply/update' protects a positive preview instruction."""
+    from app.services.scrape_assistant_autorun import preview_requested
+    if not preview_requested(prompt):
+        return False
+    text = re.sub(r"https://\S+", " ", prompt, flags=re.I)
+    positive = " ".join(
+        re.split(r"\b(?:do not|don't|never)\b", part, maxsplit=1, flags=re.I)[0]
+        for part in re.split(r"[.;!?\n]|\b(?:but|then|however)\b", text, flags=re.I)
+    )
+    return bool(re.search(
+        r"\b(?:add|update|set|fill|fix|correct|check|review)\s+"
+        r"(?:(?:the|missing|international|course|all|existing|pending)\s+){0,5}"
+        r"(?:fees?|tuition)\b|\b(?:fee|tuition)\s+(?:approval\s+)?preview\b",
+        positive, re.I,
+    ))
 
 
 def proposal(row, source):
