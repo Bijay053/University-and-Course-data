@@ -29,7 +29,7 @@ def enabled(settings, actor_id):
 
 
 def supported(action):
-    if (action.get("state") != "proposed" or action.get("publishedCount", 0)
+    if (action.get("state") != "proposed" or action.get("_confirmationOnly") or action.get("publishedCount", 0)
             or action.get("error") or action.get("conflicts")):
         return False
     count = action.get("courseCount", 0)

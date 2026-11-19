@@ -37,13 +37,15 @@ def test_ignore_assistant_foreign_and_course_links():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("text", [SHARED, CHECK])
+@pytest.mark.parametrize("text", [SHARED, CHECK, "veifiy all course ilets score", "review it and verified it"])
 async def test_signed_assistant_dispatch_matches_existing_courses_read_only(monkeypatch, text):
     from app.services import scrape_assistant as core, assistant_conversation_context
     from tests.test_assistant_image_intakes import DB
     messages = [user(LINK), user(WHY), user(SHARED)]
-    if text == CHECK:
+    if text != SHARED:
         messages.append(user(CHECK))
+    if text not in {SHARED, CHECK}:
+        messages.append(user(text))
     thread = SimpleNamespace(id="thread", actor_id=1, job_id="job", messages=messages)
     monkeypatch.setattr(core, "claim", AsyncMock(return_value=True))
     monkeypatch.setattr(core, "AsyncSessionLocal", lambda: DB(thread))
@@ -56,6 +58,11 @@ async def test_signed_assistant_dispatch_matches_existing_courses_read_only(monk
     documents.review.assert_awaited_once()
     request = documents.review.await_args.args[-1]
     assert request["_guidanceSource"] == LINK
-    assert "1 of 1" in request["_readOnlyGuidanceContext"]
-    assert "0 have verified" in request["_readOnlyGuidanceContext"]
+    if text.startswith("veifiy"):
+        assert request["_verificationPreview"] is True
+        from app.services.assistant_pending_automation import supported
+        assert not supported({"state":"proposed", "kind":"document_update", "_confirmationOnly":True})
+    else:
+        assert "1 of 1" in request["_readOnlyGuidanceContext"]
+        assert "0 have verified" in request["_readOnlyGuidanceContext"]
     core.run_automatic_action.assert_not_awaited()

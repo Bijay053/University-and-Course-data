@@ -195,6 +195,37 @@ async def test_english_applicability_report_scopes_and_fences_bulk_proposals(sto
 
 
 @pytest.mark.asyncio
+async def test_confirmed_table_evidence_verifies_existing_scores_on_reload(store, monkeypatch):
+    from app.services import assistant_staff_edits
+    from app.services.assistant_document_review import apply, BANDS, HTML_APPLICABILITY_VERSION
+    from app.services.scraper.requirement_status import public_requirement_status
+    monkeypatch.setattr(assistant_staff_edits, "permissions", lambda actor: None)
+    scores = {k: 6.0 if k == "ielts_overall" else 5.5 for k in BANDS}
+    url = "https://www.example.edu/english"
+    quote = "Engineering 5.5 5.5 5.5 5.5 6.0"
+    async with store() as db:
+        row = await db.get(ScrapedCourse, 1)
+        for field, value in scores.items():
+            setattr(row, field, value)
+        await db.commit()
+        assert public_requirement_status(row)["englishComponents"]["state"] != "verified"
+        action = {"id": "table-proof", "_turnId": "turn", "_applicabilityVersion": HTML_APPLICABILITY_VERSION,
+                  "_source": url, "_sourceType": "html", "_provenance": "official-document",
+                  "_targets": [{"id": 1, "version": service.row_version(row),
+                                "_fixedProfile": {"id": "engineering", "scores": scores, "quote": quote,
+                                                  "headerQuote": "Reading Writing Listening Speaking Overall"},
+                                "changes": [{"field": k, "oldValue": v, "newValue": v, "quote": quote}
+                                            for k, v in scores.items()]}]}
+        await apply(db, SimpleNamespace(turn_id="turn"), action, 1, {"id": 1})
+        await db.commit()
+    async with store() as db:
+        row = await db.get(ScrapedCourse, 1)
+        assert public_requirement_status(row)["englishComponents"] == {"state": "verified", "sourceUrl": url}
+        row.ielts_writing = 7
+        assert public_requirement_status(row)["englishComponents"]["state"] != "verified"
+
+
+@pytest.mark.asyncio
 async def test_document_confirmation_persists_audit_and_rejects_stale_replay(store, monkeypatch):
     from app.services.assistant_document_review import apply
     from app.services import assistant_staff_edits

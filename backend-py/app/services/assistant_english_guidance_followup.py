@@ -14,12 +14,20 @@ VERIFY = re.compile(r"\b(?:verified|valid|official|correct|right|reliable)\b", r
 
 def kind(text):
     words = URL.sub("", text)
+    words = re.sub(r"\bilets\b", "ielts", words, flags=re.I)
+    words = re.sub(r"\bveifiy\b", "verify", words, flags=re.I)
     # A field update or named course question must keep its own operation.
     if re.search(r"\b(?:add|apply|update|set|change|publish|approve|ignore|instead|not|don't)\b",
                  words, re.I):
         return None
     if ENGLISH.search(words) and ALL.search(words) and re.search(r"\bunverified\b", words, re.I):
         return "status"
+    if (ENGLISH.search(words) and ALL.search(words)
+            and re.search(r"\b(?:verify|check|validate)\b", words, re.I)
+            and not re.search(r"\b(?:fees?|intakes?|location|discover|except|only)\b", words, re.I)):
+        return "verify_all"
+    if re.fullmatch(r"\s*(?:please\s+)?review it and verif(?:y|ied) it[.!?\s]*", words, re.I):
+        return "continuation"
     if (ENGLISH.search(words) and REQUIREMENT.search(words) and SHARED.search(words)
             and re.search(r"\b(?:link|url|page|source|scourse)\b", words, re.I)):
         return "reminder"
@@ -44,13 +52,15 @@ def resolve(text, messages, home, configured):
     if prior and prior[-1] == text:
         prior.pop()
     # Only uninterrupted follow-ups in this thread inherit the all-course scope.
-    scope_all = intent == "status"
+    scope_all = intent in {"status", "verify_all"}
+    if intent == "continuation" and (not prior or kind(prior[-1]) not in {"source", "reminder", "status", "verify_all"}):
+        return None
     for old in reversed(prior):
         old_kind = kind(old)
-        if old_kind == "status":
+        if old_kind in {"status", "verify_all"}:
             scope_all = True
             break
-        if old_kind not in {"reminder", "source"}:
+        if old_kind not in {"reminder", "source", "continuation"}:
             break
     def valid(url):
         try:
@@ -93,8 +103,10 @@ async def handle(service, ids, thread, message, references):
               "and verified component requirements are separate. ")
     if url and scope_all and intent != "status":
         from app.services.assistant_document_review import review
+        options = ({"_verificationPreview": True} if intent == "verify_all"
+                   else {"_readOnlyGuidanceContext": prefix})
         await review(*ids, thread, {**message, "content": f"Check IELTS applicability for this review using {url}",
-                                    "_guidanceSource": url, "_readOnlyGuidanceContext": prefix})
+                                    "_guidanceSource": url, **options})
         return True
     sources = []
     if url:

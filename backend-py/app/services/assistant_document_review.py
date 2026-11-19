@@ -331,8 +331,19 @@ async def review(thread_id, turn_id, run_id, thread, message):
                     assessment.update(applicability="excluded", reason="General guidance excludes health/research courses; course-specific evidence is required.")
                 for c in changes:
                     c["applicabilityEvidence"] = assessment["evidence"]
+                # Only a course-matched official table with five fixed scores
+                # may certify an existing value without a numeric edit.
+                fixed_profile = None
+                if (source.get("sourceType") == "html" and
+                        {c["field"] for c in changes} == set(BANDS)):
+                    from app.services.english_html_tables import checked_profile
+                    from app.services.scraper.requirement_status import effective_requirement_status
+                    profile = checked_profile(row, candidate, source, page)
+                    if (profile and not profile.get("bandConstraint")
+                            and effective_requirement_status(row)["englishComponents"]["state"] != "verified"):
+                        fixed_profile = {k: profile[k] for k in ("id", "scores", "headerQuote", "quote")}
                 changes = [{**c, "oldValue": getattr(row, c["field"])} for c in changes
-                           if getattr(row, c["field"]) != c["newValue"]]
+                           if fixed_profile or getattr(row, c["field"]) != c["newValue"]]
                 reason = (page.get("error") or assessment.get("reason") or source.get("error")
                           or "No applicable, unambiguous document evidence established.")
                 results.append({"id": row.id, "name": row.course_name,
@@ -343,6 +354,10 @@ async def review(thread_id, turn_id, run_id, thread, message):
                                                             getattr(row, key)) for key in BANDS}})
                 if changes:
                     targets.append({"id": row.id, "version": service.row_version(row), "changes": changes})
+                    if fixed_profile:
+                        targets[-1]["_fixedProfile"] = fixed_profile
+                        if all(c["oldValue"] == c["newValue"] for c in changes):
+                            results[-1]["reason"] = "Scores already match. Approval will save the matched official evidence and verify the existing scores."
     finally:
         if client:
             await client.close()
@@ -354,6 +369,8 @@ async def review(thread_id, turn_id, run_id, thread, message):
               "_source": source.get("url"), "_objectKey": source.get("_objectKey"),
               "_sourceType": source.get("sourceType", "html"),
               "_provenance": source.get("provenance", "official-document")}
+    if message.get("_verificationPreview"):
+        action["_confirmationOnly"] = True
     from app.services.document_review_summary import summarize, describe
     counts = summarize(results)
     not_checked = counts["notChecked"]
@@ -445,12 +462,30 @@ async def apply(db, thread, action, university_id, actor):
             ))
             methods[change["field"]] = method
         row.extraction_method = methods
+        profile = target.get("_fixedProfile")
+        if profile:
+            from app.services.scraper.requirement_status import _english_fingerprint
+            if (action.get("_sourceType") != "html" or not action.get("_source")
+                    or set(profile["scores"]) != set(BANDS)
+                    or {c["field"]: c["newValue"] for c in target["changes"]} != profile["scores"]
+                    or any(getattr(row, field) != value for field, value in profile["scores"].items())):
+                raise ValueError("Official IELTS table no longer matches the reviewed scores.")
+            row.requirement_status = {**(row.requirement_status or {}), "englishComponents": {
+                "state": "verified", "sourceUrl": action["_source"],
+                "_fingerprint": _english_fingerprint(row, source_url=action["_source"]),
+                "tableId": profile["id"], "headerQuote": profile["headerQuote"], "quote": profile["quote"],
+            }}
     await db.flush()
     for target in targets:
         row = by_id[target["id"]]
         await db.refresh(row)
         if any(getattr(row, c["field"]) != c["newValue"] for c in target["changes"]):
             raise ValueError("Document edit read-back failed; the transaction was not committed.")
+        if target.get("_fixedProfile"):
+            from app.services.scraper.requirement_status import public_requirement_status
+            visible = public_requirement_status(row)["englishComponents"]
+            if visible != {"state": "verified", "sourceUrl": action["_source"]}:
+                raise ValueError("The IELTS verification badge failed read-back; no changes were committed.")
     summary = action.get("_reviewSummary", {})
     action.update(state="completed", resultSummary=(
         f"Updated {len(targets)} pending courses with audited document evidence. "

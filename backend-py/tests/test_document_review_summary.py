@@ -86,12 +86,13 @@ async def test_full_review_reports_proposed_unchanged_and_protected_without_appl
                         {"content": home + "/english update IELTS for all pending courses"})
     reply = saved.call_args.args[3]
     report = reply["documentReview"]
-    assert (report["checked"], report["matched"], report["proposed"], report["unchanged"], report["unmatched"]) == (4, 2, 1, 1, 2)
-    assert [r["status"] for r in report["rows"]] == ["unchanged", "proposed", "unverified", "unverified"]
+    assert (report["checked"], report["matched"], report["proposed"], report["unchanged"], report["unmatched"]) == (4, 2, 2, 0, 2)
+    assert [r["status"] for r in report["rows"]] == ["proposed", "proposed", "unverified", "unverified"]
+    assert "Scores already match" in report["rows"][0]["reason"]
     assert len(report["rows"][1]["changes"]) == 5
     assert reply["actions"][0]["requiresConfirmation"] is True
     assert reply["actions"][0]["_applicabilityVersion"] == 2
-    assert [t["id"] for t in reply["actions"][0]["_targets"]] == [2]
+    assert [t["id"] for t in reply["actions"][0]["_targets"]] == [1, 2]
     assert [vars(r) for r in rows] == before
 
 
