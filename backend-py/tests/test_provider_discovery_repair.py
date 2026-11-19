@@ -704,3 +704,26 @@ async def test_real_leeds_official_source_acceptance():
     for course_url in report["courses"]:
         assert (await fresh.fetch(course_url))["classification"] == "course"
     assert fresh.pages_checked <= 5
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('changed', [False, True])
+async def test_total_filter_collapse_replays_installed_catalogue_without_rewriting(monkeypatch, tmp_path, changed):
+    plan = {'official_catalogue_fallback': True, 'sitemap_url': 'https://university.example/sitemap.xml'}
+    ctx = repair_context(raw_discovered=140, after_filter=0, imported=0, drop_rate=100,
+                         quality={'fee_pct': 0, 'total_staged': 24}, provider_failure=None,
+                         effective_discovery=plan, yaml_file=tmp_path/'uni.yaml', unis_dir=tmp_path)
+    chat = mock_loop(monkeypatch, ctx, {})
+    agent.read_session('job-live')['autonomous']['catalogue_problem'] = True
+    calls = official_fetch(monkeypatch, source_changes=changed)
+    db = FakeDb()
+    result = await agent.run_ai_repair_loop('job-live', db)
+    assert not db.writes and not ctx['yaml_file'].exists()
+    chat.assert_not_awaited()
+    assert result['attempts'][0]['phase'] == 'discovery'
+    assert calls.count(plan['sitemap_url']) == 2
+    assert accepted_live_probe(result) is (not changed)
+    if not changed:
+        attempt = result['attempts'][0]
+        assert attempt['outcome'] == 'no_change' and not attempt['patches_applied']
+        assert attempt['verified_existing_discovery'] == plan
+        assert result['autonomous']['discovery_repair']['status'] == 'verification_pending'

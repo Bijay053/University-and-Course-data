@@ -3094,6 +3094,10 @@ async def run_ai_repair_loop(
         # asking OpenAI for another mutation. This no-change attempt gives the
         # UI deterministic evidence to launch the fresh verification scrape.
         current_disc = dict(ctx.get("effective_discovery") or {})
+        # A deployed fallback can already pass the URL filters on a small
+        # sample. That doesn't verify its source, or turn a catalogue request
+        # into a field repair. Replay the official strategy before dispatch.
+        catalogue_replay = bool(live and (ctx.get("provider_failure") or ctx.get("catalogue_recovery")))
         current_urls = ctx.get("repair_url_sample") or ctx.get("dropped_sample") or []
         confirmed_course_urls = {
             url for url, page in live.initial.items()
@@ -3110,6 +3114,7 @@ async def run_ai_repair_loop(
         current_minimum = max(1, (current_sim["total"] + 1) // 2)
         if (
             session["current_attempt"] == 0
+            and not catalogue_replay
             and ctx.get("imported", 0) == 0
             and not _field_repair_needed(ctx.get("quality") or {})
             and current_sim["total"] > 0
@@ -3175,7 +3180,7 @@ async def run_ai_repair_loop(
                 live.discovery_needed(ctx.get("effective_discovery") or {}) if live
                 else ctx["drop_rate"] > 20 and not _discovery_phase_done
             )
-            phase = "discovery" if discovery_needs_fix else "extraction"
+            phase = "discovery" if catalogue_replay or discovery_needs_fix else "extraction"
             current_attempt_evidence = {
                 "attempt_number": attempt_num,
                 "phase": phase,
@@ -3373,7 +3378,7 @@ async def run_ai_repair_loop(
                     "section": "recipe", "field": "audience_repair",
                     "value": True,
                 })
-            if live and int((ctx.get("quality") or {}).get("fee_pct", 100)) < 100:
+            if live and not catalogue_replay and int((ctx.get("quality") or {}).get("fee_pct", 100)) < 100:
                 from .linked_fee_repair import course_fee_links
                 linked_courses = [
                     page for course_url, page in live.initial.items()
@@ -3576,6 +3581,22 @@ async def run_ai_repair_loop(
                 )
 
             # ⑥ Apply discovery patch
+            if (catalogue_replay and disc_patch and not extr_patch and not validation_errors
+                    and live_validation and live_validation["accepted"]
+                    and all(current_disc.get(k) == v for k, v in disc_patch.items())):
+                # Reverified exactly the installed plan: retain the validation
+                # receipt, but don't rewrite YAML or provider settings.
+                current_attempt_evidence.update(
+                    outcome="no_change", patches_proposed=[], patches_applied=[],
+                    verified_existing_discovery=disc_patch,
+                )
+                session["attempts"].append(current_attempt_evidence)
+                autonomous["discovery_repair"].update(
+                    status="verification_pending",
+                    message="Existing official discovery revalidated; no settings changed.",
+                )
+                session.update(status="completed", rollback_status="unchanged")
+                break
             patch_applied_ok  = False
             patch_error: str  = ""
             extraction_apply_failed = False
