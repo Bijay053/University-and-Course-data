@@ -36,6 +36,13 @@ def supported(action):
     if not isinstance(count, int) or isinstance(count, bool) or count < 1:
         return False
     kind = action.get("kind")
+    if kind == "repair_catalogue":
+        # Only freshly generated, bounded proposals opt in. The existing
+        # dispatcher still checks permissions/configuration and the repair
+        # worker validates sources and patches before staging pending results.
+        return (count <= 50 and bool(action.get("_configVersion"))
+                and action.get("_boundedRepair") == {
+                    "maxVerificationCourses": 50, "publishesCourses": False})
     if kind == "cleanup_names":
         targets = action.get("_targets", [])
         return (len(targets) == count == len({target.get("id") for target in targets})
@@ -92,6 +99,14 @@ def prepare(reply, request, settings, actor_id):
             continue
         if supported(action):
             action.update(requiresConfirmation=False, automaticPending=True)
+            if action["kind"] == "repair_catalogue":
+                reply["content"] = reply.get("content", "").replace(
+                    "The test can select up to 50 courses, so batch approval is required. "
+                    "No repair has run yet and no course has been published.",
+                    "Your account authorises this bounded repair to start automatically. "
+                    "It may verify up to 50 courses; source and configuration checks still apply. "
+                    "Execution results will appear here. Nothing is approved or published automatically."
+                )
 
 
 def supersede_document_previews(messages, current_turn):

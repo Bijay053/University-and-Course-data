@@ -81,6 +81,7 @@ def proposal(tools, university, report, call_id):
         "label": "Diagnose, test and repair this university scraper",
         "courseCount": 50, "fields": [], "_ids": [],
         "_configVersion": tools.service.fingerprint(university.scrape_config or {}),
+        "_boundedRepair": {"maxVerificationCourses": 50, "publishesCourses": False},
         "requiresConfirmation": True,
     }
     if source_roots:
