@@ -24,6 +24,16 @@ def evidence_edit_field(prompt, messages=()):
     direct = edit_field(prompt)
     if direct:
         return direct
+    if re.search(r"\b(?:retry|rerun)\b", prompt, re.I):
+        from app.services.scrape_assistant_autorun import execution_requested
+        if not execution_requested(prompt):
+            return None
+        from app.services.assistant_action_scope import catalogue_forbidden, discovery_negated
+        positive = re.split(r"\b(?:do not|don't|never)\b", prompt, flags=re.I)[0]
+        fields = set(re.findall(r"\b(?:fees?|tuition|ielts|duration|location|campus)\b", positive, re.I))
+        fields = {"fee" if f.lower() in {"fee","fees","tuition"} else f.lower() for f in fields}
+        if len(fields) == 1 and (catalogue_forbidden(prompt) or discovery_negated(prompt)):
+            return next(iter(fields))
     if not re.search(r"\b(?:add|set|change|update|edit|fix|correct)\b", prompt, re.I):
         return None
     if re.search(r"\b(?:don't|do not|never|only explain|read.only)\b", prompt, re.I):

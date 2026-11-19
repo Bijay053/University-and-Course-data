@@ -562,6 +562,9 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
         return await response(thread, db)  # Idempotent confirmation; never dispatch twice.
     from app.services.assistant_import_pause import IMPORT_KINDS, PAUSE_REASON, provider_for_job, is_paused
     if action["kind"] in IMPORT_KINDS:
+        from app.services.assistant_action_scope import action_forbidden, action_request, REASON
+        if action_forbidden(action_request(messages, action_id), action["kind"], action):
+            raise HTTPException(409, REASON)
         university = await provider_for_job(db, job_id, lock=True)
         if is_paused(university):
             raise HTTPException(409, PAUSE_REASON)

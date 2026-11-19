@@ -25,8 +25,10 @@ def execution_requested(prompt):
     return not re.search(r"\bread[- ]only\b|\b(?:just|only)\s+(?:explain|compare|research|investigate|check|show|report)\b|\b(?:do not|don't|dont|never)\s+(?:run|change|modify|repair|fix|scrape|update|apply|add|import|recover|execute)\b", prompt, re.I)
 
 
-def choose_action(actions):
+def choose_action(actions, prompt=""):
+    from app.services.assistant_action_scope import action_forbidden
     proposed = [a for a in actions if a.get("state") == "proposed"
+                and not action_forbidden(prompt, a.get("kind"), a)
                 and not a.get("requiresConfirmation")
                 and (a.get("courseCount", 0) <= 10 or a.get("automaticPending"))
                 and (a.get("kind") in {
@@ -61,7 +63,7 @@ async def autorun(thread_id, turn_id):
         university = await provider_for_job(db, thread.job_id)
         if is_paused(university):
             actions = [a for a in actions if a.get("kind") not in IMPORT_KINDS]
-        action = choose_action(actions)
+        action = choose_action(actions, request.get("content", ""))
         if not action:
             return
         user = await db.get(User, thread.actor_id)

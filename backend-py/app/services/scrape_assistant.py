@@ -461,6 +461,9 @@ def known_sources(prompt, ctx, sampled):
         r"fix|correct|verif|ielts|english|fee|duration|location|band", prompt, re.I
     ):
         coverage = True
+    from app.services.assistant_action_scope import catalogue_forbidden
+    if catalogue_forbidden(prompt):
+        coverage = False
     candidates = re.findall(r"https://[^\s<>\"'`]+", prompt)
     english_audit = bool(re.search(r"ielts|english|band|language", prompt, re.I))
     if english_audit:
@@ -1067,6 +1070,8 @@ async def save_research_reply(thread_id, turn_id, run_id, reply, *, detail, phas
         from app.config import settings
         from app.services.assistant_pending_automation import prepare as prepare_automatic
         request = next((m for m in reversed(thread.messages) if m["role"] == "user"), {})
+        from app.services.assistant_action_scope import fence_reply
+        fence_reply(reply, request.get("content", ""))
         prepare_automatic(reply, request, settings, thread.actor_id)
         items = [dict(item) for item in thread.activity]
         finish_running(items)
