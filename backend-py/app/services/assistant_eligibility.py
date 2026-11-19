@@ -88,6 +88,9 @@ async def check_course(row, home):
 async def run(service, thread_id, turn_id, run_id, ctx, prompt):
     online = ctx.get("_eligibilityKind") == "online"
     label = "online-only" if online else "domestic-only"
+    if online and ctx.get("job", {}).get("id") and re.search(r"\b(?:all|every)\s+(?:pending\s+)?courses?\b", prompt, re.I):
+        ctx = {**await service.context(ctx["job"]["id"], provider_wide=True),
+               "_eligibilityKind": "online"}
     rows = scope(prompt, ctx["samples"])
     if online:
         from app.services.assistant_online_exclusion import selection
@@ -245,14 +248,23 @@ async def persist(service, thread_id, turn_id, run_id, ctx, rows, results, *, co
             needs_preview = False
             allowed = allowed and bool(request.get("autoRun")) and requested(request.get("content", ""))
         candidates = sum(bool(quote) for quote, _ in results.values())
-        bulk = candidates > 10 and not confirmed
-        confirmation = bulk or needs_preview and candidates > 0
+        update_delivery = online and (ctx.get("_updateDelivery") or (
+            bool(re.search(r"\b(?:add|update|correct|set)\b", request.get("content", ""), re.I))
+            and bool(re.search(r"\b(?:delivery|mode|location|campus)\b", request.get("content", ""), re.I))))
+        operation_count = (sum(state in {"on_campus", "mixed_mode", "checked"} for _, state in results.values())
+                           if update_delivery else candidates)
+        from app.services.assistant_pending_automation import enabled
+        from app.config import settings
+        owner_authorized = online and allowed and not needs_preview and enabled(settings, thread.actor_id)
+        bulk = operation_count > 10 and not confirmed and not owner_authorized
+        confirmation = bulk or needs_preview and operation_count > 0
         allowed = allowed and not confirmation
         excluded, details, sources, undo = [], [], [], []
+        updated = []
         ids = [r["id"] for r in rows]
         locked = (await db.execute(select(ScrapedCourse).where(
             ScrapedCourse.id.in_(ids),
-            ScrapedCourse.scrape_job_id == thread.job_id,
+            True if ctx.get("_providerWide") else ScrapedCourse.scrape_job_id == thread.job_id,
             ScrapedCourse.university_id == ctx["university_id"],
         ).order_by(ScrapedCourse.id).with_for_update())).scalars().all()
         current = {r.id: r for r in locked}
@@ -268,6 +280,36 @@ async def persist(service, thread_id, turn_id, run_id, ctx, rows, results, *, co
                 message = "Retained: mixed delivery or compulsory campus teaching; not online-only."
             elif online and state == "on_campus":
                 message = "Retained: course-owned delivery indicates on-campus study."
+            if update_delivery and allowed and unchanged and state in {"on_campus", "mixed_mode", "checked"}:
+                from app.services.scrape_assistant_tools import quote_in_source
+                from app.services.assistant_online_exclusion import SCHEMA
+                source = next((m.get("_sourceChecks", {}).get(candidate["url"])
+                               for m in reversed(thread.messages)
+                               if m.get("_sourceChecks", {}).get(candidate["url"])), {})
+                proof = source.get("_onlineExclusion") or {}
+                evidence_quote = proof.get("quote") or proof.get("deliveryQuote")
+                mode = "Online" if state == "checked" else proof.get("studyMode")
+                if (source.get("verified") and source.get("_onlineExclusionSchema") == SCHEMA
+                        and mode in {"Online", "On Campus", "Blended"}
+                        and evidence_quote and quote_in_source(evidence_quote, source)):
+                    updates = {"study_mode": mode}
+                    if state == "on_campus" and proof.get("courseLocation"):
+                        updates["course_location"] = proof["courseLocation"]
+                    changes = {k: {"before": getattr(row, k), "after": v} for k, v in updates.items()
+                               if getattr(row, k) != v}
+                    if changes:
+                        updated.append(row.id)
+                        import json
+                        for k in changes:
+                            setattr(row, k, changes[k]["after"])
+                        from app.models.audit import CourseAuditLog
+                        for key, change in changes.items():
+                            db.add(CourseAuditLog(scraped_course_id=row.id, field_key=key,
+                                action="assistant_verified_delivery",
+                                old_value=json.dumps(change["before"]),
+                                new_value=json.dumps(change["after"]), actor=str(thread.actor_id),
+                                reason=json.dumps({"source": candidate["url"], "quote": evidence_quote})))
+                        message += " Updated verified " + ", ".join(changes) + "."
             if quote and allowed and unchanged:
                 undo.append({"id": row.id, "status": row.status,
                              "reason": row.rejection_reason,
@@ -334,7 +376,11 @@ async def persist(service, thread_id, turn_id, run_id, ctx, rows, results, *, co
                       for state in {"mixed_mode", "on_campus", "unverified", "unavailable"}}
             summary += (f" Mixed delivery: {counts['mixed_mode']}; on-campus: {counts['on_campus']}; "
                         f"unverified: {counts['unverified']}; unavailable: {counts['unavailable']}. "
-                        "Only this existing pending review was checked; no catalogue discovery was run.")
+                        + ("All existing pending reviews for this university were in scope; "
+                         if ctx.get("_providerWide") else "Only this existing pending review was checked; ")
+                        + "no catalogue discovery was run.")
+            if update_delivery:
+                summary += f" Verified mode/location fields updated on {len(updated)} records."
         if not allowed and (candidates or not online):
             summary += (" Review and confirm the evidenced exclusions below." if confirmation else
                         " Changes were blocked because automatic execution or permission was unavailable.")
@@ -346,13 +392,20 @@ async def persist(service, thread_id, turn_id, run_id, ctx, rows, results, *, co
             "content": summary, "sources": sources, "activity": service.public_activity(items[-40:]),
             "actions": [{
                 "id": uuid.uuid4().hex, "kind": "exclude_online" if online else "exclude_domestic",
-                "label": f"Exclude confirmed {label} pending courses",
-                "courseCount": candidates if online else len(rows),
-                "fields": [], "state": "proposed" if confirmation else "completed",
+                "jobId": thread.job_id,
+                "label": ("Update verified delivery and exclude online-only courses" if update_delivery
+                          else f"Exclude confirmed {label} pending courses"),
+                "courseCount": operation_count if online else len(rows),
+                "fields": ["study_mode", "course_location"] if update_delivery else [],
+                "state": "proposed" if confirmation else (
+                    "needs_review" if online and any(state in {"unverified", "unavailable", "not checked"}
+                                                    for _, state in results.values()) else "completed"),
                 "resultSummary": summary, "courseResults": details,
                 "requiresConfirmation": confirmation, "_ctx": {
                     "university_id": ctx["university_id"], "versions": ctx["versions"],
                     **({"_eligibilityKind": "online"} if online else {}),
+                    "_providerWide": bool(ctx.get("_providerWide")),
+                    "_updateDelivery": bool(update_delivery),
                 }, "_rows": rows, "_results": results, "_turnId": turn_id,
                 "_configVersion": ctx.get("config_version"), "_undo": undo,
             }],

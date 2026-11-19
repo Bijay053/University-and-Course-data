@@ -4,10 +4,18 @@ from urllib.parse import parse_qs, urlsplit
 
 from bs4 import BeautifulSoup
 
-SCHEMA = 3
+SCHEMA = 4
 _COMMAND = re.compile(r"\b(?:reject|exclude|remove)\b.{0,70}\bonline(?:[- ]only)?\b"
                       r"|\bonline[- ]only\b.{0,50}\b(?:reject|exclude|remove)\b", re.I)
 _FOLLOWUP = re.compile(r"^\s*(?:please\s+)?(?:do it|go ahead|yes|proceed|run it)[.!]?\s*$", re.I)
+_DELIVERY_CLARIFICATION = re.compile(
+    r"^\s*(?:location|delivery)\s*:?\s*(?:fully|100%)\s+online\s+"
+    r"(?:means?|is)\s+(?:an?\s+)?online[- ]only(?:\s+course)?"
+    r"(?:\s+in\s+(?:study\s+)?mode)?[.!]?\s*$", re.I)
+_QUESTION_COMMAND = re.compile(
+    r"(?:[.!?;\n]\s*|\bpending\s+(?:list|review)\s+)"
+    r"(?:please\s+)?(?:reject|exclude|remove)\s+"
+    r"(?:them|(?:all\s+)?(?:these|those|online)(?:[- ]only)?\s+courses)\b", re.I)
 
 
 def retention_only_proof(source, requested_schema=SCHEMA):
@@ -29,18 +37,18 @@ def intent(prompt, messages=()):
     ):
         return None
     if (re.match(r"\s*(?:why|how|what|did|have|has|were|was)\b", instruction, re.I)
-            and _COMMAND.search(instruction)):
+            and _COMMAND.search(instruction) and not _QUESTION_COMMAND.search(instruction)):
         return None
     if _COMMAND.search(instruction) and re.search(r"\b(?:courses?|records?|rows?)\b", instruction, re.I):
         return {"prompt": prompt, "execute": execution_requested(prompt)}
     if pending_delivery_question(prompt) and re.search(r"\b(?:fix|check|verify|review)\b", prompt, re.I):
         return {"prompt": prompt, "execute": False}
-    if _FOLLOWUP.fullmatch(prompt):
+    if _FOLLOWUP.fullmatch(prompt) or _DELIVERY_CLARIFICATION.fullmatch(prompt):
         previous = [m.get("content", "") for m in messages if m.get("role") == "user"]
         if previous and previous[-1] == prompt:
             previous.pop()
         for prior in reversed(previous):
-            if _FOLLOWUP.fullmatch(prior):
+            if _FOLLOWUP.fullmatch(prior) or _DELIVERY_CLARIFICATION.fullmatch(prior):
                 continue
             # Only the last substantive USER request supplies authority.
             # An assistant's sampled answer never becomes a rejection rule.
@@ -129,7 +137,16 @@ def evidence(html, url):
                                  text, re.I)
             if match:
                 value = re.sub(r"\bonline learning\b", "online", match[2], flags=re.I)
-                labelled.append((_mode(value, location=match[1].lower() == "location"), text))
+                is_location = match[1].lower() == "location"
+                # TRU labels its campus value as Delivery, not Location.
+                tru_campus = (urlsplit(url).hostname in {"www.tru.ca", "tru.ca"}
+                              and node.find_parent("aside", class_="transition-highlights") is not None
+                              and value in {"Kamloops", "Williams Lake"})
+                tru_mixed = (urlsplit(url).hostname in {"www.tru.ca", "tru.ca"}
+                             and node.find_parent("aside", class_="transition-highlights") is not None
+                             and re.fullmatch(r"(?:Online(?: and |, )(?:Kamloops|Williams Lake)|"
+                                              r"(?:Kamloops|Williams Lake)(?: and |, )Online)", value, re.I))
+                labelled.append(("Blended" if tru_mixed else _mode(value, location=is_location or tru_campus), text))
     modes = {mode for mode, _ in labelled}
     if not modes or None in modes or len(modes) != 1:
         return {"state": "unverified", "name": name, "reason": "Delivery labels were absent or conflicting."}
@@ -140,7 +157,10 @@ def evidence(html, url):
     if mode != "Online":
         return {"state": "mixed_mode" if mode == "Blended" else "on_campus",
                 "name": name, "reason": "Course-owned delivery is not online-only.",
-                "deliveryQuote": labelled[0][1]}
+                "deliveryQuote": labelled[0][1], "studyMode": mode,
+                "courseLocation": next((q.split(" ", 1)[1] for _, q in labelled
+                    if q in {"Delivery Kamloops", "Delivery Williams Lake",
+                             "Location Kamloops", "Location Williams Lake"}), None)}
     # A primary Online label must not hide an international/campus panel or
     # another course option. Ambiguous audience/option applicability is a hold.
     for node in (n for n in content_nodes if n.name in {"p", "dt"}):

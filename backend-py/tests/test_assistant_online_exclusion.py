@@ -55,6 +55,50 @@ def test_do_it_uses_last_staff_command_not_the_assistants_sampled_claim():
     assert intent("do it", messages + [{"role": "user", "content": "Check MBA fees"}]) is None
 
 
+@pytest.mark.parametrize("prompt", [
+    "why online only courses listed in pending list reject them",
+    "Why are online-only courses pending? Please reject them.",
+    "Why are online-only courses pending; remove those courses",
+])
+def test_question_with_separate_explicit_rejection_command(prompt):
+    assert intent(prompt) == {"prompt": prompt, "execute": True}
+
+
+@pytest.mark.parametrize("prompt", [
+    "Why should I reject online-only courses?",
+    "Why did you reject online-only courses?",
+    "Why are online-only courses still in the pending list?",
+    "why online only courses listed in pending list do not reject them",
+    "Why are online-only courses pending? Only explain; reject them",
+])
+def test_questions_and_vetoes_do_not_authorize_rejection(prompt):
+    assert intent(prompt) is None
+
+
+def test_location_clarification_continues_only_last_explicit_user_scope():
+    command = "why online only courses listed in pending list reject them"
+    clarification = "Location Fully online mean online only course in mode"
+    messages = [{"role": "user", "content": command},
+                {"role": "assistant", "content": "Only three courses were sampled."},
+                {"role": "user", "content": clarification}]
+    assert intent(clarification, messages) == {"prompt": command, "execute": True}
+    assert intent(clarification) is None
+    assert intent(clarification, [{"role": "assistant", "content": command}]) is None
+    assert intent(clarification, messages + [
+        {"role": "user", "content": "Check MBA fees"}]) is None
+    scoped = "reject online-only row 12"
+    assert intent(clarification, [{"role": "user", "content": scoped}])["prompt"] == scoped
+
+
+def test_fully_online_location_is_evidence_not_a_staff_assertion():
+    html = "<main><h1>MSc Aesthetic Medicine</h1><dl><dt>Location</dt><dd>Fully online</dd></dl></main>"
+    proof = evidence(html, "https://www.uws.ac.uk/study/postgraduate/aesthetic-medicine/")
+    assert proof["state"] == "checked"
+    assert "Location Fully online" in proof["quote"]
+    mixed = html.replace("</main>", "<p>You are required to attend on-campus teaching.</p></main>")
+    assert evidence(mixed, URL)["state"] == "mixed_mode"
+
+
 def test_generic_command_checks_every_pending_row_not_just_sampled_or_online_labelled_rows():
     rows = [{"id": n, "name": f"Programme {n}", "url": f"https://uni.edu/course/{n}"}
             for n in range(1, 150)]

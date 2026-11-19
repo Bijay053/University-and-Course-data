@@ -130,7 +130,7 @@ async def ensure_schema(db):
     await db.commit()
 
 
-async def context(job_id: str) -> dict:
+async def context(job_id: str, *, provider_wide: bool = False) -> dict:
     from app.services.scraper.requirement_status import effective_requirement_status
     async with AsyncSessionLocal() as db:
         job = await db.get(ScrapeRuntimeJob, job_id)
@@ -141,7 +141,7 @@ async def context(job_id: str) -> dict:
             raise ValueError("University no longer exists.")
         rows = (await db.execute(
             select(ScrapedCourse).where(
-                ScrapedCourse.scrape_job_id == job_id,
+                True if provider_wide else ScrapedCourse.scrape_job_id == job_id,
                 ScrapedCourse.university_id == uni.id,
                 ScrapedCourse.status.in_(REVIEW_STATUSES),
             ).order_by(ScrapedCourse.id).limit(2001)
@@ -174,6 +174,7 @@ async def context(job_id: str) -> dict:
             "job": {"id": job_id, "status": job.status, "found": job.total_found,
                     "staged": job.imported, "skipped": job.skipped, "errors": job.errors},
             "home": uni.scrape_url, "name": uni.name, "config": config,
+            "_providerWide": provider_wide,
             "samples": samples, "eligible_ids": [row.id for row in rows],
             "versions": {str(row.id): row_version(row) for row in rows},
             "config_version": fingerprint(uni.scrape_config or {}),

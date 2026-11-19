@@ -102,7 +102,7 @@ async def test_official_reader_retains_citable_selected_delivery():
     result = await inspect_source(URL, "https://www.tru.ca", raw_body=program_html().encode())
     assert result["verified"]
     assert result["_onlineExclusion"]["state"] == "checked"
-    assert result["_onlineExclusionSchema"] == 3
+    assert result["_onlineExclusionSchema"] == 4
     assert quote_in_source(result["_onlineExclusion"]["quote"], result)
 
 

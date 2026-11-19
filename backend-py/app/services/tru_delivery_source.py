@@ -13,6 +13,28 @@ def materialize_delivery(html, url):
     if not selected.path.startswith(("/distance/programs/", "/programs/catalogue/")):
         return html
     soup = BeautifulSoup(html, "html.parser")
+    # The current catalogue template owns a single adjacent highlights panel.
+    # Bring only its selected-course facts into the main evidence region.
+    main = soup.select("main.program-transition-main")
+    highlights = soup.select("aside.transition-highlights")
+    if len(main) == len(highlights) == 1 and len(main[0].find_all("h1")) == 1:
+        panel = highlights[0]
+        blocks = [b for b in panel.select(".side-cell-fullwidth")
+                  if b.find("h4") and b.find("h4").get_text(" ", strip=True) == "Program Details"]
+        if len(blocks) == 1 and len(str(blocks[0])) < 12000:
+            block = blocks[0]
+            credential = block.find("dt", string=re.compile(r"^\s*Credential\s*$", re.I))
+            value = credential.find_next_sibling("dd") if credential else None
+            key = lambda text: " ".join(re.findall(r"\w+", text.casefold()))
+            heading = key(main[0].find("h1").get_text(" ", strip=True))
+            award = key(value.get_text(" ", strip=True)) if value else ""
+            labels = [n.get_text(" ", strip=True) for n in block.find_all("dt")]
+            if award and heading in {award, re.sub(r" general program$", "", award)} and "Delivery" in labels:
+                # Preserve the scope marker but exclude other sidebar sections.
+                owned = soup.new_tag("aside", attrs={"class": "transition-highlights"})
+                owned.append(block.extract())
+                main[0].append(owned)
+                return str(soup)
     records = []
     for script in soup.find_all("script"):
         text = script.get_text()
