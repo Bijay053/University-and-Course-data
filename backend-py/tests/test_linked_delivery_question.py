@@ -104,3 +104,17 @@ async def test_official_reader_retains_citable_selected_delivery():
     assert result["_onlineExclusion"]["state"] == "checked"
     assert result["_onlineExclusionSchema"] == 3
     assert quote_in_source(result["_onlineExclusion"]["quote"], result)
+
+
+@pytest.mark.asyncio
+async def test_read_only_tru_directory_alias_checks_supplied_static_page(monkeypatch):
+    from datetime import datetime, timezone
+    stored = {**ROW, "url": URL[:-5] + "/"}
+    check = AsyncMock(return_value=("Delivery Online", "checked"))
+    monkeypatch.setattr("app.services.assistant_online_exclusion.check", check)
+    service = SimpleNamespace(now=lambda: datetime.now(timezone.utc), save_research_reply=AsyncMock())
+    assert await handle_linked_delivery_question(service, "t", "turn", "run",
+                                                {"samples": [stored], "home": "https://www.tru.ca"}, PROMPT)
+    assert check.await_args.args[-2]["url"] == URL
+    assert stored["url"].endswith("/")
+    assert service.save_research_reply.await_args.args[-1]["actions"] == []

@@ -20,6 +20,24 @@ async def handle_linked_delivery_question(service, thread_id, turn_id, run_id, c
         return False
     from app.services.assistant_online_exclusion import selection, check
     rows = selection(prompt, ctx["samples"])
+    if not rows:
+        # TRU publishes directory and .html forms of the same exact route.
+        # This is only a read-only lookup: verify the supplied page against
+        # the saved course name, and never change its URL or exclusion scope.
+        urls = re.findall(r"https?://[^\s<>]+", prompt)
+        for supplied in urls:
+            supplied = supplied.rstrip(".,);")
+            target = urlsplit(supplied)
+            if target.hostname not in {"www.tru.ca", "tru.ca"} or target.query:
+                continue
+            for row in ctx["samples"]:
+                stored = urlsplit(row["url"])
+                path = lambda p: re.sub(r"\.html$", "", p.rstrip("/"))
+                if (target.scheme == stored.scheme == "https"
+                        and target.hostname == stored.hostname and not stored.query
+                        and target.path.startswith(("/distance/programs/", "/programs/catalogue/"))
+                        and path(target.path) == path(stored.path)):
+                    rows.append({**row, "url": supplied})
     sources = []
     lines = []
     for row in rows[:12]:
