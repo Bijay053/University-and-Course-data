@@ -624,6 +624,24 @@ async def test_confirm_reuses_guarded_fix_once_and_reports_persisted_completion(
 
 
 @pytest.mark.asyncio
+async def test_stale_document_preview_is_retired_on_reload_and_cannot_execute(store):
+    action = {"id":"old-document","kind":"document_update","state":"proposed",
+              "_turnId":"old-turn","courseCount":45,"fields":["ielts_overall"]}
+    async with store() as db:
+        db.add(ScrapeAssistantThread(id="doc-history",job_id="source",actor_id=7,turn_id="new-turn",
+            status="ready",messages=[{"role":"assistant","turnId":"old-turn","content":"Old preview",
+                                     "actions":[action]}]))
+        await db.commit()
+        before = service.row_version(await db.get(ScrapedCourse,1))
+        result = await get_assistant("source",db,{"id":7})
+        assert result["messages"][-1]["actions"][0]["state"] == "superseded"
+        assert service.row_version(await db.get(ScrapedCourse,1)) == before
+        with pytest.raises(HTTPException,match="earlier request") as error:
+            await confirm_action("source","old-document",ConfirmBody(confirm=True),db,{"id":7})
+        assert error.value.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_approval_after_investigation_blocks_old_action(store):
     async with store() as db:
         action = await propose(db)

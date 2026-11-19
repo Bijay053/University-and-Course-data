@@ -94,6 +94,20 @@ def prepare(reply, request, settings, actor_id):
             action.update(requiresConfirmation=False, automaticPending=True)
 
 
+def supersede_document_previews(messages, current_turn):
+    """A document writer cannot accept another turn's saved proposal."""
+    changed = False
+    for message in messages:
+        for action in message.get("actions", []):
+            if (action.get("kind") == "document_update" and action.get("state") == "proposed"
+                    and action.get("_turnId") and action["_turnId"] != current_turn):
+                action.update(state="superseded", resultSummary=(
+                    "Earlier document proposal was not applied. A newer request replaced "
+                    "this preview; use the latest document check and its results."))
+                changed = True
+    return changed
+
+
 async def supersede_changed_merges(service, db, messages):
     """Retire old previews, never replay them or claim another action's success."""
     pending = []

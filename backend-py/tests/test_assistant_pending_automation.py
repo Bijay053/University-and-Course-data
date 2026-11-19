@@ -76,6 +76,19 @@ def test_document_updates_require_existing_applicability_validation_and_pending_
     assert not policy.supported(action)
 
 
+def test_new_document_request_retires_old_run_buttons_without_executing_them():
+    old = {"kind":"document_update","state":"proposed","_turnId":"old"}
+    current = {"kind":"document_update","state":"proposed","_turnId":"current"}
+    finished = {"kind":"document_update","state":"completed","_turnId":"old"}
+    other = {"kind":"fix_fields","state":"proposed","_turnId":"old"}
+    messages = [{"actions":[old,finished,other]},{"actions":[current]}]
+    assert policy.supersede_document_previews(messages,"current")
+    assert old["state"] == "superseded" and "not applied" in old["resultSummary"]
+    assert current["state"] == "proposed"
+    assert finished["state"] == "completed" and other["state"] == "proposed"
+    assert not policy.supersede_document_previews(messages,"current")
+
+
 def test_html_document_updates_require_the_current_matching_version():
     action = {"kind": "document_update", "state": "proposed", "courseCount": 1,
               "_sourceType": "html", "_applicabilityVersion": 1,

@@ -174,8 +174,9 @@ async def response(thread, db, job_id=None):
     # Full durable history is retained; only the recent action window is live.
     prefix = list(thread.messages[:-LIVE_MESSAGE_LIMIT])
     messages = deepcopy(thread.messages[-LIVE_MESSAGE_LIMIT:])
-    from app.services.assistant_pending_automation import supersede_changed_merges
-    changed = await supersede_changed_merges(service, db, messages)
+    from app.services.assistant_pending_automation import supersede_changed_merges, supersede_document_previews
+    changed = supersede_document_previews(messages, thread.turn_id)
+    changed = (await supersede_changed_merges(service, db, messages)) or changed
     for message in messages:
         for action in message.get("actions", []):
             if action["kind"] == "runtime_tuning" and action["state"] == "running":
@@ -529,6 +530,8 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
     action = next((a for m in messages[-LIVE_MESSAGE_LIMIT:] for a in m.get("actions", []) if a["id"] == action_id), None)
     if action is None:
         raise HTTPException(404, "Proposed action not found.")
+    if action["kind"] == "document_update" and action.get("_turnId") != thread.turn_id:
+        raise HTTPException(409, "Document preview belongs to an earlier request.")
     if action["kind"] == "retry_failed":
         if action.get("_turnId") != thread.turn_id or action.get("_sourceId") != job_id:
             raise HTTPException(409, "This retry proposal belongs to an older request.")

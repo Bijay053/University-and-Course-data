@@ -103,7 +103,8 @@ async def handle(service, ids, thread, message, references):
               "and verified component requirements are separate. ")
     if url and scope_all and intent != "status":
         from app.services.assistant_document_review import review
-        options = ({"_verificationPreview": True} if intent == "verify_all"
+        from app.services.scrape_assistant_autorun import execution_requested
+        options = ({"_verificationPreview": not execution_requested(message["content"])} if intent == "verify_all"
                    else {"_readOnlyGuidanceContext": prefix})
         await review(*ids, thread, {**message, "content": f"Check IELTS applicability for this review using {url}",
                                     "_guidanceSource": url, **options})
