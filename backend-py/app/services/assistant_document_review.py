@@ -114,7 +114,7 @@ async def review(thread_id, turn_id, run_id, thread, message):
         ).order_by(ScrapedCourse.id))).scalars().all()
     if len(rows) > 2000:
         raise ValueError("More than 2000 pending rows; split the provider review before checking this document.")
-    if message.get("_documentToken"):
+    if message.get("_documentToken") and not message.get("_guidanceSource"):
         source = await read_uploaded(message["_documentToken"], thread.actor_id, thread.job_id)
     else:
         urls = service.requested_course_urls(prompt, [message], ctx["home"])
@@ -126,7 +126,7 @@ async def review(thread_id, turn_id, run_id, thread, message):
         configured = configured_english_urls(ctx["home"], ctx.get("config"))
         # The reviewer-supplied official page takes precedence over unrelated
         # configured guidance, even when it is HTML rather than a PDF.
-        url = url or next(iter(urls), None) or next(iter(configured), None)
+        url = message.get("_guidanceSource") or url or next(iter(urls), None) or next(iter(configured), None)
         if not url:
             raise ValueError("Provide an official English guidance page or PDF URL; no configured guidance is available.")
         async def read_guidance(target):
@@ -374,6 +374,15 @@ async def review(thread_id, turn_id, run_id, thread, message):
         reply["documentReview"]["checked"] = 0
     elif source.get("provenance") == "staff-uploaded-document":
         reply["content"] += " This is a staff-uploaded copy; its official provenance has not been independently authenticated."
+    if message.get("_readOnlyGuidanceContext"):
+        reply["actions"] = []
+        reply["content"] = (
+            message["_readOnlyGuidanceContext"] + f"Checked official guidance: {source['url']}. "
+            + reply["content"].replace("Review the proposed changes and confirm the batch.", "")
+            + " This was a read-only comparison. No correction was queued."
+        )
+        reply["sources"] = [{"url": source["url"], "title": source.get("title") or "Official guidance",
+                             "excerpt": source.get("text", "")[:500]}]
     await service.save_research_reply(thread_id, turn_id, run_id, reply,
                                      detail=f"{len(targets)} proposals; 0 course updates applied.",
                                      phase=("Document review partial — some courses unchecked" if not_checked

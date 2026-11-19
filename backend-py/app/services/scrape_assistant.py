@@ -305,6 +305,12 @@ async def investigate(thread_id: str, turn_id: str):
             # the same preview/acknowledgement contract, including legacy users.
             from app.services.live_scrape_diagnostics import handle as live_diagnostics
             from app.services import scrape_assistant as service
+            from app.services import assistant_english_guidance_followup as english_followup
+            if english_followup.kind(requested["content"]):
+                research_deadline.reschedule(asyncio.get_running_loop().time() + 1800)
+                if await english_followup.handle(service, (thread_id, turn_id, run_id),
+                                                 claimed_thread, requested, conversation_references):
+                    return
             from app.services.assistant_online_exclusion import intent as online_exclusion_intent
             online_request = online_exclusion_intent(requested["content"], conversation_messages)
             if online_request:
