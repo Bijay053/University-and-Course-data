@@ -3,6 +3,55 @@ import re
 from urllib.parse import urlsplit
 
 
+def linked_delivery_question(prompt):
+    instruction = re.sub(r"https?://\S+", "", prompt)
+    return bool(
+        re.search(r"https?://\S+", prompt)
+        and re.search(r"\b(?:online|distance|delivery|study mode)\b", instruction, re.I)
+        and re.search(r"\bwhy\b", instruction, re.I)
+        and re.search(r"\b(?:rejected|excluded|removed|pending|listed)\b", instruction, re.I)
+        and not re.search(r"\b(?:database[- ]only|stored values only|do not fetch)\b", instruction, re.I)
+    )
+
+
+async def handle_linked_delivery_question(service, thread_id, turn_id, run_id, ctx, prompt):
+    """A course URL is a selector, not authority to reject or import a course."""
+    if not linked_delivery_question(prompt):
+        return False
+    from app.services.assistant_online_exclusion import selection, check
+    rows = selection(prompt, ctx["samples"])
+    sources = []
+    lines = []
+    for row in rows[:12]:
+        try:
+            quote, state = await check(service, thread_id, turn_id, run_id, row, ctx["home"])
+        except (ValueError, TimeoutError, OSError):
+            quote, state = None, "unavailable"
+        if quote and state == "checked":
+            sources.append({"url": row["url"], "title": row["name"], "excerpt": quote})
+            lines.append(f"{row['name']}: verified course-owned online-only delivery. Evidence: {quote}")
+        else:
+            lines.append(f"{row['name']}: {state}. Online-only exclusion was not established"
+                         + (f": {quote}" if quote else "."))
+    if len(rows) > 12:
+        lines.append(f"{len(rows) - 12} matching records were not checked in this bounded investigation.")
+    if not rows:
+        lines.append("The supplied URL did not match an existing pending course in this review. "
+                     "No previous action or unrelated record was used, and no course was imported.")
+    lines.append(
+        "Online-only delivery does not by itself prove a scraper failure. The default policy "
+        "keeps these courses pending with eligibility warnings, rather than rejecting them. "
+        "Any university-specific exclusion instruction must be handled separately. "
+        "This question did not authorise changing that policy or rejecting records. "
+        "No course records were changed, approved or published."
+    )
+    await service.save_research_reply(thread_id, turn_id, run_id, {
+        "role": "assistant", "turnId": turn_id, "createdAt": service.now().isoformat(),
+        "content": "\n\n".join(lines), "sources": sources, "actions": [],
+    }, detail="Linked course delivery checked; no record or policy changes.")
+    return True
+
+
 def pending_delivery_question(prompt):
     """A queue complaint is a new review-wide subject, not a stale URL's edit."""
     instruction = re.sub(r"https?://\S+", "", prompt)

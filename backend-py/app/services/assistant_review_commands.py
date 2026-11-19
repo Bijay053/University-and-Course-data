@@ -35,6 +35,9 @@ async def saved_ielts_status(service, thread_id, turn_id, run_id, ctx, prompt):
 
 
 async def handle_read_or_rule(service, thread_id, turn_id, run_id, ctx, prompt, messages):
+    from app.services.assistant_delivery_review import handle_linked_delivery_question
+    if await handle_linked_delivery_question(service, thread_id, turn_id, run_id, ctx, prompt):
+        return True
     if await saved_ielts_status(service, thread_id, turn_id, run_id, ctx, prompt):
         return True
     from app.services.assistant_staff_locations import handle as staff_locations
@@ -136,12 +139,17 @@ async def handle_read_or_rule(service, thread_id, turn_id, run_id, ctx, prompt, 
             ).order_by(ScrapedCourse.id))).scalars().all()
         numbers = set(int(n) for n in re.findall(r"\b(?:row|record)\s*#?\s*(\d+)\b", prompt, re.I))
         selected = [r for r in rows if r.id in numbers or r.course_name.casefold() in prompt.casefold()]
-        if not selected and re.search(r"\b(this|it|that)\b", prompt, re.I):
+        urls = re.findall(r"https?://[^\s<>]+", prompt)
+        if urls:
+            from app.services.assistant_source_gate import same_course_url
+            selected = [r for r in rows if any(
+                same_course_url(r.course_website or "", url.rstrip(".,);")) for url in urls)]
+        if not selected and not urls and re.search(r"\b(this|it|that)\b", prompt, re.I):
             prior = next((a for m in reversed(messages[:-1]) for a in reversed(m.get("actions", []))
                           if a.get("kind") in {"exclude_domestic", "exclude_online"}), None)
             ids = {r["id"] for r in (prior or {}).get("_undo", [])}
             selected = [r for r in rows if r.id in ids]
-        if numbers and not selected:
+        if (numbers or urls) and not selected:
             content = "No matching row belongs to this university's scrape review. No website was fetched."
         elif selected:
             content = "\n".join(f"- Row {r.id}: {r.course_name} — {r.status}"

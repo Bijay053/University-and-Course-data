@@ -67,6 +67,21 @@ async def test_status_uses_database_not_university_website(store):
 
 
 @pytest.mark.asyncio
+async def test_status_url_identifies_record_without_row_number(store):
+    await seed_thread(store)
+    ctx = await snapshot(store)
+    ctx["job"] = {"id": "source"}
+    url = ctx["samples"][0]["url"]
+    assert await handle_read_or_rule(service, "eligibility", "turn", "owner", ctx,
+                                    f"{url}#fees is this rejected?", [])
+    async with store() as db:
+        t = await db.get(ScrapeAssistantThread, "eligibility")
+        assert ctx["samples"][0]["name"] in t.messages[-1]["content"]
+        assert "could not identify" not in t.messages[-1]["content"]
+        assert not t.messages[-1]["actions"]
+
+
+@pytest.mark.asyncio
 async def test_standing_rule_persists_without_mutating_courses(store):
     await seed_thread(store)
     ctx = await snapshot(store)

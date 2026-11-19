@@ -1,9 +1,19 @@
 import pytest
 
-from app.services.assistant_online_exclusion import evidence, intent, selection
+from app.services.assistant_online_exclusion import SCHEMA, evidence, intent, selection, retention_only_proof
 
 URL = "https://www.aston.ac.uk/study/courses/hearing-therapy"
 NAME = "Hearing Therapy Professional Doctorate"
+
+
+@pytest.mark.parametrize("state,accepted", [
+    ("on_campus", True), ("mixed_mode", True), ("unverified", True), ("checked", False),
+])
+def test_schema_upgrade_reuses_only_non_destructive_holds(state, accepted):
+    source = {"_onlineExclusionSchema": 1, "_onlineExclusion": {"state": state}}
+    assert retention_only_proof(source, 2) is accepted
+    assert not retention_only_proof(source)
+    assert not retention_only_proof(source, 3)
 
 
 def page(details="", label="Online learning"):
@@ -66,6 +76,33 @@ def test_hearing_therapy_five_required_campus_days_are_not_online_only():
     assert not proof.get("quote")
 
 
+@pytest.mark.parametrize("body", [
+    "There are five days in which you are required to attend live teaching "
+    "(on-campus), and dates for these are released in advance.",
+    "Please note – there is a two-day in-person attendance requirement as part "
+    "of the Introduction to Healthcare and Professional Practice module.",
+])
+@pytest.mark.parametrize("container", ["article", "main"])
+def test_live_campus_exceptions_in_a_separate_cms_content_container(body, container):
+    html = (page().replace("<main>", "<article>").replace("</main>", "</article>")
+            + f'<{container}><section id="how-you-will-learn"><p><strong>{body}</strong></p>'
+              f'</section></{container}>')
+    proof = evidence(html, URL)
+    assert proof["state"] == "mixed_mode"
+    assert body == proof["campusQuote"]
+    assert not proof.get("quote")
+
+
+def test_optional_or_unclear_earlier_attendance_does_not_hide_a_later_requirement():
+    html = page("<p>Attending sessions in person is encouraged where possible.</p>"
+                "<p>Some modules have in-person sessions that you are recommended to join.</p>"
+                "<p>There is a two-day in-person attendance requirement as part of the "
+                "Introduction to Healthcare and Professional Practice module.</p>")
+    proof = evidence(html, URL)
+    assert proof["state"] == "mixed_mode"
+    assert "two-day" in proof["campusQuote"]
+
+
 @pytest.mark.parametrize("details,state", [
     ("<p>All teaching is delivered online.</p>", "checked"),
     ("<p>You may attend optional on-campus workshops.</p>", "checked"),
@@ -114,7 +151,7 @@ async def test_old_flattened_or_wrong_course_sources_cannot_be_used(monkeypatch)
     from app.services import assistant_source_cache
     from app.services.assistant_online_exclusion import check
     async def source(*args, **kwargs):
-        assert kwargs["online_exclusion_schema"] == 1
+        assert kwargs["online_exclusion_schema"] == SCHEMA
         return {"verified": True, "sourceType": "html", "_onlineExclusion": {
             "state": "checked", "name": "Different Award", "quote": "Delivery: Online"}}
     monkeypatch.setattr(assistant_source_cache, "cached_source", source)
@@ -134,7 +171,7 @@ async def test_selected_dated_title_alias_never_erases_a_different_intake_or_mod
     url = "https://www.aston.ac.uk/study/courses/data-science/january-2027"
     async def source(*args, **kwargs):
         return {"url": url, "verified": True, "sourceType": "html", "text": "Delivery: Online",
-                "_onlineExclusionSchema": 1, "_onlineExclusion": {
+                "_onlineExclusionSchema": SCHEMA, "_onlineExclusion": {
                     "state": "checked", "name": "Data Science MSc", "quote": "Delivery: Online"}}
     monkeypatch.setattr(assistant_source_cache, "cached_source", source)
     result = await check(None, "thread", "turn", "run", {"url": url, "name": name},

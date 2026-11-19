@@ -202,12 +202,16 @@ async def test_online_exclusion_has_working_fenced_undo(store):
 
 
 @pytest.mark.asyncio
-async def test_online_raw_dom_capability_refresh_does_not_invalidate_unrelated_research(store):
+@pytest.mark.parametrize("old_state", [None, "on_campus", "checked"])
+@pytest.mark.parametrize("schema", [2, 3])
+async def test_online_raw_dom_capability_refresh_does_not_invalidate_unrelated_research(store, old_state, schema):
     from app.services.assistant_source_cache import cached_source
     ctx = await setup(store, count=1)
     url = ctx["samples"][0]["url"]
     old = {"url": url, "sourceType": "html", "verified": True, "text": "Stored source text",
            "_sourceScopeVersion": 2, "_ieltsFactsVersion": 2}
+    if old_state:
+        old.update(_onlineExclusionSchema=1, _onlineExclusion={"state": old_state})
     async with store() as db:
         thread = await db.get(ScrapeAssistantThread, "eligibility")
         thread.messages = [dict(thread.messages[0], _sourceChecks={url: old})]
@@ -215,11 +219,11 @@ async def test_online_raw_dom_capability_refresh_does_not_invalidate_unrelated_r
     calls = []
     async def inspect(url, home):
         calls.append(url)
-        return {**old, "_onlineExclusionSchema": 1,
+        return {**old, "_onlineExclusionSchema": schema,
                 "_onlineExclusion": {"state": "checked", "name": "BSc Music Technology",
                                      "quote": "Delivery: Online"}}
     await cached_source(service, "eligibility", "turn", "owner", url, ctx["home"], inspect, 12)
     assert calls == []
     await cached_source(service, "eligibility", "turn", "owner", url, ctx["home"], inspect, 12,
-                        online_exclusion_schema=1)
-    assert calls == [url]
+                        online_exclusion_schema=schema)
+    assert calls == ([] if old_state == "on_campus" and schema == 2 else [url])

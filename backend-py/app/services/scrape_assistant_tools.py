@@ -227,6 +227,8 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
         if b"\x00" in raw[:500]:
             raise ValueError("This research tool needs a readable HTML page, not a binary document.")
         html = raw.decode("utf-8", errors="replace")
+        from app.services.tru_delivery_source import materialize_delivery
+        html = materialize_delivery(html, url)
         from app.services.scraper.extractors.fee import extract as extract_fee
         from app.services.scraper.extractors.english_test import extract as extract_english
         soup = BeautifulSoup(html, "html.parser")

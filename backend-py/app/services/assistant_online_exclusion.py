@@ -4,10 +4,17 @@ from urllib.parse import parse_qs, urlsplit
 
 from bs4 import BeautifulSoup
 
-SCHEMA = 1
+SCHEMA = 3
 _COMMAND = re.compile(r"\b(?:reject|exclude|remove)\b.{0,70}\bonline(?:[- ]only)?\b"
                       r"|\bonline[- ]only\b.{0,50}\b(?:reject|exclude|remove)\b", re.I)
 _FOLLOWUP = re.compile(r"^\s*(?:please\s+)?(?:do it|go ahead|yes|proceed|run it)[.!]?\s*$", re.I)
+
+
+def retention_only_proof(source, requested_schema=SCHEMA):
+    """The attendance-veto upgrade cannot turn an old hold into an exclusion."""
+    return (requested_schema == 2 and source.get("_onlineExclusionSchema") == 1
+            and (source.get("_onlineExclusion") or {}).get("state")
+            in {"on_campus", "mixed_mode", "unverified"})
 
 
 def intent(prompt, messages=()):
@@ -60,14 +67,16 @@ def selection(prompt, samples):
     }
     if selected_ids:
         return [row for row in samples if row["id"] in selected_ids]
+    urls = re.findall(r"https?://[^\s<>]+", positive)
+    if urls:
+        from app.services.assistant_source_gate import same_course_url
+        return [row for row in samples if any(
+            same_course_url(row["url"], url.rstrip(".,);"))
+            for url in urls)]
     key = lambda value: " ".join(re.findall(r"\w+", value.casefold()))
     rows = [row for row in samples if f" {key(row['name'])} " in f" {key(positive)} "]
     if rows:
         return rows
-    urls = re.findall(r"https?://[^\s)]+", positive)
-    if urls:
-        return [row for row in samples if row["url"].rstrip("/") in
-                {url.rstrip("/.,") for url in urls}]
     # An unmatched singular course name must never expand into a whole review.
     return samples if re.search(r"\b(?:courses|records|rows|all|every)\b", positive, re.I) else []
 
@@ -85,19 +94,28 @@ def evidence(html, url):
         "script,style,noscript,nav,footer,[role='navigation'],[class*='related'],[class*='recommend']"
     )):
         node.decompose()
-    headings = soup.find_all("h1")
+    headings = [h for h in soup.find_all("h1") if h.get_text(strip=True)]
     if len(headings) != 1:
         return {"state": "unverified", "reason": "A unique course heading was not verified."}
     name = headings[0].get_text(" ", strip=True)
-    root = soup.find("main") or soup.find("article")
-    if root is None:
+    roots = soup.find_all(["main", "article"])
+    if not roots:
         return {"state": "unverified", "name": name, "reason": "Course-owned main content was not verified."}
+    # Some CMSs split the hero and teaching details into sibling articles.
+    # Positive labels stay tied to the course heading; attendance vetoes must
+    # cover every course-content container, not just the first article.
+    root = headings[0].find_parent(["main", "article"])
+    content_nodes = [n for n in soup.find_all(["p", "dt", "li", "dd"])
+                     if n.find_parent(["main", "article"]) is not None]
     primary = course_header_delivery(html)
     labelled = []
     if primary and primary[0] is not None:
         labelled.append(primary)
     else:
         label_root = soup.select_one(".course-page-header-wrapper") or root
+        if label_root is None:
+            return {"state": "unverified", "name": name,
+                    "reason": "Delivery labels were not associated with the course heading."}
         for node in label_root.find_all(["p", "dt"]):
             if any("hidden" in parent.attrs or parent.get("aria-hidden") == "true"
                    or re.search(r"display\s*:\s*none|visibility\s*:\s*hidden", parent.get("style", ""), re.I)
@@ -125,7 +143,7 @@ def evidence(html, url):
                 "deliveryQuote": labelled[0][1]}
     # A primary Online label must not hide an international/campus panel or
     # another course option. Ambiguous audience/option applicability is a hold.
-    for node in root.find_all(["p", "dt"]):
+    for node in (n for n in content_nodes if n.name in {"p", "dt"}):
         text = node.get_text(" ", strip=True)
         if node.name == "dt" and node.find_next_sibling("dd"):
             text += " " + node.find_next_sibling("dd").get_text(" ", strip=True)
@@ -138,24 +156,31 @@ def evidence(html, url):
                     "deliveryQuote": labelled[0][1], "campusQuote": text}
     # Retain mandatory attendance even inside a collapsed course accordion.
     # Optional visits, admissions interviews and navigation are not teaching.
-    for node in root.find_all(["p", "li", "dd"]):
+    uncertain_attendance = None
+    for node in (n for n in content_nodes if n.name in {"p", "li", "dd"}):
         for sentence in re.split(r"(?<=[.!?])\s+", node.get_text(" ", strip=True)):
             if len(sentence) > 1800 or re.search(r"\b(?:not required|not compulsory|no requirement|no mandatory)\b",
                                                 sentence, re.I):
                 continue
             campus = re.search(r"\b(?:on[- ]campus|in[- ]person|face[- ]to[- ]face)\b", sentence, re.I)
-            required = re.search(r"\b(?:required|must|mandatory|compulsory)\b", sentence, re.I)
+            required = re.search(r"\b(?:required|requirements?|must|mandatory|compulsory)\b", sentence, re.I)
             teaching = re.search(r"\b(?:teaching|taught|classes|sessions|residency|workshops|lectures)\b",
                                  sentence, re.I)
+            if (not teaching and re.search(r"\battendance\b", sentence, re.I)
+                    and re.search(r"\bmodules?\b", sentence, re.I)
+                    and not re.search(r"\b(?:interviews?|admissions?|applications?)\b", sentence, re.I)):
+                teaching = True
             if campus and required and teaching:
                 return {"state": "mixed_mode", "name": name,
                         "reason": "Required in-person teaching prevents online-only exclusion.",
                         "deliveryQuote": labelled[0][1], "campusQuote": sentence}
             if (campus and teaching
                     and not re.search(r"\b(?:optional|may|can choose|not required)\b", sentence, re.I)):
-                return {"state": "unverified", "name": name,
-                        "reason": "Campus teaching is mentioned but its applicability is unclear.",
-                        "deliveryQuote": labelled[0][1], "campusQuote": sentence}
+                uncertain_attendance = sentence
+    if uncertain_attendance:
+        return {"state": "unverified", "name": name,
+                "reason": "Campus teaching is mentioned but its applicability is unclear.",
+                "deliveryQuote": labelled[0][1], "campusQuote": uncertain_attendance}
     return {"state": "checked", "name": name, "quote": labelled[0][1],
             "reason": "Course-owned delivery is Online; no compulsory campus teaching was established."}
 
@@ -170,7 +195,7 @@ async def check(service, thread_id, turn_id, run_id, row, home):
                                  inspect_source, 12, online_exclusion_schema=SCHEMA)
     if not source.get("verified") or source.get("sourceType") != "html":
         return None, "unavailable"
-    if (source.get("_onlineExclusionSchema") != SCHEMA
+    if ((source.get("_onlineExclusionSchema") != SCHEMA and not retention_only_proof(source))
             or not same_course_url(url, source.get("url"))):
         return None, "unverified"
     proof = source.get("_onlineExclusion") or {}

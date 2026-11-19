@@ -312,6 +312,12 @@ async def investigate(thread_id: str, turn_id: str):
                                                  claimed_thread, requested, conversation_references):
                     return
             from app.services.assistant_online_exclusion import intent as online_exclusion_intent
+            from app.services.assistant_delivery_review import linked_delivery_question, handle_linked_delivery_question
+            if linked_delivery_question(requested["content"]):
+                ctx = await context(claimed_thread.job_id)
+                if await handle_linked_delivery_question(
+                        service, thread_id, turn_id, run_id, ctx, requested["content"]):
+                    return
             online_request = online_exclusion_intent(requested["content"], conversation_messages)
             if online_request:
                 from app.services import assistant_eligibility
