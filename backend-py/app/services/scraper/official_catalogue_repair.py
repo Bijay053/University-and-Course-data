@@ -453,6 +453,35 @@ async def discover_official_catalogue(evidence, *, source_url: str | None = None
     result = {"source": None, "candidates": [], "sample": [],
               "source_failures": source_failures}
     if partial_candidates:
+        # A paginated finder is not a complete catalogue. Before giving up,
+        # try one sitemap explicitly published by the university. Keep this
+        # within Evidence's existing page/time/transport limits and never
+        # recurse from an explicit source replay (including fresh validation).
+        if source_url is None:
+            robots_url = urljoin(seed, "/robots.txt")
+            robots = await evidence.fetch(robots_url)
+            if robots.get("classification") == "robots":
+                declared = next((
+                    link["url"] for link in robots.get("links", [])
+                    if isinstance(link, dict) and isinstance(link.get("url"), str)
+                    and official_url(link["url"], seed, evidence.extra_hosts)
+                    and urlsplit(link["url"]).path.lower().endswith(".xml")
+                    and link["url"] not in sources
+                ), None)
+                if declared:
+                    fallback = await discover_official_catalogue(evidence, source_url=declared)
+                    if fallback.get("source"):
+                        # Reserve live calls for independent course proof and
+                        # the fresh replay; sitemap URLs alone authorize no write.
+                        fallback["sample"] = fallback.get("sample", [])[:2]
+                        fallback["sample_alternatives"] = []
+                        return fallback
+                    source_failures.extend(fallback.get("source_failures", []))
+            else:
+                source_failures.append({
+                    "url": robots_url, "classification": robots.get("classification", "unconfirmed"),
+                    "reason": robots.get("reason") or "Official sitemap declarations unavailable",
+                })
         result.update(
             partial_sources=partial_sources,
             partial_candidates=list(partial_candidates),

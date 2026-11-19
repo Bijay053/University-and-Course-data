@@ -65,7 +65,7 @@ async def test_repair_follows_published_catalogue_but_never_certifies_partial_re
     calls = []
     async def fetch(url):
         calls.append(url)
-        if url == HOME + "/sitemap.xml":
+        if url in {HOME + "/sitemap.xml", HOME + "/robots.txt"}:
             return {"classification": "network_failure", "reason": "TimeoutError"}
         if url == HOME:
             return {"classification": "unconfirmed", "html": '<a href="/courses">Find courses</a>'}
@@ -76,7 +76,8 @@ async def test_repair_follows_published_catalogue_but_never_certifies_partial_re
         extra_hosts=(), fetch=fetch, fetch_seconds=20, max_pages=12,
     )
     result = await discover_official_catalogue(evidence)
-    assert calls == [HOME + "/sitemap.xml", HOME, HOME + "/courses"]
+    assert calls == [HOME + "/sitemap.xml", HOME, HOME + "/courses"] + (
+        [HOME + "/robots.txt"] if pagination else [])
     assert len(result["sample"]) == 2
     if pagination:
         assert result["source"] is None
