@@ -15,6 +15,15 @@ from app.services.english_html_tables import APPLICABILITY_VERSION as HTML_APPLI
 BANDS = ("ielts_overall", "ielts_reading", "ielts_writing", "ielts_listening", "ielts_speaking")
 
 
+def contains_ielts_requirements(source):
+    """Do not send fee-only or unrelated documents through course IELTS matching."""
+    texts = [source.get("_fullText") or source.get("text") or ""]
+    texts.extend(page.get("text", "") for page in source.get("_pages", [])
+                 if isinstance(page, dict))
+    return any(re.search(r"\bIELTS\b|\bInternational English Language Testing System\b",
+                         text, re.I) for text in texts)
+
+
 def requested(message):
     content = message["content"]
     # An attachment is context, not an instruction to run the IELTS workflow.
@@ -189,6 +198,27 @@ async def review(thread_id, turn_id, run_id, thread, message):
         }, detail=f"0 courses checked; {len(rows)} not checked; 0 updates.",
            phase="Source access blocked — 0 courses updated" if blocked
                  else "Document unreadable — 0 courses updated")
+        return
+    if not contains_ielts_requirements(source):
+        from app.services.document_review_summary import summarize
+        results = [{"id": row.id, "name": row.course_name, "status": "not_checked",
+                    "reason": "The supplied document contains no IELTS requirements.",
+                    "changes": [], "applicability": "unverified"} for row in rows]
+        await service.save_research_reply(thread_id, turn_id, run_id, {
+            "role": "assistant", "turnId": turn_id, "createdAt": service.now().isoformat(),
+            "content": (
+                "The supplied document was read, but it contains no IELTS requirements. "
+                "It cannot support IELTS changes. No course matching or correction was run; "
+                f"all {len(rows)} selected records remain unchanged. "
+                "Tuition information must be checked through the fee-repair workflow, "
+                "not treated as English-language evidence."
+            ),
+            "actions": [], "sourceOutcome": "no_ielts_requirements",
+            "sources": [{"url": source.get("url"), "title": source.get("title") or "Document",
+                         "excerpt": source.get("text", "")[:500]}],
+            "documentReview": {**summarize(results), "rows": results},
+        }, detail="Source read; no IELTS matching or updates attempted.",
+           phase="Document read — no IELTS requirements")
         return
     results, targets, diagnostics = [], [], []
     client = None

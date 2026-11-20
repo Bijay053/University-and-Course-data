@@ -39,12 +39,30 @@ def _main(html):
 
 async def prefetch_sources(fetch):
     """Preload the official fee, programme and linked English profiles."""
+    from . import cardiffmet_fee_schedule as schedule
     async def read(url):
         try:
             return url, await asyncio.wait_for(fetch(url), timeout=20)
         except Exception:
             return url, ""
-    return dict(await asyncio.gather(*(read(url) for url in (FEES, PGCE, ENGLISH, SELT))))
+    async def published_fees():
+        result = {}
+        try:
+            # Additional schedule reads share the existing 20-second preload
+            # ceiling; unrelated guidance cannot extend course deadlines.
+            async with asyncio.timeout(20):
+                url, html = await read(schedule.INDEX)
+                result.update(await schedule.prefetch(fetch, html))
+        except TimeoutError:
+            pass
+        return result
+    base, published = await asyncio.gather(
+        asyncio.gather(*(read(url) for url in (FEES, PGCE, ENGLISH, SELT))),
+        published_fees(),
+    )
+    sources = dict(base)
+    sources.update(published)
+    return sources
 
 
 def _write(payload, evidence, field, value, quote, source, method, *, replace=False):
@@ -244,12 +262,27 @@ def _apply_owned_english(main, title, location, url, payload, evidence):
                "english.cardiffmet_course_requirement", replace=True)
 
 
-def _apply_fee(title, location, payload, evidence, sources, referral=""):
+def _apply_fee(title, location, payload, evidence, sources, referral="", course_main=None):
     group = _fee_group(title)
     campus = _verified_location(location)
-    if not campus or not group or payload.get("international_fee") not in (None, "", 0):
+    mres = bool(re.search(r"\bMRes\b", title, re.I) and not re.search(
+        r"partner|executive|foundation", title, re.I))
+    if not campus or not (group or mres) or payload.get("international_fee") not in (None, "", 0):
         return
-    fee = _central_fee(sources.get(FEES, ""), group)
+    fee = _central_fee(sources.get(FEES, ""), group or "Postgraduate Masters Degree")
+    if course_main is not None:
+        from .cardiffmet_fee_schedule import select_fee
+        published = select_fee(sources, group or "MRes", course_main, fee)
+        if published:
+            amount, year, term, quote, source = published
+            for field, value in (("international_fee", amount), ("currency", "GBP"),
+                                 ("fee_year", year), ("fee_term", term)):
+                _write(payload, evidence, field, value, quote + "\nBasis source: " +
+                       FEES + "\n" + title + " — Location: " + location + referral,
+                       source, "fee.cardiffmet_published_schedule", replace=True)
+            return
+    if mres and not group:
+        return  # Generic masters prices alone never establish MRes applicability.
     if fee:
         amount, year, term, quote = fee
         for field, value in (("international_fee", amount), ("currency", "GBP"),
@@ -380,7 +413,7 @@ def apply_authority(html, url, payload, evidence, sources=None):
                    replace=True)
     location = facts.get("location", "")
     # A partner course can have different fees and admission requirements.
-    _apply_fee(title, location, payload, evidence, sources)
+    _apply_fee(title, location, payload, evidence, sources, course_main=main)
     _apply_owned_english(main, title, location, url, payload, evidence)
     _apply_linked_selt(main, title, location, url, payload, evidence, sources)
     # Child PGCE subjects explicitly refer readers to the shared Secondary
@@ -398,7 +431,7 @@ def apply_authority(html, url, payload, evidence, sources=None):
         return
     if not location:
         _apply_fee(title, _facts(parent).get("location", ""), payload, evidence,
-                   sources, "\nProgramme referral: " + PGCE)
+                   sources, "\nProgramme referral: " + PGCE, course_main=parent)
     pairs = []
     for p in parent.find_all("p"):
         text = " ".join(p.get_text(" ", strip=True).split())

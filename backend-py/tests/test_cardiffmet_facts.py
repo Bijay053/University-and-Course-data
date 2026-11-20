@@ -181,4 +181,8 @@ async def test_one_failed_source_does_not_discard_other_source():
     mock = AsyncMock(side_effect=fetch)
     result = await c.prefetch_sources(mock)
     assert result == {c.FEES: "", c.PGCE: PARENT, c.ENGLISH: PARENT, c.SELT: PARENT}
-    assert mock.await_count == 4
+    from app.services.scraper.extractors.cardiffmet_fee_schedule import INDEX
+    assert mock.await_count == 5
+    assert {call.args[0] for call in mock.await_args_list} == {
+        c.FEES, c.PGCE, c.ENGLISH, c.SELT, INDEX,
+    }
