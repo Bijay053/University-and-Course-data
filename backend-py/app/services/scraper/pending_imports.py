@@ -188,6 +188,11 @@ async def match_pending(db, row):
                       }), None)
         if match:
             matches[key] = match
+    if len({old.id for old in matches.values()}) != len(matches):
+        raise ValueError(
+            "One pending record matches multiple source offerings; review its "
+            "historical and current identities before importing."
+        )
     # The legacy within-job index omits award and campus. Supply an offering
     # scope for unsplit imports so distinct awards can coexist on one URL.
     row.fee_scope_key = sha256(repr(identity(row)).encode()).hexdigest()[:20]

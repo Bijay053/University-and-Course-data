@@ -399,3 +399,25 @@ async def test_current_exact_identity_reuses_a_corrected_year_without_losing_his
     async with sessions() as db:
         row = await db.get(ScrapedCourse, first.scraped_course_id)
         assert row.fee_year == 2027 and row.notes == "Reviewed correction"
+
+
+@pytest.mark.asyncio
+async def test_original_and_current_identity_cannot_collapse_two_source_offerings(store, monkeypatch):
+    from app.services.scraper import pending_imports as p
+    first = await stage(store, "first")
+    sessions, uid = store
+    async with sessions() as db:
+        existing = await db.get(ScrapedCourse, first.scraped_course_id)
+        original = ScrapedCourse(**{
+            c.key: deepcopy(getattr(existing, c.key))
+            for c in ScrapedCourse.__table__.columns if c.key not in {"id","created_at"}
+        })
+        existing.fee_year = 2027
+        await db.commit()
+        current = ScrapedCourse(**{
+            c.key: deepcopy(getattr(existing, c.key))
+            for c in ScrapedCourse.__table__.columns if c.key not in {"id","created_at"}
+        })
+        monkeypatch.setattr(p, "candidates", lambda _: {"old": original, "current": current})
+        with pytest.raises(ValueError, match="multiple source offerings"):
+            await p.match_pending(db, current)
