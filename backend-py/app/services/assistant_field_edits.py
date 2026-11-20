@@ -91,6 +91,23 @@ def existing_ielts_recheck(action):
     )
 
 
+def explicit_course_import(prompt, university_name=""):
+    """Course imports are not unsupported field edits on matching review rows."""
+    text = re.sub(r"https?://\S+", " ", prompt)
+    # Provider names are selectors, not field names or replacement values.
+    names = {university_name.strip(),
+             re.sub(r"\buniversity\b", "", university_name, flags=re.I).strip()}
+    for name in sorted(filter(None, names), key=len, reverse=True):
+        text = re.sub(r"(?<!\w)" + re.escape(name) + r"(?!\w)", " ", text, flags=re.I)
+    return bool(re.search(
+        r"\b(?:add|fetch|import|recover)\s+"
+        r"(?:(?:this|that|these|those|the|a|an|missing|new|requested|following|"
+        r"selected|specific|all|one|two|three|\d+)\s+)*"
+        r"(?:courses?|programmes?|programs?)\b",
+        text, re.I,
+    ))
+
+
 def edit_field(prompt):
     if re.search(r"\b(?:don't|do not|never)\s+(?:add|set|change|update|edit)\b", prompt, re.I):
         return None
@@ -163,7 +180,7 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
         # On an existing course, an unrecognised field must not become an
         # implicit add-course operation. Explicit add-course requests retain
         # their separate discovery path.
-        explicit_course = re.search(r"\badd\s+(?:this\s+)?course\b", prompt, re.I)
+        explicit_course = explicit_course_import(prompt, ctx.get("name", ""))
         from app.services.scrape_assistant_autorun import execution_requested
         if (rows and not explicit_course and execution_requested(prompt)
                 and re.search(r"\b(?:add|set|change|update|edit)\s+\w+", prompt, re.I)):
