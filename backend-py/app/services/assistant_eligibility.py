@@ -22,18 +22,39 @@ def requested(prompt):
 
 
 def scope(prompt, samples):
-    """A named example must not shrink an explicit request to check others."""
-    if re.search(r"\b(all|every|other|others|rest|these|those)\b", prompt, re.I):
-        return samples
-    ids = {int(value) for value in re.findall(r"\b(?:row|record)\s*#?\s*(\d+)\b", prompt, re.I)}
-    if ids:
-        return [r for r in samples if r["id"] in ids]
-    urls = re.findall(r"https://[^\s)]+", prompt)
-    if urls:
-        return [r for r in samples if (r["url"] or "").rstrip("/") in
-                {u.rstrip("/.,") for u in urls}]
+    """Resolve positive course scope without treating preservation as expansion."""
     normal = lambda s: " ".join(re.findall(r"\w+", s.casefold()))
-    return [r for r in samples if normal(r["name"]) in normal(prompt)]
+    preservation = re.compile(
+        r"\b(?:keep|leave|preserve)\b(?:(?![.;]\s)[^;\n])*?\b"
+        r"(?:unchanged|untouched|alone|as\s+is|as\s+they\s+are)\b"
+        r"|\b(?:do\s+not|don't|never|without)\s+"
+        r"(?:change|changing|update|updating|edit|editing|modify|modifying|affect|affecting)\b"
+        r".*?(?=[.;]\s|\n|$)", re.I,
+    )
+    protected_text = " ".join(m.group(0) for m in preservation.finditer(prompt))
+    positive = preservation.sub(" ", prompt)
+
+    def references(text):
+        ids = {int(v) for v in re.findall(r"\b(?:row|record)\s*#?\s*(\d+)\b", text, re.I)}
+        urls = {u.rstrip("/.,") for u in re.findall(r"https://[^\s)]+", text)}
+        return [r for r in samples if r["id"] in ids
+                or (r["url"] or "").rstrip("/") in urls
+                or (normal(r["name"]) and normal(r["name"]) in normal(text))]
+
+    wide = re.search(
+        r"\b(?:all|every|each|other|others|rest|these|those)\s+(?:\d+\s+)?"
+        r"(?:(?:the|of|existing|remaining|selected|pending|university|online|online-only|"
+        r"domestic|domestic-only|international|other)\s+)*"
+        r"(?:courses?|records?|rows?|programmes?|programs?|degrees?)\b"
+        r"|\b(?:check|review|verify|remove|exclude|reject|fix|repair|update)\s+"
+        r"(?:the\s+)?(?:all|others?|rest|these|those)\b"
+        r"(?!\s+(?:(?:the|four|five|\d+|missing|existing|current)\s+)*"
+        r"(?:IELTS|bands?|scores?|components?|fields?|skills?)\b)",
+        positive, re.I,
+    )
+    protected = {r["id"] for r in references(protected_text)}
+    return [r for r in (samples if wide else references(positive))
+            if r["id"] not in protected]
 
 
 def domestic_evidence(html, name):

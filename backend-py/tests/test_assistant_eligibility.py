@@ -30,6 +30,33 @@ def test_other_courses_includes_whole_review():
     assert eligibility.scope("remove it domestic only", rows) == []
 
 
+@pytest.mark.parametrize("instruction", [
+    "Correct the IELTS band scores for Management - Master by Research (MRes). "
+    "Keep other courses and fields unchanged.",
+    "Correct all five IELTS scores for Management - Master by Research (MRes).",
+    "Check all IELTS bands for Management - Master by Research (MRes).",
+    "Check all 5 IELTS scores for Management - Master by Research (MRes).",
+    "Correct IELTS for Management - Master by Research (MRes) without changing other courses.",
+    "Do not change all courses. Correct IELTS for Management - Master by Research (MRes).",
+    "Correct IELTS for Management - Master by Research (MRes); leave all other courses alone.",
+])
+def test_named_course_preservation_never_expands_to_review(instruction):
+    rows = [{"id": i, "name": f"Unrelated programme {i}",
+             "url": f"https://example.edu/{i}"} for i in range(1, 50)]
+    rows[39]["name"] = "Management - Master by Research (MRes)"
+    assert eligibility.scope(instruction, rows) == [rows[39]]
+
+
+def test_explicit_preserved_course_is_excluded_from_positive_bulk_scope():
+    rows = [{"id": 1, "name": "Course A", "url": "https://example.edu/a"},
+            {"id": 2, "name": "Course B", "url": "https://example.edu/b"}]
+    assert eligibility.scope("Correct all courses. Keep Course A unchanged.", rows) == rows[1:]
+    assert eligibility.scope("Correct all courses; do not change Course A.", rows) == rows[1:]
+    assert eligibility.scope("Course A is wrong; check other courses as well.", rows) == rows
+    assert eligibility.scope("Check all pending online-only courses.", rows) == rows
+    assert eligibility.scope("Course A is wrong; check all 49 courses.", rows) == rows
+
+
 @pytest.mark.parametrize("body,expected", [
     ("<p>Available to: Domestic students only</p>", True),
     ("<p>Available to: Domestic and international students</p>", False),

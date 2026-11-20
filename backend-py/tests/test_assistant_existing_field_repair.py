@@ -189,6 +189,9 @@ def test_recheck_cannot_force_unselected_or_unsupported_fields():
 @pytest.mark.asyncio
 @pytest.mark.parametrize("prompt,recheck", [
     ("Correct the IELTS band scores for Management - Master by Research (MRes).", True),
+    ("Correct the IELTS band scores for Management - Master by Research (MRes). "
+     "Keep other courses and fields unchanged.", True),
+    ("Correct all five IELTS scores for Management - Master by Research (MRes).", True),
     ("Please recheck and correct the IELTS scores for Management - Master by Research (MRes).", True),
     ("Fix incorrect IELTS bands for Management - Master by Research (MRes).", True),
     ("Repair missing IELTS bands for Management - Master by Research (MRes). "
@@ -201,8 +204,10 @@ async def test_named_ielts_correction_rechecks_existing_scores_but_missing_only_
     rows = [{"id": 1, "name": "Management - Master by Research (MRes)",
              "url": "https://example.edu/courses/mres"},
             {"id": 2, "name": "Computing MSc", "url": "https://example.edu/courses/computing"}]
+    rows += [{"id": i, "name": f"Unrelated programme {i}",
+              "url": f"https://example.edu/courses/{i}"} for i in range(3, 50)]
     ctx = {"samples": rows, "home": "https://example.edu",
-           "versions": {"1": "first", "2": "second"}, "config_version": "config"}
+           "versions": {str(r["id"]): f"version-{r['id']}" for r in rows}, "config_version": "config"}
     monkeypatch.setattr(assistant_source_cache, "cached_source", AsyncMock(return_value={"verified": True}))
     save = AsyncMock()
     fake = SimpleNamespace(action_proposal=service.action_proposal, now=service.now,

@@ -220,7 +220,8 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
                               selected_fields == ["ielts_overall"]
                               and bool(re.match(
                                   r"\s*(?:please\s+)?(?:(?:correct|(?:recheck|check)\s+and\s+correct)"
-                                  r"\s+(?:the\s+)?(?:incorrect\s+|wrong\s+)?"
+                                  r"\s+(?:the\s+)?(?:all\s+(?:(?:four|five)\s+)?)?"
+                                  r"(?:incorrect\s+|wrong\s+)?"
                                   r"|(?:fix|repair)\s+(?:the\s+)?(?:incorrect|wrong)\s+)ielts\b",
                                   prompt, re.I))),
                           courseScope=[{"id": r["id"], "name": r["name"],
@@ -234,7 +235,7 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
                     "courses. Unavailable or conflicting requirements remain unresolved."
                     if field == "ielts" else
                     "Checking and correcting the requested field on existing pending rows from official evidence. No new course will be created."
-                ) + (" Confirm the batch before it runs." if len(rows) > 10 else ""),
+                ),
                 "actions": [action], "sources": [],
             }, detail="Existing-row field correction prepared.")
             return True
