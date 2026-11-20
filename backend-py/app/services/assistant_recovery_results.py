@@ -15,6 +15,21 @@ FILTER_MESSAGES = {
     "sit_international_catalogue_filter": "Excluded because the course was not listed in the international catalogue.",
 }
 
+def recovery_completion(results, all_recovered, summary):
+    """A conclusive eligibility exclusion is not a failed extraction/import."""
+    if all_recovered:
+        return "completed", summary
+    if results and all(item.get("status") in {"recovered", "international_ineligible"}
+                       for item in results):
+        added = sum(item.get("status") == "recovered" for item in results)
+        excluded = len(results) - added
+        return "completed", (
+            f"Eligibility check complete: {len(results)} requested course(s) checked; "
+            f"{added} verified in pending review; {excluded} excluded by international-student "
+            "eligibility checks. No excluded course was added. Nothing was published."
+        )
+    return "error", summary
+
 
 async def review_course_results(db, job, requested_urls, review_statuses):
     from app.services.scraper.pending_imports import linked_course_ids, attempt_summary

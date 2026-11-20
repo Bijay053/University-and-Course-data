@@ -269,14 +269,14 @@ async def response(thread, db, job_id=None):
             elif target is not None:
                 action["progress"] = {"current": target.current or 0, "total": target.total_found or action["courseCount"], "status": target.status}
                 if action["kind"] in {"review_courses", "recover_catalogue"} and target.status not in {"queued", "running", "awaiting_approval"}:
-                    from app.services.assistant_recovery_results import review_course_results
+                    from app.services.assistant_recovery_results import review_course_results, recovery_completion
                     results, complete, summary = await review_course_results(
                         db, target, action.get("_requestedUrls", []), service.REVIEW_STATUSES,
                     )
+                    action["state"], summary = recovery_completion(results, complete, summary)
                     action["courseResults"] = results
                     action["resultSummary"] = summary
-                    action["state"] = "completed" if complete else "error"
-                    if complete:
+                    if action["state"] == "completed":
                         action.pop("error", None)
                     else:
                         action["error"] = summary

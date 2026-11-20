@@ -1330,9 +1330,17 @@ async def test_recovery_inline_outcomes_are_persisted_and_url_scoped(store, reas
         await db.commit()
         result = await get_assistant("source", db, {"id": 1})
         action = result["messages"][0]["actions"][0]
-        assert action["state"] == "error"
+        if expected == "international_ineligible":
+            # Checked and deliberately ineligible is a terminal result, not a
+            # failed extraction. This does not count the URL as recovered.
+            assert action["state"] == "completed"
+            assert "error" not in action
+            assert "1 excluded by international-student eligibility checks" in action["resultSummary"]
+            assert f"{int(partial)} verified in pending review" in action["resultSummary"]
+        else:
+            assert action["state"] == "error"
+            assert ("Partial recovery: 1 of 2" if partial else "No recovery verified for 1") in action["error"]
         assert action["jobId"] == "result-job"
-        assert ("Partial recovery: 1 of 2" if partial else "No recovery verified for 1") in action["error"]
         assert [item["status"] for item in action["courseResults"]] == (["recovered", expected] if partial else [expected])
         assert "_requestedUrls" not in action
         assert (target.imported, target.skipped, target.errors) == (9, 7, 5)

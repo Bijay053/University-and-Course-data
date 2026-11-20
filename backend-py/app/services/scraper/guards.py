@@ -1128,6 +1128,12 @@ def should_stage_course(
         )
         return (False, "bot_detection_page")
 
+    # A deliberate eligibility short-circuit can return before title
+    # extraction. Preserve that exclusion instead of relabelling a retry
+    # placeholder as a category page. URL and bot-page checks still win.
+    if payload.get("domestic_only"):
+        return (False, "domestic_only")
+
     # Bug A: reject pages whose extracted title has no degree-level qualifier.
     # Prefer payload["course_name"] (from H1 via course_name extractor) over
     # the discovery-link name (passed as course_name param) — the H1 is the
@@ -1179,11 +1185,6 @@ def should_stage_course(
             )
         else:
             return (False, "category_landing_page_missing_degree_qualifier")
-
-    # Explicit domestic-only flag: set by extractors when the page text
-    # states "this course is not available to international students" etc.
-    if payload.get("domestic_only"):
-        return (False, "domestic_only")
 
     # Global full-time policy: all page-specific and AI normalization has
     # already run by the time this final staging gate is called. If the final
