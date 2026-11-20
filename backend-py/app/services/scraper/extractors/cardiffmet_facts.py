@@ -68,7 +68,7 @@ def _fee_group(title):
     # category, a related-course card or a guess from subject words.
     if re.search(r"partner|executive|foundation|pgdip|pgcert|mres|mphil", title, re.I):
         return None
-    if re.match(r"PGCE\b", title, re.I):
+    if re.match(r"PGCE\b", title, re.I) or re.search(r"\bwith QTS\s*[-–]\s*PGCE$", title, re.I):
         return "PGCE"
     if re.search(r"\bMBA\b|Master of Business Administration", title, re.I):
         return "MBA"
@@ -130,9 +130,96 @@ def _facts(main):
     return {key: next(iter(items)) for key, items in values.items() if len(items) == 1}
 
 
+def _verified_location(location, *, allow_online=False):
+    """Every named location must be a known university site, not a partner."""
+    labels = [part.strip().lower() for part in location.split(",")]
+    allowed = {"llandaff", "llandaff campus", "cyncoed", "cyncoed campus"}
+    if allow_online:
+        allowed.add("online")
+    return bool(location) and len(labels) == len(set(labels)) and set(labels) <= allowed
+
+
+def _has_unparsed_ielts_table(main):
+    # Legacy entry requirements use tables for layout. A complete requirement
+    # paragraph inside one is still usable; separate score cells are not prose.
+    for row in main.find_all("tr"):
+        text = " ".join(row.get_text(" ", strip=True).split())
+        for paragraph in row.find_all(["p", "li"]):
+            text = text.replace(" ".join(paragraph.get_text(" ", strip=True).split()), "")
+        if re.search(r"\bIELTS\b|(?:reading|writing|listening|speaking)\s*[: -]?\s*[0-9]\.[05]\b",
+                     text, re.I):
+            return True
+    return False
+
+
+def _english_section(node):
+    if re.match(r"English Language Requirements?:", node.get_text(" ", strip=True), re.I):
+        return True
+    heading = node.find_previous(["h2", "h3", "h4", "h5"])
+    if heading and re.search(
+        r"International Applicants|International Students|English Language|Entry Requirements",
+        heading.get_text(), re.I
+    ):
+        return True
+    paragraph = node.find_previous("p")
+    return bool(paragraph and re.fullmatch(
+        r"International Applicants:?", paragraph.get_text(" ", strip=True), re.I
+    ))
+
+
+def _apply_owned_english(main, title, location, url, payload, evidence):
+    if not _verified_location(location, allow_online=True) or _has_unparsed_ielts_table(main):
+        return
+    score = r"([0-9](?:\.[05])?)"
+    lead = rf"\bIELTS(?:\s+Academic)?\s+(?:score(?:\s+of)?\s+)?{score}\s+"
+    patterns = (
+        lead + rf"(?:overall\s+|standard\s+)?with no sub[ -]?score lower than {score}\b",
+        lead + rf"overall,?\s*with at least {score} in all elements\b",
+    )
+    found = set()
+    all_overalls = set()
+    for p in main.find_all(["p", "li"]):
+        text = " ".join(p.get_text(" ", strip=True).split())
+        all_overalls.update(float(value) for value in re.findall(
+            r"\bIELTS(?:\s+Academic)?\s+(?:score(?:\s+of)?\s+)?([0-9](?:\.[05])?)\b",
+            text, re.I))
+        matches = [match for pattern in patterns if (match := re.search(pattern, text, re.I))]
+        if re.search(r"\bIELTS\b", text, re.I) and re.search(
+            r"\bmay\b|except|pathway|reading|writing|listening|speaking|recommend"
+            r"|\bbands?\b|component|sub[ -]?score|\belements?\b", text, re.I
+        ):
+            if not matches:
+                return
+            for match in matches:
+                remaining = text[:match.start()] + text[match.end():]
+                if re.search(
+                    r"\bmay\b|except|pathway|reading|writing|listening|speaking|recommend"
+                    r"|\bbands?\b|component|sub[ -]?score|\belements?\b", remaining, re.I
+                ):
+                    return
+        if not _english_section(p) or re.search(
+            r"\bmay\b|except|pathway|reading|writing|listening|speaking|recommend", text, re.I
+        ):
+            continue
+        for match in matches:
+            if match and 0 < float(match[2]) <= float(match[1]) <= 9:
+                found.add((float(match[1]), float(match[2]), text))
+    pairs = {(overall, band) for overall, band, _ in found}
+    if len(pairs) != 1:
+        return
+    overall, band = next(iter(pairs))
+    if all_overalls != {overall}:
+        return
+    quote = min(text for value, minimum, text in found if (value, minimum) == (overall, band))
+    for field in IELTS:
+        _write(payload, evidence, field, overall if field == IELTS[0] else band,
+               title + "\nCourse-owned requirement: " + quote, url,
+               "english.cardiffmet_course_requirement", replace=True)
+
+
 def _apply_fee(title, location, payload, evidence, sources, referral=""):
     group = _fee_group(title)
-    campus = bool(re.fullmatch(r"(?:Llandaff|Cyncoed)(?:\s+Campus)?", location, re.I))
+    campus = _verified_location(location)
     if not campus or not group or payload.get("international_fee") not in (None, "", 0):
         return
     fee = _central_fee(sources.get(FEES, ""), group)
@@ -146,8 +233,8 @@ def _apply_fee(title, location, payload, evidence, sources, referral=""):
 
 
 def _apply_linked_selt(main, title, location, url, payload, evidence, sources):
-    """Resolve a course-owned IELTS overall against its explicitly linked table."""
-    if not re.fullmatch(r"(?:Llandaff|Cyncoed)(?:\s+Campus)?", location, re.I):
+    """Match the policy's published score bracket to a course-owned requirement."""
+    if not _verified_location(location, allow_online=True) or _has_unparsed_ielts_table(main):
         return
     def owns_link(node, target):
         return any(
@@ -156,7 +243,7 @@ def _apply_linked_selt(main, title, location, url, payload, evidence, sources):
         )
     hub = _main(sources.get(ENGLISH, ""))
     tests = _main(sources.get(SELT, ""))
-    if not owns_link(main, ENGLISH) or hub is None or tests is None:
+    if hub is None or tests is None:
         return
     if not owns_link(hub, SELT) or not hub.find("h1") or not tests.find("h1"):
         return
@@ -166,24 +253,30 @@ def _apply_linked_selt(main, title, location, url, payload, evidence, sources):
         return
     course_scores = []
     all_scores = set()
-    for p in main.find_all("p"):
+    constraints = []
+    for p in main.find_all(["p", "li"]):
         text = " ".join(p.get_text(" ", strip=True).split())
         scores = re.findall(r"\bIELTS\s+(?:overall\s+|score\s+(?:of\s+)?)?([0-9](?:\.[05])?)\b", text, re.I)
         all_scores.update(float(score) for score in scores)
+        partial = re.search(
+            r"\bIELTS\s+([0-9](?:\.[05])?)\s+standard\s*\(with minimum\s+"
+            r"([0-9](?:\.[05])?)\s+in the Reading and Writing components\)", text, re.I
+        )
+        remaining = text
+        if partial:
+            constraints.append({"ielts_reading": float(partial[2]), "ielts_writing": float(partial[2])})
+            remaining = text[:partial.start()] + text[partial.end():]
         if re.search(r"\bIELTS\b", text, re.I) and re.search(
-            r"component|sub.?score|each band|reading|writing|listening|speaking|pre.sessional"
-            r"|\b(?:may|normally|typically|recommend\w*|higher|alternative|foundation)\b", text, re.I
+            r"component|sub.?score|\bbands?\b|\belements?\b|reading|writing|listening|speaking|pre.sessional"
+            r"|\b(?:may|normally|typically|recommend\w*|higher|alternative|foundation)\b", remaining, re.I
         ):
             return
-        heading = p.find_previous(["h2", "h3", "h4", "h5"])
-        if not heading or not re.search(
-            r"International Applicants|English Language Requirements", heading.get_text(), re.I
-        ):
+        if not _english_section(p):
             continue
         # Leave course-specific band requirements to their own evidence.
         if re.search(
-            r"component|sub.?score|each band|reading|writing|listening|speaking|pre.sessional"
-            r"|\b(?:may|normally|typically|recommend|higher|alternative|foundation)\b", text, re.I
+            r"component|sub.?score|\bbands?\b|\belements?\b|reading|writing|listening|speaking|pre.sessional"
+            r"|\b(?:may|normally|typically|recommend|higher|alternative|foundation)\b", remaining, re.I
         ):
             continue
         if not re.search(
@@ -225,11 +318,13 @@ def _apply_linked_selt(main, title, location, url, payload, evidence, sources):
     if len(matches) != 1:
         return
     values, table_quote = matches[0]
+    if any(values[field] != value for rule in constraints for field, value in rule.items()):
+        return
     if any(payload.get(field) not in (None, "", value) for field, value in values.items()):
         return
     quote = (
         f"Current course: {title}\nCourse source: {url}\nCourse requirement: {course_quote}\n"
-        f"Course-linked guidance: {ENGLISH}\nLinked IELTS Academic table, "
+        f"Official English guidance: {ENGLISH}\nLinked IELTS Academic table, "
         f"Courses with {overall:.1f} IELTS Requirements: {table_quote}"
     )
     for field, value in values.items():
@@ -255,6 +350,7 @@ def apply_authority(html, url, payload, evidence, sources=None):
     location = facts.get("location", "")
     # A partner course can have different fees and admission requirements.
     _apply_fee(title, location, payload, evidence, sources)
+    _apply_owned_english(main, title, location, url, payload, evidence)
     _apply_linked_selt(main, title, location, url, payload, evidence, sources)
     # Child PGCE subjects explicitly refer readers to the shared Secondary
     # programme for admission and course information. A global menu does not.

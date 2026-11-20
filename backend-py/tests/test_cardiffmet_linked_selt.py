@@ -36,7 +36,7 @@ def test_course_score_selects_its_own_table_column(score, values):
 
 
 @pytest.mark.parametrize("kwargs", [
-    {"referral": False}, {"location": "Partner Institution"},
+    {"location": "Partner Institution"},
     {"location": ""}, {"score": 7.5},
     {"sources": {c.SELT: TABLE}},
     {"sources": {c.ENGLISH: HUB}},
@@ -44,6 +44,7 @@ def test_course_score_selects_its_own_table_column(score, values):
     {"extra": "<p>Another route requires IELTS 6.5.</p>"},
     {"extra": "<h3>Entry requirements</h3><p>This programme requires IELTS 7.0.</p>"},
     {"extra": "<h3>Entry requirements</h3><p>IELTS 6.0 overall, writing 6.0.</p>"},
+    {"extra": "<table><tr><td>IELTS</td><td>7.5 for a selected route</td></tr></table>"},
     {"payload": {"ielts_overall": 7.5}},
     {"payload": {"ielts_writing": 7.0}},
 ])
@@ -61,6 +62,47 @@ def test_existing_matching_scores_are_preserved_while_missing_bands_are_filled()
 def test_other_test_scores_are_never_used_as_ielts():
     sources = {c.ENGLISH: HUB, c.SELT: TABLE.replace("IELTS Academic", "PTE Academic")}
     assert not apply(sources=sources)[0]
+
+
+@pytest.mark.parametrize("location", ["Online", "Llandaff Campus, Cyncoed Campus"])
+def test_explicit_course_score_can_use_linked_tests_at_known_delivery_locations(location):
+    p, _ = apply(location=location)
+    assert p["ielts_listening"] == 5.5
+
+
+def test_published_score_bracket_can_match_a_current_course_without_an_in_page_link():
+    p, _ = apply(referral=False)
+    assert tuple(p[field] for field in c.IELTS) == (6.0, 5.5, 5.5, 5.5, 5.5)
+
+
+def test_stored_overall_alone_does_not_establish_the_course_score_bracket():
+    html = """<main><h1>Computing - MSc</h1><div class="block-12__item"><h4>Location</h4>
+    <p class="block-12__item-description">Llandaff Campus</p></div><p>See English guidance.</p></main>"""
+    p, e = {"ielts_overall": 6.0}, []
+    c.apply_authority(html, URL, p, e, {c.ENGLISH: HUB, c.SELT: TABLE})
+    assert p == {"ielts_overall": 6.0} and not e
+
+
+@pytest.mark.parametrize("minimum,matched", [(6.5, True), (7.0, False)])
+def test_research_reading_writing_constraints_must_agree_with_linked_table(minimum, matched):
+    extra = f"""<p>Students need to provide evidence of fluency to at least an IELTS 6.5 standard
+    (with minimum {minimum} in the Reading and Writing components) or equivalent.</p>"""
+    p, _ = apply(score=6.5, extra=extra)
+    assert bool(p) == matched
+    if matched:
+        assert p["ielts_reading"] == p["ielts_writing"] == 6.5
+        assert p["ielts_listening"] == p["ielts_speaking"] == 6.0
+
+
+def test_paragraph_heading_can_introduce_a_course_owned_international_requirement():
+    html = f"""<main><h1>Professional Practice - MSc</h1><div class="block-12__item">
+    <h4>Location</h4><p class="block-12__item-description">Online</p></div>
+    <a href="{c.ENGLISH}">English Language Requirements</a><h3>About the Course</h3>
+    <p><strong>International Applicants:</strong></p>
+    <p>Students need to provide evidence of fluency to at least an IELTS 6.0 standard or equivalent.</p></main>"""
+    p, e = {}, []
+    c.apply_authority(html, URL, p, e, {c.ENGLISH: HUB, c.SELT: TABLE})
+    assert p["ielts_listening"] == 5.5
 
 
 @pytest.mark.parametrize("requirement", [
