@@ -83,6 +83,30 @@ def test_stored_overall_alone_does_not_establish_the_course_score_bracket():
     assert p == {"ielts_overall": 6.0} and not e
 
 
+@pytest.mark.parametrize("academic", [
+    "You will normally have achieved a 1st or 2.1 degree classification in an appropriate arts subject.",
+    "You will normally have achieved a first class or second class upper division first degree "
+    "(1st or 2.1 degree classification) in an appropriate subject, and/or equivalent professional standing.",
+])
+def test_separate_academic_normally_condition_does_not_disable_course_english(academic):
+    paragraph = academic + " In addition, those students for whom English is not their first language are required to have IELTS."
+    values = dict(zip(c.IELTS, (6.0, 5.5, 5.5, 5.5, 5.5)))
+    payload, evidence = apply(extra=f"<p>{paragraph}</p>", payload=values)
+    from types import SimpleNamespace
+    from app.services.scraper.requirement_status import build_requirement_status
+    assert payload == values
+    assert build_requirement_status(SimpleNamespace(**payload), evidence=evidence, source_url=URL)["englishComponents"]["state"] == "verified"
+
+
+@pytest.mark.parametrize("prefix", [
+    "Your degree may qualify you for alternative English language requirements.",
+    "Applicants with this degree may qualify for different IELTS requirements.",
+])
+def test_language_conditions_before_in_addition_are_not_trimmed(prefix):
+    extra = f"<p>{prefix} In addition, some students are required to have IELTS.</p>"
+    assert not apply(extra=extra)[0]
+
+
 @pytest.mark.parametrize("score,values", [
     (6.0, (6.0, 5.5, 5.5, 5.5, 5.5)),
     (6.5, (6.5, 6.0, 6.5, 6.5, 6.0)),

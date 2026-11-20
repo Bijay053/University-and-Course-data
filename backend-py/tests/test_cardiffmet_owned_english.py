@@ -33,6 +33,22 @@ def test_current_direct_requirement_supersedes_incorrect_extraction_with_evidenc
     assert p["ielts_overall"] == 7.5 and p["ielts_writing"] == 7.0
 
 
+def test_minimum_requirement_for_non_native_students_is_own_english_context():
+    text = ("Students whose first language is not English, a minimum IELTS score of "
+            "6.0 overall with no sub-score lower than 5.5 (or equivalent qualification).")
+    html = f"""<main><h1>MSc Criminal Justice and Security</h1>
+    <div class="block-12__item"><h4>Location</h4>
+    <p class="block-12__item-description">Cyncoed Campus</p></div>
+    <div>International Applicants</div><p>{text}</p></main>"""
+    payload, evidence = {}, []
+    url = c.BASE + "/courses/postgraduate/msc-criminal-justice-and-security/"
+    c.apply_authority(html, url, payload, evidence)
+    assert tuple(payload[k] for k in c.IELTS) == (6.0, 5.5, 5.5, 5.5, 5.5)
+    from types import SimpleNamespace
+    from app.services.scraper.requirement_status import build_requirement_status
+    assert build_requirement_status(SimpleNamespace(**payload), evidence=evidence, source_url=url)["englishComponents"]["state"] == "verified"
+
+
 @pytest.mark.parametrize("text", [PGCE, NUTRITION, DENTAL])
 def test_course_owned_scores_have_verifiable_component_citations(text):
     from types import SimpleNamespace

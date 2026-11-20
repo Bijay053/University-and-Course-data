@@ -189,7 +189,8 @@ def _english_section(node):
         return True
     if re.match(
         r"(?:International Applicants:?\s+)?(?:Students|Applicants) whose first language "
-        r"is not English will need to provide evidence of fluency", text, re.I,
+        r"is not English(?: will need to provide evidence of fluency"
+        r"|,\s+a minimum\s+IELTS\b)", text, re.I,
     ):
         return True
     heading = node.find_previous(["h2", "h3", "h4", "h5"])
@@ -330,6 +331,14 @@ def _apply_linked_selt(main, title, location, url, payload, evidence, sources):
     constraints = []
     for p in main.find_all(["p", "li"]):
         text = " ".join(p.get_text(" ", strip=True).split())
+        # A preceding academic-degree condition does not qualify the separate
+        # English statement. Never trim a prefix containing language conditions.
+        intro = re.fullmatch(r"(.+?\.)\s+(In addition,\s+.*\bIELTS\b.*)", text, re.I)
+        if (intro and re.search(r"\bdegree\b", intro[1], re.I)
+                and not re.search(
+                    r"IELTS|English|language|fluency|scores?|bands?|components?"
+                    r"|reading|writing|listening|speaking", intro[1], re.I)):
+            text = intro[2]
         scores = re.findall(r"\bIELTS\s+(?:overall\s+|score\s+(?:of\s+)?)?([0-9](?:\.[05])?)\b", text, re.I)
         all_scores.update(float(score) for score in scores)
         partial = re.search(
