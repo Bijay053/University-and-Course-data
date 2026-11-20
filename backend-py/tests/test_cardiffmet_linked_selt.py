@@ -1,0 +1,78 @@
+import pytest
+from app.services.scraper.extractors import cardiffmet_facts as c
+
+URL = c.BASE + "/courses/postgraduate/msc-computing/"
+HUB = f'<main><h1>English Language Requirements for International Applicants</h1><a href="{c.SELT}">Accepted tests</a></main>'
+TABLE = """<main><h1>Accepted Secure English Language Tests (SELTs)</h1><table>
+<tr><th>Qualification</th><th>Courses with 6.0 IELTS Requirements</th><th>Courses with 6.5 IELTS Requirements</th></tr>
+<tr><td>IELTS Academic <p>We accept IELTS One Skill Retake</p></td>
+<td>Overall score: 6.0 (with no component below 5.5)</td>
+<td>6.5 overall with 6.5 in both reading and writing, and a minimum of 6.0 in the remaining components</td></tr>
+</table></main>"""
+
+
+def apply(score=6.0, location="Llandaff Campus", referral=True, payload=None, sources=None, extra=""):
+    html = f"""<main><h1>MSc Computing</h1><div class="block-12__item">
+    <h4>Location</h4><p class="block-12__item-description">{location}</p></div>
+    <h3>English Language Requirements</h3>
+    {f'<a href="{c.ENGLISH}">English Language Requirements</a>' if referral else ''}
+    <h3>International Applicants</h3><p>Applicants require an IELTS {score} standard or equivalent.</p>
+    {extra}</main>"""
+    payload = dict(payload or {})
+    evidence = []
+    c.apply_authority(html, URL, payload, evidence, {c.ENGLISH: HUB, c.SELT: TABLE} if sources is None else sources)
+    return payload, evidence
+
+
+@pytest.mark.parametrize("score,values", [
+    (6.0, (6.0, 5.5, 5.5, 5.5, 5.5)),
+    (6.5, (6.5, 6.0, 6.5, 6.5, 6.0)),
+])
+def test_course_score_selects_its_own_table_column(score, values):
+    p, e = apply(score)
+    assert tuple(p[field] for field in c.IELTS) == values
+    assert all(row["source_url"] == c.SELT for row in e)
+    assert all(URL in row["snippet"] and c.ENGLISH in row["snippet"] for row in e)
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"referral": False}, {"location": "Partner Institution"},
+    {"location": ""}, {"score": 7.5},
+    {"sources": {c.SELT: TABLE}},
+    {"sources": {c.ENGLISH: HUB}},
+    {"sources": {c.ENGLISH: HUB.replace(c.SELT, "/unrelated/"), c.SELT: TABLE}},
+    {"extra": "<p>Another route requires IELTS 6.5.</p>"},
+    {"extra": "<h3>Entry requirements</h3><p>This programme requires IELTS 7.0.</p>"},
+    {"extra": "<h3>Entry requirements</h3><p>IELTS 6.0 overall, writing 6.0.</p>"},
+    {"payload": {"ielts_overall": 7.5}},
+    {"payload": {"ielts_writing": 7.0}},
+])
+def test_missing_or_conflicting_applicability_never_gets_general_bands(kwargs):
+    before = kwargs.get("payload", {})
+    assert apply(**kwargs)[0] == before
+
+
+def test_existing_matching_scores_are_preserved_while_missing_bands_are_filled():
+    p, e = apply(payload={"ielts_overall": 6.0, "ielts_reading": 5.5})
+    assert p["ielts_listening"] == 5.5 and p["ielts_reading"] == 5.5
+    assert {row["field_key"] for row in e} == {"ielts_listening", "ielts_writing", "ielts_speaking"}
+
+
+def test_other_test_scores_are_never_used_as_ielts():
+    sources = {c.ENGLISH: HUB, c.SELT: TABLE.replace("IELTS Academic", "PTE Academic")}
+    assert not apply(sources=sources)[0]
+
+
+@pytest.mark.parametrize("requirement", [
+    "Applicants may require IELTS 6.0.",
+    "Applicants require IELTS 6.0 for one route and 6.5 for another.",
+    "Applicants require IELTS 6.0 overall, 5.5 minimum individually.",
+])
+def test_conditional_or_unparsed_component_scores_are_not_generalised(requirement):
+    html = f"""<main><h1>MSc Computing</h1><div class="block-12__item">
+    <h4>Location</h4><p class="block-12__item-description">Llandaff Campus</p></div>
+    <a href="{c.ENGLISH}">English Language Requirements</a>
+    <h3>International Applicants</h3><p>{requirement}</p></main>"""
+    p, e = {}, []
+    c.apply_authority(html, URL, p, e, {c.ENGLISH: HUB, c.SELT: TABLE})
+    assert p == {} and e == []

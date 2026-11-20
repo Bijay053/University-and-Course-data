@@ -203,7 +203,7 @@ async def test_shared_loader_prefetches_cardiffmet_sources_once_for_reextraction
     from unittest.mock import AsyncMock
     from app.services.scraper.config import context
     from app.services.scraper import http_fetcher
-    from app.services.scraper.extractors.cardiffmet_facts import FEES, PGCE
+    from app.services.scraper.extractors.cardiffmet_facts import FEES, PGCE, ENGLISH, SELT
 
     monkeypatch.setattr(context, "get_uni_config", lambda: SimpleNamespace(
         base_url="https://www.cardiffmet.ac.uk"))
@@ -211,8 +211,8 @@ async def test_shared_loader_prefetches_cardiffmet_sources_once_for_reextraction
     monkeypatch.setattr(http_fetcher, "fetch_html", fetch)
     result = await university_pdfs.load_university_pdf_data({}, "United Kingdom")
     assert result["cardiffmet_profile_sources"] == {
-        FEES: "<main>official source</main>", PGCE: "<main>official source</main>"}
-    assert fetch.await_count == 2
+        url: "<main>official source</main>" for url in (FEES, PGCE, ENGLISH, SELT)}
+    assert fetch.await_count == 4
 
 @pytest.mark.asyncio
 async def test_extract_course_backfills_from_uni_pdf(monkeypatch):

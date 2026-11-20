@@ -13,6 +13,8 @@ HOSTS = {"cardiffmet.ac.uk", "www.cardiffmet.ac.uk"}
 BASE = "https://www.cardiffmet.ac.uk"
 FEES = BASE + "/international-students/fees-and-finance/"
 PGCE = BASE + "/courses/postgraduate/pgce-secondary/"
+ENGLISH = BASE + "/international-students/english-language-requirements/"
+SELT = ENGLISH + "accepted-secure-english-language-tests/"
 MONTHS = ("January February March April May June July August September October "
           "November December").split()
 IELTS = ("ielts_overall", "ielts_listening", "ielts_reading",
@@ -36,13 +38,13 @@ def _main(html):
 
 
 async def prefetch_sources(fetch):
-    """Fetch twice per scrape, not twice per course. No module/loop cache."""
+    """Preload the official fee, programme and linked English profiles."""
     async def read(url):
         try:
             return url, await asyncio.wait_for(fetch(url), timeout=20)
         except Exception:
             return url, ""
-    return dict(await asyncio.gather(read(FEES), read(PGCE)))
+    return dict(await asyncio.gather(*(read(url) for url in (FEES, PGCE, ENGLISH, SELT))))
 
 
 def _write(payload, evidence, field, value, quote, source, method, *, replace=False):
@@ -143,6 +145,97 @@ def _apply_fee(title, location, payload, evidence, sources, referral=""):
                    "fee.cardiffmet_international_profile", replace=True)
 
 
+def _apply_linked_selt(main, title, location, url, payload, evidence, sources):
+    """Resolve a course-owned IELTS overall against its explicitly linked table."""
+    if not re.fullmatch(r"(?:Llandaff|Cyncoed)(?:\s+Campus)?", location, re.I):
+        return
+    def owns_link(node, target):
+        return any(
+            a.get("href", "").rstrip("/") in (target.rstrip("/"), urlsplit(target).path.rstrip("/"))
+            for a in node.find_all("a", href=True)
+        )
+    hub = _main(sources.get(ENGLISH, ""))
+    tests = _main(sources.get(SELT, ""))
+    if not owns_link(main, ENGLISH) or hub is None or tests is None:
+        return
+    if not owns_link(hub, SELT) or not hub.find("h1") or not tests.find("h1"):
+        return
+    if not re.search(r"English Language Requirements", hub.h1.get_text(), re.I) or not re.search(
+        r"Accepted Secure English Language Tests", tests.h1.get_text(), re.I
+    ):
+        return
+    course_scores = []
+    all_scores = set()
+    for p in main.find_all("p"):
+        text = " ".join(p.get_text(" ", strip=True).split())
+        scores = re.findall(r"\bIELTS\s+(?:overall\s+|score\s+(?:of\s+)?)?([0-9](?:\.[05])?)\b", text, re.I)
+        all_scores.update(float(score) for score in scores)
+        if re.search(r"\bIELTS\b", text, re.I) and re.search(
+            r"component|sub.?score|each band|reading|writing|listening|speaking|pre.sessional"
+            r"|\b(?:may|normally|typically|recommend\w*|higher|alternative|foundation)\b", text, re.I
+        ):
+            return
+        heading = p.find_previous(["h2", "h3", "h4", "h5"])
+        if not heading or not re.search(
+            r"International Applicants|English Language Requirements", heading.get_text(), re.I
+        ):
+            continue
+        # Leave course-specific band requirements to their own evidence.
+        if re.search(
+            r"component|sub.?score|each band|reading|writing|listening|speaking|pre.sessional"
+            r"|\b(?:may|normally|typically|recommend|higher|alternative|foundation)\b", text, re.I
+        ):
+            continue
+        if not re.search(
+            r"(?:require(?:d)?|need to provide evidence of fluency to at least).{0,45}\bIELTS", text, re.I
+        ) or len(set(re.findall(r"\b[0-9](?:\.[05])?\b", text))) != 1:
+            continue
+        course_scores.extend((float(score), text) for score in scores)
+    if len({score for score, _ in course_scores}) != 1:
+        return
+    overall, course_quote = course_scores[0]
+    if overall not in (6.0, 6.5) or all_scores != {overall}:
+        return
+    matches = []
+    for table in tests.find_all("table"):
+        rows = table.find_all("tr")
+        if not rows:
+            continue
+        headers = [c.get_text(" ", strip=True) for c in rows[0].find_all(["th", "td"], recursive=False)]
+        columns = [i for i, h in enumerate(headers) if re.fullmatch(
+            rf"Courses with {overall:.1f} IELTS Requirements", h, re.I)]
+        if len(columns) != 1:
+            continue
+        for row in rows[1:]:
+            cells = row.find_all(["td", "th"], recursive=False)
+            if len(cells) != len(headers) or not re.match(
+                r"IELTS Academic\b", cells[0].get_text(" ", strip=True), re.I
+            ):
+                continue
+            text = " ".join(cells[columns[0]].get_text(" ", strip=True).split())
+            if overall == 6.0 and re.fullmatch(
+                r"Overall score:\s*6\.0\s*\(with no component below 5\.5\)", text, re.I
+            ):
+                matches.append((dict(zip(IELTS, (6.0, 5.5, 5.5, 5.5, 5.5))), text))
+            elif overall == 6.5 and re.fullmatch(
+                r"6\.5 overall with 6\.5 in both reading and writing, and a minimum of 6\.0 in the remaining components",
+                text, re.I
+            ):
+                matches.append((dict(zip(IELTS, (6.5, 6.0, 6.5, 6.5, 6.0))), text))
+    if len(matches) != 1:
+        return
+    values, table_quote = matches[0]
+    if any(payload.get(field) not in (None, "", value) for field, value in values.items()):
+        return
+    quote = (
+        f"Current course: {title}\nCourse source: {url}\nCourse requirement: {course_quote}\n"
+        f"Course-linked guidance: {ENGLISH}\nLinked IELTS Academic table, "
+        f"Courses with {overall:.1f} IELTS Requirements: {table_quote}"
+    )
+    for field, value in values.items():
+        _write(payload, evidence, field, value, quote, SELT, "english.cardiffmet_linked_selt")
+
+
 def apply_authority(html, url, payload, evidence, sources=None):
     if not is_course(url):
         return
@@ -162,6 +255,7 @@ def apply_authority(html, url, payload, evidence, sources=None):
     location = facts.get("location", "")
     # A partner course can have different fees and admission requirements.
     _apply_fee(title, location, payload, evidence, sources)
+    _apply_linked_selt(main, title, location, url, payload, evidence, sources)
     # Child PGCE subjects explicitly refer readers to the shared Secondary
     # programme for admission and course information. A global menu does not.
     links = [a for a in main.find_all("a", href=True)

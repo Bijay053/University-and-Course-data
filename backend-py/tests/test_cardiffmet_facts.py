@@ -180,5 +180,5 @@ async def test_one_failed_source_does_not_discard_other_source():
         return PARENT
     mock = AsyncMock(side_effect=fetch)
     result = await c.prefetch_sources(mock)
-    assert result == {c.FEES: "", c.PGCE: PARENT}
-    assert mock.await_count == 2
+    assert result == {c.FEES: "", c.PGCE: PARENT, c.ENGLISH: PARENT, c.SELT: PARENT}
+    assert mock.await_count == 4
