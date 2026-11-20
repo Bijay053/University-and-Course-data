@@ -40,6 +40,38 @@ afterEach(() => {
 });
 
 describe("ScrapePromptAssistant", () => {
+  it("shows automatic import-copy cleanup and refreshes the review after completion", async () => {
+    const action = {
+      id: "import-cleanup", kind: "cleanup_import_duplicates" as const, state: "proposed" as const,
+      label: "Archive duplicate copies from the last review-only import",
+      courseCount: 21, fields: [], automaticPending: true, requiresConfirmation: false,
+    };
+    const thread: AssistantThread = {
+      threadId: "imports", status: "ready", phase: "", error: null,
+      messages: [{
+        role: "assistant", content: "Original records and evidence are retained.",
+        createdAt: "2026-11-20T10:00:00Z", sources: [], actions: [action],
+      }],
+    };
+    const completed: AssistantThread = {
+      ...thread, messages: [{
+        ...thread.messages[0], actions: [{
+          ...action, state: "completed",
+          resultSummary: "Archived 21 duplicate copies. Original records unchanged.",
+        }],
+      }],
+    };
+    const changed = vi.fn();
+    const fetch = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json(thread)).mockImplementation(async () => json(completed));
+    render(<ScrapePromptAssistant jobId="j1" onChanged={changed} />);
+    await screen.findByText(/Starting automatically/);
+    expect(screen.queryByRole("button", { name: /^Run now$/i })).toBeNull();
+    await screen.findByText(/Archived 21 duplicate copies/, {}, { timeout: 4000 });
+    expect(changed).toHaveBeenCalled();
+    expect(fetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
+
   it("shows name-only bulk cleanup and starts automatically without a manual run", async () => {
     const thread: AssistantThread = {
       threadId: "names", status: "ready", phase: "", error: null,

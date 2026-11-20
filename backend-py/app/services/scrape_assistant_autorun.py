@@ -34,7 +34,7 @@ def choose_action(actions, prompt=""):
                 and (a.get("kind") in {
         "scan_catalogue", "recover_catalogue", "review_courses", "fix_fields", "repair_catalogue",
         "merge_intakes"} or a.get("automaticPending") and a.get("kind") in {
-            "staff_edit", "staff_location", "document_update", "cleanup_names"})]
+            "staff_edit", "staff_location", "document_update", "cleanup_names", "cleanup_import_duplicates"})]
     # A full discovery covers bounded recovery candidates too; never launch both.
     return next((a for a in proposed if a["kind"] == "scan_catalogue"), next(iter(proposed), None))
 

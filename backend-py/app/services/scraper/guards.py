@@ -548,6 +548,8 @@ _DEGREE_QUALIFIER_RE = re.compile(
     # "Foundation in Business". Require a named subject after in/of so broad
     # catalogue labels such as "Foundation Programmes" remain rejected.
     r"foundation\s+(?:in|of)\s+\S|"
+    r"foundation(?:\s+year)?\s+leading\s+to\s+\S|"
+    r"foundation\s+(?:certificate|year)\s+(?:in|of)\s+\S|"
     r"foundation\s+degree|"                      # UK Foundation Degree (full phrase)
     r"fda\b|"                                     # Foundation Degree Arts (UK)
     r"fdsc\b|"                                    # Foundation Degree Science (UK)
@@ -707,7 +709,8 @@ def _normalise_for_qualifier_match(text: str) -> str:
 _ANYWHERE_QUALIFIER_RE = re.compile(
     r"\b(?:"
     # ── Masters ────────────────────────────────────────────────────────────
-    r"ma|msc|msci|mba|march|meng|mphil|mpharm|mres|mfin|mds|"
+    r"ma|msc|msci|mba|march|meng|mphil|mpharm|mres|mfin|mds|mdes|"
+    r"master(?:s|'s)?\s+degrees?|"
     r"mbs|mpa|mph|med|mit|mcom|mbiol|mchem|mphys|mmath|llm|"
     # ── Doctorates ─────────────────────────────────────────────────────────
     r"phd|dba|dclinpsychol|edd|"
@@ -715,7 +718,7 @@ _ANYWHERE_QUALIFIER_RE = re.compile(
     # ── Bachelors ──────────────────────────────────────────────────────────
     r"ba|bsc|beng|llb|bnurs|bmid|bba|bbs|bcom|bbus|bit|bsw|mbbs|bds|"
     # ── PG awards ──────────────────────────────────────────────────────────
-    r"pgce|pgcert|pgdip|gdl|"
+    r"pgce|pgcert|pgdip|pgc|pgd|gdl|"
     # ── Foundation / vocational ────────────────────────────────────────────
     r"fda|fdsc|fd|certhe|diphe|hnc|hnd|"
     # ── Teacher status ─────────────────────────────────────────────────────

@@ -43,6 +43,15 @@ def supported(action):
         return (count <= 50 and bool(action.get("_configVersion"))
                 and action.get("_boundedRepair") == {
                     "maxVerificationCourses": 50, "publishesCourses": False})
+    if kind == "cleanup_import_duplicates":
+        targets = action.get("_targets", [])
+        return (
+            bool(action.get("_sourceJobId")) and bool(action.get("_universityId"))
+            and len(targets) == count == len({t.get("id") for t in targets})
+            and len({t.get("keepId") for t in targets}) == count
+            and all(t.get("id") != t.get("keepId") and t.get("version")
+                    and t.get("keepVersion") for t in targets)
+        )
     if kind == "cleanup_names":
         targets = action.get("_targets", [])
         return (len(targets) == count == len({target.get("id") for target in targets})

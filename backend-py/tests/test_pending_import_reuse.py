@@ -421,3 +421,149 @@ async def test_original_and_current_identity_cannot_collapse_two_source_offering
         monkeypatch.setattr(p, "candidates", lambda _: {"old": original, "current": current})
         with pytest.raises(ValueError, match="multiple source offerings"):
             await p.match_pending(db, current)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("missing", [
+    {"study_load": None},
+    {"fee_year": None, "fee_term": None},
+    {"study_mode": None},
+])
+async def test_partial_fresh_extraction_reuses_without_erasing_reviewed_facts(store, missing):
+    first = await stage(store, "first", study_load="Full Time")
+    sessions, _ = store
+    async with sessions() as db:
+        row = await db.get(ScrapedCourse, first.scraped_course_id)
+        before = {c.key: deepcopy(getattr(row, c.key))
+                  for c in ScrapedCourse.__table__.columns}
+    repeated = await stage(store, "second", **{"study_load": "Full Time", **missing})
+    assert repeated.scraped_course_id == first.scraped_course_id
+    async with sessions() as db:
+        assert len((await db.execute(select(ScrapedCourse))).scalars().all()) == 1
+        row = await db.get(ScrapedCourse, first.scraped_course_id)
+        assert {c.key: getattr(row, c.key) for c in ScrapedCourse.__table__.columns} == before
+        assert await linked_course_ids(db, ["second"], row.university_id) == {row.id}
+
+
+@pytest.mark.asyncio
+async def test_missing_campus_cannot_choose_between_two_known_offerings(store, monkeypatch):
+    from app.services.scraper import pending_imports as p
+    await stage(store, "first", course_location="London")
+    await stage(store, "second", course_location="Birmingham")
+    sessions, uid = store
+    async with sessions() as db:
+        stored = (await db.execute(select(ScrapedCourse).order_by(ScrapedCourse.id))).scalars().all()
+        incoming = ScrapedCourse(**{
+            c.key: deepcopy(getattr(stored[0], c.key))
+            for c in ScrapedCourse.__table__.columns if c.key not in {"id", "created_at"}
+        })
+        incoming.course_location = None
+        incoming.extraction_method = {}
+        assert p.compatible_identity(incoming, stored[0]), (p.identity(incoming), p.identity(stored[0]))
+        assert p.compatible_identity(incoming, stored[1]), (p.identity(incoming), p.identity(stored[1]))
+        monkeypatch.setattr(p, "candidates", lambda _: {"": incoming})
+        with pytest.raises(ValueError, match="multiple pending offerings"):
+            await p.match_pending(db, incoming)
+
+
+async def make_old_duplicate(store, monkeypatch):
+    """Reproduce a pre-fix incomplete import without changing its saved payload."""
+    from datetime import datetime, timezone
+    from app.services.scraper import pending_imports as p
+    first = await stage(store, "first", study_load="Full Time")
+    sessions, uid = store
+    async with sessions() as db:
+        job = await db.get(ScrapeRuntimeJob, "second")
+        job.request_payload = {"fullCatalogueReviewOnly": True}
+        job.started_at = datetime.now(timezone.utc)
+        job.status = "completed"
+        await db.commit()
+    original_match = p.compatible_identity
+    monkeypatch.setattr(p, "compatible_identity", lambda *_: False)
+    repeated = await stage(store, "second", study_load=None)
+    monkeypatch.setattr(p, "compatible_identity", original_match)
+    assert repeated.scraped_course_id != first.scraped_course_id
+    from app.services import assistant_import_cleanup as cleanup
+    async with sessions() as db:
+        job, rows, snapshots, audited = await cleanup.load(db, uid, "second")
+        found = cleanup.pairs(rows, snapshots, job, audited)
+        diagnostics = []
+        for snapshot in snapshots:
+            for data in (snapshot.original_extraction or {}).get("incoming", []):
+                copy = next(row for row in rows if row.id == repeated.scraped_course_id)
+                diagnostics.append({
+                    column.key: (data.get(column.key), getattr(copy, column.key))
+                    for column in ScrapedCourse.__table__.columns
+                    if column.key not in cleanup.METADATA
+                    and data.get(column.key) != getattr(copy, column.key)
+                })
+        if len(found) != 1:
+            import json
+            copy = next(row for row in rows if row.id == repeated.scraped_course_id)
+            print("SNAPSHOT_DIFF", json.dumps([{
+                "type": s.snapshot_type, "scope": (s.original_extraction or {}).get("fee_scope_key"),
+                "schema": (s.original_extraction or {}).get("schema"),
+                "identities": (s.original_extraction or {}).get("offeringIdentities"),
+                "incomingSchema": [(v.get("_snapshot_schema"),v.get("course_name")) for v in (s.original_extraction or {}).get("incoming",[])],
+                "reused": (s.original_extraction or {}).get("reused"),
+                "rowScope": copy.fee_scope_key,
+                "differences": {
+                    c.key: ((s.original_extraction or {}).get(c.key), getattr(copy, c.key))
+                    for c in ScrapedCourse.__table__.columns
+                    if c.key not in cleanup.METADATA
+                    and (s.original_extraction or {}).get(c.key) != getattr(copy, c.key)
+                },
+            } for s in snapshots], default=str))
+        assert len(found) == 1, ([(row.id, cleanup.pristine(row, snapshots)) for row in rows], diagnostics)
+        copy, original = found[0]
+        action = {
+            "id": "cleanup-test", "_universityId": uid, "_sourceJobId": "second",
+            "courseCount": 1, "_turnId": "test-turn",
+            "_targets": [{
+                "id": copy.id, "keepId": original.id, "name": copy.course_name,
+                "version": cleanup.version(copy), "keepVersion": cleanup.version(original),
+                "before": {key: getattr(copy, key) for key in cleanup.WRITTEN},
+            }],
+        }
+        before = {c.key: deepcopy(getattr(original, c.key)) for c in ScrapedCourse.__table__.columns}
+    return cleanup, first.scraped_course_id, repeated.scraped_course_id, action, before
+
+
+@pytest.mark.asyncio
+async def test_import_cleanup_and_undo_preserve_original_values_and_evidence(store, monkeypatch):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    cleanup, original_id, copy_id, action, before = await make_old_duplicate(store, monkeypatch)
+    sessions, uid = store
+    monkeypatch.setattr(cleanup, "permissions", lambda _: None)
+    service = SimpleNamespace(now=lambda: datetime.now(timezone.utc))
+    async with sessions() as db:
+        snapshots_before = len((await db.execute(select(PageSnapshot))).scalars().all())
+        await cleanup.apply(service, db, action, uid, 1)
+        await db.commit()
+        original, copy = await db.get(ScrapedCourse, original_id), await db.get(ScrapedCourse, copy_id)
+        assert {c.key: getattr(original, c.key) for c in ScrapedCourse.__table__.columns} == before
+        assert copy.status == "rejected" and copy.rejection_reason == f"duplicate_import_of:{original_id}"
+        assert len((await db.execute(select(PageSnapshot))).scalars().all()) == snapshots_before + 1
+        assert original_id in await linked_course_ids(db, ["second"], uid)
+        await cleanup.apply(service, db, cleanup.undo_proposal(action), uid, 1, undo=True)
+        await db.commit()
+        assert copy.status == "pending" and copy.reviewed_at is None and copy.rejection_reason is None
+        assert {c.key: getattr(original, c.key) for c in ScrapedCourse.__table__.columns} == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("which", ["copy", "original"])
+async def test_import_cleanup_refuses_any_changed_row_before_writing(store, monkeypatch, which):
+    from types import SimpleNamespace
+    cleanup, original_id, copy_id, action, before = await make_old_duplicate(store, monkeypatch)
+    sessions, uid = store
+    monkeypatch.setattr(cleanup, "permissions", lambda _: None)
+    async with sessions() as db:
+        changed = await db.get(ScrapedCourse, copy_id if which == "copy" else original_id)
+        changed.notes = "A later staff edit must not be discarded"
+        await db.commit()
+        with pytest.raises(ValueError, match="changed"):
+            await cleanup.apply(SimpleNamespace(), db, action, uid, 1)
+        await db.rollback()
+        assert (await db.get(ScrapedCourse, copy_id)).status == "pending"

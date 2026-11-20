@@ -330,6 +330,12 @@ async def investigate(thread_id: str, turn_id: str):
                 await assistant_eligibility.run(
                     service, thread_id, turn_id, run_id, ctx, online_request["prompt"])
                 return
+            from app.services.assistant_import_cleanup import requested as import_cleanup_requested, handle as cleanup_imports
+            if import_cleanup_requested(requested["content"]):
+                cleanup_ctx = await context(claimed_thread.job_id)
+                await cleanup_imports(service, thread_id, turn_id, run_id, cleanup_ctx, requested["content"])
+                await run_automatic_action(thread_id, turn_id)
+                return
             from app.services.assistant_name_cleanup import requested as cleanup_requested, handle as cleanup_names
             if cleanup_requested(requested["content"]):
                 cleanup_ctx = await context(claimed_thread.job_id)

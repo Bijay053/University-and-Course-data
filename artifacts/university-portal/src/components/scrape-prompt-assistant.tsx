@@ -25,7 +25,7 @@ export { safeSourceUrl };
 export type AssistantSource = { url: string; title: string; excerpt: string; page?: number; quoteId?: string };
 export type AssistantAction = {
   id: string;
-  kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "exclude_online" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed" | "document_update" | "merge_intakes" | "undo_intake_merge" | "cleanup_names" | "undo_name_cleanup";
+  kind: "runtime_tuning" | "fix_fields" | "repair_catalogue" | "review_courses" | "recover_catalogue" | "scan_catalogue" | "exclude_domestic" | "exclude_online" | "undo_exclusion" | "approve_course" | "staff_location" | "undo_staff_location" | "staff_edit" | "retry_failed" | "document_update" | "merge_intakes" | "undo_intake_merge" | "cleanup_names" | "undo_name_cleanup" | "cleanup_import_duplicates" | "undo_import_cleanup";
   nameCleanup?: { beforeName: string; afterName: string; intakes: string[] }[];
   requiresConfirmation?: boolean;
   automaticPending?: boolean;
@@ -111,7 +111,7 @@ export const MAX_DOCUMENT_BYTES = 2_000_000;
 export function actionNeedsConfirmation(a: AssistantAction): boolean {
   return !!a.requiresConfirmation
     || (a.kind === "fix_fields" && a.requiresConfirmation !== false)
-    || ["runtime_tuning", "staff_edit", "staff_location", "undo_staff_location", "document_update", "undo_intake_merge", "cleanup_names", "undo_name_cleanup"].includes(a.kind);
+    || ["runtime_tuning", "staff_edit", "staff_location", "undo_staff_location", "document_update", "undo_intake_merge", "cleanup_names", "undo_name_cleanup", "cleanup_import_duplicates", "undo_import_cleanup"].includes(a.kind);
 }
 export function validateDocument(file: File): string | null {
   const isPdf = file.type === "application/pdf" && /\.pdf$/i.test(file.name);
@@ -192,7 +192,9 @@ export function currentTurnEvents(t: AssistantThread | null): AssistantActivity[
 function isActiveThread(t: AssistantThread | null): boolean {
   if (!t) return false;
   if (t.status === "queued" || t.status === "researching") return true;
-  return t.messages.some(m => m.actions?.some(a => a.state === "starting" || a.state === "running"));
+  if (t.messages.some(m => m.actions?.some(a => a.state === "starting" || a.state === "running"))) return true;
+  const current = t.turnId ? t.messages.filter(m => m.turnId === t.turnId) : t.messages.slice(-1);
+  return current.some(m => m.actions?.some(a => a.state === "proposed" && a.automaticPending));
 }
 
 /** Terminal actions that may have persisted data: completed, or errored after a batch started (jobId set). */

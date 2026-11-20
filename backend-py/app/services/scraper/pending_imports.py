@@ -10,10 +10,11 @@ from app.models.page_snapshot import PageSnapshot
 from app.services.scraper.url_identity import canonical_course_url_key
 
 ATTEMPT = "pending_import_attempt"
+RECONCILIATION = "pending_import_reconciliation"
 AUTO_MUTATION_SQL = """ AND status IN ('pending', 'review_ready')
  AND NOT EXISTS (
  SELECT 1 FROM page_snapshots AS import_attempt
- WHERE import_attempt.snapshot_type = 'pending_import_attempt'
+ WHERE import_attempt.snapshot_type IN ('pending_import_attempt', 'pending_import_reconciliation')
  AND import_attempt.university_id = scraped_courses.university_id
  AND import_attempt.original_extraction->'reused'
      @> jsonb_build_array(jsonb_build_object('courseId', scraped_courses.id))
@@ -27,6 +28,20 @@ def automatic_mutation_clause():
 
 def norm(value):
     return " ".join(str(value or "").casefold().split())
+
+
+def compatible_identity(left, right):
+    """Missing extraction metadata is unknown, not a new delivery/fee variant.
+
+    URL, named award, level and explicit qualification scope must agree. Every
+    populated optional discriminator must agree too; callers must reject an
+    ambiguous match rather than choose between known variants.
+    """
+    a, b = identity(left), identity(right)
+    return (
+        all(a[i] == b[i] for i in (0, 1, 2, 3, 11))
+        and all(not a[i] or not b[i] or a[i] == b[i] for i in range(4, 11))
+    )
 
 
 def identity(row):
@@ -182,12 +197,18 @@ async def match_pending(db, row):
         .execution_options(populate_existing=True))).scalars().all()
     matches = {}
     for key, candidate in proposed.items():
-        match = next((old for old in existing
-                      if identity_token(candidate) in {
-                          originals.get(old.id), identity_token(old)
-                      }), None)
-        if match:
-            matches[key] = match
+        matching = [
+            old for old in existing
+            if identity_token(candidate) in {originals.get(old.id), identity_token(old)}
+            or compatible_identity(candidate, old)
+        ]
+        if len(matching) > 1:
+            raise ValueError(
+                "Incomplete source metadata matches multiple pending offerings; "
+                "review existing records before importing."
+            )
+        if matching:
+            matches[key] = matching[0]
     if len({old.id for old in matches.values()}) != len(matches):
         raise ValueError(
             "One pending record matches multiple source offerings; review its "
@@ -244,7 +265,7 @@ async def linked_course_ids(db, job_ids, university_id):
     payloads = (await db.execute(select(PageSnapshot.original_extraction).where(
         PageSnapshot.scrape_job_id.in_(job_ids),
         PageSnapshot.university_id == university_id,
-        PageSnapshot.snapshot_type == ATTEMPT,
+        PageSnapshot.snapshot_type.in_([ATTEMPT, RECONCILIATION]),
     ))).scalars().all()
     return {i for p in payloads for i in (p or {}).get("courseIds", [])
             if isinstance(i, int) and not isinstance(i, bool) and i > 0}
@@ -254,7 +275,7 @@ async def attempt_summary(db, job_id, university_id):
     attempts = (await db.execute(select(PageSnapshot).where(
         PageSnapshot.scrape_job_id == job_id,
         PageSnapshot.university_id == university_id,
-        PageSnapshot.snapshot_type == ATTEMPT,
+        PageSnapshot.snapshot_type.in_([ATTEMPT, RECONCILIATION]),
     ).order_by(PageSnapshot.id))).scalars().all()
     result = {}
     for attempt in attempts:
