@@ -35,6 +35,16 @@ def apply(title="Management - Master by Research (MRes)", extra="", schedule=SCH
     return payload, evidence
 
 
+@pytest.mark.parametrize("schedule", [SCHEDULE, ""])
+def test_part_time_only_masters_never_falls_back_to_full_time_profile(schedule):
+    payload, evidence = apply(
+        title="Sport Management MSc", schedule=schedule,
+        duration=DURATION.replace("18-24 months full time. ", ""),
+    )
+    assert "international_fee" not in payload
+    assert not evidence
+
+
 @pytest.mark.parametrize("title,amount,term", [
     ("Management - Master by Research (MRes)", 17600, "Full Course"),
     ("MSc Computing", 17600, "Full Course"),

@@ -269,6 +269,11 @@ def _apply_owned_english(main, title, location, url, payload, evidence):
 
 
 def _apply_fee(title, location, payload, evidence, sources, referral="", course_main=None):
+    duration = _facts(course_main).get("duration", "") if course_main is not None else ""
+    if re.search(r"\bpart[\s–-]*time\b", duration, re.I) and not re.search(
+        r"\bfull[\s–-]*time\b", duration, re.I
+    ):
+        return  # Full-time schedules do not establish part-time-only tuition.
     group = _fee_group(title)
     campus = _verified_location(location)
     mres = bool(re.search(r"\bMRes\b", title, re.I) and not re.search(

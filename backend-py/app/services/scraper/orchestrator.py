@@ -3802,8 +3802,16 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             replay = LiveRepairEvidence({
                 "scrape_url": scrape_url, "effective_config": _uni_cfg,
             })
-            catalogue = await discover_official_catalogue(replay)
+            catalogue = await discover_official_catalogue(
+                replay, candidate_limit=max_courses,
+            )
             links = [{"url": url, "name": ""} for url in catalogue["candidates"]]
+            await emit(
+                "status",
+                f"[CATALOGUE] Read {len(links)} candidate links from the official source. "
+                "Course eligibility and field verification still follow.",
+                phase="discover", kind="official_catalogue_replay", count=len(links),
+            )
             _searchstax_cfg = None
             if not links:
                 job.status = "failed"

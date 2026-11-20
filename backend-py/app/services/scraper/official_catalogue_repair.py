@@ -184,7 +184,9 @@ def _sample_alternatives(urls, titles, sample):
     return _sitemap_sample([url for url in urls if _sample_family(url) not in identities], titles, 2)
 
 
-async def discover_official_catalogue(evidence, *, source_url: str | None = None) -> dict:
+async def discover_official_catalogue(
+    evidence, *, source_url: str | None = None, candidate_limit: int | None = None,
+) -> dict:
     from app.services.scraper.guards import classify_course_candidate, OBVIOUS_NON_DEGREE, is_blocked_page
     seed = evidence.ctx["scrape_url"]
     sample_cap = 2 if (
@@ -198,6 +200,13 @@ async def discover_official_catalogue(evidence, *, source_url: str | None = None
     except (TypeError, ValueError):
         configured_cap = _SITEMAP_MAX_CANDIDATES
     max_candidates = min(_SITEMAP_MAX_CANDIDATES, max(0, configured_cap))
+    if candidate_limit is not None:
+        if isinstance(candidate_limit, bool) or not isinstance(candidate_limit, int) or candidate_limit <= 0:
+            raise ValueError("An explicit discovery candidate limit must be a positive integer")
+        # The normal orchestrator already applies fast-run, university and
+        # verification bounds. Do not silently replace its limit with the
+        # repair evidence sample cap. Repair callers retain the 200 default.
+        max_candidates = candidate_limit
     from app.services.scraper.directory_catalogue import (
         collect_directory_catalogue, directory_roots,
     )
@@ -469,7 +478,9 @@ async def discover_official_catalogue(evidence, *, source_url: str | None = None
                     and link["url"] not in sources
                 ), None)
                 if declared:
-                    fallback = await discover_official_catalogue(evidence, source_url=declared)
+                    fallback = await discover_official_catalogue(
+                        evidence, source_url=declared, candidate_limit=candidate_limit,
+                    )
                     if fallback.get("source"):
                         # Preserve the complete replay descriptor. The caller
                         # bounds actual probes and stops after sufficient live
