@@ -87,6 +87,8 @@ def test_delivery_authority_precedes_online_early_return_and_survives_enrichment
     early_gate = source.index("_authoritative_online = (")
     assert source.index("_apply_cardiffmet_delivery(") < early_gate
     assert source.rindex("_apply_cardiffmet_delivery(") > early_gate
+    assert source.index("_apply_cardiffmet(") < early_gate
+    assert source.rindex("_apply_cardiffmet(") > early_gate
 
 
 def test_campus_does_not_erase_an_existing_blended_offering():
