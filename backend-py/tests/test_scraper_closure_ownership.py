@@ -91,3 +91,40 @@ async def test_old_needs_review_summary_refreshes_once_without_rerunning_or_edit
         await scrape_assistant.response(thread,db)
         assert spy.call_count == 1
         assert (await db.get(ScrapedCourse,1)).international_fee == 9790
+
+
+@pytest.mark.asyncio
+async def test_saved_band_correction_summary_refreshes_without_replaying_writes(store, monkeypatch):
+    from app.models import ScrapeRuntimeJob, ScrapedCourse
+    from app.models.scrape_assistant import ScrapeAssistantThread
+    from app.routers import scrape, scrape_assistant
+    from app.services.assistant_fix_outcome import FIX_OUTCOME_VERSION
+    result = {"id": 1, "ok": True, "outcome": "completed", "made_progress": True,
+              "updated_fields": [], "all_updated_fields": ["ielts_listening", "ielts_speaking"]}
+    async with store() as db:
+        row = await db.get(ScrapedCourse, 1)
+        original = (row.ielts_listening, row.ielts_speaking)
+        db.add(ScrapeRuntimeJob(
+            runtime_job_id="finished-ielts", university_id=1, job_type="bulk_fix",
+            status="completed", current=1, total_found=1,
+            request_payload={"ids": [1], "targetFields": ["ielts_overall"]},
+            approval_summary={"results": [result]}))
+        thread = ScrapeAssistantThread(
+            id="ielts-thread", job_id="source", actor_id=1, turn_id="turn", status="ready",
+            phase="", messages=[{"role": "assistant", "content": "Result", "actions": [{
+                "id": "band-action", "kind": "fix_fields", "jobId": "finished-ielts",
+                "state": "needs_review", "_fixOutcomeVersion": 3, "_ids": [1],
+                "fields": ["ielts_overall"], "courseCount": 1, "courseScope": [{"id": 1}]}]}])
+        db.add(thread)
+        await db.commit()
+        spy = Mock(wraps=scrape._bulk_fix_job_dict)
+        monkeypatch.setattr(scrape, "_bulk_fix_job_dict", spy)
+        await scrape_assistant.response(thread, db)
+        action = thread.messages[-1]["actions"][0]
+        assert action["_fixOutcomeVersion"] == FIX_OUTCOME_VERSION
+        assert action["state"] == "needs_review"
+        assert "1 course with requested field values corrected" in action["resultSummary"]
+        assert "Finishing the job did not verify" not in action["resultSummary"]
+        await scrape_assistant.response(thread, db)
+        assert spy.call_count == 1
+        assert (row.ielts_listening, row.ielts_speaking) == original

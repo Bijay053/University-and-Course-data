@@ -1,4 +1,6 @@
 """Regression: 40 saved intake corrections were labelled 177 unchanged."""
+import pytest
+
 from app.services.fix_field_changes import field_change_counts
 
 
@@ -100,3 +102,31 @@ def test_overall_alias_can_report_verified_band_repair_without_replaying_it():
     assert "1 repairs verified" in summary and "saved on 1 courses" in summary
     action["fields"] = []
     assert fix_outcome(action, job)[0] == "needs_review"
+
+
+def test_existing_score_correction_reports_saved_values_without_inventing_issue_resolution():
+    from app.services.assistant_fix_outcome import fix_outcome
+    action = {"_ids": [1], "fields": ["ielts_overall"]}
+    result = {"id": 1, "ok": True, "outcome": "completed", "made_progress": True,
+              "updated_fields": [], "all_updated_fields": ["ielts_listening", "ielts_speaking"]}
+    state, summary, _ = fix_outcome(action, {
+        "total": 1, "targetFields": ["ielts_overall"], "results": [result]})
+    assert state == "needs_review"
+    assert "1 course with requested field values corrected" in summary
+    assert "0 failed" in summary and "awaiting issue-resolution review" in summary
+    assert "repairs verified" not in summary
+    assert "without verified progress" not in summary
+    assert "Finishing the job did not verify a correction" not in summary
+
+
+@pytest.mark.parametrize("result_id,fields", [(2, ["ielts_listening"]), (1, ["international_fee"])])
+def test_saved_values_outside_requested_courses_or_fields_are_not_claimed(result_id, fields):
+    from app.services.assistant_fix_outcome import fix_outcome
+    action = {"_ids": [1], "fields": ["ielts_overall"]}
+    result = {"id": result_id, "ok": True, "outcome": "completed", "made_progress": True,
+              "all_updated_fields": fields}
+    state, summary, _ = fix_outcome(action, {
+        "total": 1, "targetFields": ["international_fee"], "results": [result]})
+    assert state == "needs_review"
+    assert "with requested field values corrected" not in summary
+    assert "Finishing the job did not verify a correction" in summary

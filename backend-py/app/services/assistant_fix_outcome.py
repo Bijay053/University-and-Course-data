@@ -1,6 +1,6 @@
 """A finished queue job is not proof of a repaired course."""
 
-FIX_OUTCOME_VERSION = 3
+FIX_OUTCOME_VERSION = 4
 
 
 def fix_outcome(action, job):
@@ -27,13 +27,27 @@ def fix_outcome(action, job):
                 and r.get("ok") is not False for r in results)
     failed = sum(r.get("ok") is False or r.get("outcome") == "failed" for r in results)
     unresolved = len(results) - repaired - clear - failed
-    summary = (
-        f"{len(results)}/{len(expected)} selected course results recorded: "
-        f"{repaired} repairs verified, {clear} already clear, "
-        f"{unresolved} without verified progress, {failed} failed. "
-        "No courses were approved or published."
+    changed = (
+        field_change_counts(
+            [r for r in results if r.get("id") in expected], requested_fields
+        )["valueUpdated"] if requested_fields else 0
     )
-    changed = field_change_counts(results, job.get("targetFields"))["valueUpdated"]
+    prefix = f"{len(results)}/{len(expected)} selected course results recorded: "
+    if changed:
+        summary = prefix + f"{changed} course{'s' if changed != 1 else ''} with requested field values corrected"
+        if repaired:
+            summary += f", {repaired} repairs verified"
+        if clear:
+            summary += f", {clear} already clear"
+        if unresolved:
+            summary += f", {unresolved} awaiting issue-resolution review"
+        summary += f", {failed} failed. No courses were approved or published."
+    else:
+        summary = (
+            prefix + f"{repaired} repairs verified, {clear} already clear, "
+            f"{unresolved} without verified progress, {failed} failed. "
+            "No courses were approved or published."
+        )
     if changed:
         summary += (
             f" Requested field values were saved on {changed} courses; "
@@ -41,7 +55,7 @@ def fix_outcome(action, job):
         )
     if not complete:
         summary += " The recorded results do not cover the exact requested scope."
-    if not repaired and not clear:
+    if not repaired and not clear and not changed:
         summary += " Finishing the job did not verify a correction."
     successful = complete and not failed and not unresolved and bool(repaired or clear)
     scope = {r["id"]: r for r in action.get("courseScope", [])}
