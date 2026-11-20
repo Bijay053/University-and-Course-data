@@ -153,7 +153,17 @@ def _has_unparsed_ielts_table(main):
 
 
 def _english_section(node):
-    if re.match(r"English Language Requirements?:", node.get_text(" ", strip=True), re.I):
+    text = " ".join(node.get_text(" ", strip=True).split())
+    if any(re.search(r"related|recommend|course[-_]?card",
+                     " ".join(parent.get("class", [])) + " " + parent.get("id", ""), re.I)
+           for parent in node.parents if getattr(parent, "attrs", None)):
+        return False
+    if re.match(r"English Language Requirements?:", text, re.I):
+        return True
+    if re.match(
+        r"(?:International Applicants:?\s+)?(?:Students|Applicants) whose first language "
+        r"is not English will need to provide evidence of fluency", text, re.I,
+    ):
         return True
     heading = node.find_previous(["h2", "h3", "h4", "h5"])
     if heading and re.search(
@@ -168,14 +178,18 @@ def _english_section(node):
 
 
 def _apply_owned_english(main, title, location, url, payload, evidence):
-    if not _verified_location(location, allow_online=True) or _has_unparsed_ielts_table(main):
+    if _has_unparsed_ielts_table(main):
         return
+    known_location = _verified_location(location, allow_online=True)
     score = r"([0-9](?:\.[05])?)"
     lead = rf"\bIELTS(?:\s+Academic)?\s+(?:score(?:\s+of)?\s+)?{score}\s+"
     patterns = (
         lead + rf"(?:overall\s+|standard\s+)?with no sub[ -]?score lower than {score}\b",
         lead + rf"overall,?\s*with at least {score} in all elements\b",
     )
+    skill = r"(listening|reading|writing|speaking)"
+    paired = (lead + rf"overall,?\s+with\s+{score}\s+in\s+{skill}\s+and\s+{skill},?"
+              rf"\s+and\s+{score}\s+in\s+{skill}\s+and\s+{skill}\b")
     found = set()
     all_overalls = set()
     for p in main.find_all(["p", "li"]):
@@ -183,14 +197,23 @@ def _apply_owned_english(main, title, location, url, payload, evidence):
         all_overalls.update(float(value) for value in re.findall(
             r"\bIELTS(?:\s+Academic)?\s+(?:score(?:\s+of)?\s+)?([0-9](?:\.[05])?)\b",
             text, re.I))
-        matches = [match for pattern in patterns if (match := re.search(pattern, text, re.I))]
+        rules = []
+        for pattern in patterns:
+            if match := re.search(pattern, text, re.I):
+                rules.append((match, (float(match[1]), *([float(match[2])] * 4))))
+        if match := re.search(paired, text, re.I):
+            skills = (match[3].lower(), match[4].lower(), match[6].lower(), match[7].lower())
+            if len(set(skills)) == 4:
+                values = dict(zip(skills, (float(match[2]), float(match[2]),
+                                          float(match[5]), float(match[5]))))
+                rules.append((match, (float(match[1]), *(values[field[6:]] for field in IELTS[1:]))))
         if re.search(r"\bIELTS\b", text, re.I) and re.search(
             r"\bmay\b|except|pathway|reading|writing|listening|speaking|recommend"
             r"|\bbands?\b|component|sub[ -]?score|\belements?\b", text, re.I
         ):
-            if not matches:
+            if not rules:
                 return
-            for match in matches:
+            for match, _ in rules:
                 remaining = text[:match.start()] + text[match.end():]
                 if re.search(
                     r"\bmay\b|except|pathway|reading|writing|listening|speaking|recommend"
@@ -198,21 +221,25 @@ def _apply_owned_english(main, title, location, url, payload, evidence):
                 ):
                     return
         if not _english_section(p) or re.search(
-            r"\bmay\b|except|pathway|reading|writing|listening|speaking|recommend", text, re.I
+            r"\bmay\b|except|pathway|recommend", text, re.I
         ):
             continue
-        for match in matches:
-            if match and 0 < float(match[2]) <= float(match[1]) <= 9:
-                found.add((float(match[1]), float(match[2]), text))
-    pairs = {(overall, band) for overall, band, _ in found}
-    if len(pairs) != 1:
+        # A labelled course entry requirement covers this award even when its
+        # location includes a partner. Do not inherit a central campus policy.
+        if not known_location and not re.match(r"English Language Requirements?:", text, re.I):
+            continue
+        for _, values in rules:
+            if 0 < min(values[1:]) <= max(values[1:]) <= values[0] <= 9:
+                found.add((values, text))
+    vectors = {values for values, _ in found}
+    if len(vectors) != 1:
         return
-    overall, band = next(iter(pairs))
-    if all_overalls != {overall}:
+    values = next(iter(vectors))
+    if all_overalls != {values[0]}:
         return
-    quote = min(text for value, minimum, text in found if (value, minimum) == (overall, band))
-    for field in IELTS:
-        _write(payload, evidence, field, overall if field == IELTS[0] else band,
+    quote = min(text for candidate, text in found if candidate == values)
+    for field, value in zip(IELTS, values):
+        _write(payload, evidence, field, value,
                title + "\nCourse-owned requirement: " + quote, url,
                "english.cardiffmet_course_requirement", replace=True)
 
@@ -320,7 +347,10 @@ def _apply_linked_selt(main, title, location, url, payload, evidence, sources):
     values, table_quote = matches[0]
     if any(values[field] != value for rule in constraints for field, value in rule.items()):
         return
-    if any(payload.get(field) not in (None, "", value) for field, value in values.items()):
+    conflicts = {field for field, value in values.items()
+                 if payload.get(field) not in (None, "", value)}
+    constrained = {field for rule in constraints for field in rule}
+    if conflicts and (not constraints or conflicts & (constrained | {IELTS[0]})):
         return
     quote = (
         f"Current course: {title}\nCourse source: {url}\nCourse requirement: {course_quote}\n"
@@ -328,7 +358,8 @@ def _apply_linked_selt(main, title, location, url, payload, evidence, sources):
         f"Courses with {overall:.1f} IELTS Requirements: {table_quote}"
     )
     for field, value in values.items():
-        _write(payload, evidence, field, value, quote, SELT, "english.cardiffmet_linked_selt")
+        _write(payload, evidence, field, value, quote, SELT, "english.cardiffmet_linked_selt",
+               replace=field in conflicts)
 
 
 def apply_authority(html, url, payload, evidence, sources=None):

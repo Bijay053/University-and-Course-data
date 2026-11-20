@@ -82,6 +82,17 @@ async def test_full_request_becomes_one_fenced_existing_row_action(monkeypatch):
     assert action["requiresConfirmation"] is True
     assert "_requestedUrls" not in action and "_values" not in action
     assert inspect.await_count == 3
+    assert len(action["_evidenceUrls"]) == 3
+    assert set(action["_evidenceUrls"]) <= {r["url"] for r in rows}
+    # Exercise the actual builder output, not a synthetic action with proof
+    # metadata that the production builder might have forgotten to retain.
+    from app.services.assistant_pending_automation import prepare
+    from copy import deepcopy
+    reply = {"actions": [deepcopy(action)]}
+    prepare(reply, {"autoRun": True, "content": MULTI},
+            SimpleNamespace(scrape_assistant_auto_pending_user_ids="1"), 1)
+    assert reply["actions"][0]["automaticPending"] is True
+    assert reply["actions"][0]["requiresConfirmation"] is False
     options = field_recheck_options(action)
     assert options["forceFields"] == ["intake_months", "international_fee"]
     assert set(options["forceReasons"]) == set(options["forceFields"])
@@ -111,6 +122,38 @@ async def test_short_current_review_request_needs_no_row_numbers(monkeypatch, pr
     assert action["_versions"] == ctx["versions"]
     assert action["requiresConfirmation"] is True
     assert "_requestedUrls" not in action and "_values" not in action
+    assert len(action["_evidenceUrls"]) == 3
+
+
+@pytest.mark.parametrize("actor,auto_run,prompt", [
+    (2, True, MULTI),
+    (1, False, MULTI),
+    (1, True, "Read-only: " + MULTI),
+])
+def test_sample_proof_does_not_bypass_account_or_request_consent(actor, auto_run, prompt):
+    from app.services.assistant_pending_automation import prepare
+    action = {"kind": "fix_fields", "state": "proposed", "courseCount": 49,
+              "_ids": list(range(1, 50)), "fields": ["ielts_overall"],
+              "_evidenceUrls": ["https://example.edu/course"], "requiresConfirmation": True}
+    prepare({"actions": [action]}, {"autoRun": auto_run, "content": prompt},
+            SimpleNamespace(scrape_assistant_auto_pending_user_ids="1"), actor)
+    assert action["requiresConfirmation"] is True
+    assert not action.get("automaticPending")
+
+
+@pytest.mark.asyncio
+async def test_failed_source_gate_creates_no_automatic_action(monkeypatch):
+    from app.services import scrape_assistant as service, assistant_source_cache
+    monkeypatch.setattr(assistant_source_cache, "cached_source",
+                        AsyncMock(return_value={"verified": False, "error": "Source unavailable"}))
+    save = AsyncMock()
+    fake = SimpleNamespace(action_proposal=service.action_proposal, now=service.now,
+                           inspect_source=AsyncMock(), save_research_reply=save)
+    ctx = {"samples": [{"id": 1, "name": "Course", "url": "https://example.edu/course"}],
+           "home": "https://example.edu", "versions": {"1": "original"}, "config_version": "config"}
+    assert await handle_field_edit(fake, "thread", "turn", "run", ctx,
+                                   "Repair missing IELTS bands in this review.")
+    assert save.call_args.args[3]["actions"] == []
 
 
 @pytest.mark.parametrize("prompt", [

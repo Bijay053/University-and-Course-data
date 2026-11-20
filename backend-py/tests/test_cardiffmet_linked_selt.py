@@ -94,6 +94,28 @@ def test_research_reading_writing_constraints_must_agree_with_linked_table(minim
         assert p["ielts_listening"] == p["ielts_speaking"] == 6.0
 
 
+def test_partial_research_rule_does_not_promote_reading_writing_minimum_to_other_skills():
+    extra = """<p>Students need to provide evidence of fluency to at least an IELTS 6.5 standard
+    (with minimum 6.5 in the Reading and Writing components) or equivalent.</p>"""
+    p, e = apply(score=6.5, extra=extra, payload=dict.fromkeys(c.IELTS, 6.5))
+    assert tuple(p[field] for field in c.IELTS) == (6.5, 6.0, 6.5, 6.5, 6.0)
+    assert {row["field_key"] for row in e} == {"ielts_listening", "ielts_speaking"}
+    for protected in ({"ielts_overall": 7.5}, {"ielts_reading": 7.0}):
+        assert apply(score=6.5, extra=extra, payload=protected)[0] == protected
+
+
+@pytest.mark.parametrize("prefix", ["<strong>International Applicants</strong><br>",
+                                  "<strong>International Applicants<br></strong><br>"])
+def test_same_paragraph_international_label_supports_a_published_score_bracket(prefix):
+    html = f"""<main><h1>International Banking and Finance - BSc</h1><div class="block-12__item">
+    <h4>Location</h4><p class="block-12__item-description">Llandaff Campus</p></div>
+    <p>{prefix}Students whose first language is not English will need to provide evidence
+    of fluency to at least an IELTS 6.0 standard or equivalent.</p></main>"""
+    p = {}
+    c.apply_authority(html, URL, p, [], {c.ENGLISH: HUB, c.SELT: TABLE})
+    assert tuple(p[field] for field in c.IELTS) == (6.0, 5.5, 5.5, 5.5, 5.5)
+
+
 def test_paragraph_heading_can_introduce_a_course_owned_international_requirement():
     html = f"""<main><h1>Professional Practice - MSc</h1><div class="block-12__item">
     <h4>Location</h4><p class="block-12__item-description">Online</p></div>

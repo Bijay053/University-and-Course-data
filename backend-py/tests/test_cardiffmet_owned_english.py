@@ -80,3 +80,43 @@ def test_shared_campus_prices_require_every_location_to_be_supported(location, v
 def test_primary_pgce_suffix_is_the_award_not_a_different_masters():
     assert c._fee_group("Primary (3-11 Age Range) with QTS - PGCE") == "PGCE"
     assert c._fee_group("Education with PGCE equivalency - MA") == "Postgraduate Masters Degree"
+
+
+@pytest.mark.parametrize("prefix", ["", "<strong>International Applicants</strong><br>",
+                                  "<span><strong>International Applicants<br></strong></span>"])
+def test_self_labelled_first_language_requirement_does_not_need_an_external_heading(prefix):
+    html = f"""<main><h1>Education - MA</h1><div class="block-12__item"><h4>Location</h4>
+    <p class="block-12__item-description">Cyncoed Campus</p></div>
+    <h3>Staff Expertise</h3><p>{prefix}{NUTRITION}</p></main>"""
+    p, e = {}, []
+    c.apply_authority(html, URL, p, e)
+    assert tuple(p[field] for field in c.IELTS) == (6.0, 5.5, 5.5, 5.5, 5.5)
+
+
+def test_explicit_two_skill_pairs_preserve_their_different_minimums():
+    text = ("Students whose first language is not English will need to provide evidence of fluency "
+            "to at least an academic IELTS 6.5 overall with 6.5 in writing and reading, "
+            "and 6.0 in speaking and listening.")
+    p, _ = run(text, payload={"ielts_speaking": 5.5})
+    assert tuple(p[field] for field in c.IELTS) == (6.5, 6.0, 6.5, 6.5, 6.0)
+    assert run(text.replace("speaking and listening", "writing and listening"))[0] == {}
+
+
+def test_labelled_social_work_entry_requirement_is_not_a_campus_fee_default():
+    html = """<main><h1>Social Work - BSc</h1><div class="block-12__item"><h4>Location</h4>
+    <p class="block-12__item-description">Llandaff Campus or Bridgend College</p></div>
+    <ul><li>English Language Requirement: Academic IELTS 7.0 overall with at least
+    6.5 in all elements, or equivalent.</li></ul></main>"""
+    p, _ = {}, []
+    c.apply_authority(html, URL, p, [])
+    assert tuple(p[field] for field in c.IELTS) == (7.0, 6.5, 6.5, 6.5, 6.5)
+    assert "international_fee" not in p
+
+
+def test_related_card_requirement_is_not_the_current_courses_admission_rule():
+    html = f"""<main><h1>Education - MA</h1><div class="block-12__item"><h4>Location</h4>
+    <p class="block-12__item-description">Cyncoed Campus</p></div>
+    <div class="related-courses"><h3>International Applicants</h3><p>{NUTRITION}</p></div></main>"""
+    p = {}
+    c.apply_authority(html, URL, p, [])
+    assert not p

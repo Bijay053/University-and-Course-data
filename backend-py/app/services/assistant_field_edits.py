@@ -182,9 +182,13 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
             action = service.action_proposal({"kind": "fix_fields", "fields": selected_fields}, [r["id"] for r in rows])
             from app.services.assistant_source_gate import require_reachable_sources, SOURCE_CACHE_SECONDS
             from app.services.assistant_source_cache import cached_source
+            verified_urls = set()
             async def inspect(url,home):
-                return await cached_source(service,thread_id,turn_id,run_id,url,home,
-                                           service.inspect_source,SOURCE_CACHE_SECONDS)
+                source = await cached_source(service,thread_id,turn_id,run_id,url,home,
+                                             service.inspect_source,SOURCE_CACHE_SECONDS)
+                if source.get("verified"):
+                    verified_urls.add(url)
+                return source
             try:
                 await require_reachable_sources([r.get("url") for r in rows],ctx["home"],inspect)
             except ValueError as exc:
@@ -194,6 +198,7 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
                 },detail="Source access failed; no bulk fix queued.")
                 return True
             action.update(_versions=ctx["versions"], _configVersion=ctx["config_version"],
+                          _evidenceUrls=sorted(verified_urls),
                           requiresConfirmation=len(rows) > 10,
                           _officialFieldRecheck=sorted(requested_fields),
                           courseScope=[{"id": r["id"], "name": r["name"],
