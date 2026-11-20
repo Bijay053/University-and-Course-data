@@ -5713,6 +5713,9 @@ async def extract_course(
     # ``study_mode:rule`` is deliberately excluded by the shared helper: broad
     # page text can be navigation or marketing copy and must not reject a
     # mixed/on-campus course.
+    from app.services.scraper.extractors.cardiffmet_delivery import apply_authority as _apply_cardiffmet_delivery
+    _apply_cardiffmet_delivery(html or "", url, payload, evidence,
+                              (uni_pdf_data or {}).get("cardiffmet_profile_sources"))
     from app.services.scraper.extractors.ulaw_campuses import apply_course_online_only_authority
     _ulaw_online_only = apply_course_online_only_authority(html or "", url, payload, evidence)
     _apply_explicit_online_title_authority(payload, evidence)

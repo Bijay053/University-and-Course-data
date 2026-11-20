@@ -78,3 +78,12 @@ def test_conflicting_selectable_locations_do_not_inherit_parent():
 
 def test_different_university_cannot_use_cardiffmet_programme_facts():
     assert run(CHILD.format(REFERRAL), url="https://example.org/courses/postgraduate/pgce/")[0]["online_only"]
+
+
+def test_delivery_authority_precedes_online_early_return_and_survives_enrichment():
+    from pathlib import Path
+    source = (Path(__file__).parents[1] /
+              "app/services/scraper/pipelines/single_course.py").read_text()
+    early_gate = source.index("_authoritative_online = (")
+    assert source.index("_apply_cardiffmet_delivery(") < early_gate
+    assert source.rindex("_apply_cardiffmet_delivery(") > early_gate
