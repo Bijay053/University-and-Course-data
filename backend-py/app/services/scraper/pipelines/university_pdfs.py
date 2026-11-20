@@ -1475,6 +1475,7 @@ async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, 
     if not out and not by_course:
         vision_text = await _vision_fallback_text(raw, "fee", url, emit)
         if vision_text:
+            text = vision_text
             by_course = _pick_per_course_amounts(vision_text)
             out = _pick_amounts_from_pdf_text(vision_text)
             if not out:
@@ -1497,6 +1498,8 @@ async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, 
         # can reach it without changing the existing top-level shape.
         out = dict(out)
         out["_by_course"] = by_course
+    if out and text:
+        out["_source_text"] = text
     return out
 
 
@@ -1613,6 +1616,9 @@ async def load_university_pdf_data(
 
     out: dict[str, Any] = {}
     if fee_data:
+        source_text = fee_data.pop("_source_text", "")
+        if source_text:
+            out["fee_text"] = source_text
         # Pop the per-course map off the inner dict so the public
         # ``fee`` block stays the same shape it has always been (just
         # the uni-wide values).
@@ -1633,4 +1639,15 @@ async def load_university_pdf_data(
         out["entry_requirements"] = _p6_entry_req
         if not out.get("requirements_pdf_url") and reqs_pdf_url:
             out["requirements_pdf_url"] = reqs_pdf_url
+    # The same loader serves full scrapes and staged re-extraction. Keep
+    # programme-profile prefetch here so Review -> Fix has identical sources.
+    from urllib.parse import urlsplit
+    from app.services.scraper.config.context import get_uni_config
+    cfg = get_uni_config()
+    if cfg and urlsplit(str(cfg.base_url)).hostname in {
+        "cardiffmet.ac.uk", "www.cardiffmet.ac.uk",
+    }:
+        from app.services.scraper.extractors.cardiffmet_facts import prefetch_sources
+        from app.services.scraper.http_fetcher import fetch_html
+        out["cardiffmet_profile_sources"] = await prefetch_sources(fetch_html)
     return out

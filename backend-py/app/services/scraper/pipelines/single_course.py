@@ -9466,14 +9466,10 @@ async def extract_course(
         # symptom).
         #
         # The guard is text-based, so we can only run it when the loader
-        # surfaces ``fee_text`` (the raw extracted PDF text we'd grep for
-        # course-name tokens). Today ``load_university_pdf_data`` only
-        # returns the parsed numbers, not the source text — wiring that
-        # through is a follow-up. Until then, fail-OPEN when no text is
-        # available (preserves v1 behavior) and fail-CLOSED only when the
-        # caller has supplied text we can actually evaluate against.
-        # (Code-review feedback on PR-1: avoid silently dropping every
-        # uni-PDF fallback now that we lack the text channel.)
+        # surfaces ``fee_text`` (the raw extracted PDF text used to check
+        # course-name applicability).
+        # The loader now retains the source text. A parsed university-wide
+        # number without applicability evidence must remain missing.
         # The guard is intentionally bypassed when we have a per-course
         # row — that row IS the course-specific evidence the guard is
         # asking for, so applying the guard a second time would be
@@ -9483,11 +9479,29 @@ async def extract_course(
         unique_amounts = (
             [int(fee_amount)] if isinstance(fee_amount, (int, float)) else []
         )
-        trust_fee_fallback = True
+        trust_fee_fallback = fee_method != "uni_pdf:fees"
+        if fee_method == "uni_pdf:fees":
+            # An unmatched PDF number is not an international tuition default.
+            # Mixed schedules require a matched course row; never select one
+            # audience/price from the entire document and clone it catalogue-wide.
+            source_prices = {
+                float(v.replace(",", "")) for v in re.findall(
+                    r"(?:£|\$|€|\b(?:AUD|GBP|USD|NZD|CAD)\s*)\s*"
+                    r"(\d[\d,]*(?:\.\d{1,2})?)", fee_search_text, re.I)
+            }
+            trust_fee_fallback = bool(
+                fees_pdf_url
+                and re.search(r"\b(?:international|overseas)\b", fee_search_text, re.I)
+                and re.search(r"\b(?:tuition|course fees?|programme fees?|program fees?)\b",
+                              fee_search_text, re.I)
+                and len(source_prices) == 1
+                and fee_amount in source_prices
+            )
         if (
             fee_block
             and fees_pdf_url
             and fee_search_text
+            and trust_fee_fallback
             and fee_method == "uni_pdf:fees"  # only guard the uni-wide stamp
         ):
             try:
@@ -11892,6 +11906,9 @@ async def extract_course(
     _apply_lsbu_fee(html or "", url, payload, evidence)
     from app.services.scraper.extractors.uws_facts import apply_course_authority as _apply_uws
     _apply_uws(html or "", url, payload, evidence)
+    from app.services.scraper.extractors.cardiffmet_facts import apply_authority as _apply_cardiffmet
+    _apply_cardiffmet(html or "", url, payload, evidence,
+                      (uni_pdf_data or {}).get("cardiffmet_profile_sources"))
     from app.services.scraper.extractors.uk_course_facts import apply_authority as _apply_surrey
     _apply_surrey(html or "", url, payload, evidence)
     from app.services.scraper.acap_source import apply_campus_authority as _apply_acap_campus

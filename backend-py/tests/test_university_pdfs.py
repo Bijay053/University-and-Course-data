@@ -128,7 +128,9 @@ async def test_load_university_pdf_data_parses_fee(monkeypatch):
     )
     assert "fee" in result
     assert result["fees_pdf_url"] == "https://example.com/fees.pdf"
+    assert result["fee_text"] == _FEE_PDF_TEXT
     fee = result["fee"]
+    assert "_source_text" not in fee
     # Either 24000, 28500 or 18000 — the extractor picks one (highest score).
     assert fee.get("international_fee") in (24000, 28500, 18000)
     assert (fee.get("currency") or "").upper() in ("AUD", "AU$", "$", "A$")
@@ -190,17 +192,34 @@ async def test_load_university_pdf_data_empty_when_no_config(monkeypatch):
     result = await university_pdfs.load_university_pdf_data(None, country="Australia")
     assert result == {}
     assert called == []
-
     result = await university_pdfs.load_university_pdf_data({}, country="Australia")
     assert result == {}
     assert called == []
 
 
 @pytest.mark.asyncio
+async def test_shared_loader_prefetches_cardiffmet_sources_once_for_reextraction(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from app.services.scraper.config import context
+    from app.services.scraper import http_fetcher
+    from app.services.scraper.extractors.cardiffmet_facts import FEES, PGCE
+
+    monkeypatch.setattr(context, "get_uni_config", lambda: SimpleNamespace(
+        base_url="https://www.cardiffmet.ac.uk"))
+    fetch = AsyncMock(return_value="<main>official source</main>")
+    monkeypatch.setattr(http_fetcher, "fetch_html", fetch)
+    result = await university_pdfs.load_university_pdf_data({}, "United Kingdom")
+    assert result["cardiffmet_profile_sources"] == {
+        FEES: "<main>official source</main>", PGCE: "<main>official source</main>"}
+    assert fetch.await_count == 2
+
+@pytest.mark.asyncio
 async def test_extract_course_backfills_from_uni_pdf(monkeypatch):
     """Course HTML has no fee/IELTS → uni-PDF data fills them."""
     uni_pdf_data = {
         "fee": {"international_fee": 24000, "currency": "AUD", "fee_term": "year"},
+        "fee_text": "Bachelor of Cybersecurity international tuition fee AUD 24,000 per year.",
         "english": {"ielts_overall": 6.0, "ielts_listening": 5.5},
         "fees_pdf_url": "https://example.com/fees.pdf",
         "requirements_pdf_url": "https://example.com/policy.pdf",
@@ -224,6 +243,24 @@ async def test_extract_course_backfills_from_uni_pdf(monkeypatch):
     methods = {(e.get("field_key"), e.get("method")) for e in out["evidence"]}
     assert ("international_fee", "uni_pdf:fees") in methods
     assert ("ielts_overall", "uni_pdf:requirements") in methods
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source_text", [
+    None, "", "University funding policy: loan limit GBP 8,000.",
+    "Bachelor of Cybersecurity domestic tuition fee GBP 8,000.",
+    "Bachelor of Cybersecurity home tuition GBP 8,000; international tuition GBP 17,600.",
+])
+async def test_generic_pdf_price_without_applicable_source_does_not_stamp_courses(source_text):
+    data = {"fee": {"international_fee": 8000, "currency": "GBP", "fee_term": "Annual"},
+            "fees_pdf_url": "https://uni.example.com/funding-policy.pdf"}
+    if source_text is not None:
+        data["fee_text"] = source_text
+    out = await single_course.extract_course(
+        url="https://uni.example.com/cyber", country="United Kingdom",
+        html=_FEE_HTML_NOFEE, use_ai_fallback=False, uni_pdf_data=data)
+    assert out["payload"].get("international_fee") != 8000
+    assert not any(e.get("method") == "uni_pdf:fees" for e in out["evidence"])
 
 
 @pytest.mark.asyncio
@@ -323,6 +360,7 @@ async def test_extract_course_pdf_fills_through_empty_string_placeholder(
     """
     uni_pdf_data = {
         "fee": {"international_fee": 30000, "currency": "AUD", "fee_term": "Annual"},
+        "fee_text": "Master of Cybersecurity international tuition fee AUD 30,000 per year.",
         "english": {"ielts_overall": 6.5, "ielts_listening": 6.0},
         "fees_pdf_url": "https://example.com/fees.pdf",
         "requirements_pdf_url": "https://example.com/policy.pdf",
