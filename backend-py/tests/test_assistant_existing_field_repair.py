@@ -187,6 +187,41 @@ def test_recheck_cannot_force_unselected_or_unsupported_fields():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("prompt,recheck", [
+    ("Correct the IELTS band scores for Management - Master by Research (MRes).", True),
+    ("Please recheck and correct the IELTS scores for Management - Master by Research (MRes).", True),
+    ("Fix incorrect IELTS bands for Management - Master by Research (MRes).", True),
+    ("Repair missing IELTS bands for Management - Master by Research (MRes). "
+     "Preserve correct verified values.", False),
+])
+async def test_named_ielts_correction_rechecks_existing_scores_but_missing_only_does_not(monkeypatch, prompt, recheck):
+    from app.services import scrape_assistant as service, assistant_source_cache
+    from app.services.assistant_field_edits import existing_ielts_recheck
+    from app.routers.scrape import _targeted_reextract_fields
+    rows = [{"id": 1, "name": "Management - Master by Research (MRes)",
+             "url": "https://example.edu/courses/mres"},
+            {"id": 2, "name": "Computing MSc", "url": "https://example.edu/courses/computing"}]
+    ctx = {"samples": rows, "home": "https://example.edu",
+           "versions": {"1": "first", "2": "second"}, "config_version": "config"}
+    monkeypatch.setattr(assistant_source_cache, "cached_source", AsyncMock(return_value={"verified": True}))
+    save = AsyncMock()
+    fake = SimpleNamespace(action_proposal=service.action_proposal, now=service.now,
+                           inspect_source=AsyncMock(), save_research_reply=save)
+    assert await handle_field_edit(fake, "thread", "turn", "run", ctx, prompt)
+    action = save.call_args.args[3]["actions"][0]
+    assert action["_ids"] == [1]
+    assert action["_officialIeltsRecheck"] is recheck
+    assert existing_ielts_recheck(action) is recheck
+    assert field_recheck_options(action) == {}
+    assert _targeted_reextract_fields(action["fields"]) == {
+        "ielts_overall", "ielts_listening", "ielts_reading", "ielts_writing", "ielts_speaking"}
+    if recheck:
+        for change in ({"_evidenceUrls": []}, {"_officialFieldRecheck": []},
+                       {"fields": ["international_fee"]}, {"_officialIeltsRecheck": False}):
+            assert not existing_ielts_recheck({**action, **change})
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("host,fields,expected", [
     ("www.cardiffmet.ac.uk", ["international_fee"], True),
     ("www.cardiffmet.ac.uk", ["ielts_overall"], True),

@@ -20,8 +20,9 @@ async def test_no_bulk_job_dispatched_when_site_unreachable(store,monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("access_refused", [False, True])
+@pytest.mark.parametrize("existing_scores", [False, True])
 async def test_confirmation_uses_bounded_fallback_without_ignoring_access_refusal(
-    store, monkeypatch, access_refused,
+    store, monkeypatch, access_refused, existing_scores,
 ):
     from copy import deepcopy
     from app.models import ScrapedCourse, ScrapeRuntimeJob
@@ -39,12 +40,15 @@ async def test_confirmation_uses_bounded_fallback_without_ignoring_access_refusa
                 **({"accessIssue": "robots_unavailable"} if access_refused
                    else {"failureStage": "source_body"})}
 
-    async def cached(service, thread_id, turn_id, run_id, url, home, reader, timeout):
+    async def cached(service, thread_id, turn_id, run_id, url, home, reader, timeout,
+                     *, html_delivery_schema=None):
         assert timeout == 16
+        assert html_delivery_schema is None
         return await reader(url, home)
 
     async def dispatch(body, db, actor):
         assert body.target_fields == ["ielts_overall"]
+        assert body.smart is not existing_scores
         dispatched.append(body.ids)
         db.add(ScrapeRuntimeJob(
             runtime_job_id="bulk-seven", university_id=1, job_type="bulk_fix",
@@ -67,6 +71,10 @@ async def test_confirmation_uses_bounded_fallback_without_ignoring_access_refusa
         action["fields"] = ["ielts_overall"]
         action["_ids"] = list(range(1, 8))
         action["courseCount"] = 7
+        if existing_scores:
+            action.update(_officialIeltsRecheck=True,
+                          _officialFieldRecheck=["ielts_overall"],
+                          _evidenceUrls=["https://www.example.edu/course-6"])
         action["_versions"].update({str(row.id): service.row_version(row) for row in extra})
         thread = await db.get(ScrapeAssistantThread, "ready")
         messages = deepcopy(thread.messages)

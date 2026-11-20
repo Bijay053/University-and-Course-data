@@ -76,6 +76,21 @@ def field_recheck_options(action):
     }
 
 
+def existing_ielts_recheck(action):
+    """Explicit, source-gated rechecks use the existing targeted refresh mode.
+
+    Missing-only recovery remains issue-aware. A correction request must not
+    skip existing scores merely because all five numbers are populated.
+    """
+    return (
+        action.get("kind") == "fix_fields"
+        and action.get("_officialIeltsRecheck") is True
+        and set(action.get("fields", [])) == {"ielts_overall"}
+        and set(action.get("_officialFieldRecheck", [])) == {"ielts_overall"}
+        and bool(action.get("_evidenceUrls"))
+    )
+
+
 def edit_field(prompt):
     if re.search(r"\b(?:don't|do not|never)\s+(?:add|set|change|update|edit)\b", prompt, re.I):
         return None
@@ -201,6 +216,13 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
                           _evidenceUrls=sorted(verified_urls),
                           requiresConfirmation=len(rows) > 10,
                           _officialFieldRecheck=sorted(requested_fields),
+                          _officialIeltsRecheck=(
+                              selected_fields == ["ielts_overall"]
+                              and bool(re.match(
+                                  r"\s*(?:please\s+)?(?:(?:correct|(?:recheck|check)\s+and\s+correct)"
+                                  r"\s+(?:the\s+)?(?:incorrect\s+|wrong\s+)?"
+                                  r"|(?:fix|repair)\s+(?:the\s+)?(?:incorrect|wrong)\s+)ielts\b",
+                                  prompt, re.I))),
                           courseScope=[{"id": r["id"], "name": r["name"],
                                         "url": r.get("url")} for r in rows])
             await service.save_research_reply(thread_id, turn_id, run_id, {
