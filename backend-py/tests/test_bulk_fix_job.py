@@ -32,6 +32,51 @@ class _Session:
     async def rollback(self):
         return None
 
+    async def refresh(self, job, attribute_names=None):
+        assert job is self.job
+        if not hasattr(job, "stop_requested"):
+            job.stop_requested = False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stop_after", [0, 5, 12])
+async def test_bulk_fix_obeys_persisted_stop_and_never_overwrites_it_as_completed(monkeypatch, stop_after):
+    from unittest.mock import AsyncMock
+    from app.routers import scrape as scrape_router
+    from app.services.scraper import job_claim
+    from app.tasks import scrape_tasks
+
+    ids = list(range(1, 13))
+    job = SimpleNamespace(
+        request_payload={"courseIds": ids}, approval_summary={}, university_id=7,
+        current=0, imported=0, skipped=0, errors=0, heartbeat_at=None,
+        status="stopped" if stop_after == 0 else "running",
+        stop_requested=stop_after == 0, completed_at=None, error_message=None,
+    )
+    session = _Session(job)
+    monkeypatch.setattr(scrape_tasks, "AsyncSessionLocal", lambda: session)
+    monkeypatch.setattr(job_claim, "claim_runtime_job", AsyncMock(return_value=True))
+    seen = []
+
+    async def extract(body, db):
+        seen.extend(body.ids)
+        if len(seen) >= stop_after:
+            job.stop_requested = True
+            job.status = "stopped"
+            job.error_message = "Stopped by user"
+        return {"results": [{"id": value, "ok": True, "updated_fields": ["duration"]} for value in body.ids]}
+
+    monkeypatch.setattr(scrape_router, "re_extract_staged", extract)
+    await scrape_tasks._async_bulk_fix("fix-stop")
+    assert seen == ids[:stop_after]
+    assert job.current == stop_after
+    assert job.status == "stopped"
+    assert job.error_message == "Stopped by user"
+    assert job.approval_summary["counts"]["queued"] == 0
+    assert job.approval_summary["counts"]["running"] == 0
+    assert job.approval_summary["counts"]["remaining"] == len(ids) - stop_after
+    assert [r["id"] for r in job.approval_summary["results"]] == seen
+
 
 @pytest.mark.asyncio
 async def test_smart_worker_distinguishes_attempts_from_skips(monkeypatch):

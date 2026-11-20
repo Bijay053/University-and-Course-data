@@ -365,7 +365,31 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
         failed = int(persisted_counts.get("failed") or job.errors or 0)
         resume_at = min(max(int(job.current or 0), 0), len(ids))
 
+        async def acknowledge_stop():
+            # The portal writes this flag in another database session. The
+            # worker's identity-map instance otherwise keeps the old False.
+            await db.refresh(job, attribute_names=[
+                "stop_requested", "status", "completed_at", "error_message",
+            ])
+            if not job.stop_requested and job.status not in {"stopped", "cancelled"}:
+                return False
+            job.status = "stopped"
+            job.completed_at = job.completed_at or datetime.now(timezone.utc)
+            job.error_message = job.error_message or "Stopped by user"
+            job.approval_summary = {
+                "counts": {
+                    "queued": 0, "running": 0, "completed": completed,
+                    "noProgress": no_progress, "failed": failed,
+                    "remaining": max(0, len(ids) - int(job.current or 0)),
+                },
+                "results": list(results),
+            }
+            await db.commit()
+            return True
+
         for offset in range(resume_at, len(ids), 5):
+            if await acknowledge_stop():
+                return
             chunk = ids[offset : offset + 5]
             job.approval_summary = {
                 "counts": {
@@ -482,6 +506,8 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
             }
             await db.commit()
 
+        if await acknowledge_stop():
+            return
         job.status = "completed" if failed == 0 else "completed_with_errors"
         job.completed_at = datetime.now(timezone.utc)
         job.approval_summary = {
