@@ -50,8 +50,10 @@ def test_published_audience_award_price_year_and_basis(title, amount, term):
     p, e = apply(course(title))
     assert (p["international_fee"], p["currency"], p["fee_year"], p["fee_term"]) == (
         amount, "GBP", 2026, term)
-    assert all(x["source_url"] == c.FEES for x in e)
-    assert all("2026/27" in x["snippet"] for x in e)
+    fee_evidence = [x for x in e if x["field_key"] != "course_name"]
+    assert fee_evidence
+    assert all(x["source_url"] == c.FEES for x in fee_evidence)
+    assert all("2026/27" in x["snippet"] for x in fee_evidence)
 
 
 @pytest.mark.parametrize("title,location", [
@@ -70,8 +72,8 @@ def test_existing_price_tuple_is_never_partially_replaced():
     before = {"international_fee": 21000, "currency": "GBP", "fee_year": 2027,
               "fee_term": "Annual"}
     p, e = apply(payload=dict(before))
-    assert p == before
-    assert not e
+    assert p == {**before, "course_name": "MSc Computing"}
+    assert not [x for x in e if x["field_key"] != "course_name"]
 
 
 def test_multiple_selected_location_variants_are_not_flattened():

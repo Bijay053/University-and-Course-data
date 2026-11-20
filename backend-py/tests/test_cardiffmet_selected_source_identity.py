@@ -44,10 +44,11 @@ def apply(html, url, payload):
     return evidence
 
 
-def test_rendered_own_heading_replaces_retry_sentinel_without_fabricating_fields():
+@pytest.mark.parametrize("existing_name", ["Targeted retry", "", None])
+def test_rendered_own_heading_replaces_retry_sentinel_without_fabricating_fields(existing_name):
     title = "Psychology in Education Master's Degree - MSc (Online)"
     html = f"<main><h1>{title}</h1><aside>MSc Another Course</aside></main>"
-    payload = {"course_name": "Targeted retry"}
+    payload = {"course_name": existing_name}
     evidence = apply(html, ONLINE, payload)
     assert payload == {"course_name": title}
     assert _name_has_degree_qualifier(payload["course_name"])

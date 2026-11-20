@@ -427,7 +427,7 @@ def apply_authority(html, url, payload, evidence, sources=None):
     title = main.find("h1").get_text(" ", strip=True)
     # A late rendered response must replace the retry sentinel rather than
     # letting a real, course-owned award be rejected as a category page.
-    if str(payload.get("course_name") or "").strip().casefold() == "targeted retry":
+    if str(payload.get("course_name") or "").strip().casefold() in {"", "targeted retry"}:
         from ..guards import _name_has_degree_qualifier
         if _name_has_degree_qualifier(title):
             _write(payload, evidence, "course_name", title, title, url,
