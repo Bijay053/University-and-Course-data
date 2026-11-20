@@ -150,6 +150,21 @@ def result(choices, *, incomplete=False):
 
 async def resolve(prompt, messages, ctx, factory, catalogue_reader):
     """Return None for a non-targeted prompt; unresolved names fail closed."""
+    from app.services.scrape_assistant_autorun import execution_requested
+    supplied = re.findall(r"https?://[^\s<>\"'`]+", prompt)
+    if (supplied and not execution_requested(prompt) and re.search(
+        r"\bread[- ]only\b|\bonly\s+(?:investigate|compare|explain|report)\b", prompt, re.I
+    )):
+        try:
+            for url in supplied:
+                official_url(url.rstrip(".,);]"), ctx["home"])
+        except (ValueError, TypeError):
+            pass
+        else:
+            # These are explicit evidence targets, not a fuzzy request for a
+            # different existing award. The ordinary source reader still owns
+            # access checks; read-only intent never authorises a record write.
+            return None
     from app.services.assistant_provider_repair import filter_diagnostic, requested as provider_request
     if filter_diagnostic(prompt) or provider_request(prompt):
         # Diagnostic logs can contain "diploma", "undergraduate" and course

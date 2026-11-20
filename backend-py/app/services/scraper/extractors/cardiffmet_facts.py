@@ -425,6 +425,30 @@ def apply_authority(html, url, payload, evidence, sources=None):
     if main is None or not main.find("h1"):
         return
     title = main.find("h1").get_text(" ", strip=True)
+    # A late rendered response must replace the retry sentinel rather than
+    # letting a real, course-owned award be rejected as a category page.
+    if str(payload.get("course_name") or "").strip().casefold() == "targeted retry":
+        from ..guards import _name_has_degree_qualifier
+        if _name_has_degree_qualifier(title):
+            _write(payload, evidence, "course_name", title, title, url,
+                   "name.cardiffmet_course_heading", replace=True)
+    # Cardiff's management foundation uses its school name in the H1 but
+    # publishes the programme name in the document title. Require agreement
+    # between that title, the school subject and the exact course path.
+    school = re.fullmatch(r"Foundation Year\s*[-–]\s*Cardiff School of (.+)", title, re.I)
+    document_title = BeautifulSoup(html or "", "html.parser").find("title")
+    published = re.fullmatch(
+        r"(Foundation in (.+?))\s*\|\s*Cardiff Metropolitan University",
+        document_title.get_text(" ", strip=True) if document_title else "", re.I,
+    )
+    if (school and published and school[1].casefold() == published[2].casefold()
+            and urlsplit(url).path.rstrip("/") == "/courses/undergraduate/foundation-in-" +
+            re.sub(r"[^a-z0-9]+", "-", published[2].casefold()).strip("-")):
+        _write(payload, evidence, "course_name", published[1],
+               f"{published[1]} | {title}", url, "name.cardiffmet_foundation_title",
+               replace=True)
+        _write(payload, evidence, "degree_level", "Foundation",
+               title, url, "level.cardiffmet_foundation_heading", replace=True)
     sources = sources or {}
     facts = _facts(main)
     for label in START_LABELS:
