@@ -81,3 +81,40 @@ def guarded_widget_tuition(html, url, rule):
     if proof["supported"]:
         return float(proof["amount"]), method, proof["excerpt"]
     return None
+
+
+def programme_overview_evidence(scoped_html, url):
+    """Identify a named award from this programme's own short overview only."""
+    if not is_programme_url(url):
+        return None
+    soup = BeautifulSoup(scoped_html, "html.parser")
+    main = soup.select_one("main#main")
+    if main is None or len(main.find_all("h1")) != 1:
+        return None
+    title = main.h1.get_text(" ", strip=True)
+    if not title:
+        return None
+    paragraphs = [p.get_text(" ", strip=True) for p in main.find_all("p", limit=4)]
+    # The selected subject must belong to the actual award phrase, not merely
+    # occur elsewhere in admissions prose or another programme's widget.
+    subject = re.escape(title)
+    named_award = re.compile(
+        r"\b(?:Master|Bachelor|Doctor)\s+of\s+"
+        r"(?:(?:Science|Arts|Education|Business Administration)\s+in\s+)?"
+        + subject + r"(?!\w)", re.I,
+    )
+    for paragraph in paragraphs:
+        if len(paragraph) > 1800 or re.search(
+            r"\b(?:applicants?|admission|entry requirements?|must possess|"
+            r"must hold|prior degree|previous degree)\b", paragraph, re.I
+        ):
+            continue
+        if named_award.search(paragraph):
+            structure = re.search(
+                r"\b(?:\d+|one|two|three|four|five|six)[ -]+years?\b"
+                r"|\b(?:coursework|research methods|research thesis|research project|"
+                r"program streams|programme streams)\b", paragraph, re.I,
+            )
+            if structure:
+                return paragraph
+    return None

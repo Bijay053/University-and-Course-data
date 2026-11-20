@@ -604,7 +604,8 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     if _incomplete_course_template(html):
         return {**result, "classification": "source_render_failure",
                 "reason": "Official course components failed to render; not listing or course evidence"}
-    soup = _sanitized_visible_document(html)
+    from app.services.scraper.extractors.acadia_html import scope_programme_html
+    soup = _sanitized_visible_document(scope_programme_html(html, url))
     # This template puts the selected programme's labelled facts in a sibling
     # aside, outside main. Copy only its own bounded Program Details block,
     # not the whole sidebar or neighbouring programme cards.
@@ -798,6 +799,15 @@ def inspect_page(url: str, html: str, config=None) -> dict:
         if re.search(r"\b(?:campus|location)\b\s*:\s*[A-Z][a-z]{2,}", text):
             facts.add("location")
     owned_award = "award" in facts
+    from app.services.scraper.extractors.acadia_html import programme_overview_evidence
+    programme_overview = programme_overview_evidence(owned_html, url)
+    if programme_overview:
+        # The normal extractor uses the same scoped programme document.
+        # A named award plus its own curriculum/duration is course identity,
+        # not permission to borrow fees or requirements from shared widgets.
+        facts.update(("award", "course_structure"))
+        owned_award = True
+        result["programme_identity_evidence"] = programme_overview
     # Some course heroes split the subject, award and UCAS code into siblings.
     # Bound ownership to the title's small wrapper; never scan the whole page
     # or use this to waive a shared URL/category gate.
