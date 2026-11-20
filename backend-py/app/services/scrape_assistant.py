@@ -388,7 +388,7 @@ async def investigate(thread_id: str, turn_id: str):
             # including a field-only follow-up to the previous user prompt.
             # Share this control across engines; do not let the legacy generic
             # edit fallback or the model turn it into discovery or copy a score.
-            from app.services.assistant_field_edits import evidence_edit_field, handle_field_edit
+            from app.services.assistant_field_edits import evidence_edit_field, evidence_edit_fields, handle_field_edit
             from app.services.assistant_fee_preview import requested as fee_preview_requested
             if fee_preview_requested(requested["content"]):
                 from app.services.assistant_fee_preview import handle as fee_preview
@@ -396,9 +396,10 @@ async def investigate(thread_id: str, turn_id: str):
                 await fee_preview(service, thread_id, turn_id, run_id,
                                   await context(claimed_thread.job_id), requested["content"])
                 return
-            if (not document_requested(requested)
-                    and evidence_edit_field(requested["content"], conversation_messages)
-                    in {"ielts", "fee", "fees", "tuition"}):
+            if (not document_requested(requested) and (
+                    len(evidence_edit_fields(requested["content"])) > 1
+                    or evidence_edit_field(requested["content"], conversation_messages)
+                    in {"ielts", "fee", "fees", "tuition"})):
                 ctx = await context(claimed_thread.job_id)
                 if await handle_field_edit(service, thread_id, turn_id, run_id, ctx,
                                            requested["content"], conversation_messages):

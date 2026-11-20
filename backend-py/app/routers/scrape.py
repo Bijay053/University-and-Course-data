@@ -2606,6 +2606,7 @@ async def re_extract_staged(
     # to per-course/default English values even when the university publishes a
     # course-specific central profile.
     central_data: dict | None = None
+    recovery_pdf_data: dict | None = None
     central_config: dict = {}
     _ulaw_defer_central = False
     try:
@@ -2654,6 +2655,16 @@ async def re_extract_staged(
                     central_config,
                     university_id=body.university_id,
                 )
+            if hostname in {"cardiffmet.ac.uk", "www.cardiffmet.ac.uk"} and (
+                not (body.target_fields or body.force_fields)
+                or any(field == "international_fee" or field.startswith("ielts_")
+                       for field in [*body.target_fields, *body.force_fields])
+            ):
+                from app.services.scraper.extractors.cardiffmet_facts import prefetch_sources
+                from app.services.scraper.http_fetcher import fetch_html
+                recovery_pdf_data = {
+                    "cardiffmet_profile_sources": await prefetch_sources(fetch_html),
+                }
     except Exception as exc:
         log.warning(
             "Central-page prefetch failed for staged re-extraction uni=%s: %s",
@@ -2830,6 +2841,7 @@ async def re_extract_staged(
                             {"url": fee_source_url, "name": row.course_name or ""},
                             country=country,
                             ai_provider="openai",
+                            uni_pdf_data=recovery_pdf_data,
                             central_data=central_data,
                         ),
                         timeout=min(

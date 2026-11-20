@@ -9,6 +9,50 @@ from app.models.scrape_assistant import ScrapeAssistantThread
 from app.services.scraper.excelsia_source import facts, intake_months, owned
 
 
+def evidence_edit_fields(prompt):
+    """Resolve positive existing-field instructions without dropping companions."""
+    from app.services.scrape_assistant_autorun import preview_requested
+    from app.services.assistant_action_scope import catalogue_forbidden
+    if preview_requested(prompt) or re.search(
+        r"\bread[- ]only\b|\b(?:only|just)\s+(?:explain|compare|investigate|report)\b",
+        prompt, re.I,
+    ):
+        return set()
+    text = re.sub(r"https?://\S+", " ", prompt).replace("’", "'")
+    positive = " ".join(
+        re.split(r"\b(?:do not|don't|dont|never)\b", clause, maxsplit=1, flags=re.I)[0]
+        for clause in re.split(r"[.;!?\n]|\b(?:but|then|however)\b", text, flags=re.I)
+    )
+    if (not re.search(r"\b(?:fix|correct|repair|update|add|set|edit|fill|re-?extract)\b", positive, re.I)
+            or re.search(r"\b(?:scraper|extractor)\b", positive, re.I)
+            or not catalogue_forbidden(positive)):
+        return set()
+    patterns = {
+        "international_fee": r"\b(?:fees?|tuition)\b",
+        "ielts_overall": r"\bielts\b",
+        "intake_months": r"\b(?:intakes?|start\s+dates?)\b",
+        "duration": r"\bdurations?\b",
+        "course_location": r"\b(?:locations?|campus)\b",
+        "study_mode": r"\b(?:study\s+mode|delivery)\b",
+    }
+    return {field for field, pattern in patterns.items() if re.search(pattern, positive, re.I)}
+
+
+def field_recheck_options(action):
+    """Only server-generated, selected-field rechecks may revisit populated values."""
+    fields = sorted(set(action.get("_officialFieldRecheck", []))
+                    & set(action.get("fields", []))
+                    & {"international_fee", "intake_months", "duration", "course_location", "study_mode"})
+    if not fields:
+        return {}
+    return {
+        "forceFields": fields,
+        "forceReasons": {field: "Staff requested correction of this existing field. "
+                         "Recheck its own applicable official evidence; preserve unsupported or conflicting values."
+                         for field in fields},
+    }
+
+
 def edit_field(prompt):
     if re.search(r"\b(?:don't|do not|never)\s+(?:add|set|change|update|edit)\b", prompt, re.I):
         return None
@@ -21,6 +65,11 @@ def edit_field(prompt):
 
 def evidence_edit_field(prompt, messages=()):
     """Resolve a field-only follow-up, never reuse an assistant's numeric claim."""
+    requested = evidence_edit_fields(prompt)
+    if len(requested) == 1:
+        return {"international_fee": "fee", "ielts_overall": "ielts",
+                "intake_months": "intakes", "course_location": "location",
+                "study_mode": "study_mode", "duration": "duration"}[next(iter(requested))]
     direct = edit_field(prompt)
     if direct:
         return direct
@@ -64,7 +113,10 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
         return False
     from app.services.assistant_eligibility import scope
     rows = scope(prompt, ctx["samples"])
+    requested_fields = evidence_edit_fields(prompt)
     field = evidence_edit_field(prompt, messages)
+    if len(requested_fields) > 1:
+        field = "multiple"
     if not field:
         # On an existing course, an unrecognised field must not become an
         # implicit add-course operation. Explicit add-course requests retain
@@ -100,8 +152,9 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
     elif field not in {"intake", "intakes"}:
         field_map = {"fee": "international_fee", "fees": "international_fee", "tuition": "international_fee",
                      "ielts": "ielts_overall", "duration": "duration", "location": "course_location", "campus": "course_location"}
-        if field in field_map:
-            action = service.action_proposal({"kind": "fix_fields", "fields": [field_map[field]]}, [r["id"] for r in rows])
+        if field in field_map or requested_fields:
+            selected_fields = sorted(requested_fields) if requested_fields else [field_map[field]]
+            action = service.action_proposal({"kind": "fix_fields", "fields": selected_fields}, [r["id"] for r in rows])
             from app.services.assistant_source_gate import require_reachable_sources, SOURCE_CACHE_SECONDS
             from app.services.assistant_source_cache import cached_source
             async def inspect(url,home):
@@ -117,6 +170,7 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
                 return True
             action.update(_versions=ctx["versions"], _configVersion=ctx["config_version"],
                           requiresConfirmation=len(rows) > 10,
+                          _officialFieldRecheck=sorted(requested_fields),
                           courseScope=[{"id": r["id"], "name": r["name"],
                                         "url": r.get("url")} for r in rows])
             await service.save_research_reply(thread_id, turn_id, run_id, {

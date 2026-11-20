@@ -5,6 +5,9 @@ import re
 
 def requested(prompt):
     from app.services.assistant_image_review import action_requested
+    from app.services.assistant_field_edits import evidence_edit_fields
+    if len(evidence_edit_fields(prompt)) > 1:
+        return False
     return bool(action_requested(prompt) and re.search(
         r"\b(?:intakes?|start\s+dates?)\b", prompt, re.I))
 
