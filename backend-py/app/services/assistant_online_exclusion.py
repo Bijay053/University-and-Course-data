@@ -237,9 +237,21 @@ async def check(service, thread_id, turn_id, run_id, row, home):
     # Remove a dated title suffix only when the selected URL proves the same
     # month/year; never erase a delivery variant or a mismatched intake.
     key = lambda value: family_identity({"title": value or "", "url": url})[0]
-    if not key(row["name"]) or key(row["name"]) not in {
-        key(proof.get("name")), key(source.get("courseTitle")),
-    }:
+    # An exact course URL and a unique course heading can establish the
+    # subject even when the CMS omits the stored qualification prefix.
+    # Never strip two conflicting explicit awards or any subject/option text.
+    award = re.compile(r"^(msc|ma|mba|mph|mres|meng|bsc|ba|beng|bacc|llb|llm|phd|"
+                       r"pgcert|pgdip)\s+(.+)$")
+    stored = key(row["name"])
+    official = [key(name) for name in (proof.get("name"), source.get("courseTitle")) if name]
+    def same_name(name):
+        if stored == name:
+            return True
+        left, right = award.fullmatch(stored), award.fullmatch(name)
+        if bool(left) == bool(right):
+            return False
+        return (left[2] == name) if left else (right[2] == stored)
+    if not stored or not official or not all(same_name(name) for name in official):
         return None, "unverified"
     state, quote = proof.get("state", "unverified"), proof.get("quote")
     if state == "checked" and quote and quote_in_source(quote, source):

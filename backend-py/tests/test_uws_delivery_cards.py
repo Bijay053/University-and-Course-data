@@ -33,3 +33,44 @@ def test_compulsory_campus_teaching_still_vetoes_exclusion():
 ])
 def test_ambiguous_hidden_or_unowned_cards_never_authorize_exclusion(html):
     assert evidence(html, URL)["state"] != "checked"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stored,heading,state", [
+    ("MSc Aesthetic Medicine", "Aesthetic Medicine", "checked"),
+    ("MSc Ageing and Frailty (with Dementia)", "Ageing and Frailty (with Dementia)", "checked"),
+    ("Aesthetic Medicine", "MSc Aesthetic Medicine", "checked"),
+    ("MSc Aesthetic Medicine", "MA Aesthetic Medicine", "unverified"),
+    ("MSc Aesthetic Medicine", "PhD Aesthetic Medicine", "unverified"),
+    ("MSc Aesthetic Medicine", "Aesthetic Medicine (On Campus)", "unverified"),
+    ("MSc Aesthetic Medicine (January 2027)", "Aesthetic Medicine", "unverified"),
+    ("MSc Aesthetic Medicine", "Medicine", "unverified"),
+    ("MSc Aesthetic Medicine", "Aesthetic Medicine with Placement", "unverified"),
+])
+async def test_qualification_prefix_with_exact_course_url(monkeypatch, stored, heading, state):
+    from app.services import assistant_source_cache
+    from app.services.assistant_online_exclusion import check, SCHEMA
+    async def source(*args, **kwargs):
+        return {"url": URL, "verified": True, "sourceType": "html",
+                "text": "Location Fully online", "courseTitle": heading,
+                "_onlineExclusionSchema": SCHEMA,
+                "_onlineExclusion": {"state": "checked", "name": heading,
+                                     "quote": "Location Fully online"}}
+    monkeypatch.setattr(assistant_source_cache, "cached_source", source)
+    result = await check(None, "thread", "turn", "run", {"name": stored, "url": URL}, "https://www.uws.ac.uk")
+    assert result[1] == state
+
+
+@pytest.mark.asyncio
+async def test_qualification_prefix_cannot_hide_conflicting_official_title(monkeypatch):
+    from app.services import assistant_source_cache
+    from app.services.assistant_online_exclusion import check, SCHEMA
+    async def source(*args, **kwargs):
+        return {"url": URL, "verified": True, "sourceType": "html",
+                "text": "Location Fully online", "courseTitle": "PhD Aesthetic Medicine",
+                "_onlineExclusionSchema": SCHEMA,
+                "_onlineExclusion": {"state": "checked", "name": "Aesthetic Medicine",
+                                     "quote": "Location Fully online"}}
+    monkeypatch.setattr(assistant_source_cache, "cached_source", source)
+    assert await check(None, "t", "t", "r", {"name": "MSc Aesthetic Medicine", "url": URL},
+                       "https://www.uws.ac.uk") == (None, "unverified")
