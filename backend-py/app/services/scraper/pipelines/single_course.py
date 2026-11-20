@@ -11907,6 +11907,9 @@ async def extract_course(
     from app.services.scraper.extractors.uws_facts import apply_course_authority as _apply_uws
     _apply_uws(html or "", url, payload, evidence)
     from app.services.scraper.extractors.cardiffmet_facts import apply_authority as _apply_cardiffmet
+    from app.services.scraper.extractors.cardiffmet_delivery import apply_authority as _apply_cardiffmet_delivery
+    _apply_cardiffmet_delivery(html or "", url, payload, evidence,
+                              (uni_pdf_data or {}).get("cardiffmet_profile_sources"))
     _apply_cardiffmet(html or "", url, payload, evidence,
                       (uni_pdf_data or {}).get("cardiffmet_profile_sources"))
     from app.services.scraper.extractors.uk_course_facts import apply_authority as _apply_surrey
