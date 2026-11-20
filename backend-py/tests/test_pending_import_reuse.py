@@ -315,3 +315,87 @@ async def test_legacy_ordinary_import_identity_survives_staff_edits(store):
         rows = (await db.execute(select(ScrapedCourse))).scalars().all()
         assert len(rows) == 1
         assert {c.key: getattr(rows[0], c.key) for c in rows[0].__table__.columns} == before
+
+
+@pytest.mark.asyncio
+async def test_unrelated_ambiguous_legacy_url_does_not_block_another_course(store):
+    from app.models import ScrapedFieldEvidence
+    from app.services.scraper.snapshot_save import staged_row_backup_payload
+    sessions, uid = store
+    async with sessions() as db:
+        rows = [
+            ScrapedCourse(university_id=uid, scrape_job_id=job, status="pending",
+                          course_name=name, course_website=URL + "/shared",
+                          canonical_course_url=URL + "/shared")
+            for job, name in (("first", "Bachelor of Business"), ("third", "Master of Business"))
+        ]
+        rows[1].course_website = URL + "/other"
+        rows[1].canonical_course_url = URL + "/other"
+        db.add_all(rows)
+        await db.flush()
+        data = staged_row_backup_payload(rows[0])
+        data.pop("_staged_course_id", None)
+        db.add(PageSnapshot(university_id=uid, scrape_job_id="first",
+                            course_url=URL + "/shared", url_hash="unrelated",
+                            snapshot_type="staged_row", original_extraction=data))
+        # Both legacy rows belong to the same review cohort for association.
+        rows[1].scrape_job_id = "first"
+        db.add(ScrapedFieldEvidence(
+            scraped_course_id=rows[1].id, field_key="course_website",
+            source_url=URL + "/shared", candidate_value=URL + "/shared",
+            extraction_method="static"))
+        await db.commit()
+    from app.services.scraper.pending_imports import legacy_identities
+    async with sessions() as db:
+        with pytest.raises(ValueError, match="ambiguous"):
+            await legacy_identities(db, uid, {}, target_url=URL + "/shared")
+    result = await stage(store, "second", url=URL + "/unrelated")
+    assert result.saved
+
+
+@pytest.mark.asyncio
+async def test_shared_english_source_is_not_a_legacy_course_alias(store):
+    from app.models import ScrapedFieldEvidence
+    first = await stage(store, "first", reuse=False)
+    second = await stage(store, "third", url=URL + "/other", reuse=False)
+    sessions, uid = store
+    async with sessions() as db:
+        # A historical backup may have a central fetch URL, but its stored
+        # course website and explicit course evidence still identify the award.
+        backups = (await db.execute(select(PageSnapshot).where(
+            PageSnapshot.snapshot_type == "staged_row"))).scalars().all()
+        for backup in backups:
+            data = dict(backup.original_extraction)
+            data.pop("_staged_course_id", None)
+            backup.original_extraction = data
+            backup.course_url = "https://example.edu/english"
+        for row_id in (first.scraped_course_id, second.scraped_course_id):
+            db.add(ScrapedFieldEvidence(
+                scraped_course_id=row_id, field_key="ielts_overall", candidate_value="6.0",
+                source_url="https://example.edu/english", snippet="IELTS 6.0",
+                confidence=1, extraction_method="central_page"))
+        # Put both rows in the same legacy review to reproduce the real failure.
+        (await db.get(ScrapedCourse, second.scraped_course_id)).scrape_job_id = "first"
+        await db.commit()
+    repeated = await stage(store, "second")
+    assert repeated.scraped_course_id == first.scraped_course_id
+
+
+@pytest.mark.asyncio
+async def test_current_exact_identity_reuses_a_corrected_year_without_losing_history(store):
+    first = await stage(store, "first")
+    sessions, _ = store
+    async with sessions() as db:
+        row = await db.get(ScrapedCourse, first.scraped_course_id)
+        row.fee_year = 2027
+        row.notes = "Reviewed correction"
+        await db.commit()
+    same = await stage(store, "second", fee_year=2027)
+    assert same.scraped_course_id == first.scraped_course_id
+    original = await stage(store, "second", fee_year=2026)
+    assert original.scraped_course_id == first.scraped_course_id
+    different = await stage(store, "third", fee_year=2028)
+    assert different.scraped_course_id != first.scraped_course_id
+    async with sessions() as db:
+        row = await db.get(ScrapedCourse, first.scraped_course_id)
+        assert row.fee_year == 2027 and row.notes == "Reviewed correction"

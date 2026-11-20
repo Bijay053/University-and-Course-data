@@ -94,7 +94,7 @@ def pending_group_key(row, group):
     return sha256(repr(identity(clone)).encode()).hexdigest()[:20]
 
 
-async def legacy_identities(db, university_id, originals):
+async def legacy_identities(db, university_id, originals, *, target_url=None):
     """Associate historical backups only through a row ID or owned URL evidence.
 
     Never guess by name: that is editable, and one URL may host several awards.
@@ -110,7 +110,10 @@ async def legacy_identities(db, university_id, originals):
         return
     evidence = (await db.execute(select(
         ScrapedFieldEvidence.scraped_course_id, ScrapedFieldEvidence.source_url
-    ).where(ScrapedFieldEvidence.scraped_course_id.in_([r.id for r in rows])))).all()
+    ).where(
+        ScrapedFieldEvidence.scraped_course_id.in_([r.id for r in rows]),
+        ScrapedFieldEvidence.field_key.in_(["course_website", "course_name"]),
+    ))).all()
     urls = {}
     for row_id, url in evidence:
         if url:
@@ -121,11 +124,16 @@ async def legacy_identities(db, university_id, originals):
         PageSnapshot.snapshot_type == "staged_row",
     ).order_by(PageSnapshot.id))).scalars().all()
     columns = {c.key for c in ScrapedCourse.__table__.columns}
+    target_key = canonical_course_url_key(target_url) if target_url else None
     for backup in backups:
         data = backup.original_extraction or {}
         if data.get("_snapshot_schema") != "staged_row_v1" or not data.get("course_name"):
             continue
-        url = canonical_course_url_key(backup.course_url)
+        url = canonical_course_url_key(data.get("course_website") or backup.course_url)
+        # A shared English/fee source is not a course alias, and an unrelated
+        # ambiguous legacy offering must not block every import at a university.
+        if target_key and target_key != url:
+            continue
         matches = [
             row for row in rows
             if row.scrape_job_id == backup.scrape_job_id
@@ -161,7 +169,7 @@ async def match_pending(db, row):
     for entries in history:
         for entry in entries or []:
             originals.setdefault(entry["courseId"], entry["identity"])
-    await legacy_identities(db, row.university_id, originals)
+    await legacy_identities(db, row.university_id, originals, target_url=row.course_website)
     proposed = candidates(row)
     keys = {identity_token(candidate) for candidate in proposed.values()}
     historical_ids = [i for i, key in originals.items() if key in keys]
@@ -175,7 +183,9 @@ async def match_pending(db, row):
     matches = {}
     for key, candidate in proposed.items():
         match = next((old for old in existing
-                      if originals.get(old.id, identity_token(old)) == identity_token(candidate)), None)
+                      if identity_token(candidate) in {
+                          originals.get(old.id), identity_token(old)
+                      }), None)
         if match:
             matches[key] = match
     # The legacy within-job index omits award and campus. Supply an offering
