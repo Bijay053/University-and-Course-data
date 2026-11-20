@@ -92,6 +92,14 @@ def test_a_copy_with_any_subsequent_audit_is_not_archived():
     assert pairs([original, copy], [snapshot(copy)], job(), {copy.id}) == []
 
 
+def test_final_quality_classification_does_not_make_an_untouched_copy_an_edit():
+    original, copy = row(1, "old"), row(2, "new", study_load=None)
+    saved = snapshot(copy)
+    copy.auto_publish_status = "data_quality_failure"
+    assert pairs([original, copy], [saved], job()) == [(copy, original)]
+    assert pairs([original, copy], [saved], job(), {copy.id}) == []
+
+
 def test_two_new_variants_cannot_claim_the_same_incomplete_original():
     original = row(1, "old", fee_year=None)
     a, b = row(2, "new"), row(3, "new", fee_year=2028)

@@ -26,7 +26,7 @@ METADATA = {
     "id", "scrape_job_id", "university_id", "created_at", "updated_at",
     "status", "reviewed_at", "rejection_reason", "extraction_method",
     "scrape_warnings", "fee_scope_key", "canonical_course_url",
-    "course_id", "last_qualification_approval",
+    "course_id", "last_qualification_approval", "auto_publish_status",
 }
 WRITTEN = ("status", "rejection_reason", "reviewed_at")
 

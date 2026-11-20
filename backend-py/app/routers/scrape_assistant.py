@@ -285,10 +285,12 @@ async def response(thread, db, job_id=None):
                 ):
                     action["state"] = "completed"
                     if action["kind"] == "fix_fields":
-                        from app.services.assistant_fix_outcome import fix_outcome
+                        from app.services.assistant_fix_outcome import fix_outcome, verified_ielts_ids
                         from app.routers.scrape import _bulk_fix_job_dict
+                        outcome_job = _bulk_fix_job_dict(target)
+                        verified = await verified_ielts_ids(db, action, outcome_job, target.university_id)
                         action["state"], action["resultSummary"], action["courseResults"] = fix_outcome(
-                            action, _bulk_fix_job_dict(target))
+                            action, outcome_job, verified)
                         action["_fixOutcomeVersion"] = FIX_OUTCOME_VERSION
                         if action["state"] == "needs_review":
                             action["error"] = action["resultSummary"]
