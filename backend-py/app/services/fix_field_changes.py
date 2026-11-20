@@ -41,10 +41,14 @@ def field_change_counts(results, target_fields=None):
                 if field not in METADATA_FIELDS and matches_scope(field, scope)
             }
 
-        if relevant(result.get("updated_fields")):
+        # Workers retain the complete persisted change list before projecting
+        # legacy target aliases. An IELTS-overall request also owns its bands.
+        updated = result.get("all_updated_fields", result.get("updated_fields"))
+        refreshed = result.get("all_refreshed_evidence_fields", result.get("refreshed_evidence_fields"))
+        if relevant(updated):
             counts["valueUpdated"] += 1
         else:
             counts["valueUnchanged"] += 1
-            if relevant(result.get("refreshed_evidence_fields")):
+            if relevant(refreshed):
                 counts["evidenceRefreshedOnly"] += 1
     return counts

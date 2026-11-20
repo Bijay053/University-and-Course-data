@@ -87,6 +87,55 @@ async def test_full_request_becomes_one_fenced_existing_row_action(monkeypatch):
     assert set(options["forceReasons"]) == set(options["forceFields"])
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prompt", [
+    "Fix the remaining incorrect international fees and missing IELTS overall and band scores in this review. "
+    "Keep correct source-backed values and course-specific exceptions. Do not discover, add, approve or publish courses.",
+    "Please correct fees and IELTS for the current review.",
+    "Repair missing IELTS bands in this review.",
+])
+async def test_short_current_review_request_needs_no_row_numbers(monkeypatch, prompt):
+    from app.services import scrape_assistant as service, assistant_source_cache
+    rows = [{"id": n, "name": f"Course {n}", "url": f"https://example.edu/courses/{n}"}
+            for n in range(1, 50)]
+    ctx = {"samples": rows, "home": "https://example.edu",
+           "versions": {str(r["id"]): "original" for r in rows}, "config_version": "config"}
+    monkeypatch.setattr(assistant_source_cache, "cached_source", AsyncMock(return_value={"verified": True}))
+    save = AsyncMock()
+    fake = SimpleNamespace(action_proposal=service.action_proposal, now=service.now,
+                           inspect_source=AsyncMock(), save_research_reply=save)
+    assert await handle_field_edit(fake, "thread", "turn", "run", ctx, prompt)
+    action = save.call_args.args[3]["actions"][0]
+    assert action["kind"] == "fix_fields"
+    assert action["_ids"] == list(range(1, 50))
+    assert action["_versions"] == ctx["versions"]
+    assert action["requiresConfirmation"] is True
+    assert "_requestedUrls" not in action and "_values" not in action
+
+
+@pytest.mark.parametrize("prompt", [
+    "Fix missing fees for Nonexistent MSc in this review.",
+    "Fix missing fees for Finance in this review.",
+    "Fix missing fees for row 999 in this review.",
+    "Fix missing fees for https://other.edu/course in this review.",
+    "Set the fee to 16000 in this review.",
+])
+def test_unknown_course_or_literal_value_cannot_expand_to_whole_review(prompt):
+    from app.services.assistant_field_edits import _current_review_request
+    assert not _current_review_request(prompt)
+
+
+@pytest.mark.asyncio
+async def test_read_only_review_request_cannot_prepare_a_repair():
+    from app.services import scrape_assistant as service
+    save = AsyncMock()
+    fake = SimpleNamespace(save_research_reply=save)
+    assert not await handle_field_edit(
+        fake, "thread", "turn", "run", {"samples": []},
+        "Read-only: repair missing IELTS bands in this review.")
+    save.assert_not_awaited()
+
+
 def test_recheck_cannot_force_unselected_or_unsupported_fields():
     assert field_recheck_options({"fields": ["international_fee"],
                                   "_officialFieldRecheck": ["study_mode", "course_name"]}) == {}

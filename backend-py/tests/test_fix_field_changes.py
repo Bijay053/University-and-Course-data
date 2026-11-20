@@ -63,3 +63,40 @@ def test_durable_status_derives_historical_field_counts_without_changing_issue_c
     assert result["completed"] == 0
     assert result["noProgress"] == 1
     assert result["fieldChanges"]["valueUpdated"] == 1
+
+
+def test_saved_component_changes_survive_legacy_overall_only_projection():
+    result = {"ok": True, "attempted": True, "updated_fields": [],
+              "all_updated_fields": ["ielts_reading", "ielts_writing"]}
+    assert field_change_counts([result], ["ielts_overall"]) == {
+        "valueUpdated": 1, "valueUnchanged": 0, "evidenceRefreshedOnly": 0,
+    }
+
+
+def test_complete_change_list_still_cannot_count_unrequested_or_metadata_writes():
+    result = {"ok": True, "updated_fields": [],
+              "all_updated_fields": ["duration", "scrape_warnings"]}
+    assert field_change_counts([result], ["ielts_overall"])["valueUpdated"] == 0
+
+
+def test_saved_component_evidence_is_not_reported_as_a_value_correction():
+    result = {"ok": True, "updated_fields": [], "all_updated_fields": [],
+              "refreshed_evidence_fields": [],
+              "all_refreshed_evidence_fields": ["ielts_speaking"]}
+    assert field_change_counts([result], ["ielts_overall"]) == {
+        "valueUpdated": 0, "valueUnchanged": 1, "evidenceRefreshedOnly": 1,
+    }
+
+
+def test_overall_alias_can_report_verified_band_repair_without_replaying_it():
+    from app.services.assistant_fix_outcome import fix_outcome
+    action = {"_ids": [1], "fields": ["ielts_overall"]}
+    result = {"id": 1, "ok": True, "outcome": "completed", "made_progress": True,
+              "reason_code": "issues_resolved", "resolved_fields": ["ielts_writing"],
+              "updated_fields": [], "all_updated_fields": ["ielts_writing"]}
+    job = {"total": 1, "targetFields": ["ielts_overall"], "results": [result]}
+    state, summary, _ = fix_outcome(action, job)
+    assert state == "completed"
+    assert "1 repairs verified" in summary and "saved on 1 courses" in summary
+    action["fields"] = []
+    assert fix_outcome(action, job)[0] == "needs_review"

@@ -38,6 +38,29 @@ def evidence_edit_fields(prompt):
     return {field for field, pattern in patterns.items() if re.search(pattern, positive, re.I)}
 
 
+def _current_review_request(prompt):
+    """Recognise a generic field directive, never an unmatched named course."""
+    directive = re.split(r"[.;!?\n]", prompt, maxsplit=1)[0]
+    match = re.fullmatch(
+        r"\s*(?:please\s+)?(?:fix|correct|repair|update|fill)\s+(.+?)\s+"
+        r"(?:in|for|across|throughout)\s+(?:this|(?:the\s+)?current|open)\s+review\s*",
+        directive, re.I,
+    )
+    if not match:
+        return False
+    # A course name, URL, row selector or literal value must not silently turn
+    # into a review-wide operation just because no matching row was found.
+    words = set(re.findall(r"\w+", match.group(1).casefold()))
+    allowed = set(
+        "the all remaining incorrect wrong missing existing pending current "
+        "international tuition fee fees ielts overall individual each four component "
+        "components band bands score scores listening reading writing speaking "
+        "and duration durations intake intakes start dates course location locations "
+        "campus campuses study mode delivery".split()
+    )
+    return bool(words) and words <= allowed
+
+
 def field_recheck_options(action):
     """Only server-generated, selected-field rechecks may revisit populated values."""
     fields = sorted(set(action.get("_officialFieldRecheck", []))
@@ -114,6 +137,8 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
     from app.services.assistant_eligibility import scope
     rows = scope(prompt, ctx["samples"])
     requested_fields = evidence_edit_fields(prompt)
+    if not rows and requested_fields and _current_review_request(prompt):
+        rows = ctx["samples"]
     field = evidence_edit_field(prompt, messages)
     if len(requested_fields) > 1:
         field = "multiple"
