@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from bs4 import BeautifulSoup
 
-SCHEMA = 4
+SCHEMA = 5
 _COMMAND = re.compile(r"\b(?:reject|exclude|remove)\b.{0,70}\bonline(?:[- ]only)?\b"
                       r"|\bonline[- ]only\b.{0,50}\b(?:reject|exclude|remove)\b", re.I)
 _FOLLOWUP = re.compile(r"^\s*(?:please\s+)?(?:do it|go ahead|yes|proceed|run it)[.!]?\s*$", re.I)
@@ -130,6 +130,21 @@ def evidence(html, url):
                    for parent in [node, *node.parents] if getattr(parent, "attrs", None) is not None):
                 continue
             text = node.get_text(" ", strip=True)
+            if (node.name == "p"
+                    and re.fullmatch(r"Delivery(?: mode)?|Mode of study|Study mode|Location", text, re.I)
+                    and node.find_parent(class_="course-details") is not None
+                    and "detail-item" in (node.parent.get("class") or [])):
+                # UWS keeps the label and its value in sibling paragraphs.
+                # Accept only a single direct value in this course-owned card.
+                values = node.parent.find_all("p", recursive=False)
+                if len(values) == 2 and values[0] is node:
+                    value_node = values[1]
+                    if not any("hidden" in parent.attrs or parent.get("aria-hidden") == "true"
+                               or re.search(r"display\s*:\s*none|visibility\s*:\s*hidden",
+                                            parent.get("style", ""), re.I)
+                               for parent in [value_node, *value_node.parents]
+                               if getattr(parent, "attrs", None) is not None):
+                        text += " " + value_node.get_text(" ", strip=True)
             if node.name == "dt" and node.find_next_sibling("dd"):
                 # The evidence quote keeps the DOM's punctuation exactly.
                 text += " " + node.find_next_sibling("dd").get_text(" ", strip=True)
