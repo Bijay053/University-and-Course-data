@@ -85,8 +85,8 @@ def existing_ielts_recheck(action):
     return (
         action.get("kind") == "fix_fields"
         and action.get("_officialIeltsRecheck") is True
-        and set(action.get("fields", [])) == {"ielts_overall"}
-        and set(action.get("_officialFieldRecheck", [])) == {"ielts_overall"}
+        and "ielts_overall" in set(action.get("fields", []))
+        and "ielts_overall" in set(action.get("_officialFieldRecheck", []))
         and bool(action.get("_evidenceUrls"))
     )
 
@@ -150,7 +150,9 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
     if document_research_requested(prompt) or preview_requested(prompt):
         return False
     from app.services.assistant_eligibility import scope
-    rows = scope(prompt, ctx["samples"])
+    from app.services.assistant_university_scope import existing_course_scope
+    rows = existing_course_scope(prompt, ctx["samples"],
+                                 university_name=ctx.get("name", ""), home=ctx.get("home", ""))
     requested_fields = evidence_edit_fields(prompt)
     if not rows and requested_fields and _current_review_request(prompt):
         rows = ctx["samples"]
@@ -217,9 +219,9 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
                           requiresConfirmation=len(rows) > 10,
                           _officialFieldRecheck=sorted(requested_fields),
                           _officialIeltsRecheck=(
-                              selected_fields == ["ielts_overall"]
+                              "ielts_overall" in selected_fields
                               and bool(re.match(
-                                  r"\s*(?:please\s+)?(?:(?:correct|(?:recheck|check)\s+and\s+correct)"
+                                  r"\s*(?:please\s+)?(?:(?:correct|(?:recheck|check)\s+and\s+(?:correct|fix))"
                                   r"\s+(?:the\s+)?(?:all\s+(?:(?:four|five)\s+)?)?"
                                   r"(?:incorrect\s+|wrong\s+)?"
                                   r"|(?:fix|repair)\s+(?:the\s+)?(?:incorrect|wrong)\s+)ielts\b",
