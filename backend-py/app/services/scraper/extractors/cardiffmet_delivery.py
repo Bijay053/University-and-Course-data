@@ -86,7 +86,12 @@ def apply_authority(html, url, payload, evidence, sources=None):
     # A labelled physical teaching campus is stronger than a broad AI/CSS
     # match on "apply online". Genuine online exceptions above remain unknown
     # here and continue through the normal eligibility gate.
-    for field, value in (("course_location", location), ("study_mode", "On Campus")):
+    fields = [("course_location", location)]
+    # A physical campus rules out exclusive online delivery, not the online
+    # component of an already-established blended offering.
+    if str(payload.get("study_mode") or "").casefold() != "blended":
+        fields.append(("study_mode", "On Campus"))
+    for field, value in fields:
         _write(
             payload, evidence, field, value, quote, source,
             "delivery.cardiffmet_course_location", replace=True,

@@ -87,3 +87,13 @@ def test_delivery_authority_precedes_online_early_return_and_survives_enrichment
     early_gate = source.index("_authoritative_online = (")
     assert source.index("_apply_cardiffmet_delivery(") < early_gate
     assert source.rindex("_apply_cardiffmet_delivery(") > early_gate
+
+
+def test_campus_does_not_erase_an_existing_blended_offering():
+    payload = {"study_mode": "Blended", "online_only": True}
+    evidence = []
+    apply_authority(PARENT, URL, payload, evidence)
+    assert payload["study_mode"] == "Blended"
+    assert payload["course_location"] == "Cyncoed Campus"
+    assert not payload["online_only"]
+    assert all(e["field_key"] != "study_mode" for e in evidence)

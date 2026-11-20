@@ -66,9 +66,12 @@ async def prefetch_sources(fetch):
 
 
 def _write(payload, evidence, field, value, quote, source, method, *, replace=False):
-    if not replace and payload.get(field) not in (None, "", 0, []):
+    existing = payload.get(field)
+    if not replace and existing not in (None, "", 0, []) and existing != value:
         return
-    if replace:
+    # Equal values still need the course-owned citation. An earlier AI value
+    # must not suppress deterministic proof merely because it guessed correctly.
+    if replace or existing == value:
         for row in evidence:
             if row.get("field_key") == field:
                 row["decision_status"] = "superseded"

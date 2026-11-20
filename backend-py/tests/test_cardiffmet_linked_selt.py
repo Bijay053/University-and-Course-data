@@ -56,7 +56,7 @@ def test_missing_or_conflicting_applicability_never_gets_general_bands(kwargs):
 def test_existing_matching_scores_are_preserved_while_missing_bands_are_filled():
     p, e = apply(payload={"ielts_overall": 6.0, "ielts_reading": 5.5})
     assert p["ielts_listening"] == 5.5 and p["ielts_reading"] == 5.5
-    assert {row["field_key"] for row in e} == {"ielts_listening", "ielts_writing", "ielts_speaking"}
+    assert {row["field_key"] for row in e} == set(c.IELTS)
 
 
 def test_other_test_scores_are_never_used_as_ielts():
@@ -83,6 +83,27 @@ def test_stored_overall_alone_does_not_establish_the_course_score_bracket():
     assert p == {"ielts_overall": 6.0} and not e
 
 
+@pytest.mark.parametrize("score,values", [
+    (6.0, (6.0, 5.5, 5.5, 5.5, 5.5)),
+    (6.5, (6.5, 6.0, 6.5, 6.5, 6.0)),
+])
+def test_equal_scores_gain_verified_course_applicable_proof(score, values):
+    from types import SimpleNamespace
+    from app.services.scraper.requirement_status import (
+        build_requirement_status, effective_requirement_status,
+    )
+    before = dict(zip(c.IELTS, values))
+    payload, evidence = apply(score, payload=dict(before))
+    assert payload == before  # New proof, not invented or changed scores.
+    assert {e["field_key"] for e in evidence} == set(c.IELTS)
+    row = SimpleNamespace(**payload)
+    row.requirement_status = build_requirement_status(row, evidence=evidence, source_url=URL)
+    assert row.requirement_status["englishComponents"]["state"] == "verified"
+    assert effective_requirement_status(row)["englishComponents"]["state"] == "verified"
+    row.ielts_speaking += .5
+    assert effective_requirement_status(row)["englishComponents"]["state"] == "unknown"
+
+
 @pytest.mark.parametrize("minimum,matched", [(6.5, True), (7.0, False)])
 def test_research_reading_writing_constraints_must_agree_with_linked_table(minimum, matched):
     extra = f"""<p>Students need to provide evidence of fluency to at least an IELTS 6.5 standard
@@ -99,7 +120,7 @@ def test_partial_research_rule_does_not_promote_reading_writing_minimum_to_other
     (with minimum 6.5 in the Reading and Writing components) or equivalent.</p>"""
     p, e = apply(score=6.5, extra=extra, payload=dict.fromkeys(c.IELTS, 6.5))
     assert tuple(p[field] for field in c.IELTS) == (6.5, 6.0, 6.5, 6.5, 6.0)
-    assert {row["field_key"] for row in e} == {"ielts_listening", "ielts_speaking"}
+    assert {row["field_key"] for row in e} == set(c.IELTS)
     for protected in ({"ielts_overall": 7.5}, {"ielts_reading": 7.0}):
         assert apply(score=6.5, extra=extra, payload=protected)[0] == protected
 

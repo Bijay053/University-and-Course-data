@@ -33,6 +33,22 @@ def test_current_direct_requirement_supersedes_incorrect_extraction_with_evidenc
     assert p["ielts_overall"] == 7.5 and p["ielts_writing"] == 7.0
 
 
+@pytest.mark.parametrize("text", [PGCE, NUTRITION, DENTAL])
+def test_course_owned_scores_have_verifiable_component_citations(text):
+    from types import SimpleNamespace
+    from app.services.scraper.requirement_status import (
+        build_requirement_status, effective_requirement_status,
+    )
+    payload, evidence = run(text)
+    # Re-extracting an equal value must retain official proof too.
+    same, refreshed = run(text, payload=payload)
+    assert same == payload
+    row = SimpleNamespace(**same)
+    row.requirement_status = build_requirement_status(row, evidence=refreshed, source_url=URL)
+    assert row.requirement_status["englishComponents"]["state"] == "verified"
+    assert effective_requirement_status(row)["englishComponents"]["state"] == "verified"
+
+
 def test_requirement_in_entry_list_preserves_all_five_values():
     html = f"""<main><h1>Psychology and Criminology - BSc</h1><div class="block-12__item">
     <h4>Location</h4><p class="block-12__item-description">Llandaff Campus, Cyncoed Campus</p></div>

@@ -136,8 +136,12 @@ def _score_pattern(value: Any) -> str | None:
         return None
     whole, dot, fraction = token.partition(".")
     if not dot or not fraction or set(fraction) == {"0"}:
-        return rf"{re.escape(whole)}(?:\.0+)?"
-    return rf"{re.escape(whole)}\.{re.escape(fraction)}0*"
+        number = rf"{re.escape(whole)}(?:\.0+)?"
+    else:
+        number = rf"{re.escape(whole)}\.{re.escape(fraction)}0*"
+    # A word boundary alone accepts the "6" in "6.5". Allow sentence-ending
+    # punctuation, but never truncate a longer numeric score.
+    return rf"(?<![\d.]){number}(?!\d|\.\d)"
 
 
 def _component_evidence_matches(field: str, value: Any, snippet: str) -> bool:
@@ -173,16 +177,41 @@ def _component_evidence_matches(field: str, value: Any, snippet: str) -> bool:
     if grouped and re.search(rf"\b{component}\b", grouped.group("skills"), re.I):
         return True
 
+    leading_group = re.search(
+        rf"\b{score}\b\s+in\s+(?:both\s+|the\s+)?"
+        rf"(?P<skills>(?:listening|reading|writing|speaking)"
+        rf"(?:\s*(?:,|and|&)\s*(?:listening|reading|writing|speaking))+)\b",
+        text, re.I,
+    )
+    if leading_group and re.search(rf"\b{component}\b", leading_group["skills"], re.I):
+        return True
+
+    # "6.5 in both reading and writing ... minimum 6.0 in the remaining
+    # components" names exactly two skills and therefore the other two. Never
+    # accept "remaining components" without that contiguous named-skill rule.
+    remainder = re.search(
+        r"\b[0-9](?:\.[05])?\s+in\s+both\s+"
+        r"(?P<first>listening|reading|writing|speaking)\s+and\s+"
+        r"(?P<second>listening|reading|writing|speaking),?\s+and\s+"
+        rf"(?:a\s+)?minimum\s+(?:of\s+)?{score}\b\s+in\s+"
+        r"(?:the\s+)?remaining\s+components\b",
+        text, re.I,
+    )
+    if remainder:
+        named_skills = {remainder["first"].lower(), remainder["second"].lower()}
+        if len(named_skills) == 2 and field.removeprefix("ielts_") not in named_skills:
+            return True
+
     # Uniform floor: "minimum 5.5 in each component", "each band 6", or
     # "no band less than 5.5". The score must be in the same bounded phrase.
     all_band = (
         rf"(?:minimum(?:\s+of)?|at\s+least)\s+{score}\b[^.;:]{{0,24}}"
         rf"\b(?:in\s+)?(?:each|every|all(?:\s+four)?)\s+(?:individual\s+)?"
-        rf"(?:IELTS\s+)?(?:component|band|skill|section)s?\b"
+        rf"(?:IELTS\s+)?(?:component|band|skill|section|element|sub[ -]?score)s?\b"
         rf"|\b(?:each|every|all(?:\s+four)?)\s+(?:individual\s+)?"
-        rf"(?:IELTS\s+)?(?:component|band|skill|section)s?\b"
+        rf"(?:IELTS\s+)?(?:component|band|skill|section|element|sub[ -]?score)s?\b"
         rf"[^.;:]{{0,24}}\b{score}\b"
-        rf"|\bno\s+(?:individual\s+)?(?:component|band|skill|section)\s+"
+        rf"|\bno\s+(?:individual\s+)?(?:component|band|skill|section|element|sub[ -]?score)\s+"
         rf"(?:below\s+{score}\b|(?:less|lower)\s+than\s+{score}\b)"
     )
     return bool(re.search(all_band, text, re.I))
