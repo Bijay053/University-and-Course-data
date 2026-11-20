@@ -179,9 +179,41 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt):
             return False
     # DataTools rechecks turn ownership, live actor permissions and provider scope.
     report = await tools.execute("diagnose_scraper", {}, "provider-diagnosis")
+    previous = await tools.execute("read_scraper_repair", {}, "provider-last-verification")
+    previous = previous if isinstance(previous, dict) else {}
     content, actions = answer(report), []
+    if previous.get("ok") and (
+        previous.get("status") in {"queued", "running"}
+        or previous.get("phase") in {"verifying", "verification_queued"}
+    ):
+        # A new chat turn is not permission to duplicate an existing repair.
+        # Keep the original run's counters separate from its fresh verification.
+        run = previous.get("verificationRun") or {}
+        content = "A repair is already in progress for this review."
+        if run:
+            content += (
+                f"\n\nLatest verification: {run.get('processed') or 0} processed "
+                f"from {run.get('total') or 0} candidates; "
+                f"{run.get('staged') or 0} staged, "
+                f"{run.get('skipped') or 0} skipped, "
+                f"{run.get('errors') or 0} recorded errors."
+            )
+            if run.get("releaseRevision"):
+                content += f" Worker release: {run['releaseRevision']}."
+        content += (
+            "\n\nThe original scrape's failed-run counters are historical; they are "
+            "not the progress of this verification. No duplicate repair or verification "
+            "scrape was started. A running repair does not establish successful recovery. "
+            "Nothing was approved or published."
+        )
+        await service.save_research_reply(thread_id, turn_id, run_id, {
+            "role": "assistant", "turnId": turn_id, "createdAt": service.now().isoformat(),
+            "content": content, "actions": [], "sources": [],
+            "providerRepair": report, "currentProviderRepair": previous,
+        }, detail="Read existing repair progress; no duplicate work started.",
+            phase="Existing scraper repair is in progress")
+        return True
     if repeat:
-        previous = await tools.execute("read_scraper_repair", {}, "provider-last-verification")
         comparison = previous.get("verification") or {}
         if previous.get("phase") == "needs_review" and comparison:
             staged = comparison.get("cumulative_staged_courses", 0)

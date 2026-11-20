@@ -117,8 +117,21 @@ async def execute(tools, db, thread, name, call_id):
         from app.services.scraper.ai_repair_agent import load_repair_audit
         session = await load_repair_audit(thread.job_id, db)
         state = (session or {}).get("autonomous") or {}
+        verification = None
+        child_id = state.get("verification_job_id")
+        if isinstance(child_id, str) and child_id:
+            child = await db.get(ScrapeRuntimeJob, child_id)
+            if child and child.university_id == job.university_id:
+                verification = {
+                    "jobId": child.runtime_job_id, "status": child.status,
+                    "processed": child.current, "total": child.total_found,
+                    "staged": child.imported, "skipped": child.skipped,
+                    "errors": child.errors,
+                    "releaseRevision": child.release_revision,
+                }
         return {"ok": True, "changed": False, "status": (session or {}).get("status", "not_started"),
                 "phase": state.get("phase"), "verificationJobId": state.get("verification_job_id"),
+                "verificationRun": verification,
                 "verification": state.get("comparison"),
                 "note": "A saved configuration or queued verification is not verified recovery."}
     missing = (await db.execute(select(func.count()).select_from(ScrapedCourse).where(

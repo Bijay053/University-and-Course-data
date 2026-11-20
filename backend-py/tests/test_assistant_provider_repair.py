@@ -283,6 +283,8 @@ async def test_real_prompt_dispatch_prepares_existing_ui_action_in_both_engines(
         assert tools.ctx["job"]["id"] == "bradford-job"
         if name == "diagnose_scraper":
             return report()
+        if name == "read_scraper_repair":
+            return {"ok": True, "status": "not_started", "phase": None}
         assert name == "repair_scraper"
         return {"ok": True, "proposal": {
             "id": "repair", "kind": "repair_catalogue", "state": "proposed",
@@ -300,7 +302,7 @@ async def test_real_prompt_dispatch_prepares_existing_ui_action_in_both_engines(
     monkeypatch.setattr(DataTools, "execute", execute)
     monkeypatch.setattr(service, "_investigate", AsyncMock(side_effect=AssertionError("No website investigation expected")))
     await service.investigate("thread", "turn")
-    assert calls == ["diagnose_scraper", "repair_scraper"]
+    assert calls == ["diagnose_scraper", "read_scraper_repair", "repair_scraper"]
     assert len(replies) == 1
     assert replies[0]["actions"][0]["kind"] == "repair_catalogue"
     assert "No repair has run yet" in replies[0]["content"]
