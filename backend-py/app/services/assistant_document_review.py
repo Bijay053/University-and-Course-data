@@ -18,7 +18,7 @@ BANDS = ("ielts_overall", "ielts_reading", "ielts_writing", "ielts_listening", "
 def contains_ielts_requirements(source):
     """Do not send fee-only or unrelated documents through course IELTS matching."""
     texts = [source.get("_fullText") or source.get("text") or ""]
-    texts.extend(page.get("text", "") for page in source.get("_pages", [])
+    texts.extend(page.get("text") or "" for page in source.get("_pages") or []
                  if isinstance(page, dict))
     return any(re.search(r"\bIELTS\b|\bInternational English Language Testing System\b",
                          text, re.I) for text in texts)
@@ -215,7 +215,7 @@ async def review(thread_id, turn_id, run_id, thread, message):
             ),
             "actions": [], "sourceOutcome": "no_ielts_requirements",
             "sources": [{"url": source.get("url"), "title": source.get("title") or "Document",
-                         "excerpt": source.get("text", "")[:500]}],
+                         "excerpt": (source.get("text") or "")[:500]}],
             "documentReview": {**summarize(results), "rows": results},
         }, detail="Source read; no IELTS matching or updates attempted.",
            phase="Document read — no IELTS requirements")

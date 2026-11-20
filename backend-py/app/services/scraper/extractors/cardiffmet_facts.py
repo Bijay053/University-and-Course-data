@@ -84,14 +84,20 @@ def _intakes(text):
 def _fee_group(title):
     # Award evidence must come from the current official H1, never a stored
     # category, a related-course card or a guess from subject words.
-    if re.search(r"partner|executive|foundation|pgdip|pgcert|mres|mphil", title, re.I):
+    if re.search(r"partner|executive|foundation|pgdip|pgcert|mres|mphil|"
+                 r"dental technology|published (?:works|publications)", title, re.I):
         return None
     if re.match(r"PGCE\b", title, re.I) or re.search(r"\bwith QTS\s*[-–]\s*PGCE$", title, re.I):
         return "PGCE"
     if re.search(r"\bMBA\b|Master of Business Administration", title, re.I):
         return "MBA"
     if re.search(r"\bPhD\b|Doctorate|Doctor of ", title, re.I):
-        return "Postgraduate Doctoral Degree"
+        # The published MPhil/PhD/DMan line is not a default for named
+        # professional doctorates with their own research-fee schedules.
+        if re.search(r"\bPhD\b|Doctor of Philosophy|Doctorate in Management|Doctor of Management",
+                     title, re.I):
+            return "Postgraduate Doctoral Degree"
+        return None
     if re.search(r"\bMSc\b|\bMA\b|Master(?:'s)? (?:Degree|of )", title, re.I):
         return "Postgraduate Masters Degree"
     if re.search(r"\b(?:BSc|BA|BEng|LLB|BMus|BDes)\b|Bachelor of ", title, re.I):

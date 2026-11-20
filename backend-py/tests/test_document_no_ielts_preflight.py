@@ -11,6 +11,8 @@ from app.services import assistant_document_review as review
     ({"_fullText": "IELTS Academic overall 6.5, components 6.0"}, True),
     ({"_pages": [{"text": "International English Language Testing System score: 6.5"}]}, True),
     ({"text": "PTE 65"}, False),
+    ({"text": None, "_pages": None}, False),
+    ({"_pages": [{"text": None}]}, False),
 ])
 def test_fee_and_other_test_documents_are_not_ielts_evidence(source, expected):
     assert review.contains_ielts_requirements(source) is expected
