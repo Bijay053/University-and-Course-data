@@ -5,6 +5,56 @@ IELTS_FIELDS = ("ielts_overall", "ielts_listening", "ielts_reading",
                 "ielts_writing", "ielts_speaking")
 
 
+def propose_verified_ielts_preview(service, prompt, ctx, sources):
+    """An explicit preview gets checked comparisons even if the model omits an action.
+
+    This only constructs a confirmation-required proposal. It neither fetches
+    sources nor writes rows, and its executable scope excludes unsupported rows.
+    """
+    from app.services.scrape_assistant_autorun import preview_requested
+    if not preview_requested(prompt) or not re.search(r"\bielts\b", prompt, re.I):
+        return None
+    eligible = set(ctx.get("eligible_ids") or [])
+    ids = [row["id"] for row in ctx["samples"] if row["id"] in eligible]
+    if not ids:
+        return None
+    candidate = service.action_proposal(
+        {"kind": "fix_fields", "fields": ["ielts_overall"]}, ids)
+    if not candidate:
+        return None
+    candidate["requiresConfirmation"] = True
+    finalize_field_proposal(candidate, prompt, ctx, sources)
+    rows = {row["id"]: row for row in ctx["samples"]}
+    supported = [
+        item for item in candidate.get("repairPreview", [])
+        if item["status"] == "supported" and (
+            rows[item["id"]].get("englishVerification") != "verified"
+            or any(change["oldValue"] != change["newValue"] for change in item["changes"])
+        )
+    ]
+    if not supported:
+        return None
+    candidate.update(
+        _ids=[item["id"] for item in supported],
+        _versions=ctx["versions"], _configVersion=ctx["config_version"],
+        courseCount=len(supported),
+        courseScope=[{key:item[key] for key in ("id", "name", "url")} for item in supported],
+        repairPreview=supported,
+        _evidenceUrls=list(dict.fromkeys(
+            url for item in supported for url in (item["url"], item["source"]["url"]))),
+    )
+    titles = {source.get("url"): source.get("title") for source in sources}
+    citations = {}
+    for item in supported:
+        source = item["source"]
+        citations[(source["url"], source["quote"])] = {
+            "url": source["url"], "title": titles.get(source["url"]) or source["url"],
+            "excerpt": source["quote"],
+        }
+    candidate["_supportingSources"] = list(citations.values())[:6]
+    return candidate
+
+
 def research_only(prompt):
     from app.services.scrape_assistant_autorun import execution_requested
     return (not execution_requested(prompt) or bool(re.search(

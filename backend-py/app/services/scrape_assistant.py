@@ -1014,7 +1014,11 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str, references=Non
                 "course has been changed or added. Confirm the proposed check to run it. "
                 "Each selected course will use its own applicable evidence, not the example's scores."
             )
-    from app.services.assistant_repair_proposals import finalize_field_proposal
+    from app.services.assistant_repair_proposals import finalize_field_proposal, propose_verified_ielts_preview
+    if not action:
+        action = propose_verified_ielts_preview(this_service, prompt, ctx, sources)
+        if action:
+            citations = action.pop("_supportingSources")
     authoritative_summary = finalize_field_proposal(action, prompt, ctx, sources)
     if authoritative_summary:
         if delivery_action:
