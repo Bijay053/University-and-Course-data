@@ -166,14 +166,23 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
     from app.services.scrape_assistant_autorun import preview_requested
     if document_research_requested(prompt) or preview_requested(prompt):
         return False
+    from app.services.assistant_saved_location_sources import requested_rows, prepare_review, resolve_request
+    location_prompt = resolve_request(prompt, messages)
+    placeholder_rows = requested_rows(location_prompt, ctx["samples"], ctx.get("name", ""))
+    if placeholder_rows:
+        if await prepare_review(service, thread_id, turn_id, run_id, ctx, placeholder_rows):
+            return True
     from app.services.assistant_eligibility import scope
     from app.services.assistant_university_scope import existing_course_scope
     rows = existing_course_scope(prompt, ctx["samples"],
                                  university_name=ctx.get("name", ""), home=ctx.get("home", ""))
     requested_fields = evidence_edit_fields(prompt)
-    if not rows and requested_fields and _current_review_request(prompt):
+    if placeholder_rows is not None:
+        rows = placeholder_rows
+        requested_fields = {"course_location"}
+    if placeholder_rows is None and not rows and requested_fields and _current_review_request(prompt):
         rows = ctx["samples"]
-    field = evidence_edit_field(prompt, messages)
+    field = "location" if placeholder_rows is not None else evidence_edit_field(prompt, messages)
     if len(requested_fields) > 1:
         field = "multiple"
     if not field:
@@ -207,7 +216,12 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
         content = "This is an edit to an existing course field, not a request to add a course. Read-only request: no row changed or course fetched."
     elif not rows:
         # An edit never silently turns into discovery, even when the row moved.
-        content = "No existing pending course matched this field edit. Give the current row number or exact course name; no course was fetched or created."
+        content = (
+            "No matching pending location placeholders were found in this review. "
+            "No course was fetched, created or changed."
+            if placeholder_rows is not None else
+            "No existing pending course matched this field edit. Give the current row number or exact course name; no course was fetched or created."
+        )
     elif field not in {"intake", "intakes"}:
         field_map = {"fee": "international_fee", "fees": "international_fee", "tuition": "international_fee",
                      "ielts": "ielts_overall", "duration": "duration", "location": "course_location", "campus": "course_location"}

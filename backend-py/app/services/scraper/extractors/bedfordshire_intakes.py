@@ -108,5 +108,28 @@ def extract_admission_intakes(html, url, *, location=None):
     return True, [ExtractionResult(
         field_key="intake_months", value=months, normalized={"intake_months": months},
         confidence=0.98, snippet=quote, method=METHOD,
-        extras={"selected_location": selection},
+        extras={"selected_location": selection, "applicable_locations": sorted(locations)},
+    )]
+
+
+def extract_admission_location(html, url):
+    """Require one course-owned international campus, never a filter default.
+
+    Reuse the existing award, study-option and international-application checks.
+    Distinct applicable campuses remain ambiguous rather than assigning the
+    first dropdown option to a row whose existing location is a placeholder.
+    """
+    handled, results = extract_admission_intakes(html, url)
+    if not handled or len(results) != 1:
+        return handled, []
+    from .location import _normalise
+    labels = results[0].extras.get("applicable_locations") or []
+    cleaned = [_normalise(label) for label in labels]
+    if len(cleaned) != 1 or not cleaned[0]:
+        return True, []
+    value = cleaned[0]
+    return True, [ExtractionResult(
+        field_key="course_location", value=value,
+        normalized={"course_location": value}, confidence=0.98,
+        snippet=results[0].snippet, method="location:bedfordshire_admission_data",
     )]

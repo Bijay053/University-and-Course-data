@@ -538,6 +538,11 @@ _NON_LOCATION_PHRASES: frozenset[str] = frozenset({
     "select campus",
     "choose campus",
     "all campuses",
+    "all locations",
+    "select location",
+    "select a location",
+    "choose location",
+    "choose a location",
     "campus",
     # UTAS "Study period" panel value — availability label, not a campus name.
     "study period",
@@ -1780,6 +1785,14 @@ def _from_winchester_course_facts(soup: BeautifulSoup) -> str | None:
 async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG001
     if not html:
         return []
+
+    # Admissions dropdown data belongs to this course and its international
+    # study option. The generic heading cascade also sees the site-wide
+    # "All locations" filter, so it must not outrank these owned facts.
+    from .bedfordshire_intakes import extract_admission_location
+    beds_handled, beds_results = extract_admission_location(html, url)
+    if beds_handled:
+        return beds_results
 
     # APU's course identity is the authority for delivery and campus.  The
     # site-wide course shell contains related ODL links and campus menus, so

@@ -820,6 +820,13 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
                     service, db, thread, action, rows, job.university_id, actor)
             except ValueError as exc:
                 raise HTTPException(409, str(exc)) from exc
+        elif action["kind"] == "fix_fields" and "_savedLocationTargets" in action:
+            from app.services.assistant_saved_location_apply import apply_saved_locations
+            try:
+                await apply_saved_locations(
+                    service, db, thread, action, rows, job.university_id, actor)
+            except ValueError as exc:
+                raise HTTPException(409, str(exc)) from exc
         elif action["kind"] == "fix_fields":
             from app.routers.scrape import StartBulkFixBody, start_bulk_fix_job
             from app.services.assistant_source_gate import require_reachable_sources, repair_probe_urls, SOURCE_CACHE_SECONDS
