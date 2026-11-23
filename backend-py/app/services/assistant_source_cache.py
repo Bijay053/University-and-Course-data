@@ -7,7 +7,7 @@ from app.models.scrape_assistant import ScrapeAssistantThread
 
 ACCESS_ISSUES = frozenset({"robots_unavailable", "robots_disallowed", "source_access_denied"})
 FAILURE_REUSE_SECONDS = 120
-IELTS_FACTS_VERSION = 2
+IELTS_FACTS_VERSION = 3
 
 
 async def refresh_ielts_facts(source, url):
@@ -21,16 +21,26 @@ async def refresh_ielts_facts(source, url):
         return source
     from html import escape
     from app.services.scraper.extractors.english_test import extract
-    text = source.get("_fullText") or source.get("text") or ""
-    results = await extract("<main>" + escape(text) + "</main>", url) if text else []
-    facts = [
-        {"field": r.field_key, "value": r.value, "normalized": r.normalized,
-         "quote": r.snippet, "method": r.method}
-        for r in results if r.field_key == "ielts_overall"
-    ]
-    if facts:
-        source["facts"] = [f for f in source.get("facts", [])
-                           if not str(f.get("field", "")).startswith("ielts_")] + facts
+    blocks = [source.get("text") or ""]
+    blocks.extend(item.get("text") or "" for item in source.get("excerpts", [])
+                  if isinstance(item, dict))
+    facts = []
+    seen = set()
+    for block in dict.fromkeys(blocks):
+        if not block:
+            continue
+        results = await extract("<main>" + escape(block) + "</main>", url)
+        for result in results:
+            if result.field_key != "ielts_overall" or not result.snippet:
+                continue
+            key = (repr(sorted((result.normalized or {}).items())), result.snippet)
+            if key not in seen:
+                seen.add(key)
+                facts.append({"field": result.field_key, "value": result.value,
+                              "normalized": result.normalized, "quote": result.snippet,
+                              "method": result.method})
+    source["facts"] = [f for f in source.get("facts", [])
+                       if not str(f.get("field", "")).startswith("ielts_")] + facts
     source["_ieltsFactsVersion"] = IELTS_FACTS_VERSION
     return source
 
@@ -38,7 +48,7 @@ async def refresh_ielts_facts(source, url):
 async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect, timeout, *,
                         fresh=False, html_table_schema=None, html_delivery_schema=None,
                         html_intake_schema=None, html_fee_links_schema=None,
-                        online_exclusion_schema=None):
+                        online_exclusion_schema=None, html_english_scope_schema=None):
     from app.services.scrape_assistant_tools import official_url
     try:
         url = official_url(url, home)
@@ -94,6 +104,14 @@ async def cached_source(service, thread_id, turn_id, run_id, url, home, inspect,
                         # Old flattened text cannot prove ownership of a
                         # Location label. Read the permitted raw body once.
                         break
+                    if (html_english_scope_schema is not None and result.get("verified")
+                            and result.get("sourceType") == "html"):
+                        from app.services.scraper.extractors.aru_linked_english import is_course_url
+                        if (is_course_url(url)
+                                and result.get("_aruEnglishScopeVersion") != html_english_scope_schema):
+                            # Flattened text cannot establish ownership of an
+                            # English referral or distinguish foundation entry.
+                            break
                     checked_at = result.get("_sourceCheckedAt")
                     age = wall_time() - checked_at if isinstance(checked_at, (int, float)) else None
                     reusable_failure = (

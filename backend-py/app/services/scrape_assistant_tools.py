@@ -340,6 +340,20 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
             if course_title not in text:
                 text = course_title + "\n" + text
         from app.services.assistant_online_exclusion import evidence as online_exclusion_evidence, SCHEMA as online_exclusion_schema
+        from app.services.scraper.extractors.aru_linked_english import (
+            referral as aru_referral, SCHEMA as aru_english_schema,
+        )
+        aru_scope = aru_referral(html, url)
+        excerpts = evidence_excerpts(text, facts)
+        if aru_scope:
+            # Keep the original referral as its own contiguous excerpt; never
+            # append it to text and manufacture a new document boundary.
+            if quote_in_source(aru_scope["quote"], {"text": text}):
+                if not any(quote_in_source(aru_scope["quote"], {"text": item["text"]})
+                           for item in excerpts):
+                    excerpts.append({"id": f"q{len(excerpts)}", "text": aru_scope["quote"]})
+            else:
+                aru_scope = None
         return {
             "url": url, "title": title[:200], "sourceType": "html",
             "text": text[:24000], "_fullText": text, **identity,
@@ -348,7 +362,7 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
             "_excelsiaIntake": {"name": intake_facts.get("course_name"), "months": intake_facts.get("intake_months"),
                                "quote": intake_facts.get("_intake_snippet")},
             "_eligibilityQuote": domestic_evidence(html, eligibility_name) if eligibility_name else None,
-            "facts": facts, "excerpts": evidence_excerpts(text, facts), "verified": True,
+            "facts": facts, "excerpts": excerpts, "verified": True,
             "_htmlExcerptsSchema": HTML_EXCERPTS_SCHEMA,
             "_htmlFeeLinksSchema": 1,
             "_deliveryFactsVersion": 1,
@@ -356,6 +370,8 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
             "_onlineExclusion": online_exclusion_evidence(html, url),
             "_intakeFactsVersion": INTAKE_FACTS_VERSION,
             "_englishTablesSchema": SCHEMA, "_englishTables": profiles(str(evidence_root)),
+            "_aruEnglishScopeVersion": aru_english_schema,
+            "_aruEnglishReferral": aru_scope,
             "_courseCohorts": cohort_data,
             "englishLinks": english_links[:8], "feeLinks": fee_links[:8],
         }

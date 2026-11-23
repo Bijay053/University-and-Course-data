@@ -97,6 +97,9 @@ def finalize_field_proposal(action, prompt, ctx, sources):
                 for source in sources
                 if scope["url"] and str(source.get("url") or "").rstrip("/") == scope["url"].rstrip("/")
                 for scores, quote in _course_ielts(source)]
+            from app.services.scraper.extractors.aru_linked_english import comparison as aru_comparison
+            for source in sources:
+                evidence.extend(aru_comparison(row, source, sources))
             distinct = {entry[0] for entry in evidence}
             preview = {**scope, "status":"unverified", "changes":[],
                        "reason":"No complete, course-specific five-score evidence was verified."}

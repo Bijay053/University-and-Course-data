@@ -683,7 +683,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str, references=Non
     await progress(thread_id, turn_id, "Checking official pages and catalogue evidence", run_id)
     source_slots = asyncio.Semaphore(6)
     source_deadline = time.monotonic() + 30
-    async def source_check(url):
+    async def source_check(url, *, deadline=None):
         from app.services.assistant_official_sources import source_check_detail
         started = time.monotonic()
         identifier = uuid.uuid4().hex
@@ -691,7 +691,7 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str, references=Non
             "Source check queued", status="running", url=url, event_id=identifier,
         ))
         async with source_slots:
-            remaining = source_deadline - time.monotonic()
+            remaining = (source_deadline if deadline is None else deadline) - time.monotonic()
             try:
                 if remaining <= 0:
                     raise TimeoutError()
@@ -706,6 +706,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str, references=Non
                     fresh=bool(re.search(r"\b(fresh|re-?scrape|re-?fetch)\b", prompt, re.I)),
                     **({"html_fee_links_schema": 1} if re.search(
                         r"fee|tuition", prompt, re.I) else {}),
+                    **({"html_english_scope_schema": 1} if re.search(
+                        r"ielts|english|band|language", prompt, re.I) else {}),
                     **({"html_delivery_schema": 1} if re.search(
                         r"\b(?:online|on[- ]campus|study mode|delivery|blended|distance)\b",
                         prompt, re.I) else {}),
@@ -764,6 +766,10 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str, references=Non
         running = [group.create_task(task) for task in tasks]
     findings = [task.result() for task in running]
     sources, catalogue = (findings[:-1], findings[-1]) if check_catalogue else (findings, None)
+    # A course batch exhausting its budget must not starve its official
+    # English referrals. Alternatives and followed links share one bounded
+    # additional window, not an unlimited timeout per source.
+    guidance_deadline = time.monotonic() + 15
     from app.services.assistant_official_sources import english_guidance_alternatives
     alternatives = english_guidance_alternatives(ctx["home"], prompt, sources, ctx.get("config"))
     if alternatives:
@@ -771,7 +777,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str, references=Non
             "Checking alternative official English guidance", status="running",
             detail="Separate published URLs; no PDF suffix was added or removed. Each source must pass robots.txt.",
         ))
-        sources.extend(await asyncio.gather(*(source_check(url) for url in alternatives)))
+        sources.extend(await asyncio.gather(*(
+            source_check(url, deadline=guidance_deadline) for url in alternatives)))
     link_keys = []
     if re.search(r"ielts|english|band|language", prompt, re.I):
         link_keys.append("englishLinks")
@@ -791,7 +798,8 @@ async def _investigate(thread_id: str, turn_id: str, run_id: str, references=Non
                 if link not in seen:
                     seen.add(link)
                     followups.append(link)
-        sources.extend(await asyncio.gather(*(source_check(url) for url in followups[:3])))
+        sources.extend(await asyncio.gather(*(
+            source_check(url, deadline=guidance_deadline) for url in followups[:3])))
     from app.services.scrape_assistant_coverage import research_coverage
     coverage = research_coverage(sampled if recent_user_urls else ctx["samples"], sources)
     await record_activity(thread_id, turn_id, run_id, event(

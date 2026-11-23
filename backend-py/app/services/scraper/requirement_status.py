@@ -202,6 +202,20 @@ def _component_evidence_matches(field: str, value: Any, snippet: str) -> bool:
         if len(named_skills) == 2 and field.removeprefix("ielts_") not in named_skills:
             return True
 
+    four_skills = re.search(
+        rf"\b{score}\b\s+in\s+each\s+of\s+the\s+four\s+language\s+skills\b",
+        text, re.I,
+    )
+    if four_skills:
+        tail = text[four_skills.end():four_skills.end() + 180]
+        tail = re.split(r"\b(?:TOEFL|Pearson|PTE|Postgraduate courses|Undergraduate courses)\b",
+                        tail, maxsplit=1, flags=re.I)[0]
+        if not re.search(
+            r"\b(?:except|however|but)\b|\b(?:writing|speaking|reading|listening)\b"
+            r".{0,25}\b[4-9](?:\.[05])?\b", tail, re.I,
+        ):
+            return True
+
     # Uniform floor: "minimum 5.5 in each component", "each band 6", or
     # "no band less than 5.5". The score must be in the same bounded phrase.
     all_band = (

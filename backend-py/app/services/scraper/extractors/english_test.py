@@ -143,6 +143,24 @@ _ENGLISH_SUBTEST_REQUIREMENT_RE = re.compile(
 
 # --- IELTS (overall + subscores 4.0-9.0) -------------------------------------
 def _ielts(text: str) -> dict[str, float] | None:
+    four_skills = re.search(
+        r"\bIELTS\s*(?:\(\s*Academic\s*\)\s*)?(?:Academic\s+)?"
+        r"Overall\s+([4-9](?:\.[05])?)\s+with\s+([4-9](?:\.[05])?)\s+"
+        r"in\s+each\s+of\s+the\s+four\s+language\s+skills\b",
+        text, re.I,
+    )
+    if four_skills:
+        overall, floor = map(float, four_skills.groups())
+        tail = text[four_skills.end():four_skills.end() + 180]
+        tail = re.split(r"\b(?:TOEFL|Pearson|PTE|Postgraduate courses|Undergraduate courses)\b",
+                        tail, maxsplit=1, flags=re.I)[0]
+        conditional = re.search(
+            r"\b(?:except|however|but)\b|\b(?:writing|speaking|reading|listening)\b"
+            r".{0,25}\b[4-9](?:\.[05])?\b", tail, re.I,
+        )
+        if 4 <= floor <= overall <= 9 and not conditional:
+            return dict(overall=overall, listening=floor, reading=floor,
+                        writing=floor, speaking=floor)
     # Some course pages label IELTS prose only as English language
     # requirements. Require an adjacent explicit overall + uniform floor;
     # never borrow an unlabelled number or a score from another test.
@@ -871,6 +889,21 @@ def _duolingo(text: str) -> float | None:
     return None
 
 
+def _ielts_evidence_quote(text: str, scores: dict[str, float] | None) -> str:
+    """Keep a contiguous score-bearing quotation, never the page's navigation."""
+    if not scores:
+        return ""
+    anchors = re.finditer(r"\bIELTS\b|English language requirements", text, re.I)
+    for index, match in enumerate(anchors):
+        if index >= 32:
+            break
+        quote = text[max(0, match.start() - 80):match.start() + 1100]
+        if _ielts(quote) == scores:
+            return quote
+    # Cross-section or otherwise unlocatable values are not citation proof.
+    return ""
+
+
 def _emit(test: str, scores: dict[str, float] | float | None, snippet: str) -> list[ExtractionResult]:
     if scores is None:
         return []
@@ -902,7 +935,7 @@ def _emit(test: str, scores: dict[str, float] | float | None, snippet: str) -> l
                 value=scores.get("overall"),
                 normalized=normalized,
                 confidence=0.85,
-                snippet=snippet[:200],
+                snippet=snippet[:1200 if test == "ielts" else 200],
                 method="regex",
             )
         )
@@ -1467,7 +1500,15 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             )
         ]
 
-    text = compact(html_to_text(html))
+    from .aru_linked_english import is_course_url as _aru_url, owned_sections as _aru_sections
+    if _aru_url(url):
+        # ARU's foundation admissions alternatives are not the selected
+        # degree's English section. A referral without scores needs linked
+        # policy proof; it must not turn a foundation 5.5 into the degree score.
+        sections = _aru_sections(html, url)
+        text = compact(" ".join(sections))
+    else:
+        text = compact(html_to_text(html))
     if not text:
         return []
     snippet = text[:500]
@@ -1490,7 +1531,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     ielts_quote = (ielts_heading.group(0) if ielts_values and ielts_heading
                    and ielts_values.get("overall") == float(ielts_heading.group(1))
                    and ielts_values.get("listening") == float(ielts_heading.group(2))
-                   else snippet)
+                   else _ielts_evidence_quote(text, ielts_values))
     results: list[ExtractionResult] = [
         *_emit("ielts", ielts_values, ielts_quote),
         *(_emit("pte", _pte(text), snippet) if not _suppress_pte else []),

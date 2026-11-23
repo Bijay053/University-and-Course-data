@@ -11943,6 +11943,18 @@ async def extract_course(
         from app.services.scraper.extractors.hsu_linked_english import recover_linked_english
         await recover_linked_english(_hsu_source_html, url, payload, evidence, fetch_html)
 
+    # A course-owned ARU referral can establish the correct UG/PG policy.
+    # Professional, research and conflicting requirements are never defaulted.
+    from app.services.scraper.extractors.aru_linked_english import (
+        is_course_url as _is_aru_course, recover as _recover_aru_english,
+    )
+    if _is_aru_course(url):
+        try:
+            await _recover_aru_english(html or "", url, payload, evidence, fetch_html)
+        except Exception as _aru_english_error:
+            log.warning("ARU linked English verification failed for %s (%s)",
+                        url, type(_aru_english_error).__name__)
+
     # ── Evidence selection finalisation ────────────────────────────────────
     # Mark the winning evidence row for each field as decision_status="selected"
     # so that scraped_field_evidence.selected mirrors the actual column values
