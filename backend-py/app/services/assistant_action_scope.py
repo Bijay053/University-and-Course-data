@@ -8,11 +8,25 @@ FIELDS = r"\b(?:fees?|tuition|ielts|bands?|english|durations?|locations?|campus|
 
 
 def discovery_negated(prompt):
+    prompt = prompt.replace("’", "'")
+    # A shared "do not" also governs coordinated verbs: "do not edit fees,
+    # approve courses, or run discovery". Do not mistake that last verb for a
+    # separate positive catalogue goal. "But/however/instead/then" start a
+    # new clause and must not inherit this negation.
+    coordinated = re.search(
+        r"\b(?:do\s+not|don't|dont|never)\b"
+        r"(?:(?!\b(?:but|however|instead|then)\b)[^.!?;]){0,240}?"
+        r"\b(?:or|and)\s+(?:(?:run|start|launch|perform|execute|any|new|fresh|course|catalogue|a|the|full)\s+){0,6}"
+        r"(?:discover(?:y)?|scan(?:ning)?|catalog(?:ue)?|scrap(?:e|ing)|import(?:s)?|(?:add|create)\s+(?:new\s+)?courses?)\b",
+        prompt, re.I,
+    )
+    if coordinated:
+        return True
     return bool(re.search(
         r"\b(?:do\s+not|don't|dont|never|no)\s+"
         r"(?:(?:run|start|launch|perform|execute|any|new|fresh|course|catalogue|a|the|full)\s+){0,6}"
         r"(?:discover(?:y)?|scan(?:ning)?|catalog(?:ue)?|scrap(?:e|ing)|import(?:s)?|(?:add|create)\s+(?:new\s+)?courses?)\b",
-        prompt.replace("’", "'"), re.I))
+        prompt, re.I))
 
 
 def catalogue_forbidden(prompt):
