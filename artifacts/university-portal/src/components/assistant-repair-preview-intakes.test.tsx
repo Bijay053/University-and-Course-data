@@ -13,6 +13,15 @@ const preview = (oldValue: string[], newValue: string[]): RepairPreview => ({
 });
 
 describe("intake correction comparisons", () => {
+  it("labels retained evidence with its original capture time", () => {
+    const saved = preview([], ["January", "September"]);
+    saved.source = { ...saved.source!, origin: "saved_official_html",
+      capturedAt: "2026-11-23T01:00:00+00:00" };
+    const { container } = render(<AssistantRepairPreview scope={[course]}
+      previews={[saved]} testId="saved-intake-preview" />);
+    expect(screen.getByText(/Not a fresh website check/)).toBeTruthy();
+    expect(container.querySelector("time")?.getAttribute("datetime")).toBe("2026-11-23T01:00:00+00:00");
+  });
   it("shows all current and proposed months with readable separators", () => {
     render(<AssistantRepairPreview scope={[course]}
       previews={[preview(["January"], ["January", "April", "September"])]} testId="intake-preview" />);

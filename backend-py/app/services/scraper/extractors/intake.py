@@ -1251,6 +1251,10 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     from urllib.parse import urlparse as _up
 
     _host = (_up(url).hostname or "").lower()
+    from .bedfordshire_intakes import extract_admission_intakes
+    handled, admission_intakes = extract_admission_intakes(html, url)
+    if handled:
+        return admission_intakes
 
     # Otago's startDates meta is course-owned and selected for the current
     # qualification.  It must beat regex, navigation, and AI guesses; an

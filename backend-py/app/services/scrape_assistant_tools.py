@@ -278,6 +278,11 @@ async def inspect_source(url: str, home: str, *, raw_body: bytes | None = None) 
                     raw_text = " ".join(soup.get_text(" ", strip=True).split()).casefold()
                     if normalized_quote in raw_text and normalized_quote not in " ".join(text.split()).casefold():
                         text = result.snippet + "\n" + text
+                if result.method == "intake:bedfordshire_admission_data" and result.snippet:
+                    # Keep the literal, contiguous published JSON, not a
+                    # synthesized quotation assembled from separate options.
+                    if result.snippet in html:
+                        text = text + "\n" + result.snippet
                 facts.append({
                     "field": result.field_key, "value": result.value,
                     "normalized": result.normalized, "quote": result.snippet,

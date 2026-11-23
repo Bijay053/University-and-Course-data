@@ -783,7 +783,14 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
     thread.messages, thread.updated_at = deepcopy(messages), service.now()
     await db.flush()
     try:
-        if action["kind"] == "fix_fields":
+        if action["kind"] == "fix_fields" and "_savedIntakeTargets" in action:
+            from app.services.assistant_saved_intake_apply import apply_saved_intakes
+            try:
+                await apply_saved_intakes(
+                    service, db, thread, action, rows, job.university_id, actor)
+            except ValueError as exc:
+                raise HTTPException(409, str(exc)) from exc
+        elif action["kind"] == "fix_fields":
             from app.routers.scrape import StartBulkFixBody, start_bulk_fix_job
             from app.services.assistant_source_gate import require_reachable_sources, repair_probe_urls, SOURCE_CACHE_SECONDS
             from app.services.assistant_source_cache import cached_source

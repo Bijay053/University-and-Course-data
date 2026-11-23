@@ -5,7 +5,7 @@ from urllib.parse import urljoin, urlsplit
 from bs4 import BeautifulSoup
 from .base import ExtractionResult
 
-INTAKE_FACTS_VERSION = 2
+INTAKE_FACTS_VERSION = 3
 MONTHS = ("January February March April May June July August September October November December").split()
 DATE = re.compile(r"\b(" + "|".join(MONTHS) + r")\b", re.I)
 LABEL = re.compile(r"(?:course\s+)?(?:start\s+dates?|intakes?)\s*:?", re.I)

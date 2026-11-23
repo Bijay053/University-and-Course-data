@@ -21,7 +21,8 @@ def intake_proof(source, url, name):
         for fact in source.get("facts", []):
             months = (fact.get("normalized") or {}).get("intake_months")
             if (fact.get("field") == "intake_months"
-                    and fact.get("method") == "intake:selected_start_option"
+                    and fact.get("method") in {
+                        "intake:selected_start_option", "intake:bedfordshire_admission_data"}
                     and months and quote_in_source(fact.get("quote") or "", source)):
                 candidates.append((months, fact["quote"]))
     if len({tuple(months) for months, _ in candidates}) != 1:

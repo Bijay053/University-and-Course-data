@@ -5,7 +5,7 @@ export type RepairPreview = RepairCourseScope & {
   status: "supported" | "unverified";
   reason: string;
   changes: { field: string; oldValue: number | string | string[] | null; newValue: number | string | string[] | null }[];
-  source?: { url: string; quote: string };
+  source?: { url: string; quote: string; capturedAt?: string; origin?: string; selectedLocation?: string | null };
 };
 const labels: Record<string, string> = {
   ielts_overall: "IELTS overall", ielts_listening: "Listening",
@@ -60,6 +60,16 @@ export function AssistantRepairPreview({ scope, previews, testId, applied = fals
             </table>
           </div>
           {preview.source && <blockquote className="mt-2 border-l-2 border-teal-300 pl-2 text-slate-600">
+            {preview.source.origin === "saved_official_html" && <p className="mb-1 text-amber-900">
+              Saved official page · captured{" "}
+              <time dateTime={preview.source.capturedAt}>{preview.source.capturedAt
+                ? new Date(preview.source.capturedAt).toLocaleString() : "at an unverified time"}</time>.
+              {" "}Not a fresh website check.
+            </p>}
+            {preview.source.selectedLocation && <p className="mb-1">
+              Selected published option: {preview.source.selectedLocation}.
+              {" "}The existing location selected this option; its location was not changed or independently verified.
+            </p>}
             {sourceHref && <a href={sourceHref} target="_blank" rel="noopener noreferrer nofollow"
               className="text-teal-800 underline">Source evidence</a>}
             <p className="mt-1 whitespace-pre-wrap">{preview.source.quote}</p>

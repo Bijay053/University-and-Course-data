@@ -3,6 +3,30 @@ import asyncio
 import re
 
 
+def resolve_request(prompt, messages=()):
+    """Carry only short, topic-free user follow-ups across an intake request."""
+    if requested(prompt):
+        return prompt
+    from app.services.assistant_image_review import action_requested
+    allowed = set(("there is in on the course page pages fix this ths it scraping scrapying "
+                   "scapying bug issue still same please not working again rerun do does why "
+                   "that solve error problem can you work doesnt did nothing happen happened").split())
+    def generic(text):
+        return bool(action_requested(text) and
+                    set(re.findall(r"\w+", text.casefold())) <= allowed)
+    if not generic(prompt):
+        return None
+    previous = [m.get("content", "") for m in messages if m.get("role") == "user"]
+    if previous and previous[-1] == prompt:
+        previous.pop()
+    for prior in reversed(previous):
+        if requested(prior):
+            return prior
+        if not generic(prior):
+            break
+    return None
+
+
 def requested(prompt):
     from app.services.assistant_image_review import action_requested
     from app.services.assistant_field_edits import evidence_edit_fields
@@ -47,6 +71,9 @@ async def handle(service, thread_id, turn_id, run_id, ctx, prompt, messages):
             "content": "No existing pending course matched this intake request. No discovery or new course was created.",
             "actions": [], "sources": [],
         }, detail="No pending intake target matched.")
+        return True
+    from app.services.assistant_saved_intake_sources import prepare_saved_review
+    if await prepare_saved_review(service, thread_id, turn_id, run_id, ctx, rows):
         return True
     from app.services.assistant_source_cache import cached_source
     checked = []

@@ -158,6 +158,7 @@ async def context(job_id: str, *, provider_wide: bool = False) -> dict:
             "id": row.id, "name": row.course_name,
             "url": row.course_website, "degreeLevel": row.degree_level,
             "studyMode": row.study_mode,
+            "location": row.course_location,
             "intakes": list(row.intake_months or []),
             "fee": row.international_fee, "currency": row.currency,
             "feeTerm": row.fee_term, "feeYear": row.fee_year,
@@ -360,11 +361,12 @@ async def investigate(thread_id: str, turn_id: str):
                         return
             # Source-backed intake repairs apply to both engines, including a
             # screenshot accompanied by an actual staff correction request.
-            from app.services.assistant_intake_review import requested as intake_requested, handle as intake_review
-            if intake_requested(requested["content"]):
+            from app.services.assistant_intake_review import resolve_request as intake_request, handle as intake_review
+            intake_prompt = intake_request(requested["content"], conversation_messages)
+            if intake_prompt:
                 ctx = await context(claimed_thread.job_id)
                 if await intake_review(service, thread_id, turn_id, run_id, ctx,
-                                       requested["content"], conversation_messages):
+                                       intake_prompt, conversation_messages):
                     await run_automatic_action(thread_id, turn_id)
                     return
             from app.services.selective_retry import retry_requested
