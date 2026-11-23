@@ -183,11 +183,17 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
     from app.services.scrape_assistant_tools import PublicNetworkBackend
     transport = httpx.AsyncHTTPTransport(verify=(urlsplit(url).hostname not in insecure), retries=0)
     transport._pool._network_backend = PublicNetworkBackend()
+    path = urlsplit(url).path
+    # Policy and sitemap requests are not HTML requests. A server may correctly
+    # reject the HTML-only Accept header with 406 before returning robots.txt.
+    accept = ("text/plain" if path == "/robots.txt" else
+              "application/xml,text/xml;q=0.9" if path.lower().endswith(".xml") else
+              "text/html,application/xhtml+xml")
     async with httpx.AsyncClient(
         timeout=timeout, follow_redirects=False,
         transport=transport, trust_env=False,
         verify=(urlsplit(url).hostname not in insecure),
-        headers={"User-Agent": "StudyInfoCentre-SourceVerifier/1.0", "Accept": "text/html,application/xhtml+xml"},
+        headers={"User-Agent": "StudyInfoCentre-SourceVerifier/1.0", "Accept": accept},
     ) as client:
         async with client.stream("GET", url) as response:
             if response.status_code in (404, 410):
