@@ -796,7 +796,8 @@ async def confirm_action(job_id: str, action_id: str, body: ConfirmBody, db: Dat
                     html_delivery_schema=1 if "study_mode" in action["fields"] else None)
             try:
                 verified_sources = await require_reachable_sources(repair_probe_urls(sample_rows, action),
-                    sample_rows[0].course_website if sample_rows else "",inspect_cached)
+                    sample_rows[0].course_website if sample_rows else "",inspect_cached,
+                    preferred_urls=action.get("_evidenceUrls") or ())
             except ValueError as exc:
                 raise HTTPException(status_code=409,detail=str(exc))
             from app.services.assistant_retained_repair import apply_retained_ielts

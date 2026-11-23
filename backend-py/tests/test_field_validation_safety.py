@@ -53,7 +53,11 @@ async def test_bulk_fix_preflight_checks_bounded_samples_and_refuses_unreachable
     with pytest.raises(ValueError,match="not queued"):
         await require_reachable_sources([f"https://example.edu/course/{i}" for i in range(229)],
                                        "https://example.edu",unavailable)
-    assert len(checked)==3
+    # A network-only failure permits the existing three-page spread fallback.
+    # Explicit access refusals still stop after the initial three checks.
+    assert checked == [
+        f"https://example.edu/course/{i}" for i in (0,1,2,3,116,228)
+    ]
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("robots_status,robots,course_status,expected_calls",[

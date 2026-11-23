@@ -2718,6 +2718,10 @@ def _from_otago_polytechnic_international_fee(
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
+    from .bedfordshire_fees import course_fee as bedfordshire_course_fee
+    beds_known, beds_fee = bedfordshire_course_fee(html, url)
+    if beds_known:
+        return [beds_fee] if beds_fee is not None else []
     from .tru_calculator import extract as tru_calculator
     tru_known, tru_fee = await tru_calculator(html, url)
     if tru_known:

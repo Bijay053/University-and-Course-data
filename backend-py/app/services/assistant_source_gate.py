@@ -54,7 +54,7 @@ def access_blocked_answer(sources):
         "I could not verify the requested official source on this check:\n"
         + failures
         + "\n\nThis does not establish why the stored field was originally missing. "
-        "No source-dependent correction was queued or applied, and existing values were left unchanged. "
+        "No source-dependent repair was queued or applied, and existing values were left unchanged. "
         + (
             "I will not bypass access restrictions or invent a value. "
             "A permitted official source, or a value you explicitly supply as staff-provided, "
@@ -68,7 +68,23 @@ def access_blocked_answer(sources):
     )
 
 
-async def require_reachable_sources(urls,home,inspect=None):
+def prioritised_probe_urls(urls, preferred_urls=()):
+    """Prioritise supplied/checked examples without expanding the approved cohort."""
+    candidates = list(dict.fromkeys(u for u in urls if u))
+    preferred = list(dict.fromkeys(
+        candidate for requested in preferred_urls for candidate in candidates
+        if same_course_url(candidate, requested)
+    ))
+    return preferred + [u for u in candidates if u not in preferred]
+
+
+def prompt_probe_preferences(prompt):
+    """Extract priorities only; they cannot authorise fetching another course."""
+    import re
+    return [url.rstrip(".,;!?)]}") for url in re.findall(r'https://[^\s<>"\']+', prompt)]
+
+
+async def require_reachable_sources(urls,home,inspect=None,*,preferred_urls=()):
     import asyncio
     if inspect is None:
         from app.services.scrape_assistant_tools import inspect_source
@@ -76,7 +92,7 @@ async def require_reachable_sources(urls,home,inspect=None):
     async def check(url):
         try:return await asyncio.wait_for(inspect(url,home),SOURCE_CHECK_SECONDS)
         except (Exception,):return {"verified":False, "error":"Verification did not finish within the source-check budget."}
-    candidates=list(dict.fromkeys(u for u in urls if u))
+    candidates=prioritised_probe_urls(urls,preferred_urls)
     samples=candidates[:3]
     results=await asyncio.gather(*(check(u) for u in samples))
     if (not any(s.get("verified") for s in results) and len(candidates)>3
@@ -95,7 +111,6 @@ async def require_reachable_sources(urls,home,inspect=None):
         raise ValueError(
             "No sampled official page could be verified; bulk repair was not queued. "
             + details + " Provide a permitted official course URL or authorised document.")
-    return results
     return results
 
 def gate_unreachable_repair(reply,sources):

@@ -214,7 +214,7 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
         if field in field_map or requested_fields:
             selected_fields = sorted(requested_fields) if requested_fields else [field_map[field]]
             action = service.action_proposal({"kind": "fix_fields", "fields": selected_fields}, [r["id"] for r in rows])
-            from app.services.assistant_source_gate import require_reachable_sources, SOURCE_CACHE_SECONDS
+            from app.services.assistant_source_gate import require_reachable_sources, prompt_probe_preferences, SOURCE_CACHE_SECONDS
             from app.services.assistant_source_cache import cached_source
             verified_urls = set()
             async def inspect(url,home):
@@ -224,7 +224,9 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
                     verified_urls.add(url)
                 return source
             try:
-                await require_reachable_sources([r.get("url") for r in rows],ctx["home"],inspect)
+                await require_reachable_sources(
+                    [r.get("url") for r in rows],ctx["home"],inspect,
+                    preferred_urls=prompt_probe_preferences(prompt))
             except ValueError as exc:
                 await service.save_research_reply(thread_id,turn_id,run_id,{
                     "role":"assistant","createdAt":service.now().isoformat(),
