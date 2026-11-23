@@ -25,6 +25,8 @@ def contains_ielts_requirements(source):
 
 
 def requested(message):
+    if message.get("_attachmentsRead"):
+        return False
     content = message["content"]
     # An attachment is context, not an instruction to run the IELTS workflow.
     # Fee/intake/location commands retain their existing-field repair path.
@@ -98,7 +100,8 @@ def validate_changes(candidate, source, course):
     return changes
 
 
-async def review(thread_id, turn_id, run_id, thread, message):
+async def review(thread_id, turn_id, run_id, thread, message, *, _source=None, _service=None):
+    service = _service or globals()["service"]
     from app.services.assistant_documents import read_uploaded
     from app.services.scrape_agent_v2.model import complete
     from app.services.ai.openai_client import _client
@@ -123,7 +126,9 @@ async def review(thread_id, turn_id, run_id, thread, message):
         ).order_by(ScrapedCourse.id))).scalars().all()
     if len(rows) > 2000:
         raise ValueError("More than 2000 pending rows; split the provider review before checking this document.")
-    if message.get("_documentToken") and not message.get("_guidanceSource"):
+    if _source is not None:
+        source = _source
+    elif message.get("_documentToken") and not message.get("_guidanceSource"):
         source = await read_uploaded(message["_documentToken"], thread.actor_id, thread.job_id)
     else:
         urls = service.requested_course_urls(prompt, [message], ctx["home"])

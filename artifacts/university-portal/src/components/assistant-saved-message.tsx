@@ -1,6 +1,6 @@
 import { ExternalLink, GraduationCap } from "lucide-react";
 import { AssistantMarkdown } from "./assistant-markdown";
-import { AssistantMessageAttachment } from "./assistant-message-attachment";
+import { AssistantMessageAttachment, AssistantMessageAttachments } from "./assistant-message-attachment";
 import { safeSourceUrl } from "./assistant-safe-url";
 import { clockTime, type SavedMessage } from "./assistant-timeline";
 
@@ -15,7 +15,9 @@ export function AssistantSavedMessage({ message: m, at, currentJobId, onReviewJo
 }) {
   const otherReview = m.jobId !== currentJobId;
   const isImage = !!m.attachment && !!m.turnId && ["image/png", "image/jpeg"].includes(m.attachment.contentType);
-  const image = isImage && (
+  const image = m.attachments?.length && m.turnId
+    ? <AssistantMessageAttachments jobId={m.jobId} turnId={m.turnId} attachments={m.attachments} />
+    : isImage && (
     <AssistantMessageAttachment filename={m.attachment!.filename}
       src={`/api/scrape/jobs/${encodeURIComponent(m.jobId)}/assistant/messages/${encodeURIComponent(m.turnId!)}/image`} />
   );

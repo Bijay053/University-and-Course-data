@@ -46,7 +46,10 @@ def public_message(message, *, thread_id, job_id, position, actor_id):
         {key: action[key] for key in ("label", "state", "resultSummary", "error") if key in action}
         for action in message.get("actions", []) if isinstance(action, dict)
     ]
-    from app.services.assistant_documents import message_image
+    from app.services.assistant_documents import message_image, public_attachments
+    attachments = public_attachments(message, actor_id, job_id)
+    if attachments:
+        result["attachments"] = attachments
     image = message_image(message, actor_id, job_id)
     if image:
         result["attachment"] = {key: image[key] for key in ("filename", "contentType")}

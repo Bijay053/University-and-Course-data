@@ -74,6 +74,7 @@ class PromptBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     prompt: str = Field(min_length=1)
     documentToken: str | None = Field(default=None, max_length=4000)
+    documentTokens: list[str] | None = Field(default=None, min_length=1, max_length=5)
 
 
 class DocumentUploadBody(BaseModel):
@@ -332,10 +333,13 @@ async def response(thread, db, job_id=None):
         thread.updated_at = service.now()
         await db.commit()
     public = deepcopy(messages)
-    from app.services.assistant_documents import message_image
+    from app.services.assistant_documents import message_image, public_attachments
     for position, (original, visible) in enumerate(zip(messages, public), start=len(prefix) + 1):
         visible.update(threadId=thread.id, jobId=thread.job_id, position=position)
         image = message_image(original, thread.actor_id, thread.job_id)
+        attachments = public_attachments(original, thread.actor_id, thread.job_id)
+        if attachments:
+            visible["attachments"] = attachments
         if image:
             visible["attachment"] = {"filename": image["filename"], "contentType": image["contentType"]}
     live_phase = thread.phase
@@ -454,6 +458,28 @@ async def get_assistant(job_id: str, db: Database, actor: Actor):
     return result
 
 
+@router.get("/jobs/{job_id}/assistant/messages/{turn_id}/attachments/{attachment_index}")
+async def message_attachment_content(job_id: str, turn_id: str, attachment_index: int,
+                                     db: Database, actor: Actor):
+    from urllib.parse import quote
+    from app.services.assistant_documents import message_attachments, read_bytes
+    _, thread = await owned_thread(job_id, actor, db)
+    message = next((m for m in (thread.messages if thread else [])
+                    if m.get("role") == "user" and m.get("turnId") == turn_id), {})
+    data = next((data for index, data in message_attachments(message, int(actor["id"]), job_id)
+                 if index == attachment_index), None)
+    if data is None:
+        raise HTTPException(404, "Attachment not found.")
+    try:
+        raw = await read_bytes(data)
+    except Exception:
+        raise HTTPException(404, "Attachment is no longer available.") from None
+    return Response(raw, media_type=data["contentType"], headers={
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": "inline; filename*=UTF-8''" + quote(data["filename"], safe=""),
+    })
+
+
 @router.get("/jobs/{job_id}/assistant/messages/{turn_id}/image")
 async def message_image_content(job_id: str, turn_id: str, db: Database, actor: Actor):
     from app.services.assistant_documents import message_image, read_bytes
@@ -479,10 +505,13 @@ async def prompt_assistant(job_id: str, body: PromptBody, db: Database, actor: A
     if not prompt:
         raise HTTPException(422, "Describe what you want checked.")
     await owned_thread(job_id, actor, db)
-    if body.documentToken:
-        from app.services.assistant_documents import verify
+    tokens = body.documentTokens or ([body.documentToken] if body.documentToken else [])
+    if body.documentToken and body.documentTokens:
+        raise HTTPException(422, "Use one attachment list, not both attachment formats.")
+    if tokens:
+        from app.services.assistant_documents import validate_tokens
         try:
-            verify(body.documentToken, int(actor["id"]), job_id)
+            validate_tokens(tokens, int(actor["id"]), job_id)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
     await db.execute(insert(ScrapeAssistantThread).values(
@@ -506,7 +535,8 @@ async def prompt_assistant(job_id: str, body: PromptBody, db: Database, actor: A
     thread.messages = list(thread.messages) + [{
         "role": "user", "content": prompt, "createdAt": service.now().isoformat(), "turnId": turn, "autoRun": execution_requested(prompt),
         "_engine":"v2" if enabled_for(settings,actor["id"]) else "legacy",
-        "_documentToken": body.documentToken,
+        "_documentToken": tokens[0] if len(tokens) == 1 else None,
+        "_documentTokens": tokens if len(tokens) > 1 else None,
     }]
     thread.updated_at = service.now()
     await db.commit()

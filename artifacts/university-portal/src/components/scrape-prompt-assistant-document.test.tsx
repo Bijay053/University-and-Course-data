@@ -135,7 +135,7 @@ describe("document upload", () => {
       ? {items:[{kind:"file",getAsFile:()=>image}],files:[]}
       : {items:[],files:[image]}});
     await waitFor(() => expect(screen.getByTestId("assistant-attachment").getAttribute("data-status")).toBe("ready"));
-    expect((await screen.findByAltText("Attached image preview")).getAttribute("src")).toBe("blob:screenshot");
+    expect((await screen.findByAltText("Preview: pasted-image.png")).getAttribute("src")).toBe("blob:screenshot");
     const metadata = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/documents/upload-url"))!;
     expect(JSON.parse(String(metadata[1]?.body))).toMatchObject({filename:"pasted-image.png", contentType:"image/png"});
     const uploaded = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/documents/content"))!;
@@ -159,14 +159,95 @@ describe("document upload", () => {
     expect(fetchMock.mock.calls.length).toBe(calls);
   });
 
-  it("rejects multiple pasted images without silently replacing an attachment", async () => {
+  it("uploads all pasted images without replacing an attachment", async () => {
     const {fetchMock} = await setup(() => json(empty));
-    const calls = fetchMock.mock.calls.length;
     const image = new File(["png"],"image.png",{type:"image/png"});
     fireEvent.paste(screen.getByTestId("input-assistant-prompt"),
       {clipboardData:{items:[],files:[image,image]}});
-    expect(screen.getByTestId("assistant-submit-error").textContent).toContain("one image at a time");
-    expect(fetchMock.mock.calls.length).toBe(calls);
+    await waitFor(() => expect(screen.getAllByTestId("assistant-attachment")).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByTestId("assistant-attachment")
+      .every(a => a.dataset.status === "ready")).toBe(true));
+    expect(fetchMock.mock.calls.filter(([u]) => String(u).endsWith("/documents/upload-url"))).toHaveLength(2);
+  });
+  it("submits mixed files in order and removes only the chosen attachment", async () => {
+    const {fetchMock,input} = await setup(() => json({...empty,status:"ready"}));
+    let next = 0;
+    fetchMock.mockImplementation(async (url, init) => {
+      if (String(url).endsWith("/documents/upload-url"))
+        return json({...grant,documentToken:`file-${++next}`});
+      if (String(url).startsWith("https://bucket")) return new Response(null,{status:204});
+      return json({...empty,status:"ready"});
+    });
+    fireEvent.change(screen.getByTestId("input-assistant-document"),{target:{files:[
+      pdf(),new File(["png"],"first.png",{type:"image/png"}),
+      new File(["jpg"],"second.jpg",{type:"image/jpeg"}),
+    ]}});
+    await waitFor(() => expect(screen.getAllByTestId("assistant-attachment")
+      .filter(a => a.dataset.status === "ready")).toHaveLength(3));
+    fireEvent.click(screen.getAllByTestId("button-remove-attachment")[1]);
+    expect(screen.getAllByTestId("assistant-attachment")).toHaveLength(2);
+    fireEvent.change(input,{target:{value:"Compare these attachments"}});
+    fireEvent.click(screen.getByTestId("button-assistant-submit"));
+    await waitFor(() => expect(screen.queryByTestId("assistant-attachment")).toBeNull());
+    const post=fetchMock.mock.calls.find(([u,i]) => u==="/api/scrape/jobs/j1/assistant" && i?.method==="POST")!;
+    expect(JSON.parse(String(post[1]?.body))).toEqual({
+      prompt:"Compare these attachments",documentTokens:["file-1","file-3"],
+    });
+  });
+  it("rejects a six-file selection without silently dropping files", async () => {
+    const {fetchMock} = await setup(() => json(empty));
+    fireEvent.change(screen.getByTestId("input-assistant-document"),{target:{files:Array.from({length:6},()=>pdf())}});
+    expect(screen.getByTestId("assistant-attachment-error").textContent).toContain("up to 5 files");
+    expect(screen.queryByTestId("assistant-attachment")).toBeNull();
+    expect(fetchMock.mock.calls.filter(([u]) => String(u).endsWith("/documents/upload-url"))).toHaveLength(0);
+  });
+  it("keeps every ready attachment when sending fails", async () => {
+    const {input} = await setup(() => json({detail:"Try again"},503));
+    fireEvent.change(screen.getByTestId("input-assistant-document"),{target:{files:[pdf(),pdf()]}});
+    await waitFor(() => expect(screen.getAllByTestId("assistant-attachment")
+      .filter(a=>a.dataset.status==="ready")).toHaveLength(2));
+    fireEvent.change(input,{target:{value:"Read both files"}});
+    fireEvent.click(screen.getByTestId("button-assistant-submit"));
+    await screen.findByTestId("assistant-submit-error");
+    expect(screen.getAllByTestId("assistant-attachment")).toHaveLength(2);
+    expect((input as HTMLTextAreaElement).value).toBe("Read both files");
+  });
+  it("renders every sent attachment with its private original-review URL", async () => {
+    const thread:AssistantThread={...empty,status:"ready",messages:[{
+      role:"user",createdAt:"2026-11-23T01:00:00Z",content:"Compare files",turnId:"turn",
+      jobId:"original-review",attachments:[
+        {index:0,filename:"requirements.pdf",contentType:"application/pdf",size:100},
+        {index:1,filename:"one.png",contentType:"image/png",size:100},
+        {index:2,filename:"two.jpg",contentType:"image/jpeg",size:100},
+      ],
+    }]};
+    vi.spyOn(globalThis,"fetch").mockImplementation(async()=>json(thread));
+    render(<ScrapePromptAssistant jobId="j1" />);
+    const link=await screen.findByTestId("sent-file-attachment");
+    expect(link.getAttribute("href")).toBe("/api/scrape/jobs/original-review/assistant/messages/turn/attachments/0");
+    expect(screen.getAllByTestId("sent-image-attachment")).toHaveLength(2);
+    expect(screen.getByAltText("Attached image: two.jpg").getAttribute("src"))
+      .toBe("/api/scrape/jobs/original-review/assistant/messages/turn/attachments/2");
+  });
+  it("keeps failed and successful uploads separate and blocks sending until removed", async () => {
+    const {fetchMock,input} = await setup(() => json(empty));
+    fetchMock.mockImplementation(async (url,init) => {
+      if (String(url).endsWith("/documents/upload-url")) {
+        const meta=JSON.parse(String(init?.body));
+        return meta.filename==="bad.pdf" ? json({detail:"Storage unavailable"},503) : json(grant);
+      }
+      if (String(url).startsWith("https://bucket")) return new Response(null,{status:204});
+      return json(empty);
+    });
+    fireEvent.change(screen.getByTestId("input-assistant-document"),{target:{files:[
+      new File(["bad"],"bad.pdf",{type:"application/pdf"}),pdf(),
+    ]}});
+    fireEvent.change(input,{target:{value:"Read both"}});
+    await waitFor(() => expect(screen.getAllByTestId("assistant-attachment")
+      .map(a=>a.dataset.status).sort()).toEqual(["error","ready"]));
+    expect((screen.getByTestId("button-assistant-submit") as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getAllByTestId("button-remove-attachment")[0]);
+    expect((screen.getByTestId("button-assistant-submit") as HTMLButtonElement).disabled).toBe(false);
   });
   it("uploads through the authenticated portal without cross-origin S3 requests", async () => {
     const { fetchMock } = await setup(() => json({ ...empty, status: "ready" }));
@@ -220,7 +301,7 @@ describe("document upload", () => {
     fireEvent.change(screen.getByTestId("input-assistant-document"), { target: { files: [pdf(2_000_001)] } });
     expect(screen.getByTestId("text-attachment-status").textContent).toMatch(/2 MB/);
     fireEvent.change(screen.getByTestId("input-assistant-document"), { target: { files: [new File(["x"], "a.txt", { type: "text/plain" })] } });
-    expect(screen.getByTestId("text-attachment-status").textContent).toMatch(/PDF, PNG or JPEG/);
+    expect(screen.getAllByTestId("text-attachment-status")[1].textContent).toMatch(/PDF, PNG or JPEG/);
     expect(fetchMock.mock.calls.length).toBe(calls);
   });
 });

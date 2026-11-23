@@ -11,6 +11,7 @@ from app.config import settings
 from app.services import snapshot_store
 
 MAX_BYTES = 2_000_000
+MAX_ATTACHMENTS = 5
 UPLOAD_TYPES = {
     "application/pdf": (".pdf",),
     "image/png": (".png",),
@@ -126,15 +127,49 @@ async def read_bytes(data):
 
 def message_image(message, actor_id, job_id):
     """Only resolve a signed attachment saved on this owner's user message."""
-    if message.get("role") != "user" or not message.get("turnId") or not message.get("_documentToken"):
-        return None
-    try:
-        data = verify(message["_documentToken"], actor_id, job_id, allow_expired=True)
-    except ValueError:
-        return None
-    if data.get("contentType") not in {"image/png", "image/jpeg"}:
-        return None
-    return data
+    return next((data for _, data in message_attachments(message, actor_id, job_id)
+                 if data.get("contentType") in {"image/png", "image/jpeg"}), None)
+
+
+def document_tokens(message):
+    """The old single-file contract remains readable, including saved history."""
+    tokens = message.get("_documentTokens")
+    if isinstance(tokens, list):
+        return tokens[:MAX_ATTACHMENTS]
+    return [message["_documentToken"]] if message.get("_documentToken") else []
+
+
+def validate_tokens(tokens, actor_id, job_id):
+    if not 1 <= len(tokens) <= MAX_ATTACHMENTS:
+        raise ValueError("Attach between one and five files.")
+    if any(not isinstance(token, str) or not 0 < len(token) <= 4000 for token in tokens):
+        raise ValueError("Invalid document attachment.")
+    documents = [verify(token, actor_id, job_id) for token in tokens]
+    if len({d["key"] for d in documents}) != len(documents):
+        raise ValueError("The same attachment was included more than once.")
+    if any(d.get("contentType") not in UPLOAD_TYPES or not 0 < d.get("size", 0) <= MAX_BYTES
+           for d in documents) or sum(d["size"] for d in documents) > MAX_ATTACHMENTS * MAX_BYTES:
+        raise ValueError("Attach up to five files, no larger than 2 MB each.")
+    return documents
+
+
+def message_attachments(message, actor_id, job_id):
+    if message.get("role") != "user" or not message.get("turnId"):
+        return []
+    found = []
+    for index, token in enumerate(document_tokens(message)):
+        try:
+            data = verify(token, actor_id, job_id, allow_expired=True)
+        except ValueError:
+            continue
+        if data.get("contentType") in UPLOAD_TYPES:
+            found.append((index, data))
+    return found
+
+
+def public_attachments(message, actor_id, job_id):
+    return [{"index": index, **{key: data[key] for key in ("filename", "contentType", "size")}}
+            for index, data in message_attachments(message, actor_id, job_id)]
 
 
 async def read_uploaded(token, actor_id, job_id):

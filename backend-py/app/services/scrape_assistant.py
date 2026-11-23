@@ -307,6 +307,12 @@ async def investigate(thread_id: str, turn_id: str):
             # the same preview/acknowledgement contract, including legacy users.
             from app.services.live_scrape_diagnostics import handle as live_diagnostics
             from app.services import scrape_assistant as service
+            if requested.get("_documentTokens"):
+                research_deadline.reschedule(asyncio.get_running_loop().time() + 1800)
+                from app.services.assistant_attachment_batch import review as review_attachments
+                if await review_attachments(service, thread_id, turn_id, run_id,
+                                            claimed_thread, requested):
+                    return
             from app.services import assistant_english_guidance_followup as english_followup
             if english_followup.kind(requested["content"]):
                 research_deadline.reschedule(asyncio.get_running_loop().time() + 1800)

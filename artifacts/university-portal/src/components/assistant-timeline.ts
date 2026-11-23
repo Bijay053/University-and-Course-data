@@ -9,6 +9,7 @@ export type SavedMessage = {
   threadId: string; jobId: string; position: number;
   role: "user" | "assistant"; content: string; createdAt?: string; turnId?: string;
   attachment?: { filename: string; contentType: string };
+  attachments?: AssistantMessage["attachments"];
   sources?: { url?: string; title?: string; excerpt?: string; page?: number }[];
   actions?: SavedActionSummary[];
 };
@@ -94,6 +95,9 @@ export function projectLive(m: AssistantMessage, fallbackJobId: string): SavedMe
   };
   if (typeof m.createdAt === "string") out.createdAt = m.createdAt;
   if (typeof m.turnId === "string") out.turnId = m.turnId;
+  if (Array.isArray(m.attachments)) out.attachments = m.attachments.map(a => ({
+    index: a.index, filename: a.filename, contentType: a.contentType, size: a.size,
+  }));
   if (m.attachment && typeof m.attachment.filename === "string" && typeof m.attachment.contentType === "string")
     out.attachment = { filename: m.attachment.filename, contentType: m.attachment.contentType };
   if (Array.isArray(m.sources)) out.sources = m.sources.filter(Boolean).map(s => ({ url: s.url, title: s.title, excerpt: s.excerpt, page: s.page }));
