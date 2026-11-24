@@ -10,7 +10,7 @@ METHOD = "intake:bedfordshire_admission_data"
 MONTHS = "January February March April May June July August September October November December".split()
 
 
-def extract_admission_intakes(html, url, *, location=None):
+def extract_admission_intakes(html, url, *, location=None, _location_only=False):
     """Return (handled, results); ambiguous data must not fall into page-wide regex."""
     parsed = urlsplit(url)
     if parsed.hostname not in {"beds.ac.uk", "www.beds.ac.uk"} or not parsed.path.startswith("/courses/"):
@@ -97,7 +97,7 @@ def extract_admission_intakes(html, url, *, location=None):
             selection = labels.pop()
             selected = [(label, dates) for label, dates in selected if label == selection]
     locations = {location for location, _ in selected}
-    if len(locations) > 1:
+    if len(locations) > 1 and not _location_only:
         by_location = {
             location: frozenset().union(*(months for loc, months in selected if loc == location))
             for location in locations
@@ -119,15 +119,25 @@ def extract_admission_location(html, url):
     Distinct applicable campuses remain ambiguous rather than assigning the
     first dropdown option to a row whose existing location is a placeholder.
     """
-    handled, results = extract_admission_intakes(html, url)
+    # A campus fact does not require different delivery options to have the
+    # same intake dates. Keep that restriction for the intake extractor.
+    handled, results = extract_admission_intakes(html, url, _location_only=True)
     if not handled or len(results) != 1:
         return handled, []
     from .location import _normalise
     labels = results[0].extras.get("applicable_locations") or []
-    cleaned = [_normalise(label) for label in labels]
-    if len(cleaned) != 1 or not cleaned[0]:
+    cleaned = {}
+    for label in labels:
+        # This published option explicitly names its physical campus. It does
+        # not authorize changing the course's separate delivery-mode field.
+        blended = re.fullmatch(r"Blended\s+Learning\s*\(([^()]+\bcampus)\)", label, re.I)
+        value = _normalise(blended[1] if blended else label)
+        if not value:
+            return True, []
+        cleaned.setdefault(" ".join(value.casefold().split()), value)
+    if len(cleaned) != 1:
         return True, []
-    value = cleaned[0]
+    value = next(iter(cleaned.values()))
     return True, [ExtractionResult(
         field_key="course_location", value=value,
         normalized={"course_location": value}, confidence=0.98,

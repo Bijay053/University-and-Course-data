@@ -161,6 +161,38 @@ async def test_other_university_keeps_its_existing_source_path(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_expired_copy_reports_its_age_without_reading_or_repeating_live_checks(store, monkeypatch):
+    async with store() as db:
+        row = await db.get(ScrapedCourse, 1)
+        row.course_location = "All locations"
+        row.extraction_method = {"course_location": "location.heading"}
+        db.add(PageSnapshot(**metadata(
+            fetched_at=datetime.now(timezone.utc) - timedelta(hours=28))))
+        await db.commit()
+    read = AsyncMock(side_effect=AssertionError("Expired bytes cannot authorize a repair"))
+    monkeypatch.setattr(saved, "captured_location", read)
+    plans = await saved.saved_plans(
+        SimpleNamespace(AsyncSessionLocal=store), "source", 1, ROWS[:1])
+    assert len(plans) == 1 and plans[0]["status"] == "unverified"
+    assert not plans[0]["changes"]
+    assert "24-hour automatic-repair limit" in plans[0]["reason"]
+    read.assert_not_awaited()
+    from app.services.assistant_field_edits import handle_field_edit
+    api = SimpleNamespace(AsyncSessionLocal=store, now=service.now,
+        save_research_reply=AsyncMock(),
+        inspect_source=AsyncMock(side_effect=AssertionError("Do not retry the blocked live gate")))
+    ctx = {"job": {"id": "source"}, "university_id": 1,
+           "home": "https://www.beds.ac.uk", "samples": ROWS[:1],
+           "name": "University of Bedfordshire"}
+    assert await handle_field_edit(api, "thread", "turn", "run", ctx,
+                                   "Fix All locations in this review")
+    reply = api.save_research_reply.call_args.args[3]
+    assert "24-hour automatic-repair limit" in reply["content"]
+    assert not reply["actions"]
+    api.inspect_source.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_one_failed_saved_source_does_not_hide_other_supported_courses(store, monkeypatch):
     other = ROWS[1]["url"]
     async with store() as db:

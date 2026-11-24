@@ -116,7 +116,7 @@ async def saved_plans(service, job_id, university_id, rows):
             PageSnapshot.scrape_job_id == job_id,
             PageSnapshot.course_url.in_(urls),
             PageSnapshot.snapshot_type == "html", PageSnapshot.status_code == 200,
-            PageSnapshot.fetched_at >= now - MAX_AGE, PageSnapshot.fetched_at <= now,
+            PageSnapshot.fetched_at <= now,
         ).order_by(PageSnapshot.fetched_at.desc()).limit(2 * MAX_ROWS))).scalars().all()
         methods = dict((await db.execute(select(
             ScrapedCourse.id, ScrapedCourse.extraction_method,
@@ -140,6 +140,15 @@ async def saved_plans(service, job_id, university_id, rows):
         snapshot = next((s for s in snapshots if snapshot_valid(
             s, job_id, university_id, row.get("url") or "")), None)
         if snapshot is None:
+            expired = next((s for s in snapshots if s.fetched_at < now - MAX_AGE
+                and snapshot_valid(s, job_id, university_id, row.get("url") or "",
+                                   now=s.fetched_at)), None)
+            if expired:
+                plan["reason"] = (
+                    f"The saved official page was captured {expired.fetched_at.isoformat()} "
+                    "and exceeds the 24-hour automatic-repair limit. Its content was not "
+                    "read or treated as current evidence. A permitted fresh source is required."
+                )
             return
         try:
             async with semaphore:
@@ -197,7 +206,8 @@ async def prepare_review(service, thread_id, turn_id, run_id, ctx, rows):
     await service.save_research_reply(thread_id, turn_id, run_id, {
         "role": "assistant", "turnId": turn_id, "createdAt": service.now().isoformat(),
         "content": (
-            f"Checked {len(rows)} pending location placeholders against saved official course pages. "
+            f"Assessed {len(rows)} pending location placeholders using saved-source metadata "
+            "and any eligible official course pages. "
             f"{len(supported)} course-specific location corrections prepared; "
             f"{len(exceptions)} unverified and unchanged. "
             "These are dated captured pages, not fresh website checks. "
