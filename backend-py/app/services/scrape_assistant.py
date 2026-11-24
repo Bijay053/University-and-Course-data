@@ -296,6 +296,11 @@ async def investigate(thread_id: str, turn_id: str):
             async with AsyncSessionLocal() as db:
                 claimed_thread=await db.get(ScrapeAssistantThread,thread_id)
                 requested=next(m for m in reversed(claimed_thread.messages) if m["role"]=="user")
+                from app.services.assistant_ielts_preview import requested as whole_ielts_preview
+                if whole_ielts_preview(requested["content"]):
+                    # Whole-review previews check the full existing cohort,
+                    # not the ordinary 40-row conversational research sample.
+                    research_deadline.reschedule(asyncio.get_running_loop().time() + 1200)
                 v2=requested.get("_engine")=="v2" or "_agentV2" in requested
                 from app.services.assistant_conversation_context import university_context, with_cross_review_context
                 conversation_references=await university_context(db,claimed_thread,requested["content"])
@@ -403,6 +408,11 @@ async def investigate(thread_id: str, turn_id: str):
             # Share this control across engines; do not let the legacy generic
             # edit fallback or the model turn it into discovery or copy a score.
             from app.services.assistant_field_edits import evidence_edit_field, evidence_edit_fields, handle_field_edit
+            if whole_ielts_preview(requested["content"]):
+                from app.services.assistant_ielts_preview import run as preview_ielts
+                await preview_ielts(service, thread_id, turn_id, run_id,
+                                    await context(claimed_thread.job_id), requested["content"])
+                return
             from app.services.assistant_fee_preview import requested as fee_preview_requested
             if fee_preview_requested(requested["content"]):
                 from app.services.assistant_fee_preview import handle as fee_preview
