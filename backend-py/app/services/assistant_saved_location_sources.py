@@ -13,26 +13,68 @@ from app.models.page_snapshot import PageSnapshot
 from app.services.assistant_saved_intake_sources import MAX_AGE, MAX_BYTES, MAX_ROWS, snapshot_valid
 
 PLACEHOLDERS = {"all locations", "all campuses"}
+_PLACEHOLDER_TEXT = r"\ball\s+(?:locations|campuses)\b"
+_OTHER_COURSES = re.compile(
+    r"\s*(?:(?:there\s+are|(?:please\s+)?(?:fix|correct|check))\s+)?"
+    r"(?:the\s+)?(?:other|remaining|more)\s+(?:pending\s+)?(?:courses|records|rows)\s+"
+    r"(?:with|have|show|showing)\s+(?:the\s+)?same\s+(?:issue|problem|bug)"
+    r"(?:\s+too)?[.!?\s]*", re.I)
+_RETRY = re.compile(
+    r"\s*(?:please\s+)?(?:fix|repair|correct)\s+"
+    r"(?:(?:this|that|the|same)\s+)?(?:it|bug|issue|problem)"
+    r"(?:\s+(?:please|again))?[.!?\s]*", re.I)
+_REVIEW_PLACEHOLDERS = "Fix the Course Location values showing All locations in this review"
+
+
+def repair_requested(prompt):
+    """A location placeholder complaint is not a literal replacement value."""
+    positive = prompt
+    if re.search(r"\b(?:keep|leave|preserve|except|excluding|without)\b", positive, re.I):
+        return False
+    return (
+        bool(re.search(_PLACEHOLDER_TEXT, positive, re.I))
+        and not re.search(r"\bread[- ]only\b|\b(?:do not|don't|never|only explain)\b", positive, re.I)
+        and not re.search(r"\b(?:set|replace|change|add)\b|\bto\s+\w+", positive, re.I)
+        and bool(re.search(r"\b(?:fix|correct|repair)\b|\bstill\s+"
+                           r"(?:(?:shows?|showing|has|says|is)\s+)?"
+                           + _PLACEHOLDER_TEXT, positive, re.I))
+    )
 
 
 def resolve_request(prompt, messages=()):
-    """Continue an uninterrupted user location repair, never another topic."""
-    short = re.compile(
-        r"\s*(?:please\s+)?(?:fix|repair|correct)\s+"
-        r"(?:(?:this|that|the|same)\s+)?(?:it|bug|issue|problem)"
-        r"(?:\s+(?:please|again))?[.!?\s]*", re.I)
-    if not short.fullmatch(prompt):
+    """Resolve a same-review follow-up, carrying the symptom, never a value."""
+    others = bool(_OTHER_COURSES.fullmatch(prompt))
+    if not (others or _RETRY.fullmatch(prompt)):
         return prompt
     previous = [m.get("content", "") for m in messages if m.get("role") == "user"]
     if previous and previous[-1] == prompt:
         previous.pop()
-    for prior in reversed(previous):
-        if short.fullmatch(prior):
+    passed_literal_edit = False
+    for prior in reversed(previous[-12:]):
+        if _RETRY.fullmatch(prior):
             continue
-        if (re.search(r"\ball\s+(?:locations|campuses)\b", prior, re.I)
-                and re.search(r"\b(?:fix|correct|repair)\b", prior, re.I)
-                and not re.search(r"\b(?:do not|don't|never|read[- ]only)\b", prior, re.I)):
+        if _OTHER_COURSES.fullmatch(prior):
+            others = True
+            continue
+        if repair_requested(prior):
+            if others:
+                # Do not broaden a request with explicit preservation or a
+                # different field. A new explicit instruction is required.
+                from app.services.assistant_field_edits import evidence_edit_fields
+                if re.search(
+                        r"\b(?:only|except|excluding|keep|leave|preserve|without|do not|don't|never)\b", prior, re.I
+                ) or evidence_edit_fields(prior) - {"course_location"}:
+                    break
+                return _REVIEW_PLACEHOLDERS
             return prior
+        if others and not passed_literal_edit:
+            from app.services.assistant_staff_values import parse
+            literal = parse(prior)
+            if literal and not literal.error and not literal.all_courses and set(literal.values) == {"course_location"}:
+                # A staff correction between the complaint and "other courses"
+                # doesn't change which field is affected or supply a new value.
+                passed_literal_edit = True
+                continue
         break
     return prompt
 
@@ -43,11 +85,9 @@ def is_placeholder(value):
 
 def requested_rows(prompt, rows, university_name=""):
     """A generic placeholder complaint targets bad values, not a course name."""
-    if (not re.search(r"\ball\s+(?:locations|campuses)\b", prompt, re.I)
-            or re.search(r"\bread[- ]only\b|\b(?:do not|don't|never|only explain)\b", prompt, re.I)
-            or not re.search(r"\b(?:fix|correct|repair)\b", prompt, re.I)
-            or re.search(r"\b(?:set|replace|change|add)\b|\bto\s+\w+", prompt, re.I)):
+    if not repair_requested(prompt):
         return None
+    rows = [r for r in rows if r.get("status", "pending") == "pending"]
     ids = {int(value) for value in re.findall(
         r"\b(?:row|record)\s*#?\s*(\d+)\b", prompt, re.I)}
     urls = {urldefrag(value.rstrip(".,)"))[0].rstrip("/")

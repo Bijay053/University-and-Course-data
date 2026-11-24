@@ -9,7 +9,7 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
 
-from app.models import ScrapedCourse
+from app.models import ScrapedCourse, ScrapeRuntimeJob, University
 from app.models.audit import CourseAuditLog
 from app.models.evidence import ScrapedFieldEvidence
 from app.models.page_snapshot import PageSnapshot
@@ -19,7 +19,7 @@ from app.services import assistant_saved_location_sources as saved
 from app.services.snapshot_store import build_s3_key
 from tests.test_assistant_saved_intakes import metadata
 from tests.test_bedfordshire_intakes import URL, NAME, page
-from tests.test_scrape_prompt_assistant import store, assistant_postgres
+from tests.test_scrape_prompt_assistant import store, assistant_postgres, prompt_thread
 
 
 ROWS = [
@@ -67,6 +67,123 @@ def test_short_retry_keeps_the_actual_users_uninterrupted_location_scope():
         {"role": "user", "content": "fix this bug"},
     ]
     assert saved.resolve_request("fix it", messages) == original
+
+
+FOLLOWUP = "there are other courses with same issue"
+HEALTHCARE = "Associate Continuing Healthcare Practitioner Fdsc"
+HEALTHCARE_COMPLAINT = f"{HEALTHCARE} still All locations"
+STAFF_EDIT = "For row 3: set course location to Luton campus."
+
+
+def test_named_still_all_locations_complaint_does_not_select_other_rows():
+    rows = [ROWS[0], {**ROWS[1], "name": HEALTHCARE}]
+    assert [r["id"] for r in saved.requested_rows(HEALTHCARE_COMPLAINT, rows)] == [2]
+    assert saved.requested_rows(HEALTHCARE_COMPLAINT, ROWS) == []
+
+
+@pytest.mark.parametrize("prompt", [
+    FOLLOWUP, "Fix the other courses with the same problem",
+    "Other pending records have the same bug too.",
+])
+def test_other_courses_inherits_placeholder_not_staff_value(prompt):
+    history = [
+        {"role": "user", "content": HEALTHCARE_COMPLAINT},
+        {"role": "assistant", "content": "Source access blocked"},
+        {"role": "user", "content": STAFF_EDIT},
+        {"role": "assistant", "content": "Saved Luton campus"},
+    ]
+    normalized = saved.resolve_request(prompt, history)
+    assert "Luton campus" not in normalized
+    assert [r["id"] for r in saved.requested_rows(normalized, ROWS)] == [1, 2]
+    assert saved.resolve_request("fix it", history + [
+        {"role": "user", "content": prompt},
+    ]) == normalized
+
+
+@pytest.mark.parametrize("history", [
+    [{"role": "assistant", "content": "Fix All locations across the review"}],
+    [{"role": "user", "content": STAFF_EDIT}],
+    [{"role": "user", "content": HEALTHCARE_COMPLAINT},
+     {"role": "user", "content": "Fix all fees"}],
+    [{"role": "user", "content": "Fix All locations; keep Nursing MSc unchanged"}],
+    [{"role": "user", "content": "Read-only: fix All locations"}],
+])
+def test_other_courses_does_not_inherit_unrelated_or_restricted_history(history):
+    assert saved.resolve_request(FOLLOWUP, history) == FOLLOWUP
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("engine,fresh_first", [("legacy", True), ("v2", True), ("v2", False)])
+async def test_other_courses_checks_placeholder_cohort_before_either_engine(
+    store, monkeypatch, engine, fresh_first,
+):
+    from app.services import snapshot_store
+    from app.services.scrape_agent_v2 import runtime
+
+    async def unexpected(*args, **kwargs):
+        raise AssertionError("Location follow-up must not call generic research or retry a blocked page")
+
+    monkeypatch.setattr(service, "inspect_source", unexpected)
+    monkeypatch.setattr(service, "_investigate", unexpected)
+    monkeypatch.setattr(runtime, "investigate", unexpected)
+    download = AsyncMock(return_value=page().encode())
+    monkeypatch.setattr(snapshot_store, "download_snapshot", download)
+    thread_id, turn_id = await prompt_thread(store, FOLLOWUP)
+    async with store() as db:
+        uni = await db.get(University, 1)
+        uni.name, uni.scrape_url = "University of Bedfordshire", "https://www.beds.ac.uk"
+        row = await db.get(ScrapedCourse, 1)
+        row.course_name, row.course_website, row.course_location = NAME, URL, "All locations"
+        db.add(ScrapeRuntimeJob(runtime_job_id="another-review", university_id=1,
+                               job_type="scrape", status="completed"))
+        await db.flush()
+        db.add_all([
+            ScrapedCourse(id=2, university_id=1, scrape_job_id="source", status="pending",
+                course_name=ROWS[1]["name"], course_website=ROWS[1]["url"], course_location="All locations"),
+            ScrapedCourse(id=3, university_id=1, scrape_job_id="source", status="pending",
+                course_name=HEALTHCARE, course_location="Luton campus",
+                extraction_method={"course_location": "staff-provided"}),
+            ScrapedCourse(id=4, university_id=1, scrape_job_id="another-review", status="pending",
+                course_name="Other review", course_location="All locations"),
+            ScrapedCourse(id=5, university_id=1, scrape_job_id="source", status="excluded",
+                course_name="Excluded course", course_location="All locations"),
+            PageSnapshot(**metadata(fetched_at=datetime.now(timezone.utc) -
+                                    timedelta(hours=0 if fresh_first else 30))),
+            PageSnapshot(**metadata(id=992, course_url=ROWS[1]["url"],
+                url_hash=hashlib.sha256(ROWS[1]["url"].encode()).hexdigest()[:16],
+                storage_path=build_s3_key(1, "source", ROWS[1]["url"], "html"),
+                fetched_at=datetime.now(timezone.utc)-timedelta(hours=30))),
+        ])
+        thread = await db.get(ScrapeAssistantThread, thread_id)
+        thread.messages = [
+            {"role": "user", "content": HEALTHCARE_COMPLAINT},
+            {"role": "assistant", "content": "Source access blocked"},
+            {"role": "user", "content": STAFF_EDIT},
+            {"role": "assistant", "content": "Saved Luton campus"},
+            {**thread.messages[-1], "_engine":engine},
+        ]
+        await db.commit()
+    await service.investigate(thread_id, turn_id)
+    async with store() as db:
+        thread = await db.get(ScrapeAssistantThread, thread_id)
+        reply = thread.messages[-1]
+        assert thread.status == "ready"
+        assert "Assessed 2 pending location placeholders" in reply["content"]
+        assert f"{1 if fresh_first else 2} unverified and unchanged" in reply["content"]
+        assert "24-hour automatic-repair limit" in reply["content"]
+        if fresh_first:
+            action, = reply["actions"]
+            assert action["_ids"] == [1]
+            assert action["fields"] == ["course_location"]
+            assert action["state"] == "proposed" and action["requiresConfirmation"] is True
+        else:
+            assert not reply["actions"]
+        assert [(r.id, r.course_location) for r in (await db.execute(
+            select(ScrapedCourse).order_by(ScrapedCourse.id))).scalars()] == [
+                (1, "All locations"), (2, "All locations"), (3, "Luton campus"),
+                (4, "All locations"), (5, "All locations"),
+            ]
+    assert download.await_count == int(fresh_first)
 
 
 @pytest.mark.parametrize("intervening", [

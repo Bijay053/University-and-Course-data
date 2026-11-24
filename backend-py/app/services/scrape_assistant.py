@@ -408,6 +408,19 @@ async def investigate(thread_id: str, turn_id: str):
             # Share this control across engines; do not let the legacy generic
             # edit fallback or the model turn it into discovery or copy a score.
             from app.services.assistant_field_edits import evidence_edit_field, evidence_edit_fields, handle_field_edit
+            from app.services.assistant_saved_location_sources import repair_requested as location_repair_requested
+            from app.services.assistant_saved_location_sources import resolve_request as resolve_location_request
+            # Local follow-ups can inherit the issue, not a course from another
+            # review, an old approval, or a previous staff-supplied campus.
+            local_messages = claimed_thread.messages
+            location_prompt = resolve_location_request(requested["content"], local_messages)
+            if (not document_requested(requested) and location_repair_requested(location_prompt)
+                    and not evidence_edit_fields(location_prompt) - {"course_location"}):
+                ctx = await context(claimed_thread.job_id)
+                if await handle_field_edit(service, thread_id, turn_id, run_id, ctx,
+                                           requested["content"], local_messages):
+                    await run_automatic_action(thread_id, turn_id)
+                    return
             if whole_ielts_preview(requested["content"]):
                 from app.services.assistant_ielts_preview import run as preview_ielts
                 await preview_ielts(service, thread_id, turn_id, run_id,

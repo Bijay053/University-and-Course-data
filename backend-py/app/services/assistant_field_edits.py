@@ -249,7 +249,7 @@ async def handle_field_edit(service, thread_id, turn_id, run_id, ctx, prompt, me
                 return True
             action.update(_versions=ctx["versions"], _configVersion=ctx["config_version"],
                           _evidenceUrls=sorted(verified_urls),
-                          requiresConfirmation=len(rows) > 10,
+                          requiresConfirmation=placeholder_rows is not None or len(rows) > 10,
                           _officialFieldRecheck=sorted(requested_fields),
                           _officialIeltsRecheck=(
                               "ielts_overall" in selected_fields
